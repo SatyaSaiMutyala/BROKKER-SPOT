@@ -1,4 +1,4 @@
-# brokkerspot
+# BROKKER-SPOT
 
 A new Flutter project.
 
