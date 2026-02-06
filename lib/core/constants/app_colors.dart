@@ -26,4 +26,13 @@ class AppColors {
   static const Color divider = Color(0xFF4A4A4A);
   static const Color switchActive = Color(0xFFD4A84B);
   static const Color switchInactive = Color(0xFF4A4A4A);
+
+  // Payment Screen Colors
+  static const Color successGreen = Color(0xFF4CAF50);
+  static const Color goldAccent = Color(0xFFD9C27C);
+
+  // Announcement Screen Colors
+  static const Color teal = Color(0xFF2B8B8B);
+  static const Color tealLight = Color(0xFFE8F5F5);
+  static const Color activeGreen = Color(0xFF4CAF50);
 }
