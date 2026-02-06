@@ -38,6 +38,21 @@ class _SplashViewState extends State<SplashView> {
             AppAssets.background,
             fit: BoxFit.cover,
           ),
+
+          // Linear Gradient Overlay
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x33000000), // #00000033
+                  Color(0xE5000000), // #000000E5
+                ],
+              ),
+            ),
+          ),
+
           // Logo
           Center(
             child: Image.asset(

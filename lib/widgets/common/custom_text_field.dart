@@ -28,7 +28,8 @@ class CustomTextField extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.3),
+            // color: Colors.white.withValues(alpha: 0.3),
+            color: Color(0xFFFFFFFF).withValues(alpha: 0.5),
             width: 1,
           ),
         ),

@@ -1,5 +1,7 @@
+import 'package:brokkerspot/views/auth/signup_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
@@ -45,6 +47,20 @@ class _LoginViewState extends State<LoginView> {
           Image.asset(
             AppAssets.background,
             fit: BoxFit.cover,
+          ),
+
+          // Linear Gradient Overlay
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x30000000), // #00000033
+                  Color(0xE4000000), // #000000E5
+                ],
+              ),
+            ),
           ),
           // Content
           SafeArea(
@@ -93,7 +109,7 @@ class _LoginViewState extends State<LoginView> {
                   _buildBottomLinks(),
                   const Spacer(),
                   // Need Help
-                  _buildNeedHelp(),
+                  Align(alignment: Alignment.topLeft, child: _buildNeedHelp()),
                   SizedBox(height: 30.h),
                 ],
               ),
@@ -130,7 +146,7 @@ class _LoginViewState extends State<LoginView> {
             SizedBox(width: 8.w),
             Text(
               AppStrings.rememberMe,
-              style: TextStyle(
+              style: GoogleFonts.roboto(
                 color: AppColors.textWhite,
                 fontSize: 13.sp,
               ),
@@ -144,7 +160,7 @@ class _LoginViewState extends State<LoginView> {
           },
           child: Text(
             AppStrings.forgotPassword,
-            style: TextStyle(
+            style: GoogleFonts.roboto(
               color: AppColors.textWhite,
               fontSize: 13.sp,
             ),
@@ -159,10 +175,12 @@ class _LoginViewState extends State<LoginView> {
       width: double.infinity,
       height: 52.h,
       child: ElevatedButton(
-        onPressed: _controller.isLoading ? null : _controller.login,
+        onPressed:
+            _controller.isLoading ? _controller.login : _controller.login,
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              _controller.hasInput ? AppColors.primary : Colors.transparent,
+          backgroundColor: _controller.hasInput
+              ? AppColors.primary
+              : Colors.white.withOpacity(0.6),
           foregroundColor: _controller.hasInput
               ? AppColors.backgroundDark
               : AppColors.textWhite,
@@ -189,8 +207,9 @@ class _LoginViewState extends State<LoginView> {
               )
             : Text(
                 AppStrings.login,
-                style: TextStyle(
+                style: GoogleFonts.roboto(
                   fontSize: 15.sp,
+                  color: Colors.black,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -204,15 +223,15 @@ class _LoginViewState extends State<LoginView> {
         Expanded(
           child: Container(
             height: 0.5.h,
-            color: Colors.white.withValues(alpha: 0.3),
+            color: Colors.white.withValues(alpha: 0.5),
           ),
         ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w),
           child: Text(
             AppStrings.or,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+            style: GoogleFonts.inter(
+              color: Colors.white.withValues(alpha: 0.3),
               fontSize: 13.sp,
             ),
           ),
@@ -220,7 +239,7 @@ class _LoginViewState extends State<LoginView> {
         Expanded(
           child: Container(
             height: 0.5.h,
-            color: Colors.white.withValues(alpha: 0.3),
+            color: Colors.white.withValues(alpha: 0.5),
           ),
         ),
       ],
@@ -234,10 +253,13 @@ class _LoginViewState extends State<LoginView> {
         GestureDetector(
           onTap: () {
             // Handle create account
+
+            Navigator.push(
+                context, MaterialPageRoute(builder: (context) => SignUpView()));
           },
           child: Text(
             AppStrings.createNewAccount,
-            style: TextStyle(
+            style: GoogleFonts.roboto(
               color: AppColors.textWhite,
               fontSize: 13.sp,
               fontWeight: FontWeight.w500,
@@ -250,7 +272,7 @@ class _LoginViewState extends State<LoginView> {
           },
           child: Text(
             AppStrings.continueAsGuest,
-            style: TextStyle(
+            style: GoogleFonts.roboto(
               color: AppColors.textWhite,
               fontSize: 13.sp,
               fontWeight: FontWeight.w500,
@@ -268,9 +290,9 @@ class _LoginViewState extends State<LoginView> {
       },
       child: Text(
         AppStrings.needHelp,
-        style: TextStyle(
+        style: GoogleFonts.roboto(
           color: AppColors.textWhite,
-          fontSize: 13.sp,  
+          fontSize: 13.sp,
         ),
       ),
     );

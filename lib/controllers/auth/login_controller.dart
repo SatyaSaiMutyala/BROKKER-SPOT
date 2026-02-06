@@ -1,4 +1,6 @@
+import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 class LoginController extends ChangeNotifier {
   final TextEditingController emailController = TextEditingController();
@@ -26,14 +28,15 @@ class LoginController extends ChangeNotifier {
   }
 
   Future<void> login() async {
-    if (!hasInput) return;
+    // if (!hasInput) return;
 
     _isLoading = true;
     notifyListeners();
 
     try {
       // TODO: Implement actual login logic
-      await Future.delayed(const Duration(seconds: 2));
+      // await Future.delayed(const Duration(seconds: 2));
+      Get.to(() => DashboardView());
     } catch (e) {
       // Handle error
     } finally {
