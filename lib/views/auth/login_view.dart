@@ -74,7 +74,7 @@ class _LoginViewState extends State<LoginView> {
                     AppAssets.appName,
                     width: 170.w,
                   ),
-                  SizedBox(height: 90.h),
+                  SizedBox(height: 160.h),
                   // Email Field
                   CustomTextField(
                     controller: _controller.emailController,

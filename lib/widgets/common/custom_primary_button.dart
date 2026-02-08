@@ -8,6 +8,7 @@ class CustomPrimaryButton extends StatelessWidget {
   final double radius;
   final Color? backgroundColor;
   final bool isDisabled;
+  final Color defaultColor;
 
   const CustomPrimaryButton({
     super.key,
@@ -17,6 +18,7 @@ class CustomPrimaryButton extends StatelessWidget {
     this.radius = 8,
     this.backgroundColor,
     this.isDisabled = false,
+    this.defaultColor = Colors.white,
   });
 
   @override
@@ -36,7 +38,7 @@ class CustomPrimaryButton extends StatelessWidget {
         child: Text(
           title,
           style: GoogleFonts.roboto(
-            color: Colors.white,
+            color: defaultColor,
             fontWeight: FontWeight.bold,
           ),
         ),
