@@ -43,4 +43,12 @@ class AppStrings {
   static const String propertyVideoImages = 'Property Video & Images';
   static const String setPropertyPrice = 'Set Property Price & Availability';
   static const String setBrokerProposals = 'Set Broker Proposals Limit';
+
+  // Home Screen
+  static const String hello = 'Hello,';
+  static const String search = 'Search...';
+  static const String allStory = 'All Story';
+  static const String more = 'More';
+  static const String newLaunch = 'New Launch';
+  static const String damac = 'DAMAC';
 }

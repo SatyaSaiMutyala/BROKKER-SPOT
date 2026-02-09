@@ -1,5 +1,6 @@
 import 'package:brokkerspot/views/brokker/brokker_login/view/brokker_login_view.dart';
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
+import 'package:brokkerspot/views/user/deals/my_project_deals_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -37,7 +38,9 @@ class AccountView extends StatelessWidget {
           _accountTile(
             icon: Icons.handshake_outlined,
             title: 'My Project Deals',
-            onTap: () {},
+            onTap: () {
+              Get.to(() => const MyProjectDealsView());
+            },
           ),
           _divider(),
           _accountTile(
