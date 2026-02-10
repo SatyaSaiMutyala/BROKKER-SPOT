@@ -1,3 +1,4 @@
+import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/brokker/brokker_account/brokker_profile_view.dart';
 import 'package:brokkerspot/views/brokker/dashboard/bottom_nav_controller.dart';
 import 'package:brokkerspot/views/brokker/home/brokker_home_view.dart';
@@ -17,7 +18,7 @@ class BrokerDashBoardView extends StatelessWidget {
     BrokerProjectsView(),
     BrokerMeetingView(),
     BrokerPaymentsView(),
-    BrokerProfileView()
+    BrokerProfileView(),
   ];
 
   @override
@@ -27,27 +28,44 @@ class BrokerDashBoardView extends StatelessWidget {
         body: pages[controller.currentIndex.value],
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: controller.currentIndex.value,
-          onTap: controller.changeTab,
           type: BottomNavigationBarType.fixed,
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: Colors.grey,
+          onTap: controller.changeTab,
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard),
+              icon: ImageIcon(
+                AssetImage('assets/images/home_icon.png'),
+                size: 24,
+              ),
               label: 'Dashboard',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.work),
+              icon: ImageIcon(
+                AssetImage('assets/images/projects_icon.png'),
+                size: 24,
+              ),
               label: 'Projects',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.handshake),
+              icon: ImageIcon(
+                AssetImage('assets/images/meeting_icon.png'),
+                size: 24,
+              ),
               label: 'Meeting',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.payment),
+              icon: ImageIcon(
+                AssetImage('assets/images/payments_icon.png'),
+                size: 24,
+              ),
               label: 'Payments',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person),
+              icon: ImageIcon(
+                AssetImage('assets/images/account_icon.png'),
+                size: 24,
+              ),
               label: 'Account',
             ),
           ],

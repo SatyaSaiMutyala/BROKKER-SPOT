@@ -1,7 +1,23 @@
+import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
-class VerificationScreen extends StatelessWidget {
+class VerificationScreen extends StatefulWidget {
   const VerificationScreen({super.key});
+
+  @override
+  State<VerificationScreen> createState() => _VerificationScreenState();
+}
+
+class _VerificationScreenState extends State<VerificationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Simulate a delay for verification process
+    Future.delayed(Duration(seconds: 2), () {
+      Get.offAll(() => BrokerDashBoardView());
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

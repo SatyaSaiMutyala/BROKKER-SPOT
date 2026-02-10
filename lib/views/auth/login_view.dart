@@ -1,6 +1,8 @@
+import 'package:brokkerspot/views/auth/foreget_password_view.dart';
 import 'package:brokkerspot/views/auth/signup_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
@@ -157,6 +159,7 @@ class _LoginViewState extends State<LoginView> {
         GestureDetector(
           onTap: () {
             // Handle forgot password
+            Get.to(() => const ForgetPasswordView());
           },
           child: Text(
             AppStrings.forgotPassword,

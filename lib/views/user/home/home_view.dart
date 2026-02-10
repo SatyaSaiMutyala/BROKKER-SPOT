@@ -1,3 +1,4 @@
+import 'package:brokkerspot/views/user/home/more_property_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -272,12 +273,17 @@ class HomeView extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Text(
-                'More',
-                style: GoogleFonts.inter(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade600,
+              InkWell(
+                onTap: () {
+                  Get.to(() => MorePropertyView(announcements: announcements));
+                },
+                child: Text(
+                  'More',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade600,
+                  ),
                 ),
               ),
             ],
@@ -296,7 +302,8 @@ class HomeView extends StatelessWidget {
                 announcement: announcements[index],
                 onTap: () => Get.to(() => PropertyDetailView(
                       announcement: announcements[index],
-                      sectionTitle: announcements[index].propertyName ?? 'Details',
+                      sectionTitle:
+                          announcements[index].propertyName ?? 'Details',
                     )),
               );
             },
@@ -335,12 +342,18 @@ class HomeView extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Text(
-                'More',
-                style: GoogleFonts.inter(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade600,
+              InkWell(
+                onTap: () {
+                  Get.to(() =>
+                      MorePropertyView(announcements: damacAnnouncements));
+                },
+                child: Text(
+                  'More',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade600,
+                  ),
                 ),
               ),
             ],

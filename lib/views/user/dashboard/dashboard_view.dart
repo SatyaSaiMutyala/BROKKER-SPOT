@@ -38,19 +38,31 @@ class _DashboardViewState extends State<DashboardView> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
+            icon: ImageIcon(
+              AssetImage('assets/images/home_icon.png'),
+              size: 24,
+            ),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.campaign),
+            icon: ImageIcon(
+              AssetImage('assets/images/announcement_icon.png'),
+              size: 24,
+            ),
             label: 'Announcements',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.handshake),
+            icon: ImageIcon(
+              AssetImage('assets/images/meeting_icon1.png'),
+              size: 24,
+            ),
             label: 'Meeting',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: ImageIcon(
+              AssetImage('assets/images/account_icon.png'),
+              size: 24,
+            ),
             label: 'Account',
           ),
         ],

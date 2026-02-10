@@ -1,50 +1,44 @@
-import 'package:brokkerspot/views/auth/create_new_password.dart';
+import 'package:brokkerspot/views/auth/email_verification_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 
-class EmailVerificationView extends StatelessWidget {
-  final bool password;
-  const EmailVerificationView({super.key, this.password = false});
+class ForgetPasswordView extends StatelessWidget {
+  const ForgetPasswordView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: const Size(375, 812),
-      builder: (_, __) {
-        return Scaffold(
-          backgroundColor: Colors.white,
-          resizeToAvoidBottomInset: false, // ✅ IMPORTANT
-          body: SafeArea(
-            child: AnimatedPadding(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOut,
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                children: [
-                  _topSection(context),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 24.w),
-                          child: _contentSection(context),
-                        ),
-                        const Spacer(),
-                        _bottomCityImage(context),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false, // ✅ IMPORTANT
+      body: SafeArea(
+        child: AnimatedPadding(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
-        );
-      },
+          child: Column(
+            children: [
+              _topSection(context),
+              Expanded(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24.w),
+                      child: _contentSection(context),
+                    ),
+                    const Spacer(),
+                    _bottomCityImage(context),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -92,7 +86,7 @@ class EmailVerificationView extends StatelessWidget {
       children: [
         SizedBox(height: 20.h),
         Text(
-          'EMAIL VERIFICATION',
+          'Password assistance',
           style: GoogleFonts.inter(
             fontSize: 20.sp,
             fontWeight: FontWeight.w600,
@@ -108,7 +102,7 @@ class EmailVerificationView extends StatelessWidget {
             ),
             children: [
               const TextSpan(
-                text: 'Please Enter The 6-Digit Code We Sent To Your E-Mail',
+                text: 'Enter the email address with brokkerspot.',
               ),
               TextSpan(
                 text: '*',
@@ -118,7 +112,7 @@ class EmailVerificationView extends StatelessWidget {
           ),
         ),
         SizedBox(height: 30.h),
-        _otpField(),
+        _emailField(),
         SizedBox(height: 30.h),
         _verifyButton(context),
       ],
@@ -126,10 +120,10 @@ class EmailVerificationView extends StatelessWidget {
   }
 
   // ---------------- OTP FIELD ----------------
-  Widget _otpField() {
+  Widget _emailField() {
     return TextField(
-      keyboardType: TextInputType.number,
-      maxLength: 6,
+      // keyboardType: TextInputType.number,
+
       style: GoogleFonts.inter(
         fontSize: 16.sp,
         fontWeight: FontWeight.w500,
@@ -137,21 +131,10 @@ class EmailVerificationView extends StatelessWidget {
       ),
       decoration: InputDecoration(
         counterText: '',
-        hintText: 'Code',
+        hintText: 'Email',
         hintStyle: GoogleFonts.inter(
           fontSize: 14.sp,
           color: Colors.grey,
-        ),
-        suffixIcon: Padding(
-          padding: EdgeInsets.only(top: 14.h),
-          child: Text(
-            'GET CODE',
-            style: GoogleFonts.inter(
-              fontSize: 13.sp,
-              color: const Color(0xFFD9C27C),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
         ),
         suffixIconConstraints: const BoxConstraints(minWidth: 0),
         enabledBorder: const UnderlineInputBorder(
@@ -177,14 +160,12 @@ class EmailVerificationView extends StatelessWidget {
           ),
         ),
         onPressed: () {
-          if (password == true) {
-            Get.to(() => const CreateNewPasswordView());
-          } else {
-            _showSuccessBottomSheet(context);
-          }
+          Get.to(() => const EmailVerificationView(
+                password: true,
+              ));
         },
         child: Text(
-          'Verify Now',
+          'Continue',
           style: GoogleFonts.inter(
             fontSize: 14.sp,
             fontWeight: FontWeight.w500,
@@ -192,58 +173,6 @@ class EmailVerificationView extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-
-  void _showSuccessBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: false,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        return Container(
-          height: 220.h,
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(
-              top: Radius.circular(24),
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // CHECK ICON
-              Container(
-                height: 56.h,
-                width: 56.h,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFFD9C27C), // gold
-                ),
-                child: const Icon(
-                  Icons.check,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-
-              SizedBox(height: 20.h),
-
-              // TEXT
-              Text(
-                'You have successfully create an account.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 14.sp,
-                  color: Colors.black54,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
