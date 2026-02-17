@@ -267,12 +267,38 @@ class _CreateNewPasswordViewState extends State<CreateNewPasswordView> {
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
         height: 220.h,
+        width: double.infinity,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: const Center(
-          child: Icon(Icons.check_circle, size: 60, color: Colors.green),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              height: 56.h,
+              width: 56.h,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFD9C27C),
+              ),
+              child: const Icon(
+                Icons.check,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+            SizedBox(height: 20.h),
+            Text(
+              'Your New Password has successfully created.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14.sp,
+                color: Colors.black54,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
         ),
       ),
     );

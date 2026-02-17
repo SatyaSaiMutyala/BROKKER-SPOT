@@ -16,31 +16,28 @@ class EmailVerificationView extends StatelessWidget {
       builder: (_, __) {
         return Scaffold(
           backgroundColor: Colors.white,
-          resizeToAvoidBottomInset: false, // ✅ IMPORTANT
+          resizeToAvoidBottomInset: true,
           body: SafeArea(
-            child: AnimatedPadding(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOut,
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                children: [
-                  _topSection(context),
-                  Expanded(
+            child: Column(
+              children: [
+                _topSection(context),
+                Expanded(
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     child: Column(
                       children: [
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 24.w),
                           child: _contentSection(context),
                         ),
-                        const Spacer(),
+                        SizedBox(height: 20.h),
                         _bottomCityImage(context),
                       ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );

@@ -70,13 +70,13 @@ class _LoginViewState extends State<LoginView> {
               padding: EdgeInsets.symmetric(horizontal: 28.w),
               child: Column(
                 children: [
-                  SizedBox(height: 40.h),
+                  SizedBox(height: 100.h),
                   // Logo
                   Image.asset(
                     AppAssets.appName,
                     width: 170.w,
                   ),
-                  SizedBox(height: 160.h),
+                  SizedBox(height: 140.h),
                   // Email Field
                   CustomTextField(
                     controller: _controller.emailController,

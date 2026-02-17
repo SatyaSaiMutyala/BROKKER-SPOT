@@ -1,5 +1,4 @@
 import 'package:brokkerspot/views/brokker/brokker_login/view/brokker_login_view.dart';
-import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/deals/my_project_deals_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -84,12 +83,12 @@ class AccountView extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
         child: Row(
           children: [
             Icon(
               icon,
-              size: 32,
+              size: 28,
               color: const Color(0xFFD9C27C), // gold
             ),
             SizedBox(width: 14.w),

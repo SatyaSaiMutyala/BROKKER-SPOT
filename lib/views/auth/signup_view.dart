@@ -33,17 +33,21 @@ class _SignUpViewState extends State<SignUpView> {
               children: [
                 _topSection(context),
 
-                // MAIN CONTENT (static, no scroll)
                 Expanded(
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: _formSection(),
-                      ),
-                      const Spacer(),
-                      _bottomCityImage(),
-                    ],
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: _formSection(),
+                        ),
+                        SizedBox(height: 20.h),
+                        _bottomCityImage(),
+                      ],
+                    ),
                   ),
                 ),
               ],

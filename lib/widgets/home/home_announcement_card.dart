@@ -20,7 +20,7 @@ class HomeAnnouncementCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 260.w,
+        width: 328.w,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16.r),
@@ -51,7 +51,7 @@ class HomeAnnouncementCard extends StatelessWidget {
       children: [
         // Property image
         SizedBox(
-          height: 160.h,
+          height: 215.h,
           width: double.infinity,
           child: (a.imageUrls != null && a.imageUrls!.isNotEmpty)
               ? Image.asset(
@@ -98,7 +98,7 @@ class HomeAnnouncementCard extends StatelessWidget {
               Text(
                 'AED ',
                 style: GoogleFonts.inter(
-                  fontSize: 13.sp,
+                  fontSize: 14.sp,
                   fontWeight: FontWeight.w500,
                   color: Colors.black,
                 ),
@@ -106,7 +106,7 @@ class HomeAnnouncementCard extends StatelessWidget {
               Text(
                 _formatPrice(a.price ?? 0),
                 style: GoogleFonts.inter(
-                  fontSize: 17.sp,
+                  fontSize: 19.sp,
                   fontWeight: FontWeight.w800,
                   color: Colors.black,
                 ),
@@ -114,7 +114,7 @@ class HomeAnnouncementCard extends StatelessWidget {
               Text(
                 ' yearly',
                 style: GoogleFonts.inter(
-                  fontSize: 12.sp,
+                  fontSize: 13.sp,
                   fontWeight: FontWeight.w400,
                   color: Colors.black87,
                 ),
@@ -123,7 +123,7 @@ class HomeAnnouncementCard extends StatelessWidget {
               Text(
                 a.timeAgo ?? '',
                 style: GoogleFonts.inter(
-                  fontSize: 10.sp,
+                  fontSize: 11.sp,
                   color: Colors.grey,
                 ),
               ),
@@ -136,12 +136,12 @@ class HomeAnnouncementCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
-              fontSize: 13.sp,
+              fontSize: 14.sp,
               fontWeight: FontWeight.w700,
               color: Colors.black,
             ),
           ),
-          SizedBox(height: 4.h),
+          SizedBox(height: 6.h),
           // Location row
           Row(
             children: [
@@ -151,7 +151,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
-                    fontSize: 11.sp,
+                    fontSize: 12.sp,
                     color: Colors.grey.shade600,
                   ),
                 ),

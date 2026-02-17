@@ -291,7 +291,7 @@ class HomeView extends StatelessWidget {
         ),
         SizedBox(height: 12.h),
         SizedBox(
-          height: 260.h,
+          height: 328.h,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -361,7 +361,7 @@ class HomeView extends StatelessWidget {
         ),
         SizedBox(height: 12.h),
         SizedBox(
-          height: 260.h,
+          height: 328.h,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: 16.w),
