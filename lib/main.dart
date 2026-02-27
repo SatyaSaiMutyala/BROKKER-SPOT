@@ -1,3 +1,4 @@
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
@@ -6,8 +7,9 @@ import 'package:get/get.dart';
 import 'core/constants/app_colors.dart';
 import 'views/splash/splash_view.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await LocalStorageService.init();
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

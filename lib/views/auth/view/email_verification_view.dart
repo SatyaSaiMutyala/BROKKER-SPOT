@@ -1,13 +1,50 @@
-import 'package:brokkerspot/views/auth/create_new_password.dart';
+import 'package:brokkerspot/views/auth/controller/email_verification_controller.dart';
+import 'package:brokkerspot/views/auth/controller/forget_password_controller.dart';
+import 'package:brokkerspot/views/auth/view/create_new_password.dart';
+import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 
-class EmailVerificationView extends StatelessWidget {
+class EmailVerificationView extends StatefulWidget {
   final bool password;
-  const EmailVerificationView({super.key, this.password = false});
+  final String email;
+
+  const EmailVerificationView({
+    super.key,
+    this.password = false,
+    required this.email,
+  });
+
+  @override
+  State<EmailVerificationView> createState() => _EmailVerificationViewState();
+}
+
+class _EmailVerificationViewState extends State<EmailVerificationView> {
+  late final EmailVerificationController controller;
+  late final ForgetPasswordController forgetPasswordController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize controller safely
+    controller = Get.put(
+      EmailVerificationController(),
+      tag: widget.email,
+    );
+    forgetPasswordController =
+        Get.put(ForgetPasswordController(), tag: widget.email);
+  }
+
+  @override
+  void dispose() {
+    Get.delete<EmailVerificationController>(tag: widget.email);
+    Get.delete<ForgetPasswordController>(tag: widget.email);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +103,7 @@ class EmailVerificationView extends StatelessWidget {
             top: 20.h,
             left: 20.w,
             child: InkWell(
-              onTap: () => Navigator.pop(context),
+              onTap: () => Get.back(),
               child: Container(
                 padding: EdgeInsets.all(8.w),
                 decoration: BoxDecoration(
@@ -97,21 +134,11 @@ class EmailVerificationView extends StatelessWidget {
           ),
         ),
         SizedBox(height: 10.h),
-        RichText(
-          text: TextSpan(
-            style: GoogleFonts.inter(
-              fontSize: 12.sp,
-              color: Colors.black54,
-            ),
-            children: [
-              const TextSpan(
-                text: 'Please Enter The 6-Digit Code We Sent To Your E-Mail',
-              ),
-              TextSpan(
-                text: '*',
-                style: GoogleFonts.roboto(color: Colors.red),
-              ),
-            ],
+        Text(
+          'Please Enter The 6-Digit Code We Sent To Your E-Mail',
+          style: GoogleFonts.inter(
+            fontSize: 12.sp,
+            color: Colors.black54,
           ),
         ),
         SizedBox(height: 30.h),
@@ -125,6 +152,9 @@ class EmailVerificationView extends StatelessWidget {
   // ---------------- OTP FIELD ----------------
   Widget _otpField() {
     return TextField(
+      controller: widget.password == false
+          ? controller.otpController
+          : forgetPasswordController.otpController,
       keyboardType: TextInputType.number,
       maxLength: 6,
       style: GoogleFonts.inter(
@@ -134,23 +164,38 @@ class EmailVerificationView extends StatelessWidget {
       ),
       decoration: InputDecoration(
         counterText: '',
-        hintText: 'Code',
+        hintText: 'Enter OTP',
         hintStyle: GoogleFonts.inter(
           fontSize: 14.sp,
           color: Colors.grey,
         ),
-        suffixIcon: Padding(
-          padding: EdgeInsets.only(top: 14.h),
-          child: Text(
-            'GET CODE',
-            style: GoogleFonts.inter(
-              fontSize: 13.sp,
-              color: const Color(0xFFD9C27C),
-              fontWeight: FontWeight.w500,
+        suffixIcon: InkWell(
+          onTap: () async {
+            if (widget.password == false) {
+              bool success = await controller.resendOtp(widget.email);
+              if (success) {
+                controller.otpController.clear();
+              }
+            } else {
+              bool success =
+                  await forgetPasswordController.forgetPassword(widget.email);
+              if (success) {
+                controller.otpController.clear();
+              }
+            }
+          },
+          child: Padding(
+            padding: EdgeInsets.only(top: 14.h),
+            child: Text(
+              'GET CODE',
+              style: GoogleFonts.inter(
+                fontSize: 13.sp,
+                color: const Color(0xFFD9C27C),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ),
-        suffixIconConstraints: const BoxConstraints(minWidth: 0),
         enabledBorder: const UnderlineInputBorder(
           borderSide: BorderSide(color: Colors.black26),
         ),
@@ -161,41 +206,56 @@ class EmailVerificationView extends StatelessWidget {
     );
   }
 
-  // ---------------- BUTTON ----------------
+  // ---------------- VERIFY BUTTON ----------------
   Widget _verifyButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 46.h,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFD9C27C),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
+    return Obx(
+      () => SizedBox(
+        width: double.infinity,
+        height: 46.h,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFD9C27C),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
           ),
-        ),
-        onPressed: () {
-          if (password == true) {
-            Get.to(() => const CreateNewPasswordView());
-          } else {
-            _showSuccessBottomSheet(context);
-          }
-        },
-        child: Text(
-          'Verify Now',
-          style: GoogleFonts.inter(
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-          ),
+          onPressed: controller.isLoading.value
+              ? null
+              : () async {
+                  if (widget.password == true) {
+                    bool success = await forgetPasswordController
+                        .forgotPasswordVerifyOtp(widget.email);
+                    if (success) {
+                      Get.to(() => CreateNewPasswordView(email: widget.email));
+                    }
+                  } else {
+                    bool success = await controller.verifyOtp(widget.email);
+                    if (success) {
+                      _showSuccessBottomSheet(context);
+                    }
+                  }
+                },
+          child: controller.isLoading.value
+              ? const CircularProgressIndicator(
+                  color: Colors.white,
+                )
+              : Text(
+                  'Verify Now',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
         ),
       ),
     );
   }
 
+  // ---------------- SUCCESS BOTTOM SHEET ----------------
   void _showSuccessBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: false,
       backgroundColor: Colors.transparent,
       builder: (_) {
         return Container(
@@ -210,13 +270,12 @@ class EmailVerificationView extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // CHECK ICON
               Container(
                 height: 56.h,
                 width: 56.h,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Color(0xFFD9C27C), // gold
+                  color: Color(0xFFD9C27C),
                 ),
                 child: const Icon(
                   Icons.check,
@@ -224,17 +283,13 @@ class EmailVerificationView extends StatelessWidget {
                   size: 28,
                 ),
               ),
-
               SizedBox(height: 20.h),
-
-              // TEXT
               Text(
-                'You have successfully create an account.',
+                'You have successfully created an account.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 14.sp,
                   color: Colors.black54,
-                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],
@@ -242,6 +297,10 @@ class EmailVerificationView extends StatelessWidget {
         );
       },
     );
+
+    Future.delayed(const Duration(seconds: 3), () {
+      Get.offAll(() => LoginView());
+    });
   }
 
   // ---------------- BOTTOM IMAGE ----------------
@@ -250,7 +309,7 @@ class EmailVerificationView extends StatelessWidget {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      height: keyboardOpen ? 60.h : 120.h, // 👈 shrink on keyboard
+      height: keyboardOpen ? 60.h : 120.h,
       width: double.infinity,
       child: Image.asset(
         'assets/images/city.png',

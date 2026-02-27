@@ -1,7 +1,10 @@
+import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import '../../core/constants/app_assets.dart';
-import '../auth/login_view.dart';
+import '../auth/view/login_view.dart';
 
 class SplashView extends StatefulWidget {
   const SplashView({super.key});
@@ -14,16 +17,19 @@ class _SplashViewState extends State<SplashView> {
   @override
   void initState() {
     super.initState();
-    _navigateToLogin();
+    _checkLoginStatus();
   }
 
-  Future<void> _navigateToLogin() async {
+  Future<void> _checkLoginStatus() async {
     await Future.delayed(const Duration(seconds: 3));
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginView()),
-      );
+
+    final token = LocalStorageService.getAccessToken();
+    final user = LocalStorageService.getUser();
+
+    if (token != null && user != null) {
+      Get.offAll(() => DashboardView());
+    } else {
+      Get.offAll(() => LoginView());
     }
   }
 

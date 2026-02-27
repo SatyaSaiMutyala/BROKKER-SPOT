@@ -1,12 +1,39 @@
-import 'package:brokkerspot/views/auth/email_verification_view.dart';
+import 'package:brokkerspot/views/auth/controller/email_verification_controller.dart';
+import 'package:brokkerspot/views/auth/controller/forget_password_controller.dart';
+import 'package:brokkerspot/views/auth/view/email_verification_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 
-class ForgetPasswordView extends StatelessWidget {
+class ForgetPasswordView extends StatefulWidget {
   const ForgetPasswordView({super.key});
+
+  @override
+  State<ForgetPasswordView> createState() => _ForgetPasswordViewState();
+}
+
+class _ForgetPasswordViewState extends State<ForgetPasswordView> {
+  late final ForgetPasswordController controller;
+
+  TextEditingController emailController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize controller safely
+    controller = Get.put(
+      ForgetPasswordController(),
+    );
+  }
+
+  @override
+  void dispose() {
+    Get.delete<EmailVerificationController>();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +150,7 @@ class ForgetPasswordView extends StatelessWidget {
   Widget _emailField() {
     return TextField(
       // keyboardType: TextInputType.number,
+      controller: emailController,
 
       style: GoogleFonts.inter(
         fontSize: 16.sp,
@@ -159,10 +187,23 @@ class ForgetPasswordView extends StatelessWidget {
             borderRadius: BorderRadius.circular(30),
           ),
         ),
-        onPressed: () {
-          Get.to(() => const EmailVerificationView(
-                password: true,
-              ));
+        onPressed: () async {
+          bool success =
+              await controller.forgetPassword(emailController.text.trim());
+          if (success) {
+            Get.to(() => EmailVerificationView(
+                  password: true,
+                  email: emailController.text.trim(),
+                ));
+          } else {
+            Get.snackbar(
+              "Error",
+              "Failed to send OTP. Please try again.",
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+            );
+          }
         },
         child: Text(
           'Continue',

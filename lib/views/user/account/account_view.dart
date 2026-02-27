@@ -1,4 +1,7 @@
+import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/brokker_login_view.dart';
+import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
 import 'package:brokkerspot/views/user/deals/my_project_deals_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -10,6 +13,8 @@ class AccountView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AccountController controller = Get.put(AccountController());
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -67,6 +72,16 @@ class AccountView extends StatelessWidget {
             icon: Icons.settings_outlined,
             title: 'Setting',
             onTap: () {},
+          ),
+          _divider(),
+          _accountTile(
+            icon: Icons.logout_outlined,
+            title: 'Logout',
+            onTap: () {
+              controller.logout();
+              // LocalStorageService.clearAll();
+              // Get.offAll(() => LoginView());
+            },
           ),
           _divider(),
         ],
