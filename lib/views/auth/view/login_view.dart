@@ -1,4 +1,5 @@
 import 'package:brokkerspot/views/auth/view/foreget_password_view.dart';
+import 'package:brokkerspot/views/auth/view/help/need_help_view.dart';
 import 'package:brokkerspot/views/auth/view/signup_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -52,7 +53,7 @@ class LoginView extends StatelessWidget {
                     hintText: AppStrings.email,
                     suffixIcon: Icons.person_outline,
                     keyboardType: TextInputType.emailAddress,
-                    onChanged: (_) => controller.update(),
+                    onChanged: (_) => controller.validateForm(),
                   ),
 
                   SizedBox(height: 24.h),
@@ -66,7 +67,7 @@ class LoginView extends StatelessWidget {
                             : Icons.visibility_outlined,
                         obscureText: controller.obscurePassword.value,
                         onSuffixTap: controller.togglePasswordVisibility,
-                        onChanged: (_) => controller.update(),
+                        onChanged: (_) => controller.validateForm(),
                       )),
 
                   SizedBox(height: 16.h),
@@ -145,36 +146,44 @@ class LoginView extends StatelessWidget {
 
   /// LOGIN BUTTON
   Widget _buildLoginButton() {
-    return Obx(() => SizedBox(
-          width: double.infinity,
-          height: 52.h,
-          child: ElevatedButton(
-            onPressed: controller.isLoading.value ? null : controller.login,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30.r),
-              ),
+    return Obx(() {
+      final valid = controller.isFormValid.value;
+      return SizedBox(
+        width: double.infinity,
+        height: 52.h,
+        child: ElevatedButton(
+          onPressed: controller.isLoading.value
+              ? null
+              : valid
+                  ? controller.login
+                  : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: valid ? AppColors.primary : Colors.grey.shade400,
+            disabledBackgroundColor: Colors.grey.shade400,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30.r),
             ),
-            child: controller.isLoading.value
-                ? SizedBox(
-                    width: 22.w,
-                    height: 22.h,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text(
-                    AppStrings.login,
-                    style: GoogleFonts.roboto(
-                      fontSize: 15.sp,
-                      color: Colors.black,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
           ),
-        ));
+          child: controller.isLoading.value
+              ? SizedBox(
+                  width: 22.w,
+                  height: 22.h,
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Text(
+                  AppStrings.login,
+                  style: GoogleFonts.roboto(
+                    fontSize: 15.sp,
+                    color: valid ? Colors.black : Colors.white70,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+        ),
+      );
+    });
   }
 
   Widget _buildOrDivider() {
@@ -232,7 +241,7 @@ class LoginView extends StatelessWidget {
 
   Widget _buildNeedHelp() {
     return GestureDetector(
-      onTap: () {},
+      onTap: () => Get.to(() => const NeedHelpView()),
       child: Text(
         AppStrings.needHelp,
         style: GoogleFonts.roboto(

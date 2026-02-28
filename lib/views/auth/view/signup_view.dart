@@ -7,7 +7,8 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class SignUpView extends StatefulWidget {
-  const SignUpView({super.key});
+  final bool isBrokerSignup;
+  const SignUpView({super.key, this.isBrokerSignup = false});
 
   @override
   State<SignUpView> createState() => _SignUpViewState();
@@ -19,6 +20,7 @@ class _SignUpViewState extends State<SignUpView> {
 
   String selectedCode = '+971';
   bool _obscurePassword = true;
+  bool _agreeToCreateBroker = false;
 
   @override
   void initState() {
@@ -167,6 +169,10 @@ class _SignUpViewState extends State<SignUpView> {
           _passwordField(),
           SizedBox(height: 16.h),
           _passwordRules(),
+          if (widget.isBrokerSignup) ...[
+            SizedBox(height: 20.h),
+            _brokerAccountCheckbox(),
+          ],
           SizedBox(height: 24.h),
           _createAccountButton(),
           SizedBox(height: 16.h),
@@ -296,6 +302,48 @@ class _SignUpViewState extends State<SignUpView> {
         ));
   }
 
+  // ---------------- BROKER CHECKBOX ----------------
+  Widget _brokerAccountCheckbox() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 24.w,
+          height: 24.h,
+          child: Checkbox(
+            value: _agreeToCreateBroker,
+            onChanged: (value) {
+              setState(() => _agreeToCreateBroker = value ?? false);
+            },
+            activeColor: AppColors.primary,
+            side: BorderSide(color: Colors.grey.shade400),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
+        SizedBox(width: 8.w),
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() => _agreeToCreateBroker = !_agreeToCreateBroker);
+            },
+            child: Padding(
+              padding: EdgeInsets.only(top: 2.h),
+              child: Text(
+                'By creating a broker account, I agree to also have a user account.',
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ---------------- BUTTON ----------------
   Widget _createAccountButton() {
     return Obx(() => SizedBox(
@@ -328,7 +376,9 @@ class _SignUpViewState extends State<SignUpView> {
             child: controller.isLoading.value
                 ? const CircularProgressIndicator(color: Colors.white)
                 : Text(
-                    'Create an Account',
+                    _agreeToCreateBroker
+                        ? 'Create a broker Account'
+                        : 'Create an Account',
                     style: GoogleFonts.inter(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w600,

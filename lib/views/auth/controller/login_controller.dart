@@ -14,6 +14,7 @@ class LoginController extends GetxController {
   var obscurePassword = true.obs;
   var isLoading = false.obs;
   var rememberMe = false.obs;
+  var isFormValid = false.obs;
 
   void toggleRememberMe(bool value) {
     rememberMe.value = value;
@@ -21,6 +22,14 @@ class LoginController extends GetxController {
 
   bool get hasInput =>
       emailController.text.isNotEmpty && passwordController.text.isNotEmpty;
+
+  void validateForm() {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+    final emailValid =
+        RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$').hasMatch(email);
+    isFormValid.value = emailValid && password.isNotEmpty;
+  }
 
   void togglePasswordVisibility() {
     obscurePassword.value = !obscurePassword.value;

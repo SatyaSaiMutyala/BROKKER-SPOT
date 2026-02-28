@@ -36,7 +36,7 @@ class HomeView extends StatelessWidget {
                 child: NewLaunchBanner(
                   title: 'New Launch',
                   subtitle: 'CANAL\nHEIGHTS',
-                  timeLeft: '15:45',
+                  timeLeft: '15:00',
                   imageUrl: 'assets/images/banner.png',
                 ),
               ),

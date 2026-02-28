@@ -18,19 +18,31 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
   late final ForgetPasswordController controller;
 
   TextEditingController emailController = TextEditingController();
+  bool _isValidEmail = false;
+
+  bool _checkEmail(String email) {
+    return RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$').hasMatch(email.trim());
+  }
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize controller safely
     controller = Get.put(
       ForgetPasswordController(),
     );
+
+    emailController.addListener(() {
+      final valid = _checkEmail(emailController.text);
+      if (valid != _isValidEmail) {
+        setState(() => _isValidEmail = valid);
+      }
+    });
   }
 
   @override
   void dispose() {
+    emailController.dispose();
     Get.delete<EmailVerificationController>();
     super.dispose();
   }
@@ -39,31 +51,24 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      resizeToAvoidBottomInset: false, // ✅ IMPORTANT
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
-        child: AnimatedPadding(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            children: [
-              _topSection(context),
-              Expanded(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24.w),
-                      child: _contentSection(context),
-                    ),
-                    const Spacer(),
-                    _bottomCityImage(context),
-                  ],
-                ),
+        child: Column(
+          children: [
+            _topSection(context),
+            Expanded(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24.w),
+                    child: _contentSection(context),
+                  ),
+                  const Spacer(),
+                  _bottomCityImage(context),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -113,23 +118,23 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
       children: [
         SizedBox(height: 20.h),
         Text(
-          'Password assistance',
-          style: GoogleFonts.inter(
-            fontSize: 20.sp,
-            fontWeight: FontWeight.w600,
+          'PASSWORD ASSISTANCE',
+          style: GoogleFonts.carlito(
+            fontSize: 24.sp,
+            fontWeight: FontWeight.w700,
             color: AppColors.primary,
           ),
         ),
         SizedBox(height: 10.h),
         RichText(
           text: TextSpan(
-            style: GoogleFonts.inter(
-              fontSize: 12.sp,
-              color: Colors.black54,
-            ),
+            style: GoogleFonts.carlito(
+                fontSize: 14.sp,
+                color: Colors.black54,
+                fontWeight: FontWeight.w400),
             children: [
               const TextSpan(
-                text: 'Enter the email address with brokkerspot.',
+                text: 'Enter the Email Address with Brokkerspot.',
               ),
               TextSpan(
                 text: '*',
@@ -152,16 +157,17 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
       // keyboardType: TextInputType.number,
       controller: emailController,
 
-      style: GoogleFonts.inter(
+      style: GoogleFonts.roboto(
         fontSize: 16.sp,
         fontWeight: FontWeight.w500,
         letterSpacing: 2,
       ),
       decoration: InputDecoration(
         counterText: '',
-        hintText: 'Email',
-        hintStyle: GoogleFonts.inter(
+        hintText: 'E-mail',
+        hintStyle: GoogleFonts.roboto(
           fontSize: 14.sp,
+          fontWeight: FontWeight.w400,
           color: Colors.grey,
         ),
         suffixIconConstraints: const BoxConstraints(minWidth: 0),
@@ -182,35 +188,38 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
       height: 46.h,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFD9C27C),
+          backgroundColor:
+              _isValidEmail ? const Color(0xFFD9C27C) : Colors.grey.shade300,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
           ),
         ),
-        onPressed: () async {
-          bool success =
-              await controller.forgetPassword(emailController.text.trim());
-          if (success) {
-            Get.to(() => EmailVerificationView(
-                  password: true,
-                  email: emailController.text.trim(),
-                ));
-          } else {
-            Get.snackbar(
-              "Error",
-              "Failed to send OTP. Please try again.",
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: Colors.red,
-              colorText: Colors.white,
-            );
-          }
-        },
+        onPressed: _isValidEmail
+            ? () async {
+                bool success = await controller
+                    .forgetPassword(emailController.text.trim());
+                if (success) {
+                  Get.to(() => EmailVerificationView(
+                        password: true,
+                        email: emailController.text.trim(),
+                      ));
+                } else {
+                  Get.snackbar(
+                    "Error",
+                    "Failed to send OTP. Please try again.",
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              }
+            : null,
         child: Text(
           'Continue',
           style: GoogleFonts.inter(
             fontSize: 14.sp,
             fontWeight: FontWeight.w500,
-            color: Colors.white,
+            color: _isValidEmail ? Colors.white : Colors.black54,
           ),
         ),
       ),
@@ -219,16 +228,11 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
 
   // ---------------- BOTTOM IMAGE ----------------
   Widget _bottomCityImage(BuildContext context) {
-    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: keyboardOpen ? 60.h : 120.h, // 👈 shrink on keyboard
+    return Image.asset(
+      'assets/images/city.png',
+      height: 120.h,
       width: double.infinity,
-      child: Image.asset(
-        'assets/images/city.png',
-        fit: BoxFit.cover,
-      ),
+      fit: BoxFit.cover,
     );
   }
 }

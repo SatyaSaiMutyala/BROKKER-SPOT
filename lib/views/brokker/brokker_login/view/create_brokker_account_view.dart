@@ -1,6 +1,8 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/complete_profile_screen.dart';
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
+import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -53,11 +55,17 @@ class CreateBrokerAccountView extends StatelessWidget {
 
             // Buttons Section
             CustomPrimaryButton(
-              title: "Login / Signup",
+              title: LocalStorageService.isLoggedIn()
+                  ? "Continue"
+                  : "Login / Signup",
               backgroundColor: AppColors.primary,
               radius: 30,
               onPressed: () {
-                Get.offAll(() => CompleteProfileScreen());
+                if (LocalStorageService.isLoggedIn()) {
+                  Get.offAll(() => CompleteProfileScreen());
+                } else {
+                  showLoginRequiredDialog(context);
+                }
               },
             ),
 

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_assets.dart';
-import '../auth/view/login_view.dart';
+import '../auth/view/welcome_view.dart';
 
 class SplashView extends StatefulWidget {
   const SplashView({super.key});
@@ -29,7 +29,7 @@ class _SplashViewState extends State<SplashView> {
     if (token != null && user != null) {
       Get.offAll(() => DashboardView());
     } else {
-      Get.offAll(() => LoginView());
+      Get.offAll(() => const WelcomeView());
     }
   }
 

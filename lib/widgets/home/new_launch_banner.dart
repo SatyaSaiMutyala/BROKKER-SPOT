@@ -62,65 +62,32 @@ class NewLaunchBanner extends StatelessWidget {
 
             // Content
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 16.h),
+              padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 14.h),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Left text
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 10.w, vertical: 3.h),
-                          decoration: BoxDecoration(
-                            color: AppColors.goldAccent,
-                            borderRadius: BorderRadius.circular(4.r),
-                          ),
-                          child: Text(
-                            title,
-                            style: GoogleFonts.inter(
-                              fontSize: 11.sp,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 8.h),
-                        Text(
-                          subtitle,
-                          style: GoogleFonts.inter(
-                            fontSize: 22.sp,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            height: 1.1,
-                          ),
-                        ),
-                      ],
+                  // Top-left title badge
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 10.w, vertical: 3.h),
+                    child: Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                  // Right timer
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        timeLeft,
-                        style: GoogleFonts.inter(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'h left',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
+                  const Spacer(),
+                  // Top-right timer in 1 line
+                  Text(
+                    '$timeLeft h left',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               ),
