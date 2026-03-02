@@ -14,14 +14,6 @@
       },
       "oauth_client": [
         {
-          "client_id": "625855875282-7ms4r6vjbtmlvboucoeen4l2031559dc.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.brokersport.app",
-            "certificate_hash": "d1e5da34738c0ba3fe1cd0c90acdb2c6522bda5b"
-          }
-        },
-        {
           "client_id": "625855875282-gu4ggo821o7l31vnu5h8qbid49mte6h3.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -45,13 +37,6 @@
             {
               "client_id": "625855875282-gs1st9mvhn411ac8r8dtdr033feass52.apps.googleusercontent.com",
               "client_type": 3
-            },
-            {
-              "client_id": "625855875282-54mq74pcdrpeppadf6986kbarp9jjblb.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.brokersport.app"
-              }
             }
           ]
         }

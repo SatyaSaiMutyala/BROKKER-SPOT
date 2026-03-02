@@ -1,3 +1,4 @@
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
@@ -16,28 +17,48 @@ class WelcomeViewController extends GetxController {
   Future<void> signInWithGoogle() async {
     try {
       isLoading.value = true;
+      print('=== Google Sign-In Started ===');
 
-      // Initialize once
-      await _googleSignIn.initialize();
+      // Initialize with serverClientId (Web Client ID from Firebase Console)
+      await _googleSignIn.initialize(
+        serverClientId:
+            '625855875282-gs1st9mvhn411ac8r8dtdr033feass52.apps.googleusercontent.com', // TODO: Replace with your Web Client ID
+      );
+      print('Google Sign-In initialized');
 
       final GoogleSignInAccount googleUser =
           await GoogleSignIn.instance.authenticate();
+      print('Google user authenticated: ${googleUser.email}');
 
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      print('Got Google auth tokens - idToken: ${googleAuth.idToken != null}');
 
       final credential = GoogleAuthProvider.credential(
         idToken: googleAuth.idToken,
       );
+      print('Firebase credential created');
 
-      await _auth.signInWithCredential(credential);
+      final userCredential = await _auth.signInWithCredential(credential);
+      print('Firebase sign-in success: ${userCredential.user?.email}');
+
+      // Save Firebase token to LocalStorage so isLoggedIn() returns true
+      final firebaseToken = await userCredential.user?.getIdToken();
+      if (firebaseToken != null) {
+        await LocalStorageService.saveAccessToken(firebaseToken);
+        print('Token saved to LocalStorage');
+      }
 
       Get.offAll(() => DashboardView());
     } on FirebaseAuthException catch (e) {
+      print('Google Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
       Get.snackbar("Google Sign-In Failed", e.message ?? "");
-    } catch (e) {
+    } catch (e, s) {
+      print('Google Sign-In Error: $e');
+      print('Stack trace: $s');
       Get.snackbar("Error", e.toString());
     } finally {
       isLoading.value = false;
+      print('=== Google Sign-In Ended ===');
     }
   }
 
@@ -60,7 +81,13 @@ class WelcomeViewController extends GetxController {
         accessToken: appleCredential.authorizationCode,
       );
 
-      await _auth.signInWithCredential(oauthCredential);
+      final userCredential = await _auth.signInWithCredential(oauthCredential);
+
+      // Save Firebase token to LocalStorage so isLoggedIn() returns true
+      final firebaseToken = await userCredential.user?.getIdToken();
+      if (firebaseToken != null) {
+        await LocalStorageService.saveAccessToken(firebaseToken);
+      }
 
       Get.offAll(() => DashboardView());
     } on FirebaseAuthException catch (e) {
