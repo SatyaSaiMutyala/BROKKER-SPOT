@@ -29,7 +29,7 @@ class _SplashViewState extends State<SplashView> {
     if (token != null && user != null) {
       Get.offAll(() => DashboardView());
     } else {
-      Get.offAll(() => const WelcomeView());
+      Get.offAll(() => WelcomeView());
     }
   }
 

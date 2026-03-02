@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "625855875282",
+    "project_id": "brokkerspot-6bc24",
+    "storage_bucket": "brokkerspot-6bc24.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:625855875282:android:9191f3f77760fff35f850b",
+        "android_client_info": {
+          "package_name": "com.brokersport.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "625855875282-gu4ggo821o7l31vnu5h8qbid49mte6h3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.brokersport.app",
+            "certificate_hash": "ea779c14bc5bc49f68ba9d0ace4602c693178ab2"
+          }
+        },
+        {
+          "client_id": "625855875282-gs1st9mvhn411ac8r8dtdr033feass52.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtWy2tfzTMDuW_LaCDOY47c7b0yOKWguU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "625855875282-gs1st9mvhn411ac8r8dtdr033feass52.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

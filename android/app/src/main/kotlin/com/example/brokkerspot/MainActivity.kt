@@ -1,4 +1,4 @@
-package com.example.brokkerspot
+package com.brokersport.app
 
 import io.flutter.embedding.android.FlutterActivity
 
