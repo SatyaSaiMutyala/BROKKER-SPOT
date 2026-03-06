@@ -1,5 +1,6 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -25,8 +26,11 @@ class _SplashViewState extends State<SplashView> {
 
     final token = LocalStorageService.getAccessToken();
     final user = LocalStorageService.getUser();
+    final firebaseUser = FirebaseAuth.instance.currentUser;
 
-    if (token != null && user != null) {
+    // Email login: has both token and user data
+    // Google/Apple login: has token and Firebase user but no backend user data
+    if (token != null && (user != null || firebaseUser != null)) {
       Get.offAll(() => DashboardView());
     } else {
       Get.offAll(() => WelcomeView());
