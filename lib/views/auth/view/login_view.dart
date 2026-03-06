@@ -14,12 +14,13 @@ import '../../../widgets/common/custom_text_field.dart';
 class LoginView extends StatelessWidget {
   LoginView({super.key});
 
-  final LoginController controller = Get.put(LoginController());
+  final LoginController controller =
+      Get.put(LoginController(), permanent: true);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -39,8 +40,9 @@ class LoginView extends StatelessWidget {
           SafeArea(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 28.w),
-              child: Column(
-                children: [
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
                   SizedBox(height: 100.h),
 
                   Image.asset(AppAssets.appName, width: 170.w),
@@ -86,12 +88,13 @@ class LoginView extends StatelessWidget {
 
                   _buildBottomLinks(),
 
-                  const Spacer(),
+                  SizedBox(height: 40.h),
 
                   Align(alignment: Alignment.topLeft, child: _buildNeedHelp()),
 
                   SizedBox(height: 30.h),
                 ],
+              ),
               ),
             ),
           ),

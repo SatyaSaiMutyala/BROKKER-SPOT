@@ -97,7 +97,7 @@ class _SignUpViewState extends State<SignUpView> {
             ),
           ),
           Positioned(
-            top: 20.h,
+            top: MediaQuery.of(context).padding.top + 10.h,
             left: 20.w,
             child: InkWell(
               onTap: () => Navigator.pop(context),
@@ -107,7 +107,7 @@ class _SignUpViewState extends State<SignUpView> {
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFFE5E5E5)),
                 ),
-                child: const Icon(Icons.arrow_back, size: 16),
+                child: const Icon(Icons.arrow_back_ios_new, size: 16),
               ),
             ),
           ),

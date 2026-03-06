@@ -9,7 +9,10 @@ class AccountMenuView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: const BackButton(color: Colors.grey),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
           "My Account",
           style: TextStyle(color: Colors.black),

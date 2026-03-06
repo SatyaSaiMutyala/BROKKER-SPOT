@@ -5,6 +5,7 @@ import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
@@ -33,23 +34,35 @@ class CreateBrokerAccountView extends StatelessWidget {
             const Text(
               "In Order to create a new account You need to prepare the following documents",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey, fontSize: 14),
+              style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w400),
             ),
             const SizedBox(height: 40),
 
-            // Document Cards Grid/Wrap
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              alignment: WrapAlignment.center,
-              children: const [
-                DocumentCard(icon: Icons.badge_outlined, label: "Passport"),
-                DocumentCard(
-                    icon: Icons.account_balance_outlined,
-                    label: "Bank Information"),
-                DocumentCard(icon: Icons.info_outline, label: "Personal Info"),
-              ],
-            ),
+            // Document Cards
+            Builder(builder: (context) {
+              final cardWidth = (MediaQuery.of(context).size.width - 64) / 2;
+              return Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                alignment: WrapAlignment.center,
+                children: [
+                  SizedBox(
+                    width: cardWidth - 16,
+                    child: const DocumentCard(icon: Icons.badge_outlined, label: "Passport"),
+                  ),
+                  SizedBox(
+                    width: cardWidth + 16,
+                    child: const DocumentCard(
+                        icon: Icons.account_balance_outlined,
+                        label: "Bank Information"),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: const DocumentCard(icon: Icons.info_outline, label: "Personal Info"),
+                  ),
+                ],
+              );
+            }),
 
             const Spacer(flex: 3),
 
@@ -104,7 +117,7 @@ class CreateBrokerAccountView extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            top: -60.h,
+            top: -35.h,
             right: -20.w,
             child: SizedBox(
               width: 300.w,
@@ -116,11 +129,11 @@ class CreateBrokerAccountView extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: 24.h,
+            top: MediaQuery.of(context).padding.top,
             left: 6.w,
             child: IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back_ios, size: 20),
+              onPressed: () => SystemNavigator.pop(),
+              icon: const Icon(Icons.arrow_back_ios_new, size: 20),
               style: IconButton.styleFrom(
                 backgroundColor: Colors.white,
                 elevation: 2,
@@ -143,20 +156,25 @@ class DocumentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 16,
+            spreadRadius: 2,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
               padding: EdgeInsets.all(4),
@@ -165,10 +183,12 @@ class DocumentCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: Colors.white, size: 24)),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
           ),
         ],
       ),

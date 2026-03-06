@@ -28,7 +28,7 @@ class ChatView extends StatelessWidget {
               ),
               child: const Center(
                 child: Icon(
-                  Icons.arrow_back_ios,
+                  Icons.arrow_back_ios_new,
                   size: 14,
                   color: Colors.black,
                 ),
