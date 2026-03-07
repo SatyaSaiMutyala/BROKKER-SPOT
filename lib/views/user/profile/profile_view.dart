@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -15,19 +16,20 @@ class _VerifiedArcPainter extends CustomPainter {
     if (!isVerified) return;
 
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 4;
+    final radius = size.width / 2 - 6;
 
-    // Green arc from ~120° (bottom-right) to ~340° (top-right)
-    // In canvas: 0°=right, 90°=bottom, 180°=left, 270°=top
-    const startAngle = 120 * pi / 180; // ~4-5 o'clock
-    const endAngle = 340 * pi / 180; // ~1 o'clock
-    const sweepAngle = endAngle - startAngle; // ~220°
+    // Arc from 6 o'clock to 3 o'clock going SHORT way (bottom-right quarter)
+    // 6 o'clock = 90° canvas, 3 o'clock = 0°/360° canvas
+    // Sweep: from 90° going NEGATIVE (counter-clockwise) 90° to reach 0°
+    const startAngle = 90 * pi / 180; // 6 o'clock (bottom)
+    const sweepAngle = -(90 * pi / 180); // 90° counter-clockwise to 3 o'clock
+    // Badge will be at 0° (3 o'clock / right side)
 
     // Draw thick green arc band
     final arcPaint = Paint()
       ..color = const Color(0xFF2E7D32)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 5.0
+      ..strokeWidth = 14.0
       ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(
@@ -39,22 +41,22 @@ class _VerifiedArcPainter extends CustomPainter {
     );
 
     // Draw each letter of "Verified" along the arc
-    const text = 'V e r i f i e d';
-    final letters = text.split('');
-    // Place text in the middle portion of the arc
-    final textStartAngle = startAngle + sweepAngle * 0.25;
-    final textSweep = sweepAngle * 0.55;
+    // Arc goes from 90° (6 o'clock) to 0° (3 o'clock) counter-clockwise
+    // "V" near 6 o'clock, "d" near 3 o'clock — so letters go from high angle to low
+    const letters = ['V', 'e', 'r', 'i', 'f', 'i', 'e', 'd'];
+    const textPadding = 0.1; // 10% padding from edges
+    final arcStart = startAngle + sweepAngle * textPadding; // near 6 o'clock
+    final arcTextSweep = sweepAngle * (1 - 2 * textPadding);
 
     for (int i = 0; i < letters.length; i++) {
-      final letterAngle =
-          textStartAngle + (i / (letters.length - 1)) * textSweep;
+      final letterAngle = arcStart + (i / (letters.length - 1)) * arcTextSweep;
 
       final tp = TextPainter(
         text: TextSpan(
           text: letters[i],
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 9,
+            fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -66,25 +68,25 @@ class _VerifiedArcPainter extends CustomPainter {
       final x = center.dx + radius * cos(letterAngle);
       final y = center.dy + radius * sin(letterAngle);
       canvas.translate(x, y);
-      // Rotate letter to follow the arc tangent
-      canvas.rotate(letterAngle + pi / 2);
+      // Rotate letter: tangent direction is letterAngle - pi/2 for counter-clockwise
+      canvas.rotate(letterAngle - pi / 2);
       tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
       canvas.restore();
     }
 
-    // Gold circle badge with white star at the end of arc (~340°)
-    final badgeAngle = endAngle;
+    // Gold circle badge with white star at 3 o'clock (right side)
+    const badgeAngle = 0.0;
     final badgeX = center.dx + radius * cos(badgeAngle);
     final badgeY = center.dy + radius * sin(badgeAngle);
     final badgeCenter = Offset(badgeX, badgeY);
-    const badgeRadius = 10.0;
+    const badgeRadius = 12.0;
 
     // Gold circle background
     final badgeBgPaint = Paint()..color = const Color(0xFFD4AF37);
     canvas.drawCircle(badgeCenter, badgeRadius, badgeBgPaint);
 
     // White star inside the badge
-    _drawStar(canvas, badgeCenter, 6.0, Paint()..color = Colors.white);
+    _drawStar(canvas, badgeCenter, 7.0, Paint()..color = Colors.white);
   }
 
   void _drawStar(Canvas canvas, Offset center, double size, Paint paint) {
@@ -140,9 +142,11 @@ class ProfileView extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              Get.offAll(() => const DashboardView(initialIndex: 3));
+            },
             icon: Icon(Icons.settings_outlined,
-                size: 22.sp, color: AppColors.primary),
+                size: 28.sp, color: AppColors.primary),
           ),
         ],
       ),
@@ -204,11 +208,11 @@ class ProfileView extends StatelessWidget {
               width: 110.w,
               height: 110.w,
               child: CustomPaint(
-                painter: _VerifiedArcPainter(isVerified: isVerified),
+                foregroundPainter: _VerifiedArcPainter(isVerified: isVerified),
                 child: Center(
                   child: Container(
-                    width: 84.w,
-                    height: 84.w,
+                    width: 96.w,
+                    height: 96.w,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.grey.shade200,
@@ -218,16 +222,20 @@ class ProfileView extends StatelessWidget {
                           ? Image.network(
                               controller.profileImage.value,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.person,
-                                size: 38.sp,
-                                color: Colors.grey,
+                              width: 96.w,
+                              height: 96.w,
+                              errorBuilder: (_, __, ___) => Image.asset(
+                                'assets/images/profile.jpg',
+                                fit: BoxFit.cover,
+                                width: 96.w,
+                                height: 96.w,
                               ),
                             )
-                          : Icon(
-                              Icons.person,
-                              size: 38.sp,
-                              color: Colors.grey,
+                          : Image.asset(
+                              'assets/images/profile.jpg',
+                              fit: BoxFit.cover,
+                              width: 96.w,
+                              height: 96.w,
                             ),
                     ),
                   ),
@@ -249,7 +257,7 @@ class ProfileView extends StatelessWidget {
           ],
         ),
 
-        SizedBox(width: 16.w),
+        SizedBox(width: 36.w),
 
         // Right: Experience, Following, License with BRN/ORN columns
         Expanded(

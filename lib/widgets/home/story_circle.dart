@@ -27,8 +27,8 @@ class StoryCircle extends StatelessWidget {
           children: [
             // Gold-bordered circle
             Container(
-              width: 56.w,
-              height: 56.w,
+              width: 66.w,
+              height: 66.w,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: hasStory

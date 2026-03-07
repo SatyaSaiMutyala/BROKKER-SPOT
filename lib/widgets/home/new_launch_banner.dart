@@ -24,10 +24,10 @@ class NewLaunchBanner extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 120.h,
+        height: 90.h,
         width: double.infinity,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(6.r),
           color: Colors.grey.shade300,
         ),
         clipBehavior: Clip.antiAlias,

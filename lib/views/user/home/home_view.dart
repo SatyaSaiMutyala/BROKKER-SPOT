@@ -30,7 +30,7 @@ class HomeView extends StatelessWidget {
               SizedBox(height: 12.h),
               // Header
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                padding: EdgeInsets.only(left: 16),
                 child: _buildHeader(),
               ),
               SizedBox(height: 16.h),
@@ -66,60 +66,68 @@ class HomeView extends StatelessWidget {
     return Row(
       children: [
         // Profile avatar + greeting (tappable)
-        GestureDetector(
-          onTap: () {
-            if (!profileController.isGuest) {
-              Get.to(() => ProfileView());
-            }
-          },
-          child: Row(
-            children: [
-              Container(
-                width: 46.w,
-                height: 46.w,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey.shade200,
-                  border: Border.all(color: Colors.grey.shade300, width: 1),
-                ),
-                child: ClipOval(
-                  child: Icon(
-                    Icons.person,
-                    size: 24.sp,
-                    color: Colors.grey,
+        Flexible(
+          child: GestureDetector(
+            onTap: () {
+              if (!profileController.isGuest) {
+                Get.to(() => ProfileView());
+              }
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 46.w,
+                  height: 46.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey.shade200,
+                    border: Border.all(color: Colors.grey.shade300, width: 1),
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/home-profile-icon.jpg',
+                      fit: BoxFit.cover,
+                      width: 46.w,
+                      height: 46.w,
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(width: 10.w),
-              Obx(() => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Hello,',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      Text(
-                        profileController.isGuest
-                            ? 'Guest User'
-                            : profileController.userName.value.isNotEmpty
-                                ? profileController.userName.value
-                                : '...',
-                        style: GoogleFonts.inter(
-                          fontSize: 17.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  )),
-            ],
+                SizedBox(width: 10.w),
+                Flexible(
+                  child: Obx(() => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hello,',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          Text(
+                            profileController.isGuest
+                                ? 'Guest User'
+                                : profileController.userName.value.isNotEmpty
+                                    ? profileController.userName.value
+                                    : '...',
+                            style: GoogleFonts.inter(
+                              fontSize: 17.sp,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ],
+                      )),
+                ),
+              ],
+            ),
           ),
         ),
-        const Spacer(),
+        SizedBox(width: 10.w),
         // Search box
         _buildSearchBox(),
         SizedBox(width: 10.w),
@@ -203,12 +211,15 @@ class HomeView extends StatelessWidget {
   // ─────────── STORIES ───────────
   Widget _buildStorySection() {
     final stories = [
-      {'name': 'Brokkerspot', 'image': 'assets/images/story.png'},
-      {'name': 'Rachid', 'image': 'assets/images/story.png'},
-      {'name': 'Nisha', 'image': 'assets/images/story.png'},
-      {'name': 'Joya', 'image': 'assets/images/story.png'},
-      {'name': 'Aman', 'image': 'assets/images/story.png'},
-      {'name': 'Sara', 'image': 'assets/images/story.png'},
+      {'name': 'Brokkerspot', 'image': 'assets/images/brocker-icon.png'},
+      {'name': 'Rachid', 'image': 'assets/images/story1.png'},
+      {'name': 'Nisha', 'image': 'assets/images/story2.png'},
+      {'name': 'Joya', 'image': 'assets/images/story3.png'},
+      {'name': 'Aman', 'image': 'assets/images/story4.png'},
+      {'name': 'Sara', 'image': 'assets/images/story1.png'},
+      {'name': 'Ali', 'image': 'assets/images/story2.png'},
+      {'name': 'Riya', 'image': 'assets/images/story3.png'},
+      {'name': 'Omar', 'image': 'assets/images/story4.png'},
     ];
 
     return Column(
@@ -271,7 +282,7 @@ class HomeView extends StatelessWidget {
             children: [
               Text(
                 'Announcements',
-                style: GoogleFonts.inter(
+                style: GoogleFonts.carlito(
                   fontSize: 15.sp,
                   fontWeight: FontWeight.w700,
                   color: Colors.black,
@@ -293,8 +304,8 @@ class HomeView extends StatelessWidget {
                 },
                 child: Text(
                   'More',
-                  style: GoogleFonts.inter(
-                    fontSize: 13.sp,
+                  style: GoogleFonts.carlito(
+                    fontSize: 14.sp,
                     fontWeight: FontWeight.w500,
                     color: Colors.grey.shade600,
                   ),
@@ -340,7 +351,7 @@ class HomeView extends StatelessWidget {
             children: [
               Text(
                 'DAMAC',
-                style: GoogleFonts.inter(
+                style: GoogleFonts.carlito(
                   fontSize: 15.sp,
                   fontWeight: FontWeight.w700,
                   color: Colors.black,
@@ -363,7 +374,7 @@ class HomeView extends StatelessWidget {
                 },
                 child: Text(
                   'More',
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.carlito(
                     fontSize: 13.sp,
                     fontWeight: FontWeight.w500,
                     color: Colors.grey.shade600,

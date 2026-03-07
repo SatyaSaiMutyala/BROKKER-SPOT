@@ -5,14 +5,15 @@ import 'package:brokkerspot/views/user/meeting/meeting_view.dart';
 import 'package:flutter/material.dart';
 
 class DashboardView extends StatefulWidget {
-  const DashboardView({super.key});
+  final int initialIndex;
+  const DashboardView({super.key, this.initialIndex = 0});
 
   @override
   State<DashboardView> createState() => _DashboardViewState();
 }
 
 class _DashboardViewState extends State<DashboardView> {
-  int _currentIndex = 0;
+  late int _currentIndex = widget.initialIndex;
 
   final List<Widget> _screens = [
     HomeView(),
@@ -28,11 +29,17 @@ class _DashboardViewState extends State<DashboardView> {
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade300),
+          BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        elevation: 0,
         selectedItemColor: const Color(0xFFD9C27C),
-        unselectedItemColor: Colors.grey,
+        unselectedItemColor: Colors.black54,
         onTap: (index) {
           setState(() => _currentIndex = index);
         },
@@ -65,6 +72,8 @@ class _DashboardViewState extends State<DashboardView> {
             ),
             label: 'Account',
           ),
+        ],
+      ),
         ],
       ),
     );

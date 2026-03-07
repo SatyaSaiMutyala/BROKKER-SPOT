@@ -26,21 +26,29 @@ class HomeAnnouncementCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16.r),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12,
+              spreadRadius: 1,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image section with badge
-            _buildImageSection(a),
-            // Info section
-            _buildInfoSection(a),
-          ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16.r),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image section with badge
+              _buildImageSection(a),
+              // Info section
+              _buildInfoSection(a),
+            ],
+          ),
         ),
       ),
     );
@@ -65,12 +73,14 @@ class HomeAnnouncementCard extends StatelessWidget {
         if (a.listingType != null)
           Positioned(
             top: 12.h,
-            left: 12.w,
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
               decoration: BoxDecoration(
                 color: AppColors.goldAccent,
-                borderRadius: BorderRadius.circular(6.r),
+                borderRadius: BorderRadius.only(
+                  topRight: Radius.circular(6.r),
+                  bottomRight: Radius.circular(6.r),
+                ),
               ),
               child: Text(
                 a.listingType!,
@@ -97,7 +107,7 @@ class HomeAnnouncementCard extends StatelessWidget {
             children: [
               Text(
                 'AED ',
-                style: GoogleFonts.inter(
+                style: GoogleFonts.poppins(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w500,
                   color: Colors.black,
@@ -105,16 +115,16 @@ class HomeAnnouncementCard extends StatelessWidget {
               ),
               Text(
                 _formatPrice(a.price ?? 0),
-                style: GoogleFonts.inter(
+                style: GoogleFonts.poppins(
                   fontSize: 19.sp,
                   fontWeight: FontWeight.w800,
-                  color: Colors.black,
+                  color: AppColors.primary,
                 ),
               ),
               Text(
                 ' yearly',
-                style: GoogleFonts.inter(
-                  fontSize: 13.sp,
+                style: GoogleFonts.poppins(
+                  fontSize: 14.sp,
                   fontWeight: FontWeight.w400,
                   color: Colors.black87,
                 ),
@@ -122,7 +132,7 @@ class HomeAnnouncementCard extends StatelessWidget {
               const Spacer(),
               Text(
                 a.timeAgo ?? '',
-                style: GoogleFonts.inter(
+                style: GoogleFonts.poppins(
                   fontSize: 11.sp,
                   color: Colors.grey,
                 ),
