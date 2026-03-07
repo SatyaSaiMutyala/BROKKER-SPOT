@@ -6,6 +6,7 @@ import 'package:brokkerspot/views/brokker/brokker_login/view/create_brokker_acco
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
 import 'package:brokkerspot/views/user/deals/my_project_deals_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -19,83 +20,166 @@ class AccountView extends StatelessWidget {
     AccountController controller = Get.put(AccountController());
     final bool isGuest = !LocalStorageService.isLoggedIn();
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        centerTitle: true,
-        title: Text(
-          'Account',
-          style: GoogleFonts.inter(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.black),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.grey.shade100,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      body: Column(
-        children: [
-          _accountTile(
-            icon: Icons.person_outline,
-            title: 'MyAccount',
-            enabled: !isGuest,
-            onTap: () {},
-          ),
-          _divider(),
-          _accountTile(
-            icon: Icons.handshake_outlined,
-            title: 'My Project Deals',
-            enabled: !isGuest,
-            onTap: () {
-              Get.to(() => const MyProjectDealsView());
-            },
-          ),
-          _divider(),
-          _accountTile(
-            icon: Icons.campaign_outlined,
-            title: isGuest ? 'MY ANNOUNCEMENTS' : 'My Announcements',
-            enabled: !isGuest,
-            onTap: () {},
-          ),
-          _divider(),
-          _accountTile(
-            icon: isGuest ? Icons.business_center_outlined : Icons.swap_horiz,
-            title: isGuest ? 'Become Broker' : 'Switch to Broker side',
-            enabled: true,
-            onTap: () {
-                Get.to(() => BrokerOnboardingView());
-            },
-          ),
-          _divider(),
-          _accountTile(
-            icon: Icons.favorite_border,
-            title: 'My Wishlist',
-            enabled: !isGuest,
-            onTap: () {},
-          ),
-          _divider(),
-          _accountTile(
-            icon: Icons.settings_outlined,
-            title: 'Setting',
-            enabled: !isGuest,
-            onTap: () {},
-          ),
-          _divider(),
-          if (!isGuest) ...[
-            _accountTile(
-              icon: Icons.logout_outlined,
-              title: 'Logout',
-              enabled: true,
-              onTap: () {
-                controller.logout();
-              },
+      child: Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            _buildHeader(context),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.grey.shade100,
+                      const Color(0xFFE8F5F5).withValues(alpha: 0.3),
+                    ],
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+                  child: Column(
+                    children: [
+                      // First card
+                      _buildCard(
+                        children: [
+                          _accountTile(
+                            icon: Icons.person_outline,
+                            title: 'My Information',
+                            enabled: !isGuest,
+                            onTap: () {},
+                          ),
+                          _tileDivider(),
+                          _accountTile(
+                            icon: Icons.handshake_outlined,
+                            title: 'My Deals',
+                            enabled: !isGuest,
+                            onTap: () {
+                              Get.to(() => const MyProjectDealsView());
+                            },
+                          ),
+                          _tileDivider(),
+                          _accountTile(
+                            icon: Icons.account_balance_outlined,
+                            title: 'My Bank Account Details',
+                            enabled: !isGuest,
+                            onTap: () {},
+                          ),
+                          _tileDivider(),
+                          _accountTile(
+                            icon: Icons.campaign_outlined,
+                            title: 'Announcement',
+                            enabled: !isGuest,
+                            onTap: () {},
+                          ),
+                          _tileDivider(),
+                          _accountTile(
+                            icon: Icons.favorite,
+                            title: 'My Wishlist',
+                            enabled: !isGuest,
+                            onTap: () {},
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      // Second card
+                      _buildCard(
+                        children: [
+                          _accountTile(
+                            icon: Icons.people_outline,
+                            title: isGuest ? 'Become Broker' : 'Switch to User side',
+                            enabled: true,
+                            onTap: () {
+                              Get.to(() => BrokerOnboardingView());
+                            },
+                          ),
+                          _tileDivider(),
+                          _accountTile(
+                            icon: Icons.card_membership_outlined,
+                            title: 'My Subscription',
+                            enabled: !isGuest,
+                            onTap: () {},
+                          ),
+                          _tileDivider(),
+                          _accountTile(
+                            icon: Icons.settings_outlined,
+                            title: 'Setting',
+                            enabled: !isGuest,
+                            onTap: () {},
+                          ),
+                          if (!isGuest) ...[
+                            _tileDivider(),
+                            _accountTile(
+                              icon: Icons.logout_outlined,
+                              title: 'Logout',
+                              enabled: true,
+                              onTap: () {
+                                controller.logout();
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-            _divider(),
           ],
+        ),
+      ),
+      ),
+    );
+  }
+
+  // ---------------- HEADER ----------------
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            
+            child: Center(
+              child: Text(
+                'My Account',
+                style: GoogleFonts.inter(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+          // SizedBox(width: 40.w),
         ],
       ),
+    );
+  }
+
+  // ---------------- CARD ----------------
+  Widget _buildCard({required List<Widget> children}) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+      ),
+      child: Column(children: children),
     );
   }
 
@@ -109,31 +193,31 @@ class AccountView extends StatelessWidget {
     return InkWell(
       onTap: enabled ? onTap : null,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
         child: Row(
           children: [
             Icon(
               icon,
-              size: 28,
+              size: 24,
               color: enabled
-                  ? const Color(0xFFD9C27C)
-                  : const Color(0xFFD9C27C).withValues(alpha: 0.4),
+                  ? AppColors.primary
+                  : AppColors.primary.withValues(alpha: 0.4),
             ),
-            SizedBox(width: 14.w),
+            SizedBox(width: 16.w),
             Expanded(
               child: Text(
                 title,
                 style: GoogleFonts.inter(
                   fontSize: 14.sp,
-                  fontWeight: enabled ? FontWeight.w500 : FontWeight.w400,
-                  color: enabled ? Colors.black : Colors.grey.shade400,
+                  fontWeight: FontWeight.w500,
+                  color: enabled ? Colors.black87 : Colors.grey.shade400,
                 ),
               ),
             ),
             Icon(
-              Icons.arrow_forward_ios,
-              size: 14,
-              color: enabled ? Colors.black45 : Colors.grey.shade300,
+              Icons.chevron_right,
+              size: 22,
+              color: enabled ? Colors.grey.shade500 : Colors.grey.shade300,
             ),
           ],
         ),
@@ -142,11 +226,14 @@ class AccountView extends StatelessWidget {
   }
 
   // ---------------- DIVIDER ----------------
-  Widget _divider() {
-    return Divider(
-      height: 1,
-      thickness: 0.6,
-      color: Colors.grey.shade300,
+  Widget _tileDivider() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w),
+      child: Divider(
+        height: 1,
+        thickness: 0.5,
+        color: Colors.grey.shade200,
+      ),
     );
   }
 }
@@ -182,7 +269,6 @@ void showLoginRequiredDialog(BuildContext context) {
               ),
             ),
             SizedBox(height: 24.h),
-            // Login button
             SizedBox(
               width: double.infinity,
               height: 46.h,
@@ -208,7 +294,6 @@ void showLoginRequiredDialog(BuildContext context) {
               ),
             ),
             SizedBox(height: 12.h),
-            // Signup button
             SizedBox(
               width: double.infinity,
               height: 46.h,

@@ -95,33 +95,36 @@ class HomeView extends StatelessWidget {
                 ),
                 SizedBox(width: 10.w),
                 Flexible(
-                  child: Obx(() => Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Hello,',
-                            style: GoogleFonts.inter(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.grey,
-                            ),
+                  child: Obx(() {
+                    final name = profileController.userName.value;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hello,',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.grey,
                           ),
-                          Text(
-                            profileController.isGuest
-                                ? 'Guest User'
-                                : profileController.userName.value.isNotEmpty
-                                    ? profileController.userName.value
-                                    : '...',
-                            style: GoogleFonts.inter(
-                              fontSize: 17.sp,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
+                        ),
+                        Text(
+                          profileController.isGuest
+                              ? 'Guest User'
+                              : name.isNotEmpty
+                                  ? name
+                                  : '...',
+                          style: GoogleFonts.inter(
+                            fontSize: 17.sp,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
                           ),
-                        ],
-                      )),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ],
+                    );
+                  }),
                 ),
               ],
             ),

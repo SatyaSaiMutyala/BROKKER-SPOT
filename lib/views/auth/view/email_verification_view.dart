@@ -55,6 +55,7 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
           backgroundColor: Colors.white,
           resizeToAvoidBottomInset: true,
           body: SafeArea(
+            bottom: false,
             child: Column(
               children: [
                 _topSection(context),
@@ -62,18 +63,13 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
                   child: SingleChildScrollView(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 24.w),
-                          child: _contentSection(context),
-                        ),
-                        SizedBox(height: 20.h),
-                        _bottomCityImage(context),
-                      ],
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24.w),
+                      child: _contentSection(context),
                     ),
                   ),
                 ),
+                _bottomCityImage(context),
               ],
             ),
           ),
@@ -90,7 +86,7 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            top: -60.h,
+            top: -100.h,
             right: -20.w,
             child: Image.asset(
               'assets/images/top_curve.png',
@@ -100,7 +96,7 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
             ),
           ),
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10.h,
+            top: 10.h,
             left: 20.w,
             child: InkWell(
               onTap: () => Get.back(),
@@ -110,7 +106,7 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFFE5E5E5)),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 16),
+                child: const Icon(Icons.arrow_back_ios_new, size: 18),
               ),
             ),
           ),
@@ -164,9 +160,9 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
       ),
       decoration: InputDecoration(
         counterText: '',
-        hintText: 'Enter OTP',
+        hintText: 'Code',
         hintStyle: GoogleFonts.inter(
-          fontSize: 14.sp,
+          fontSize: 15.sp,
           color: Colors.grey,
         ),
         suffixIcon: InkWell(
@@ -211,7 +207,7 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
     return Obx(
       () => SizedBox(
         width: double.infinity,
-        height: 46.h,
+        height: 48.h,
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFD9C27C),
@@ -305,16 +301,10 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
 
   // ---------------- BOTTOM IMAGE ----------------
   Widget _bottomCityImage(BuildContext context) {
-    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: keyboardOpen ? 60.h : 120.h,
+    return Image.asset(
+      'assets/images/city.png',
       width: double.infinity,
-      child: Image.asset(
-        'assets/images/city.png',
-        fit: BoxFit.cover,
-      ),
+      fit: BoxFit.fitWidth,
     );
   }
 }

@@ -1,100 +1,217 @@
 import 'package:brokkerspot/views/auth/view/foreget_password_view.dart';
-import 'package:brokkerspot/views/auth/view/help/need_help_view.dart';
 import 'package:brokkerspot/views/auth/view/signup_view.dart';
+import 'package:brokkerspot/views/auth/controller/welcome_view_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_strings.dart';
 import '../controller/login_controller.dart';
-import '../../../widgets/common/custom_text_field.dart';
 
 class LoginView extends StatelessWidget {
   LoginView({super.key});
 
   final LoginController controller =
       Get.put(LoginController(), permanent: true);
+  final WelcomeViewController socialController =
+      Get.put(WelcomeViewController());
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       resizeToAvoidBottomInset: true,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(AppAssets.background, fit: BoxFit.cover),
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0x30000000),
-                  Color(0xE4000000),
-                ],
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _topSection(context),
+            Expanded(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 28.w),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: "Let's ",
+                              style: GoogleFonts.roboto(
+                                fontSize: 26.sp,
+                                fontWeight: FontWeight.w400,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            TextSpan(
+                              text: "Sign In",
+                              style: GoogleFonts.roboto(
+                                fontSize: 26.sp,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: 10.h),
+
+                      // Subtitle
+                      Text(
+                        'quis nostrud exercitation ullamco laboris nisi ut',
+                        style: GoogleFonts.roboto(
+                          fontSize: 13.sp,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+
+                      SizedBox(height: 40.h),
+
+                      // Email field
+                      TextField(
+                        controller: controller.emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        onChanged: (_) => controller.validateForm(),
+                        style: GoogleFonts.roboto(
+                          fontSize: 15.sp,
+                          color: Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Email',
+                          hintStyle: GoogleFonts.roboto(
+                            fontSize: 15.sp,
+                            color: Colors.grey,
+                          ),
+                          suffixIcon: Icon(
+                            Icons.person_outline,
+                            color: AppColors.primary,
+                            size: 22.sp,
+                          ),
+                          enabledBorder: const UnderlineInputBorder(
+                            borderSide:
+                                BorderSide(color: Color(0xFFB5B5B5)),
+                          ),
+                          focusedBorder: const UnderlineInputBorder(
+                            borderSide:
+                                BorderSide(color: Color(0xFFB5B5B5)),
+                          ),
+                        ),
+                      ),
+
+                      SizedBox(height: 20.h),
+
+                      // Password field
+                      Obx(() => TextField(
+                            controller: controller.passwordController,
+                            obscureText: controller.obscurePassword.value,
+                            onChanged: (_) => controller.validateForm(),
+                            style: GoogleFonts.roboto(
+                              fontSize: 14.sp,
+                              color: Colors.black87,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Password',
+                              hintStyle: GoogleFonts.roboto(
+                                fontSize: 15.sp,
+                                color: Colors.grey,
+                              ),
+                              suffixIcon: GestureDetector(
+                                onTap: controller.togglePasswordVisibility,
+                                child: Icon(
+                                  controller.obscurePassword.value
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  color: AppColors.primary,
+                                  size: 22.sp,
+                                ),
+                              ),
+                              enabledBorder: const UnderlineInputBorder(
+                                borderSide:
+                                    BorderSide(color: Color(0xFFB5B5B5)),
+                              ),
+                              focusedBorder: const UnderlineInputBorder(
+                                borderSide:
+                                    BorderSide(color: Color(0xFFB5B5B5)),
+                              ),
+                            ),
+                          )),
+
+                      SizedBox(height: 14.h),
+
+                      // Remember me + Forgot password
+                      _buildRememberForgotRow(),
+
+                      SizedBox(height: 28.h),
+
+                      // Login button
+                      _buildLoginButton(),
+
+                      SizedBox(height: 28.h),
+
+                      // Or Sign With divider
+                      _buildOrDivider(),
+
+                      SizedBox(height: 28.h),
+
+                      // Social buttons
+                      _buildSocialButtons(),
+
+                      SizedBox(height: 30.h),
+
+                      // Don't have an account? Sign Up
+                      _buildSignUpLink(),
+
+                      SizedBox(height: 40.h),
+                    ],
+                  ),
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------- TOP SECTION ----------------
+  Widget _topSection(BuildContext context) {
+    return SizedBox(
+      height: 220.h,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Top curve
+          Positioned(
+            top: -100.h,
+            right: -20.w,
+            child: Image.asset(
+              'assets/images/top_curve.png',
+              width: 300.w,
+              height: 349.h,
+              fit: BoxFit.contain,
+            ),
           ),
-          SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 28.w),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                  SizedBox(height: 100.h),
 
-                  Image.asset(AppAssets.appName, width: 170.w),
-
-                  SizedBox(height: 140.h),
-
-                  /// EMAIL
-                  CustomTextField(
-                    controller: controller.emailController,
-                    hintText: AppStrings.email,
-                    suffixIcon: Icons.person_outline,
-                    keyboardType: TextInputType.emailAddress,
-                    onChanged: (_) => controller.validateForm(),
-                  ),
-
-                  SizedBox(height: 24.h),
-
-                  /// PASSWORD
-                  Obx(() => CustomTextField(
-                        controller: controller.passwordController,
-                        hintText: AppStrings.password,
-                        suffixIcon: controller.obscurePassword.value
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        obscureText: controller.obscurePassword.value,
-                        onSuffixTap: controller.togglePasswordVisibility,
-                        onChanged: (_) => controller.validateForm(),
-                      )),
-
-                  SizedBox(height: 16.h),
-
-                  _buildRememberForgotRow(),
-
-                  SizedBox(height: 28.h),
-
-                  _buildLoginButton(),
-
-                  SizedBox(height: 28.h),
-
-                  _buildOrDivider(),
-
-                  SizedBox(height: 28.h),
-
-                  _buildBottomLinks(),
-
-                  SizedBox(height: 40.h),
-
-                  Align(alignment: Alignment.topLeft, child: _buildNeedHelp()),
-
-                  SizedBox(height: 30.h),
-                ],
-              ),
+          // Back button
+          Positioned(
+            top: 10.h,
+            left: 20.w,
+            child: InkWell(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                ),
+                child: const Icon(Icons.arrow_back_ios_new, size: 18),
               ),
             ),
           ),
@@ -103,7 +220,7 @@ class LoginView extends StatelessWidget {
     );
   }
 
-  /// Remember + Forgot
+  // ---------------- REMEMBER + FORGOT ----------------
   Widget _buildRememberForgotRow() {
     return Obx(() => Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -112,23 +229,25 @@ class LoginView extends StatelessWidget {
               children: [
                 SizedBox(
                   width: 40.w,
-                  height: 22.h,
+                  height: 28.h,
                   child: FittedBox(
                     fit: BoxFit.contain,
                     child: Switch(
                       value: controller.rememberMe.value,
                       onChanged: controller.toggleRememberMe,
-                      activeColor: AppColors.textWhite,
+                      activeColor: Colors.white,
                       activeTrackColor: AppColors.primary,
+                      inactiveThumbColor: Colors.white,
+                      inactiveTrackColor: Colors.grey.shade300,
                     ),
                   ),
                 ),
                 SizedBox(width: 8.w),
                 Text(
-                  AppStrings.rememberMe,
+                  'Remember me',
                   style: GoogleFonts.roboto(
-                    color: AppColors.textWhite,
-                    fontSize: 13.sp,
+                    color: Colors.black54,
+                    fontSize: 15.sp,
                   ),
                 ),
               ],
@@ -136,10 +255,10 @@ class LoginView extends StatelessWidget {
             GestureDetector(
               onTap: () => Get.to(() => const ForgetPasswordView()),
               child: Text(
-                AppStrings.forgotPassword,
+                'Forgot password?',
                 style: GoogleFonts.roboto(
-                  color: AppColors.textWhite,
-                  fontSize: 13.sp,
+                  color: Colors.black54,
+                  fontSize: 15.sp,
                 ),
               ),
             ),
@@ -147,13 +266,24 @@ class LoginView extends StatelessWidget {
         ));
   }
 
-  /// LOGIN BUTTON
+  // ---------------- LOGIN BUTTON ----------------
   Widget _buildLoginButton() {
     return Obx(() {
       final valid = controller.isFormValid.value;
-      return SizedBox(
+      return Container(
         width: double.infinity,
         height: 52.h,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30.r),
+          boxShadow: [
+            BoxShadow(
+              color: (valid ? AppColors.primary : Colors.grey.shade300)
+                  .withValues(alpha: 0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
         child: ElevatedButton(
           onPressed: controller.isLoading.value
               ? null
@@ -161,8 +291,10 @@ class LoginView extends StatelessWidget {
                   ? controller.login
                   : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: valid ? AppColors.primary : Colors.grey.shade400,
-            disabledBackgroundColor: Colors.grey.shade400,
+            backgroundColor:
+                valid ? AppColors.primary : Colors.grey.shade300,
+            disabledBackgroundColor: Colors.grey.shade300,
+            elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30.r),
             ),
@@ -177,10 +309,10 @@ class LoginView extends StatelessWidget {
                   ),
                 )
               : Text(
-                  AppStrings.login,
+                  'Login',
                   style: GoogleFonts.roboto(
                     fontSize: 15.sp,
-                    color: valid ? Colors.black : Colors.white70,
+                    color: valid ? Colors.white : Colors.black45,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -189,52 +321,79 @@ class LoginView extends StatelessWidget {
     });
   }
 
+  // ---------------- OR DIVIDER ----------------
   Widget _buildOrDivider() {
     return Row(
       children: [
         Expanded(
-          child: Container(height: 0.5.h, color: Colors.white54),
+          child: Container(
+            height: 0.5,
+            color: const Color(0xFFB5B5B5),
+          ),
         ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w),
           child: Text(
-            AppStrings.or,
-            style: GoogleFonts.inter(
-              color: Colors.white38,
+            'Or Sign With',
+            style: GoogleFonts.roboto(
+              color: Colors.grey,
               fontSize: 13.sp,
             ),
           ),
         ),
         Expanded(
-          child: Container(height: 0.5.h, color: Colors.white54),
+          child: Container(
+            height: 0.5,
+            color: const Color(0xFFB5B5B5),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildBottomLinks() {
+  // ---------------- SOCIAL BUTTONS ----------------
+  Widget _buildSocialButtons() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // Google
         GestureDetector(
-          onTap: () => Get.to(() => SignUpView()),
-          child: Text(
-            AppStrings.createNewAccount,
-            style: GoogleFonts.roboto(
-              color: AppColors.textWhite,
-              fontSize: 13.sp,
-              fontWeight: FontWeight.w500,
+          onTap: socialController.signInWithGoogle,
+          child: Container(
+            width: 56.w,
+            height: 56.w,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey.shade200,
+            ),
+            child: Center(
+              child: Image.asset(
+                'assets/images/google_icon.png',
+                width: 26.w,
+                height: 26.w,
+              ),
             ),
           ),
         ),
+
+        SizedBox(width: 20.w),
+
+        // Apple
         GestureDetector(
-          onTap: () {},
-          child: Text(
-            AppStrings.continueAsGuest,
-            style: GoogleFonts.roboto(
-              color: AppColors.textWhite,
-              fontSize: 13.sp,
-              fontWeight: FontWeight.w500,
+          onTap: socialController.signInWithApple,
+          child: Container(
+            width: 56.w,
+            height: 56.w,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey.shade200,
+            ),
+            child: Center(
+              child: Image.asset(
+                'assets/images/apple_icon.png',
+                width: 26.w,
+                height: 26.w,
+              ),
             ),
           ),
         ),
@@ -242,15 +401,33 @@ class LoginView extends StatelessWidget {
     );
   }
 
-  Widget _buildNeedHelp() {
-    return GestureDetector(
-      onTap: () => Get.to(() => const NeedHelpView()),
-      child: Text(
-        AppStrings.needHelp,
-        style: GoogleFonts.roboto(
-          color: AppColors.textWhite,
-          fontSize: 13.sp,
-        ),
+  // ---------------- SIGN UP LINK ----------------
+  Widget _buildSignUpLink() {
+    return Center(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            "Don't have an account?  ",
+            style: GoogleFonts.roboto(
+              color: Colors.grey,
+              fontSize: 15.sp,
+            ),
+          ),
+          GestureDetector(
+            onTap: () => Get.to(() => SignUpView()),
+            child: Text(
+              'Sign Up',
+              style: GoogleFonts.roboto(
+                color: AppColors.primary,
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w500,
+                decoration: TextDecoration.underline,
+                decorationColor: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

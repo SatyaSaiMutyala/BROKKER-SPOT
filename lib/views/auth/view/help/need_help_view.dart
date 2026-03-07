@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:brokkerspot/core/constants/app_assets.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 
 class NeedHelpView extends StatefulWidget {
@@ -54,6 +55,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
       backgroundColor: Colors.white,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             _topSection(context),
@@ -67,7 +69,6 @@ class _NeedHelpViewState extends State<NeedHelpView> {
                       padding: EdgeInsets.symmetric(horizontal: 24.w),
                       child: _formSection(),
                     ),
-                    SizedBox(height: 20.h),
                     _bottomCityImage(),
                   ],
                 ),
@@ -87,7 +88,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            top: -60.h,
+            top: -100.h,
             right: -20.w,
             child: Image.asset(
               'assets/images/top_curve.png',
@@ -96,8 +97,9 @@ class _NeedHelpViewState extends State<NeedHelpView> {
               fit: BoxFit.contain,
             ),
           ),
+          // Back button
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10.h,
+            top: 10.h,
             left: 20.w,
             child: InkWell(
               onTap: () => Navigator.pop(context),
@@ -107,7 +109,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFFE5E5E5)),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 16),
+                child: const Icon(Icons.arrow_back_ios_new, size: 18),
               ),
             ),
           ),
@@ -144,10 +146,10 @@ class _NeedHelpViewState extends State<NeedHelpView> {
               color: Colors.grey,
             ),
             enabledBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
+              borderSide: BorderSide(color: Color(0xFFB5B5B5)),
             ),
             focusedBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.black),
+              borderSide: BorderSide(color: Color(0xFFB5B5B5)),
             ),
           ),
         ),
@@ -155,58 +157,60 @@ class _NeedHelpViewState extends State<NeedHelpView> {
         SizedBox(height: 14.h),
 
         // Phone Number
-        Row(
+        Column(
           children: [
-            Image.asset(
-              'assets/images/uae_flag.png',
-              width: 28.w,
-              height: 20.h,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Text(
-                '🇦🇪',
-                style: TextStyle(fontSize: 18.sp),
-              ),
-            ),
-            SizedBox(width: 8.w),
-            DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedCountryCode,
-                style: GoogleFonts.roboto(
-                  fontSize: 14.sp,
-                  color: Colors.black,
-                ),
-                items: const [
-                  DropdownMenuItem(value: '+971', child: Text('+971')),
-                  DropdownMenuItem(value: '+91', child: Text('+91')),
-                  DropdownMenuItem(value: '+1', child: Text('+1')),
+            Padding(
+              padding: EdgeInsets.only(top: 12.h, bottom: 12.h),
+              child: Row(
+                children: [
+                  Image.asset(
+                    'assets/images/uae_flag.png',
+                    width: 28.w,
+                    height: 20.h,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Text(
+                      '🇦🇪',
+                      style: TextStyle(fontSize: 18.sp),
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  Text(
+                    _selectedCountryCode,
+                    style: GoogleFonts.roboto(
+                      fontSize: 14.sp,
+                      color: Colors.black,
+                    ),
+                  ),
+                  SizedBox(width: 16.w),
+                  Container(
+                    width: 1,
+                    height: 24.h,
+                    color: const Color(0xFFB5B5B5),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: TextField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      style: GoogleFonts.roboto(fontSize: 14.sp),
+                      decoration: InputDecoration(
+                        hintText: 'Phone Number',
+                        hintStyle: GoogleFonts.roboto(
+                          fontSize: 14.sp,
+                          color: Colors.grey,
+                        ),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ),
                 ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedCountryCode = value);
-                  }
-                },
               ),
             ),
-            SizedBox(width: 8.w),
-            Expanded(
-              child: TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                style: GoogleFonts.roboto(fontSize: 14.sp),
-                decoration: InputDecoration(
-                  hintText: 'Phone Number',
-                  hintStyle: GoogleFonts.roboto(
-                    fontSize: 14.sp,
-                    color: Colors.grey,
-                  ),
-                  enabledBorder: const UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black26),
-                  ),
-                  focusedBorder: const UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black),
-                  ),
-                ),
-              ),
+            Container(
+              height: 1,
+              color: const Color(0xFFB5B5B5),
             ),
           ],
         ),
@@ -225,10 +229,10 @@ class _NeedHelpViewState extends State<NeedHelpView> {
               color: Colors.grey,
             ),
             enabledBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
+              borderSide: BorderSide(color: Color(0xFFB5B5B5)),
             ),
             focusedBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.black),
+              borderSide: BorderSide(color: Color(0xFFB5B5B5)),
             ),
           ),
         ),
@@ -238,7 +242,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
         // Message text area
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: const Color(0xFFB5B5B5)),
             borderRadius: BorderRadius.circular(8.r),
           ),
           child: TextField(
@@ -267,7 +271,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: _isFormValid
-                  ? const Color(0xFFD9C27C)
+                  ? AppColors.primary
                   : Colors.grey.shade300,
               disabledBackgroundColor: Colors.grey.shade300,
               shape: RoundedRectangleBorder(
@@ -301,7 +305,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
               TextSpan(
                 text: 'Note : ',
                 style: GoogleFonts.roboto(
-                  fontSize: 12.sp,
+                  fontSize: 14.sp,
                   color: AppColors.primary,
                   fontWeight: FontWeight.w600,
                 ),
@@ -309,7 +313,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
               TextSpan(
                 text: 'Our team will contact you ',
                 style: GoogleFonts.roboto(
-                  fontSize: 12.sp,
+                  fontSize: 14.sp,
                   color: Colors.black54,
                 ),
               ),
@@ -375,9 +379,8 @@ class _NeedHelpViewState extends State<NeedHelpView> {
   Widget _bottomCityImage() {
     return Image.asset(
       'assets/images/city.png',
-      height: 120.h,
       width: double.infinity,
-      fit: BoxFit.cover,
+      fit: BoxFit.fitWidth,
     );
   }
 }

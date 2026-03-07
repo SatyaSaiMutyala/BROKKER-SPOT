@@ -48,6 +48,7 @@ class _SignUpViewState extends State<SignUpView> {
           backgroundColor: Colors.white,
           resizeToAvoidBottomInset: true,
           body: SafeArea(
+            bottom: false,
             child: Column(
               children: [
                 _topSection(context),
@@ -56,18 +57,13 @@ class _SignUpViewState extends State<SignUpView> {
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: EdgeInsets.only(bottom: 20.h),
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: _formSection(),
-                        ),
-                        SizedBox(height: 20.h),
-                        _bottomCityImage(),
-                      ],
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: _formSection(),
                     ),
                   ),
                 ),
+                _bottomCityImage(),
               ],
             ),
           ),
@@ -79,12 +75,12 @@ class _SignUpViewState extends State<SignUpView> {
   // ---------------- TOP SECTION ----------------
   Widget _topSection(BuildContext context) {
     return SizedBox(
-      height: 220.h,
+      height: 180.h,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            top: -60.h,
+            top: -100.h,
             right: -20.w,
             child: SizedBox(
               width: 300.w,
@@ -97,7 +93,7 @@ class _SignUpViewState extends State<SignUpView> {
             ),
           ),
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10.h,
+            top: 10.h,
             left: 20.w,
             child: InkWell(
               onTap: () => Navigator.pop(context),
@@ -132,12 +128,12 @@ class _SignUpViewState extends State<SignUpView> {
                     children: [
                       Text(
                         'Already have an Account? ',
-                        style: GoogleFonts.inter(fontSize: 12.sp),
+                        style: GoogleFonts.inter(fontSize: 13.sp),
                       ),
                       Text(
                         'Login',
                         style: GoogleFonts.inter(
-                          fontSize: 12.sp,
+                          fontSize: 13.sp,
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
                         ),
@@ -351,7 +347,7 @@ class _SignUpViewState extends State<SignUpView> {
           height: 46.h,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
+              backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
               ),
@@ -393,32 +389,27 @@ class _SignUpViewState extends State<SignUpView> {
     return Text.rich(
       TextSpan(
         text: 'By clicking create an Account button, I agree to brokkerspot ',
-        style: GoogleFonts.inter(fontSize: 10.sp, color: Colors.grey.shade600),
+        style: GoogleFonts.inter(fontSize: 11.sp, color: Colors.grey.shade600),
         children: [
           TextSpan(
             text: 'Terms & conditions.',
             style: GoogleFonts.inter(
-              fontSize: 10.sp,
+              fontSize: 11.sp,
               color: AppColors.primary,
               fontWeight: FontWeight.w600,
             ),
           ),
         ],
       ),
-      textAlign: TextAlign.center,
+      textAlign: TextAlign.start,
     );
   }
 
   Widget _bottomCityImage() {
     return Image.asset(
       'assets/images/city.png',
-      height: 120.h,
       width: double.infinity,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => Container(
-        height: 120.h,
-        color: Colors.grey.shade200,
-      ),
+      fit: BoxFit.fitWidth,
     );
   }
 }

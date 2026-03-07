@@ -14,28 +14,86 @@ class SplashView extends StatefulWidget {
   State<SplashView> createState() => _SplashViewState();
 }
 
-class _SplashViewState extends State<SplashView> {
+class _SplashViewState extends State<SplashView>
+    with TickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late AnimationController _moveController;
+  late Animation<double> _logoFade;
+  late Animation<double> _logoScale;
+  late Animation<Alignment> _logoPosition;
+  late Animation<double> _logoWidth;
+
   @override
   void initState() {
     super.initState();
-    _checkLoginStatus();
+
+    // Phase 1: Logo fades in + scales at center
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+
+    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
+    );
+
+    _logoScale = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOutBack),
+    );
+
+    // Phase 2: Logo moves up + shrinks to match welcome_view position
+    _moveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _logoPosition = AlignmentTween(
+      begin: Alignment.center,
+      end: const Alignment(0.0, -0.65),
+    ).animate(
+      CurvedAnimation(parent: _moveController, curve: Curves.easeInOut),
+    );
+
+    _logoWidth = Tween<double>(begin: 220.w, end: 170.w).animate(
+      CurvedAnimation(parent: _moveController, curve: Curves.easeInOut),
+    );
+
+    _startAnimation();
   }
 
-  Future<void> _checkLoginStatus() async {
-    await Future.delayed(const Duration(seconds: 3));
+  Future<void> _startAnimation() async {
+    // Brief pause before logo appears
+    await Future.delayed(const Duration(milliseconds: 600));
 
+    // Phase 1: Fade in logo at center
+    _fadeController.forward();
+    await Future.delayed(const Duration(milliseconds: 2000));
+
+    // Phase 2: Move logo up to top position
+    _moveController.forward();
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    // Navigate
+    _navigate();
+  }
+
+  void _navigate() {
     final token = LocalStorageService.getAccessToken();
     final user = LocalStorageService.getUser();
-    print("Token: $token, User: ${user?.toJson()}");
     final firebaseUser = FirebaseAuth.instance.currentUser;
 
-    // Email login: has both token and user data
-    // Google/Apple login: has token and Firebase user but no backend user data
     if (token != null && (user != null || firebaseUser != null)) {
       Get.offAll(() => DashboardView());
     } else {
       Get.offAll(() => WelcomeView());
     }
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _moveController.dispose();
+    super.dispose();
   }
 
   @override
@@ -50,26 +108,41 @@ class _SplashViewState extends State<SplashView> {
             fit: BoxFit.cover,
           ),
 
-          // Linear Gradient Overlay
+          // Gradient Overlay matching the design
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
+                stops: [0.0, 0.35, 0.65, 1.0],
                 colors: [
-                  Color(0x33000000), // #00000033
-                  Color(0xE5000000), // #000000E5
+                  Color(0x15000000),
+                  Color(0x50000000),
+                  Color(0xA5000000),
+                  Color(0xE5000000),
                 ],
               ),
             ),
           ),
 
-          // Logo
-          Center(
-            child: Image.asset(
-              AppAssets.appName,
-              width: 220.w,
-            ),
+          // Animated Logo
+          AnimatedBuilder(
+            animation: Listenable.merge([_fadeController, _moveController]),
+            builder: (context, child) {
+              return Align(
+                alignment: _logoPosition.value,
+                child: FadeTransition(
+                  opacity: _logoFade,
+                  child: Transform.scale(
+                    scale: _logoScale.value,
+                    child: Image.asset(
+                      AppAssets.appName,
+                      width: _logoWidth.value,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
