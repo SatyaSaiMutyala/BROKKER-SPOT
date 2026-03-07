@@ -14,11 +14,11 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
+  final List<Widget> _screens = [
     HomeView(),
-    AnnouncementsView(),
-    MeetingView(),
-    AccountView(),
+    const AnnouncementsView(),
+    const MeetingView(),
+    const AccountView(),
   ];
 
   @override

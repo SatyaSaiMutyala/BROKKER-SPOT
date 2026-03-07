@@ -26,6 +26,7 @@ class _SplashViewState extends State<SplashView> {
 
     final token = LocalStorageService.getAccessToken();
     final user = LocalStorageService.getUser();
+    print("Token: $token, User: ${user?.toJson()}");
     final firebaseUser = FirebaseAuth.instance.currentUser;
 
     // Email login: has both token and user data

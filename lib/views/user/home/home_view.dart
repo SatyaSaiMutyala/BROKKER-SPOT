@@ -1,3 +1,5 @@
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 import 'package:brokkerspot/views/user/home/more_property_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -12,7 +14,9 @@ import 'package:brokkerspot/views/user/home/property_detail_view.dart';
 import 'package:brokkerspot/views/user/home/search_view.dart';
 
 class HomeView extends StatelessWidget {
-  const HomeView({super.key});
+  HomeView({super.key});
+
+  final ProfileController profileController = Get.put(ProfileController());
 
   @override
   Widget build(BuildContext context) {
@@ -61,49 +65,59 @@ class HomeView extends StatelessWidget {
   Widget _buildHeader() {
     return Row(
       children: [
-        // Profile avatar
-        Container(
-          width: 46.w,
-          height: 46.w,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.grey.shade200,
-            border: Border.all(color: Colors.grey.shade300, width: 1),
+        // Profile avatar + greeting (tappable)
+        GestureDetector(
+          onTap: () {
+            if (!profileController.isGuest) {
+              Get.to(() => ProfileView());
+            }
+          },
+          child: Row(
+            children: [
+              Container(
+                width: 46.w,
+                height: 46.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade200,
+                  border: Border.all(color: Colors.grey.shade300, width: 1),
+                ),
+                child: ClipOval(
+                  child: Icon(
+                    Icons.person,
+                    size: 24.sp,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+              SizedBox(width: 10.w),
+              Obx(() => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hello,',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      Text(
+                        profileController.isGuest
+                            ? 'Guest User'
+                            : profileController.userName.value.isNotEmpty
+                                ? profileController.userName.value
+                                : '...',
+                        style: GoogleFonts.inter(
+                          fontSize: 17.sp,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  )),
+            ],
           ),
-          child: ClipOval(
-            child: Image.asset(
-              'assets/images/profile.jpg',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.person,
-                size: 24.sp,
-                color: Colors.grey,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: 10.w),
-        // Greeting text
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Hello,',
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w400,
-                color: Colors.grey,
-              ),
-            ),
-            Text(
-              'Rachid',
-              style: GoogleFonts.inter(
-                fontSize: 17.sp,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
-            ),
-          ],
         ),
         const Spacer(),
         // Search box
