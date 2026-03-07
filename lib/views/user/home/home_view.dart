@@ -66,7 +66,7 @@ class HomeView extends StatelessWidget {
     return Row(
       children: [
         // Profile avatar + greeting (tappable)
-        Flexible(
+        Expanded(
           child: GestureDetector(
             onTap: () {
               if (!profileController.isGuest) {
@@ -74,7 +74,6 @@ class HomeView extends StatelessWidget {
               }
             },
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   width: 46.w,
@@ -94,7 +93,7 @@ class HomeView extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: 10.w),
-                Flexible(
+                Expanded(
                   child: Obx(() {
                     final name = profileController.userName.value;
                     return Column(
@@ -136,6 +135,7 @@ class HomeView extends StatelessWidget {
         SizedBox(width: 10.w),
         // Notification bell
         _buildNotificationBell(),
+        SizedBox(width: 6.w),
       ],
     );
   }
@@ -172,16 +172,12 @@ class HomeView extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
+        SizedBox(
           width: 40.w,
           height: 40.w,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.goldAccent.withValues(alpha: 0.15),
-          ),
           child: Icon(
             Icons.notifications_none_rounded,
-            size: 24.sp,
+            size: 28.sp,
             color: AppColors.goldAccent,
           ),
         ),
