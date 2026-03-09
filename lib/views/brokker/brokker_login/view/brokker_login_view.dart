@@ -51,6 +51,24 @@ class _BrokerOnboardingViewState extends State<BrokerOnboardingView> {
       body: SafeArea(
         child: Column(
           children: [
+            // Back button
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16, top: 12),
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFE5E5E5)),
+                    ),
+                    child: const Icon(Icons.arrow_back_ios_new, size: 18),
+                  ),
+                ),
+              ),
+            ),
             Expanded(
               child: PageView.builder(
                 controller: _pageController,

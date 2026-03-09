@@ -25,6 +25,7 @@ class EmailVerificationView extends StatefulWidget {
 class _EmailVerificationViewState extends State<EmailVerificationView> {
   late final EmailVerificationController controller;
   late final ForgetPasswordController forgetPasswordController;
+  bool _isOtpValid = false;
 
   @override
   void initState() {
@@ -37,6 +38,16 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
     );
     forgetPasswordController =
         Get.put(ForgetPasswordController(), tag: widget.email);
+
+    // Listen to OTP changes
+    final otpCtrl = widget.password == false
+        ? controller.otpController
+        : forgetPasswordController.otpController;
+    otpCtrl.addListener(() {
+      setState(() {
+        _isOtpValid = otpCtrl.text.trim().length == 6;
+      });
+    });
   }
 
   @override
@@ -56,21 +67,29 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
           resizeToAvoidBottomInset: true,
           body: SafeArea(
             bottom: false,
-            child: Column(
-              children: [
-                _topSection(context),
-                Expanded(
-                  child: SingleChildScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24.w),
-                      child: _contentSection(context),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          children: [
+                            _topSection(context),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 24.w),
+                              child: _contentSection(context),
+                            ),
+                          ],
+                        ),
+                        _bottomCityImage(context),
+                      ],
                     ),
                   ),
-                ),
-                _bottomCityImage(context),
-              ],
+                );
+              },
             ),
           ),
         );
@@ -86,7 +105,7 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            top: -100.h,
+            top: -90.h,
             right: -20.w,
             child: Image.asset(
               'assets/images/top_curve.png',
@@ -205,46 +224,50 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
   // ---------------- VERIFY BUTTON ----------------
   Widget _verifyButton(BuildContext context) {
     return Obx(
-      () => SizedBox(
-        width: double.infinity,
-        height: 48.h,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFD9C27C),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+      () {
+        final isDisabled = !_isOtpValid || controller.isLoading.value;
+        return SizedBox(
+          width: double.infinity,
+          height: 48.h,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _isOtpValid ? AppColors.primary : Colors.grey.shade300,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              elevation: 0,
             ),
-          ),
-          onPressed: controller.isLoading.value
-              ? null
-              : () async {
-                  if (widget.password == true) {
-                    bool success = await forgetPasswordController
-                        .forgotPasswordVerifyOtp(widget.email);
-                    if (success) {
-                      Get.to(() => CreateNewPasswordView(email: widget.email));
+            onPressed: isDisabled
+                ? null
+                : () async {
+                    if (widget.password == true) {
+                      bool success = await forgetPasswordController
+                          .forgotPasswordVerifyOtp(widget.email);
+                      if (success) {
+                        Get.to(() => CreateNewPasswordView(email: widget.email));
+                      }
+                    } else {
+                      bool success = await controller.verifyOtp(widget.email);
+                      if (success) {
+                        _showSuccessBottomSheet(context);
+                      }
                     }
-                  } else {
-                    bool success = await controller.verifyOtp(widget.email);
-                    if (success) {
-                      _showSuccessBottomSheet(context);
-                    }
-                  }
-                },
-          child: controller.isLoading.value
-              ? const CircularProgressIndicator(
-                  color: Colors.white,
-                )
-              : Text(
-                  'Verify Now',
-                  style: GoogleFonts.inter(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w500,
+                  },
+            child: controller.isLoading.value
+                ? const CircularProgressIndicator(
                     color: Colors.white,
+                  )
+                : Text(
+                    'Verify Now',
+                    style: GoogleFonts.inter(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

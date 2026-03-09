@@ -12,14 +12,30 @@ class RulesScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.chevron_left, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+        leading: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Get.back(),
+          child: Padding(
+            padding: EdgeInsets.all(12),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE5E5E5)),
+              ),
+              child: Icon(
+                Icons.arrow_back_ios_new,
+                size: 18,
+                color: Colors.black,
+              ),
+            ),
+          ),
         ),
         title:
             Text("Rules", style: TextStyle(color: Colors.black, fontSize: 16)),
         centerTitle: true,
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         elevation: 0.5,
       ),
       body: Column(

@@ -5,6 +5,7 @@ import 'package:brokkerspot/views/brokker/brokker_login/view/brokker_login_view.
 import 'package:brokkerspot/views/brokker/brokker_login/view/create_brokker_account_view.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
 import 'package:brokkerspot/views/user/deals/my_project_deals_view.dart';
+import 'package:brokkerspot/views/user/settings/settings_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -17,35 +18,22 @@ class AccountView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    AccountController controller = Get.put(AccountController());
+    Get.put(AccountController());
     final bool isGuest = !LocalStorageService.isLoggedIn();
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        statusBarColor: Colors.grey.shade100,
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            _buildHeader(context),
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.grey.shade100,
-                      const Color(0xFFE8F5F5).withValues(alpha: 0.3),
-                    ],
-                  ),
-                ),
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(context),
+              Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
                   child: Column(
@@ -59,7 +47,7 @@ class AccountView extends StatelessWidget {
                             enabled: !isGuest,
                             onTap: () {},
                           ),
-                          _tileDivider(),
+                          // _tileDivider(),
                           _accountTile(
                             icon: Icons.handshake_outlined,
                             title: 'My Deals',
@@ -68,21 +56,14 @@ class AccountView extends StatelessWidget {
                               Get.to(() => const MyProjectDealsView());
                             },
                           ),
-                          _tileDivider(),
-                          _accountTile(
-                            icon: Icons.account_balance_outlined,
-                            title: 'My Bank Account Details',
-                            enabled: !isGuest,
-                            onTap: () {},
-                          ),
-                          _tileDivider(),
+                          // _tileDivider(),
                           _accountTile(
                             icon: Icons.campaign_outlined,
                             title: 'Announcement',
                             enabled: !isGuest,
                             onTap: () {},
                           ),
-                          _tileDivider(),
+                          // _tileDivider(),
                           _accountTile(
                             icon: Icons.favorite,
                             title: 'My Wishlist',
@@ -97,62 +78,39 @@ class AccountView extends StatelessWidget {
                         children: [
                           _accountTile(
                             icon: Icons.people_outline,
-                            title: isGuest ? 'Become Broker' : 'Switch to User side',
+                            title: 'Become Broker',
                             enabled: true,
                             onTap: () {
                               Get.to(() => BrokerOnboardingView());
                             },
                           ),
-                          _tileDivider(),
-                          _accountTile(
-                            icon: Icons.card_membership_outlined,
-                            title: 'My Subscription',
-                            enabled: !isGuest,
-                            onTap: () {},
-                          ),
-                          _tileDivider(),
+                          // _tileDivider(),
                           _accountTile(
                             icon: Icons.settings_outlined,
                             title: 'Setting',
                             enabled: !isGuest,
-                            onTap: () {},
+                            onTap: () => Get.to(() => SettingsView()),
                           ),
-                          if (!isGuest) ...[
-                            _tileDivider(),
-                            _accountTile(
-                              icon: Icons.logout_outlined,
-                              title: 'Logout',
-                              enabled: true,
-                              onTap: () {
-                                controller.logout();
-                              },
-                            ),
-                          ],
                         ],
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 
   // ---------------- HEADER ----------------
   Widget _buildHeader(BuildContext context) {
-    return Container(
+    return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-      ),
       child: Row(
         children: [
           Expanded(
-            
             child: Center(
               child: Text(
                 'My Account',
@@ -164,7 +122,7 @@ class AccountView extends StatelessWidget {
               ),
             ),
           ),
-          // SizedBox(width: 40.w),
+          SizedBox(width: 40.w),
         ],
       ),
     );

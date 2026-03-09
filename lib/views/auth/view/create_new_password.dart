@@ -21,40 +21,35 @@ class CreateNewPasswordView extends StatelessWidget {
       backgroundColor: Colors.white,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Stack(
-          children: [
-            /// MAIN CONTENT
-            SingleChildScrollView(
-              padding: EdgeInsets.only(bottom: 160.h),
-              child: Column(
-                children: [
-                  _topSection(context),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24.w),
-                    child: Obx(() => _contentSection(
-                          context,
-                          controller,
-                          passwordFocus,
-                          confirmFocus,
-                        )),
-                  ),
-                ],
+        bottom: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      children: [
+                        _topSection(context),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24.w),
+                          child: Obx(() => _contentSection(
+                                context,
+                                controller,
+                                passwordFocus,
+                                confirmFocus,
+                              )),
+                        ),
+                      ],
+                    ),
+                    _bottomCityImage(context),
+                  ],
+                ),
               ),
-            ),
-
-            /// BOTTOM IMAGE
-            Positioned(
-              bottom: -10,
-              left: 0,
-              right: 0,
-              child: Image.asset(
-                'assets/images/city.png',
-                height: 120.h,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -66,7 +61,7 @@ class CreateNewPasswordView extends StatelessWidget {
       child: Stack(
         children: [
           Positioned(
-            top: -60.h,
+            top: -90.h,
             right: -20.w,
             child: Image.asset(
               'assets/images/top_curve.png',
@@ -76,7 +71,7 @@ class CreateNewPasswordView extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10.h,
+            top: 10.h,
             left: 20.w,
             child: InkWell(
               onTap: () => Get.back(),
@@ -86,7 +81,7 @@ class CreateNewPasswordView extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFFE5E5E5)),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 16),
+                child: const Icon(Icons.arrow_back_ios_new, size: 18),
               ),
             ),
           ),
@@ -165,7 +160,9 @@ class CreateNewPasswordView extends StatelessWidget {
           height: 46.h,
           child: ElevatedButton(
             onPressed:
-                controller.isLoading.value ? null : controller.resetPassword,
+                (!controller.isPasswordValid || controller.isLoading.value)
+                    ? null
+                    : controller.resetPassword,
             style: ElevatedButton.styleFrom(
               backgroundColor: controller.isPasswordValid
                   ? const Color(0xFFD9C27C)
@@ -182,6 +179,15 @@ class CreateNewPasswordView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  // ---------------- BOTTOM IMAGE ----------------
+  Widget _bottomCityImage(BuildContext context) {
+    return Image.asset(
+      'assets/images/city.png',
+      width: double.infinity,
+      fit: BoxFit.fitWidth,
     );
   }
 }

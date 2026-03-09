@@ -7,103 +7,135 @@ import 'package:brokkerspot/models/announcement_model.dart';
 class HomeAnnouncementCard extends StatelessWidget {
   final AnnouncementModel announcement;
   final VoidCallback? onTap;
+  final bool showAvatar;
 
   const HomeAnnouncementCard({
     super.key,
     required this.announcement,
     this.onTap,
+    this.showAvatar = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final a = announcement;
-    return GestureDetector(
+    return Padding(
+      padding: EdgeInsets.only(bottom: 10.h),
+      child: GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 328.w,
+        width: 300.w,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: const Color(0xFFF8F8F8),
           borderRadius: BorderRadius.circular(16.r),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 12,
-              spreadRadius: 1,
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 16,
+              spreadRadius: 2,
               offset: const Offset(0, 4),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
             ),
           ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16.r),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Image section with badge
               _buildImageSection(a),
-              // Info section
               _buildInfoSection(a),
+              
             ],
           ),
         ),
       ),
+    ),
     );
   }
 
   Widget _buildImageSection(AnnouncementModel a) {
-    return Stack(
-      children: [
-        // Property image
-        SizedBox(
-          height: 215.h,
-          width: double.infinity,
-          child: (a.imageUrls != null && a.imageUrls!.isNotEmpty)
-              ? Image.asset(
-                  a.imageUrls!.first,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _imagePlaceholder(),
-                )
-              : _imagePlaceholder(),
-        ),
-        // "For Rent" / listing type badge
-        if (a.listingType != null)
-          Positioned(
-            top: 12.h,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
-              decoration: BoxDecoration(
-                color: AppColors.goldAccent,
-                borderRadius: BorderRadius.only(
-                  topRight: Radius.circular(6.r),
-                  bottomRight: Radius.circular(6.r),
+    return SizedBox(
+      height: 230.h,
+      child: Stack(
+        children: [
+          // Property image - full height
+          Positioned.fill(
+            bottom: 22.h,
+            child: (a.imageUrls != null && a.imageUrls!.isNotEmpty)
+                ? Image.asset(
+                    a.imageUrls!.first,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                  )
+                : _imagePlaceholder(),
+          ),
+          // "For Rent" badge - top left
+          if (a.listingType != null)
+            Positioned(
+              top: 12.h,
+              left: 0,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
+                decoration: BoxDecoration(
+                  color: AppColors.goldAccent,
+                  borderRadius: BorderRadius.only(
+                    topRight: Radius.circular(6.r),
+                    bottomRight: Radius.circular(6.r),
+                  ),
                 ),
-              ),
-              child: Text(
-                a.listingType!,
-                style: GoogleFonts.inter(
-                  fontSize: 11.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                child: Text(
+                  a.listingType!,
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
-          ),
-      ],
+          // Owner avatar - bottom left
+          if (showAvatar)
+            Positioned(
+              bottom: 0,
+              left: 14.w,
+              child: Container(
+                width: 44.w,
+                height: 44.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade200,
+                  border: Border.all(color: Colors.white, width: 2.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: a.ownerAvatarUrl != null && a.ownerAvatarUrl!.isNotEmpty
+                      ? Image.network(a.ownerAvatarUrl!, fit: BoxFit.cover)
+                      : Icon(Icons.person, size: 22.sp, color: Colors.grey),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildInfoSection(AnnouncementModel a) {
     return Padding(
-      padding: EdgeInsets.all(12.w),
+      padding: EdgeInsets.fromLTRB(14.w, 6.h, 14.w, 10.h),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Price row + time
           Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
                 'AED ',
@@ -116,7 +148,7 @@ class HomeAnnouncementCard extends StatelessWidget {
               Text(
                 _formatPrice(a.price ?? 0),
                 style: GoogleFonts.poppins(
-                  fontSize: 19.sp,
+                  fontSize: 20.sp,
                   fontWeight: FontWeight.w800,
                   color: AppColors.primary,
                 ),
@@ -151,7 +183,10 @@ class HomeAnnouncementCard extends StatelessWidget {
               color: Colors.black,
             ),
           ),
-          SizedBox(height: 6.h),
+          SizedBox(height: 8.h),
+          // Divider
+          // Divider(height: 1, thickness: 0.5, color: Colors.grey.shade300),
+          // SizedBox(height: 8.h),
           // Location row
           Row(
             children: [
@@ -161,15 +196,15 @@ class HomeAnnouncementCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
-                    fontSize: 12.sp,
-                    color: Colors.grey.shade600,
+                    fontSize: 13.sp,
+                    color: Colors.black,
                   ),
                 ),
               ),
               Icon(
                 Icons.chevron_right,
-                size: 18.sp,
-                color: Colors.grey.shade500,
+                size: 20.sp,
+                color: AppColors.primary,
               ),
             ],
           ),

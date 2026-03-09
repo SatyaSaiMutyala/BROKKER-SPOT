@@ -47,18 +47,18 @@ class NewLaunchBanner extends StatelessWidget {
               Container(color: AppColors.backgroundDark),
 
             // Gradient overlay
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.6),
-                    Colors.black.withValues(alpha: 0.1),
-                  ],
-                ),
-              ),
-            ),
+            // Container(
+            //   decoration: BoxDecoration(
+            //     gradient: LinearGradient(
+            //       begin: Alignment.centerLeft,
+            //       end: Alignment.centerRight,
+            //       colors: [
+            //         Colors.black.withValues(alpha: 0.6),
+            //         Colors.black.withValues(alpha: 0.1),
+            //       ],
+            //     ),
+            //   ),
+            // ),
 
             // Content
             Padding(
@@ -67,28 +67,28 @@ class NewLaunchBanner extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Top-left title badge
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 10.w, vertical: 3.h),
-                    child: Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 11.sp,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  // Top-right timer in 1 line
-                  Text(
-                    '$timeLeft h left',
-                    style: GoogleFonts.inter(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
+                  // Container(
+                  //   padding: EdgeInsets.symmetric(
+                  //       horizontal: 10.w, vertical: 3.h),
+                  //   child: Text(
+                  //     title,
+                  //     style: GoogleFonts.inter(
+                  //       fontSize: 11.sp,
+                  //       fontWeight: FontWeight.w700,
+                  //       color: Colors.white,
+                  //     ),
+                  //   ),
+                  // ),
+                  // const Spacer(),
+                  // // Top-right timer in 1 line
+                  // Text(
+                  //   '$timeLeft h left',
+                  //   style: GoogleFonts.inter(
+                  //     fontSize: 13.sp,
+                  //     fontWeight: FontWeight.w600,
+                  //     color: Colors.white,
+                  //   ),
+                  // ),
                 ],
               ),
             ),

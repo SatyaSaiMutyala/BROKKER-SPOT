@@ -72,7 +72,7 @@ class WelcomeView extends StatelessWidget {
 
                     // Google Button
                     _buildSocialButton(
-                      icon: 'assets/images/google_icon.png',
+                      icon: 'assets/images/google_splash_icon.png',
                       label: 'Continue with Google',
                       onTap: controller.signInWithGoogle,
                     ),
@@ -81,7 +81,7 @@ class WelcomeView extends StatelessWidget {
 
                     // Apple Button
                     _buildSocialButton(
-                      icon: 'assets/images/apple_icon.png',
+                      icon: 'assets/images/apple_splash_icon.png',
                       label: 'Continue with Apple',
                       onTap: controller.signInWithApple,
                     ),
@@ -118,30 +118,40 @@ class WelcomeView extends StatelessWidget {
                       ],
                     ),
 
-                    SizedBox(height: 20.h),
+                    SizedBox(height: 10.h),
 
                     // Continue with Email
-                    GestureDetector(
-                      onTap: () => Get.to(() => LoginView()),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.mail_outline,
-                            color: AppColors.textWhite,
-                            size: 21.sp,
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Get.to(() => LoginView()),
+                        borderRadius: BorderRadius.circular(30.r),
+                        splashColor: Colors.white24,
+                        highlightColor: Colors.white12,
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                'assets/images/email_icon.png',
+                                width: 21.sp,
+                                height: 21.sp,
+                              ),
+                              SizedBox(width: 10.w),
+                              Text(
+                                'Continue with Email',
+                                style: TextStyle(
+                                  fontFamily: 'Lato',
+                                  fontSize: 15.sp,
+                                  color: AppColors.textWhite,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
-                          SizedBox(width: 10.w),
-                          Text(
-                            'Continue with Email',
-                            style: TextStyle(
-                              fontFamily: 'Lato',
-                              fontSize: 15.sp,
-                              color: AppColors.textWhite,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
 
@@ -168,7 +178,7 @@ class WelcomeView extends StatelessWidget {
                           onTap: () => Get.offAll(() => DashboardView()),
                           child: Container(
                             padding: EdgeInsets.symmetric(
-                                horizontal: 22.w, vertical: 12.h),
+                                horizontal: 22.w, vertical: 9.h),
                             decoration: BoxDecoration(
                               border: Border.all(
                                   color: AppColors.primary, width: 1.2),
@@ -219,20 +229,21 @@ class WelcomeView extends StatelessWidget {
         width: double.infinity,
         height: 54.h,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Colors.white.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(30.r),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(icon, width: 24.w, height: 24.h),
+            Image.asset(icon, width: 22.w, height: 26.h),
             SizedBox(width: 12.w),
             Text(
               label,
               style: TextStyle(
                 fontFamily: 'Lato',
                 fontSize: 16.sp,
-                color: Colors.black87,
+                color: Colors.black,
                 fontWeight: FontWeight.w500,
               ),
             ),

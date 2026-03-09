@@ -12,7 +12,9 @@ class CompleteProfileController extends GetxController {
 
   RxString selectedCountry = ''.obs;
   RxString selectedCity = ''.obs;
+  RxString selectedAreas = ''.obs;
   RxString selectedExperience = ''.obs;
+  RxString selectedLanguage = ''.obs;
 
   RxList<String> selectedLanguages = <String>[].obs;
 

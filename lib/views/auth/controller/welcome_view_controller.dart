@@ -1,3 +1,4 @@
+import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -51,11 +52,16 @@ class WelcomeViewController extends GetxController {
       Get.offAll(() => DashboardView());
     } on FirebaseAuthException catch (e) {
       print('Google Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
-      Get.snackbar("Google Sign-In Failed", e.message ?? "");
+      AppToast.error(e.message ?? "Google Sign-In Failed");
     } catch (e, s) {
       print('Google Sign-In Error: $e');
       print('Stack trace: $s');
-      Get.snackbar("Error", e.toString());
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('cancel') || msg.contains('abort') || msg.contains('sign_in_canceled')) {
+        // User pressed back / cancelled — do nothing
+      } else {
+        AppToast.error("Google Sign-In Failed");
+      }
     } finally {
       isLoading.value = false;
       print('=== Google Sign-In Ended ===');
@@ -91,9 +97,14 @@ class WelcomeViewController extends GetxController {
 
       Get.offAll(() => DashboardView());
     } on FirebaseAuthException catch (e) {
-      Get.snackbar("Apple Sign-In Failed", e.message ?? "");
+      AppToast.error(e.message ?? "Apple Sign-In Failed");
     } catch (e) {
-      Get.snackbar("Error", e.toString());
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('cancel') || msg.contains('abort') || msg.contains('AuthorizationErrorCode.canceled')) {
+        // User pressed back / cancelled — do nothing
+      } else {
+        AppToast.error("Apple Sign-In Failed");
+      }
     } finally {
       isLoading.value = false;
     }

@@ -2,6 +2,7 @@ import 'package:brokkerspot/views/auth/view/foreget_password_view.dart';
 import 'package:brokkerspot/views/auth/view/signup_view.dart';
 import 'package:brokkerspot/views/auth/controller/welcome_view_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,18 +25,21 @@ class LoginView extends StatelessWidget {
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            _topSection(context),
-            Expanded(
-              child: SingleChildScrollView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 28.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    _topSection(context),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 28.w),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                       // Title
                       RichText(
                         text: TextSpan(
@@ -172,9 +176,11 @@ class LoginView extends StatelessWidget {
                     ],
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
+        );
+          },
         ),
       ),
     );
@@ -190,7 +196,7 @@ class LoginView extends StatelessWidget {
           // Top curve
           Positioned(
             top: -100.h,
-            right: -20.w,
+            right: -10.w,
             child: Image.asset(
               'assets/images/top_curve.png',
               width: 300.w,
@@ -201,7 +207,7 @@ class LoginView extends StatelessWidget {
 
           // Back button
           Positioned(
-            top: 10.h,
+            top: 5.h,
             left: 20.w,
             child: InkWell(
               onTap: () => Navigator.pop(context),
@@ -369,8 +375,8 @@ class LoginView extends StatelessWidget {
             child: Center(
               child: Image.asset(
                 'assets/images/google_icon.png',
-                width: 26.w,
-                height: 26.w,
+                width: 56.w,
+                height: 56.w,
               ),
             ),
           ),
@@ -391,8 +397,8 @@ class LoginView extends StatelessWidget {
             child: Center(
               child: Image.asset(
                 'assets/images/apple_icon.png',
-                width: 26.w,
-                height: 26.w,
+                width: 56.w,
+                height: 56.w,
               ),
             ),
           ),

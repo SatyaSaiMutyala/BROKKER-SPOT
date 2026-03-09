@@ -54,9 +54,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Owner row
-            _buildOwnerRow(a),
-            // Image carousel
+            // Image carousel with owner row overlay
             _buildImageCarousel(a),
             // Details
             Padding(
@@ -80,74 +78,86 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
     );
   }
 
-  Widget _buildOwnerRow(AnnouncementModel a) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-      child: Row(
-        children: [
-          // Avatar
-          Container(
-            width: 36.w,
-            height: 36.w,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.grey.shade200,
-              border: Border.all(color: Colors.grey.shade300, width: 1),
-            ),
-            child: ClipOval(
-              child: a.ownerAvatarUrl != null && a.ownerAvatarUrl!.isNotEmpty
-                  ? Image.network(a.ownerAvatarUrl!, fit: BoxFit.cover)
-                  : Icon(Icons.person, size: 20.sp, color: Colors.grey),
-            ),
-          ),
-          SizedBox(width: 10.w),
-          // Name
-          Text(
-            a.ownerName ?? '',
-            style: GoogleFonts.inter(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
-            ),
-          ),
-          const Spacer(),
-          // Listing type
-          Text(
-            a.listingType ?? '',
-            style: GoogleFonts.inter(
-              fontSize: 13.sp,
-              fontWeight: FontWeight.w600,
-              color: AppColors.teal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  static const List<String> _fallbackImages = [
+    'assets/images/rent1.png',
+    'assets/images/rent2.png',
+  ];
 
   Widget _buildImageCarousel(AnnouncementModel a) {
-    final imageCount = a.imageUrls?.length ?? 0;
-    final totalDots = imageCount > 0 ? imageCount : 6;
+    final hasImages = (a.imageUrls?.length ?? 0) > 0;
+    final images = hasImages ? a.imageUrls! : _fallbackImages;
+    final totalDots = images.length;
 
-    return Stack(
+    return ClipRRect(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(14.r)),
+      child: Stack(
       children: [
         // Image
         SizedBox(
-          height: 180.h,
+          height: 220.h,
           width: double.infinity,
-          child: imageCount > 0
-              ? PageView.builder(
-                  itemCount: imageCount,
-                  onPageChanged: (index) {
-                    setState(() => _currentImageIndex = index);
-                  },
-                  itemBuilder: (_, index) => Image.network(
-                    a.imageUrls![index],
+          child: PageView.builder(
+            itemCount: images.length,
+            onPageChanged: (index) {
+              setState(() => _currentImageIndex = index);
+            },
+            itemBuilder: (_, index) => hasImages
+                ? Image.network(
+                    images[index],
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                  )
+                : Image.asset(
+                    images[index],
+                    fit: BoxFit.cover,
                   ),
-                )
-              : _imagePlaceholder(),
+          ),
+        ),
+        // Owner row overlay
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.5),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36.w,
+                  height: 36.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey.shade200,
+                    border: Border.all(color: Colors.white, width: 1),
+                  ),
+                  child: ClipOval(
+                    child: a.ownerAvatarUrl != null && a.ownerAvatarUrl!.isNotEmpty
+                        ? Image.network(a.ownerAvatarUrl!, fit: BoxFit.cover)
+                        : Icon(Icons.person, size: 20.sp, color: Colors.grey),
+                  ),
+                ),
+                SizedBox(width: 10.w),
+                Text(
+                  a.ownerName ?? '',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         // Wishlist heart
         if (widget.showWishlist)
@@ -186,6 +196,27 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
               ),
             ),
           ),
+        // Listing type badge
+        if (a.listingType != null && a.listingType!.isNotEmpty)
+          Positioned(
+            bottom: 30.h,
+            right: 14.w,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(6.r),
+              ),
+              child: Text(
+                a.listingType!,
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
         // Dot indicators
         Positioned(
           bottom: 10.h,
@@ -210,6 +241,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
           ),
         ),
       ],
+    ),
     );
   }
 
@@ -240,7 +272,15 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
           style: GoogleFonts.inter(
             fontSize: 18.sp,
             fontWeight: FontWeight.w800,
-            color: AppColors.teal,
+            color: AppColors.primary,
+          ),
+        ),
+        Text(
+          ' Yearly',
+          style: GoogleFonts.inter(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
           ),
         ),
         const Spacer(),

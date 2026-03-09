@@ -5,7 +5,7 @@ import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
@@ -75,7 +75,7 @@ class CreateBrokerAccountView extends StatelessWidget {
               radius: 30,
               onPressed: () {
                 if (LocalStorageService.isLoggedIn()) {
-                  Get.offAll(() => CompleteProfileScreen());
+                  Get.to(() => const CompleteProfileScreen());
                 } else {
                   showLoginRequiredDialog(context);
                 }
@@ -132,7 +132,7 @@ class CreateBrokerAccountView extends StatelessWidget {
             top: MediaQuery.of(context).padding.top,
             left: 6.w,
             child: IconButton(
-              onPressed: () => SystemNavigator.pop(),
+              onPressed: () => Get.offAll(() => const DashboardView(initialIndex: 3)),
               icon: const Icon(Icons.arrow_back_ios_new, size: 20),
               style: IconButton.styleFrom(
                 backgroundColor: Colors.white,

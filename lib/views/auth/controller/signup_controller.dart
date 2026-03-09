@@ -23,6 +23,30 @@ class SignupController extends GetxController {
   var hasMinLength = false.obs;
   var hasSpecialChar = false.obs;
 
+  // Form validity
+  var isFormValid = false.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    nameController.addListener(_checkFormValid);
+    emailController.addListener(_checkFormValid);
+    passwordController.addListener(_checkFormValid);
+    mobileController.addListener(_checkFormValid);
+  }
+
+  void _checkFormValid() {
+    isFormValid.value = nameController.text.trim().isNotEmpty &&
+        emailController.text.trim().isNotEmpty &&
+        GetUtils.isEmail(emailController.text.trim()) &&
+        mobileController.text.trim().length >= 6 &&
+        hasUppercase.value &&
+        hasLowercase.value &&
+        hasNumber.value &&
+        hasMinLength.value &&
+        hasSpecialChar.value;
+  }
+
   // Signup Method
   Future<bool> signup() async {
     // Validate inputs
@@ -93,6 +117,7 @@ class SignupController extends GetxController {
     hasNumber.value = password.contains(RegExp(r'[0-9]'));
     hasMinLength.value = password.length >= 8;
     hasSpecialChar.value = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+    _checkFormValid();
   }
 
   // Validate all inputs before submission

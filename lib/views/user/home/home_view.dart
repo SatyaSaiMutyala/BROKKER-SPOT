@@ -41,7 +41,7 @@ class HomeView extends StatelessWidget {
                   title: 'New Launch',
                   subtitle: 'CANAL\nHEIGHTS',
                   timeLeft: '15:00',
-                  imageUrl: 'assets/images/banner.png',
+                  imageUrl: 'assets/images/banner-img.png',
                 ),
               ),
               SizedBox(height: 20.h),
@@ -238,11 +238,16 @@ class HomeView extends StatelessWidget {
               ),
               SizedBox(width: 6.w),
               Container(
-                width: 8.w,
-                height: 8.w,
+                width: 20.w,
+                height: 20.w,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.activeGreen,
+                  color: AppColors.primary,
+                ),
+                child: const Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 16,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -272,7 +277,10 @@ class HomeView extends StatelessWidget {
   Widget _buildAnnouncementsSection() {
     final announcements = _getMockAnnouncements();
 
-    return Column(
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(vertical: 10.h),
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
@@ -282,25 +290,40 @@ class HomeView extends StatelessWidget {
               Text(
                 'Announcements',
                 style: GoogleFonts.carlito(
-                  fontSize: 15.sp,
+                  fontSize: 16.sp,
                   fontWeight: FontWeight.w700,
                   color: Colors.black,
                 ),
               ),
               SizedBox(width: 6.w),
-              Container(
-                width: 8.w,
-                height: 8.w,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.activeGreen,
+              InkWell(
+                onTap: () => Get.to(() => PropertyDetailView(
+                      announcement: announcements.first,
+                      sectionTitle: announcements.first.propertyName ?? 'Details',
+                    )),
+                borderRadius: BorderRadius.circular(9.r),
+                child: Container(
+                  width: 18.w,
+                  height: 18.w,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary,
+                  ),
+                  child: Center(
+                    child: Text(
+                      'i',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const Spacer(),
               InkWell(
-                onTap: () {
-                  Get.to(() => MorePropertyView(announcements: announcements));
-                },
+                onTap: () => Get.to(() => MorePropertyView(announcements: announcements)),
                 child: Text(
                   'More',
                   style: GoogleFonts.carlito(
@@ -315,7 +338,7 @@ class HomeView extends StatelessWidget {
         ),
         SizedBox(height: 12.h),
         SizedBox(
-          height: 328.h,
+          height: 370.h,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -324,16 +347,12 @@ class HomeView extends StatelessWidget {
             itemBuilder: (_, index) {
               return HomeAnnouncementCard(
                 announcement: announcements[index],
-                onTap: () => Get.to(() => PropertyDetailView(
-                      announcement: announcements[index],
-                      sectionTitle:
-                          announcements[index].propertyName ?? 'Details',
-                    )),
               );
             },
           ),
         ),
       ],
+    ),
     );
   }
 
@@ -341,68 +360,83 @@ class HomeView extends StatelessWidget {
   Widget _buildDamacSection() {
     final damacAnnouncements = _getMockDamacAnnouncements();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.w),
-          child: Row(
-            children: [
-              Text(
-                'DAMAC',
-                style: GoogleFonts.carlito(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
-                ),
-              ),
-              SizedBox(width: 6.w),
-              Container(
-                width: 8.w,
-                height: 8.w,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.activeGreen,
-                ),
-              ),
-              const Spacer(),
-              InkWell(
-                onTap: () {
-                  Get.to(() =>
-                      MorePropertyView(announcements: damacAnnouncements));
-                },
-                child: Text(
-                  'More',
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(vertical: 10.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w),
+            child: Row(
+              children: [
+                Text(
+                  'DAMAC',
                   style: GoogleFonts.carlito(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey.shade600,
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
                   ),
                 ),
-              ),
-            ],
+                SizedBox(width: 6.w),
+                InkWell(
+                  onTap: () => Get.to(() => PropertyDetailView(
+                        announcement: damacAnnouncements.first,
+                        sectionTitle: 'DAMAC',
+                      )),
+                  borderRadius: BorderRadius.circular(9.r),
+                  child: Container(
+                    width: 18.w,
+                    height: 18.w,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.primary,
+                    ),
+                    child: Center(
+                      child: Text(
+                        'i',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                InkWell(
+                  onTap: () => Get.to(() => MorePropertyView(announcements: damacAnnouncements)),
+                  child: Text(
+                    'More',
+                    style: GoogleFonts.carlito(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: 12.h),
-        SizedBox(
-          height: 328.h,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            itemCount: damacAnnouncements.length,
-            separatorBuilder: (_, __) => SizedBox(width: 14.w),
-            itemBuilder: (_, index) {
-              return HomeAnnouncementCard(
-                announcement: damacAnnouncements[index],
-                onTap: () => Get.to(() => PropertyDetailView(
-                      announcement: damacAnnouncements[index],
-                      sectionTitle: 'DAMAC',
-                    )),
-              );
-            },
+          SizedBox(height: 12.h),
+          SizedBox(
+            height: 370.h,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              itemCount: damacAnnouncements.length,
+              separatorBuilder: (_, __) => SizedBox(width: 14.w),
+              itemBuilder: (_, index) {
+                return HomeAnnouncementCard(
+                  announcement: damacAnnouncements[index],
+                  showAvatar: false,
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -439,15 +473,15 @@ class HomeView extends StatelessWidget {
   List<AnnouncementModel> _getMockDamacAnnouncements() {
     return [
       AnnouncementModel(
-        listingType: 'For Rent',
+        listingType: '80 UNITS',
         imageUrls: ['assets/images/room.png'],
-        price: 25000,
-        propertyName: 'DAMAC HILLS VILLA',
+        price: 1000000,
+        propertyName: 'SAFA TWO de GRISOGONO',
         location: 'Dubai | United Arab Emirates',
-        timeAgo: '2 hr ago',
+        timeAgo: '15 min ago',
       ),
       AnnouncementModel(
-        listingType: 'For sell',
+        listingType: '45 UNITS',
         imageUrls: ['assets/images/room.png'],
         price: 1200000,
         propertyName: 'DAMAC LAGOONS',

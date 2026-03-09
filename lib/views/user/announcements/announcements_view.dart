@@ -61,7 +61,7 @@ class AnnouncementsView extends StatelessWidget {
             child: Icon(
               Icons.search,
               size: 26.sp,
-              color: AppColors.teal,
+              color: AppColors.primary,
             ),
           ),
           const Spacer(),
@@ -81,7 +81,7 @@ class AnnouncementsView extends StatelessWidget {
             child: Icon(
               Icons.add_home_outlined,
               size: 26.sp,
-              color: AppColors.teal,
+              color: AppColors.primary,
             ),
           ),
         ],

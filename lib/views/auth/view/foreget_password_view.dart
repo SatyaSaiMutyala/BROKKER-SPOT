@@ -51,24 +51,32 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Column(
-          children: [
-            _topSection(context),
-            Expanded(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24.w),
-                    child: _contentSection(context),
-                  ),
-                  const Spacer(),
-                  _bottomCityImage(context),
-                ],
+        bottom: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      children: [
+                        _topSection(context),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24.w),
+                          child: _contentSection(context),
+                        ),
+                      ],
+                    ),
+                    _bottomCityImage(context),
+                  ],
+                ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -82,7 +90,7 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            top: -60.h,
+            top: -90.h,
             right: -20.w,
             child: Image.asset(
               'assets/images/top_curve.png',
@@ -92,7 +100,7 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
             ),
           ),
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10.h,
+            top: 10.h,
             left: 20.w,
             child: InkWell(
               onTap: () => Navigator.pop(context),
@@ -102,7 +110,7 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFFE5E5E5)),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 16),
+                child: const Icon(Icons.arrow_back_ios_new, size: 18),
               ),
             ),
           ),
@@ -230,9 +238,8 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
   Widget _bottomCityImage(BuildContext context) {
     return Image.asset(
       'assets/images/city.png',
-      height: 120.h,
       width: double.infinity,
-      fit: BoxFit.cover,
+      fit: BoxFit.fitWidth,
     );
   }
 }

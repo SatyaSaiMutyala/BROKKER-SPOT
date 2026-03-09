@@ -58,7 +58,7 @@ class StoryCircle extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: 6.h),
+            SizedBox(height: 4.h),
             Text(
               name,
               maxLines: 1,

@@ -56,25 +56,29 @@ class _NeedHelpViewState extends State<NeedHelpView> {
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            _topSection(context),
-            Expanded(
-              child: SingleChildScrollView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24.w),
-                      child: _formSection(),
+                    Column(
+                      children: [
+                        _topSection(context),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24.w),
+                          child: _formSection(),
+                        ),
+                      ],
                     ),
                     _bottomCityImage(),
                   ],
                 ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -88,7 +92,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            top: -100.h,
+            top: -90.h,
             right: -20.w,
             child: Image.asset(
               'assets/images/top_curve.png',

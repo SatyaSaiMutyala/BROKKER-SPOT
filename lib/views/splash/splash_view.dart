@@ -58,7 +58,25 @@ class _SplashViewState extends State<SplashView>
       CurvedAnimation(parent: _moveController, curve: Curves.easeInOut),
     );
 
-    _startAnimation();
+    _checkAndNavigate();
+  }
+
+  Future<void> _checkAndNavigate() async {
+    final token = LocalStorageService.getAccessToken();
+    final user = LocalStorageService.getUser();
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    final isLoggedIn = token != null && (user != null || firebaseUser != null);
+
+    if (isLoggedIn) {
+      // User has token - show splash image briefly then go to dashboard
+      _fadeController.value = 1.0;
+      _logoScale = AlwaysStoppedAnimation(1.0);
+      await Future.delayed(const Duration(milliseconds: 1500));
+      Get.offAll(() => DashboardView());
+    } else {
+      // No token - play full animation then go to welcome
+      await _startAnimation();
+    }
   }
 
   Future<void> _startAnimation() async {

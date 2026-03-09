@@ -16,11 +16,86 @@ class SignUpView extends StatefulWidget {
 
 class _SignUpViewState extends State<SignUpView> {
   final FocusNode _passwordFocus = FocusNode();
+  final FocusNode _phoneFocus = FocusNode();
   final SignupController controller = Get.put(SignupController());
 
   String selectedCode = '+971';
   bool _obscurePassword = true;
   bool _agreeToCreateBroker = false;
+
+  static final List<Map<String, String>> _countryCodes = [
+    {'flag': '🇦🇪', 'code': '+971'},
+    {'flag': '🇮🇳', 'code': '+91'},
+    {'flag': '🇺🇸', 'code': '+1'},
+    {'flag': '🇬🇧', 'code': '+44'},
+    {'flag': '🇦🇺', 'code': '+61'},
+    {'flag': '🇸🇦', 'code': '+966'},
+    {'flag': '🇶🇦', 'code': '+974'},
+    {'flag': '🇰🇼', 'code': '+965'},
+    {'flag': '🇧🇭', 'code': '+973'},
+    {'flag': '🇴🇲', 'code': '+968'},
+    {'flag': '🇪🇬', 'code': '+20'},
+    {'flag': '🇯🇴', 'code': '+962'},
+    {'flag': '🇱🇧', 'code': '+961'},
+    {'flag': '🇮🇶', 'code': '+964'},
+    {'flag': '🇵🇰', 'code': '+92'},
+    {'flag': '🇧🇩', 'code': '+880'},
+    {'flag': '🇱🇰', 'code': '+94'},
+    {'flag': '🇳🇵', 'code': '+977'},
+    {'flag': '🇵🇭', 'code': '+63'},
+    {'flag': '🇮🇩', 'code': '+62'},
+    {'flag': '🇲🇾', 'code': '+60'},
+    {'flag': '🇸🇬', 'code': '+65'},
+    {'flag': '🇹🇭', 'code': '+66'},
+    {'flag': '🇻🇳', 'code': '+84'},
+    {'flag': '🇨🇳', 'code': '+86'},
+    {'flag': '🇯🇵', 'code': '+81'},
+    {'flag': '🇰🇷', 'code': '+82'},
+    {'flag': '🇩🇪', 'code': '+49'},
+    {'flag': '🇫🇷', 'code': '+33'},
+    {'flag': '🇮🇹', 'code': '+39'},
+    {'flag': '🇪🇸', 'code': '+34'},
+    {'flag': '🇵🇹', 'code': '+351'},
+    {'flag': '🇳🇱', 'code': '+31'},
+    {'flag': '🇧🇪', 'code': '+32'},
+    {'flag': '🇨🇭', 'code': '+41'},
+    {'flag': '🇦🇹', 'code': '+43'},
+    {'flag': '🇸🇪', 'code': '+46'},
+    {'flag': '🇳🇴', 'code': '+47'},
+    {'flag': '🇩🇰', 'code': '+45'},
+    {'flag': '🇫🇮', 'code': '+358'},
+    {'flag': '🇵🇱', 'code': '+48'},
+    {'flag': '🇬🇷', 'code': '+30'},
+    {'flag': '🇹🇷', 'code': '+90'},
+    {'flag': '🇷🇺', 'code': '+7'},
+    {'flag': '🇺🇦', 'code': '+380'},
+    {'flag': '🇿🇦', 'code': '+27'},
+    {'flag': '🇳🇬', 'code': '+234'},
+    {'flag': '🇰🇪', 'code': '+254'},
+    {'flag': '🇬🇭', 'code': '+233'},
+    {'flag': '🇪🇹', 'code': '+251'},
+    {'flag': '🇲🇦', 'code': '+212'},
+    {'flag': '🇹🇳', 'code': '+216'},
+    {'flag': '🇧🇷', 'code': '+55'},
+    {'flag': '🇲🇽', 'code': '+52'},
+    {'flag': '🇦🇷', 'code': '+54'},
+    {'flag': '🇨🇴', 'code': '+57'},
+    {'flag': '🇨🇱', 'code': '+56'},
+    {'flag': '🇵🇪', 'code': '+51'},
+    {'flag': '🇳🇿', 'code': '+64'},
+    {'flag': '🇮🇪', 'code': '+353'},
+    {'flag': '🇮🇱', 'code': '+972'},
+    {'flag': '🇭🇰', 'code': '+852'},
+    {'flag': '🇹🇼', 'code': '+886'},
+    {'flag': '🇲🇲', 'code': '+95'},
+    {'flag': '🇦🇫', 'code': '+93'},
+    {'flag': '🇮🇷', 'code': '+98'},
+    {'flag': '🇾🇪', 'code': '+967'},
+    {'flag': '🇸🇾', 'code': '+963'},
+    {'flag': '🇱🇾', 'code': '+218'},
+    {'flag': '🇸🇩', 'code': '+249'},
+    {'flag': '🇩🇿', 'code': '+213'},
+  ];
 
   @override
   void initState() {
@@ -31,11 +106,14 @@ class _SignUpViewState extends State<SignUpView> {
     controller.passwordController.addListener(() {
       controller.validatePassword(controller.passwordController.text);
     });
+
+    _phoneFocus.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _passwordFocus.dispose();
+    _phoneFocus.dispose();
     super.dispose();
   }
 
@@ -49,22 +127,31 @@ class _SignUpViewState extends State<SignUpView> {
           resizeToAvoidBottomInset: true,
           body: SafeArea(
             bottom: false,
-            child: Column(
-              children: [
-                _topSection(context),
-                Expanded(
-                  child: SingleChildScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: EdgeInsets.only(bottom: 20.h),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: _formSection(),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints:
+                        BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          children: [
+                            _topSection(context),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: _formSection(),
+                            ),
+                          ],
+                        ),
+                        _bottomCityImage(),
+                      ],
                     ),
                   ),
-                ),
-                _bottomCityImage(),
-              ],
+                );
+              },
             ),
           ),
         );
@@ -82,18 +169,15 @@ class _SignUpViewState extends State<SignUpView> {
           Positioned(
             top: -100.h,
             right: -20.w,
-            child: SizedBox(
-              width: 300.w,
+            child: Image.asset(
+              'assets/images/top_curve.png',
+              width: 290.w,
               height: 349.h,
-              child: Image.asset(
-                'assets/images/top_curve.png',
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => Container(),
-              ),
+              fit: BoxFit.contain,
             ),
           ),
           Positioned(
-            top: 10.h,
+            top: 5.h,
             left: 20.w,
             child: InkWell(
               onTap: () => Navigator.pop(context),
@@ -103,7 +187,7 @@ class _SignUpViewState extends State<SignUpView> {
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFFE5E5E5)),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 16),
+                child: const Icon(Icons.arrow_back_ios_new, size: 18),
               ),
             ),
           ),
@@ -188,7 +272,12 @@ class _SignUpViewState extends State<SignUpView> {
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: GoogleFonts.inter(fontSize: 13.sp),
-        border: const UnderlineInputBorder(),
+        enabledBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFFB5B5B5), width: 0.5),
+        ),
+        focusedBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFFB5B5B5), width: 0.9),
+        ),
         contentPadding: EdgeInsets.symmetric(vertical: 12.h),
       ),
     );
@@ -196,46 +285,58 @@ class _SignUpViewState extends State<SignUpView> {
 
   // ---------------- PHONE FIELD ----------------
   Widget _phoneField() {
-    return Row(
+    return Column(
       children: [
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 8.w),
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: selectedCode,
-              items: const [
-                DropdownMenuItem(value: '+971', child: Text('🇦🇪 +971')),
-                DropdownMenuItem(value: '+91', child: Text('🇮🇳 +91')),
-                DropdownMenuItem(value: '+1', child: Text('🇺🇸 +1')),
-              ],
-              onChanged: (value) {
-                setState(() {
-                  selectedCode = value!;
-                  controller.countryCodeController.text =
-                      value.replaceAll('+', '');
-                });
-              },
+        Row(
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.w),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedCode,
+                  dropdownColor: Colors.white,
+                  menuMaxHeight: 300,
+                  items: _countryCodes
+                      .map((c) => DropdownMenuItem(
+                            value: c['code'],
+                            child: Text('${c['flag']} ${c['code']}',
+                                style: GoogleFonts.inter(fontSize: 13.sp)),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedCode = value!;
+                      controller.countryCodeController.text =
+                          value.replaceAll('+', '');
+                    });
+                  },
+                ),
+              ),
             ),
-          ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: TextField(
+                controller: controller.mobileController,
+                focusNode: _phoneFocus,
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
+                maxLength: 10,
+                decoration: InputDecoration(
+                  hintText: 'Phone Number',
+                  hintStyle: GoogleFonts.inter(fontSize: 13.sp),
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  border: InputBorder.none,
+                  counterText: '',
+                  contentPadding: EdgeInsets.symmetric(vertical: 12.h),
+                ),
+              ),
+            ),
+          ],
         ),
-        SizedBox(width: 10.w),
-        Expanded(
-          child: TextField(
-            controller: controller.mobileController,
-            keyboardType: TextInputType.phone,
-            textInputAction: TextInputAction.next,
-            maxLength: 10,
-            decoration: InputDecoration(
-              hintText: 'Phone Number',
-              hintStyle: GoogleFonts.inter(fontSize: 13.sp),
-              border: const UnderlineInputBorder(),
-              counterText: '',
-              contentPadding: EdgeInsets.symmetric(vertical: 12.h),
-            ),
-          ),
+        Container(
+          height: _phoneFocus.hasFocus ? 0.9 : 0.5,
+          color: const Color(0xFFB5B5B5),
         ),
       ],
     );
@@ -263,7 +364,12 @@ class _SignUpViewState extends State<SignUpView> {
             });
           },
         ),
-        border: const UnderlineInputBorder(),
+        enabledBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFFB5B5B5), width: 0.5),
+        ),
+        focusedBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFFB5B5B5), width: 0.9),
+        ),
         contentPadding: EdgeInsets.symmetric(vertical: 12.h),
       ),
     );
@@ -342,47 +448,50 @@ class _SignUpViewState extends State<SignUpView> {
 
   // ---------------- BUTTON ----------------
   Widget _createAccountButton() {
-    return Obx(() => SizedBox(
-          width: double.infinity,
-          height: 46.h,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-              elevation: 0,
+    return Obx(() {
+      final isValid = controller.isFormValid.value;
+      return SizedBox(
+        width: double.infinity,
+        height: 46.h,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isValid ? AppColors.primary : Colors.grey.shade300,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
             ),
-            onPressed: controller.isLoading.value
-                ? null
-                : () async {
-                    FocusScope.of(context).unfocus();
-                    bool success = await controller.signup();
-                    if (success) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EmailVerificationView(
-                            email: controller.emailController.text,
-                          ),
-                        ),
-                      );
-                    }
-                  },
-            child: controller.isLoading.value
-                ? const CircularProgressIndicator(color: Colors.white)
-                : Text(
-                    _agreeToCreateBroker
-                        ? 'Create a broker Account'
-                        : 'Create an Account',
-                    style: GoogleFonts.inter(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
+            elevation: 0,
           ),
-        ));
+          onPressed: (!isValid || controller.isLoading.value)
+              ? null
+              : () async {
+                  FocusScope.of(context).unfocus();
+                  bool success = await controller.signup();
+                  if (success) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EmailVerificationView(
+                          email: controller.emailController.text,
+                        ),
+                      ),
+                    );
+                  }
+                },
+          child: controller.isLoading.value
+              ? const CircularProgressIndicator(color: Colors.white)
+              : Text(
+                  _agreeToCreateBroker
+                      ? 'Create a broker Account'
+                      : 'Create an Account',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+        ),
+      );
+    });
   }
 
   Widget _termsText() {
