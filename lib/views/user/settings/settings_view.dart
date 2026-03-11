@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/views/user/settings/change_password_view.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -138,7 +139,7 @@ class SettingsView extends StatelessWidget {
             icon: Icons.lock_outline,
             iconColor: AppColors.goldAccent,
             title: 'Change Password',
-            onTap: () {},
+            onTap: () => Get.to(() => ChangePasswordView()),
           ),
           _tileDivider(),
           _settingsTile(

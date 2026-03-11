@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
+import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -49,6 +50,7 @@ class WelcomeViewController extends GetxController {
         print('Token saved to LocalStorage');
       }
 
+      DeviceService.registerDevice();
       Get.offAll(() => DashboardView());
     } on FirebaseAuthException catch (e) {
       print('Google Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
@@ -95,6 +97,7 @@ class WelcomeViewController extends GetxController {
         await LocalStorageService.saveAccessToken(firebaseToken);
       }
 
+      DeviceService.registerDevice();
       Get.offAll(() => DashboardView());
     } on FirebaseAuthException catch (e) {
       AppToast.error(e.message ?? "Apple Sign-In Failed");

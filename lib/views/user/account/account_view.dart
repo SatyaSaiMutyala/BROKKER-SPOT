@@ -12,6 +12,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 
 class AccountView extends StatelessWidget {
   const AccountView({super.key});
@@ -76,14 +78,22 @@ class AccountView extends StatelessWidget {
                       // Second card
                       _buildCard(
                         children: [
-                          _accountTile(
-                            icon: Icons.people_outline,
-                            title: 'Become Broker',
-                            enabled: true,
-                            onTap: () {
-                              Get.to(() => BrokerOnboardingView());
-                            },
-                          ),
+                          Obx(() {
+                            final profileCtrl = Get.find<ProfileController>();
+                            final isBroker = profileCtrl.accountType.value == 2;
+                            return _accountTile(
+                              icon: Icons.people_outline,
+                              title: isBroker ? 'Switch to Broker Side' : 'Become Broker',
+                              enabled: true,
+                              onTap: () {
+                                if (isBroker) {
+                                  Get.offAll(() => BrokerDashBoardView());
+                                } else {
+                                  Get.to(() => BrokerOnboardingView());
+                                }
+                              },
+                            );
+                          }),
                           // _tileDivider(),
                           _accountTile(
                             icon: Icons.settings_outlined,
