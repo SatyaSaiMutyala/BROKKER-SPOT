@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
           title: 'Brokker',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
-            fontFamily: 'Roboto',
+            fontFamily: 'Poppins',
             colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
             useMaterial3: true,
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/widgets/home/new_launch_banner.dart';
 import 'package:brokkerspot/widgets/search/filter_chip_bar.dart';
@@ -36,28 +37,10 @@ class _SearchViewState extends State<SearchView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon:
-              Icon(Icons.arrow_back_ios_new, size: 20.sp, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        centerTitle: true,
-        title: Text(
-          'Search',
-          style: GoogleFonts.inter(
-            fontSize: 18.sp,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
-        ),
-      ),
-      body: Column(
+      body: SafeArea(
+        child: Column(
         children: [
-          Divider(height: 1, color: Colors.grey.shade200),
+          const CustomHeader(title: 'Search', showBackButton: true),
           Expanded(
             child: SingleChildScrollView(
               child: Column(
@@ -71,7 +54,7 @@ class _SearchViewState extends State<SearchView> {
                       title: 'New Launch',
                       subtitle: 'CANAL\nHEIGHTS',
                       timeLeft: '15:45',
-                      imageUrl: 'assets/images/banner.png',
+                      imageUrl: 'assets/images/banner-img.png',
                     ),
                   ),
                   SizedBox(height: 16.h),
@@ -87,14 +70,15 @@ class _SearchViewState extends State<SearchView> {
                   ),
                   SizedBox(height: 8.h),
                   // Property results
-                  ..._getMockResults().map(
-                    (item) => SearchPropertyCard(
-                      announcement: item['announcement'] as AnnouncementModel,
-                      ownerName: item['ownerName'] as String?,
-                      ownerAvatarUrl: item['ownerAvatar'] as String?,
-                      timeAgo: item['timeAgo'] as String?,
-                      badge: item['badge'] as String?,
-                      unitsLeft: item['unitsLeft'] as int?,
+                  ..._getMockResults().asMap().entries.map(
+                    (entry) => SearchPropertyCard(
+                      index: entry.key,
+                      announcement: entry.value['announcement'] as AnnouncementModel,
+                      ownerName: entry.value['ownerName'] as String?,
+                      ownerAvatarUrl: entry.value['ownerAvatar'] as String?,
+                      timeAgo: entry.value['timeAgo'] as String?,
+                      badge: entry.value['badge'] as String?,
+                      unitsLeft: entry.value['unitsLeft'] as int?,
                     ),
                   ),
                   SizedBox(height: 24.h),
@@ -103,6 +87,7 @@ class _SearchViewState extends State<SearchView> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -123,7 +108,7 @@ class _SearchViewState extends State<SearchView> {
               child: Row(
                 children: [
                   SizedBox(width: 14.w),
-                  Icon(Icons.search, size: 22.sp, color: Colors.grey),
+                  Image.asset('assets/images/search_icon.png', width: 22.sp, height: 22.sp),
                   SizedBox(width: 10.w),
                   Expanded(
                     child: TextField(
@@ -134,7 +119,7 @@ class _SearchViewState extends State<SearchView> {
                       ),
                       decoration: InputDecoration(
                         hintText: 'City, Area or Building...',
-                        hintStyle: GoogleFonts.inter(
+                        hintStyle: GoogleFonts.poppins(
                           fontSize: 14.sp,
                           color: Colors.grey.shade400,
                         ),
@@ -153,14 +138,17 @@ class _SearchViewState extends State<SearchView> {
           Container(
             width: 46.h,
             height: 46.h,
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: AppColors.goldAccent,
-              borderRadius: BorderRadius.circular(12.r),
+              borderRadius: BorderRadius.circular(8.r),
             ),
-            child: Icon(
-              Icons.tune_rounded,
-              size: 22.sp,
-              color: Colors.white,
+            child: Center(
+              child: Image.asset(
+                'assets/images/filter_icon.png',
+                width: 46.sp,
+                height: 46.sp,
+              ),
             ),
           ),
         ],

@@ -1,6 +1,10 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/auth/controller/signup_controller.dart';
+import 'package:brokkerspot/views/auth/controller/welcome_view_controller.dart';
 import 'package:brokkerspot/views/auth/view/email_verification_view.dart';
+import 'package:brokkerspot/views/auth/view/login_view.dart';
+import 'package:brokkerspot/widgets/common/custom_text_field.dart';
+import 'package:brokkerspot/widgets/common/top_curve_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -18,6 +22,7 @@ class _SignUpViewState extends State<SignUpView> {
   final FocusNode _passwordFocus = FocusNode();
   final FocusNode _phoneFocus = FocusNode();
   final SignupController controller = Get.put(SignupController());
+  final WelcomeViewController socialController = Get.put(WelcomeViewController());
 
   String selectedCode = '+971';
   bool _obscurePassword = true;
@@ -159,37 +164,14 @@ class _SignUpViewState extends State<SignUpView> {
     );
   }
 
-  // ---------------- TOP SECTION ----------------
   Widget _topSection(BuildContext context) {
     return SizedBox(
       height: 180.h,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Positioned(
-            top: -100.h,
-            right: -20.w,
-            child: Image.asset(
-              'assets/images/top_curve.png',
-              width: 290.w,
-              height: 349.h,
-              fit: BoxFit.contain,
-            ),
-          ),
-          Positioned(
-            top: 5.h,
-            left: 20.w,
-            child: InkWell(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE5E5E5)),
-                ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 18),
-              ),
-            ),
+          TopCurveSection(
+            onBack: () => Navigator.pop(context),
           ),
           Positioned(
             bottom: 24.h,
@@ -238,15 +220,34 @@ class _SignUpViewState extends State<SignUpView> {
     return Form(
       child: Column(
         children: [
-          _textField(
-              'Full Name', controller.nameController, TextInputType.name),
-          SizedBox(height: 14.h),
+          CustomTextField(
+            controller: controller.nameController,
+            hintText: 'Full Name',
+            keyboardType: TextInputType.name,
+            isDark: false,
+          ),
+          SizedBox(height: 8.h),
           _phoneField(),
-          SizedBox(height: 14.h),
-          _textField(
-              'E-mail', controller.emailController, TextInputType.emailAddress),
-          SizedBox(height: 14.h),
-          _passwordField(),
+          SizedBox(height: 8.h),
+          CustomTextField(
+            controller: controller.emailController,
+            hintText: 'E-mail',
+            keyboardType: TextInputType.emailAddress,
+            isDark: false,
+          ),
+          SizedBox(height: 8.h),
+          CustomTextField(
+            controller: controller.passwordController,
+            hintText: 'Password',
+            obscureText: _obscurePassword,
+            isDark: false,
+            suffixIcon: _obscurePassword ? Icons.visibility_off : Icons.visibility,
+            onSuffixTap: () {
+              setState(() {
+                _obscurePassword = !_obscurePassword;
+              });
+            },
+          ),
           SizedBox(height: 16.h),
           _passwordRules(),
           if (widget.isBrokerSignup) ...[
@@ -257,28 +258,12 @@ class _SignUpViewState extends State<SignUpView> {
           _createAccountButton(),
           SizedBox(height: 16.h),
           _termsText(),
+          SizedBox(height: 28.h),
+          _buildOrDivider(),
+          SizedBox(height: 28.h),
+          _buildSocialButtons(),
+          SizedBox(height: 30.h),
         ],
-      ),
-    );
-  }
-
-  // ---------------- TEXT FIELD ----------------
-  Widget _textField(String hint, TextEditingController textController,
-      TextInputType keyboardType) {
-    return TextField(
-      controller: textController,
-      keyboardType: keyboardType,
-      textInputAction: TextInputAction.next,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: GoogleFonts.inter(fontSize: 13.sp),
-        enabledBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFB5B5B5), width: 0.5),
-        ),
-        focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFB5B5B5), width: 0.9),
-        ),
-        contentPadding: EdgeInsets.symmetric(vertical: 12.h),
       ),
     );
   }
@@ -342,63 +327,22 @@ class _SignUpViewState extends State<SignUpView> {
     );
   }
 
-  // ---------------- PASSWORD FIELD ----------------
-  Widget _passwordField() {
-    return TextField(
-      controller: controller.passwordController,
-      focusNode: _passwordFocus,
-      obscureText: _obscurePassword,
-      keyboardType: TextInputType.visiblePassword,
-      textInputAction: TextInputAction.done,
-      decoration: InputDecoration(
-        hintText: 'Password',
-        hintStyle: GoogleFonts.inter(fontSize: 13.sp),
-        suffixIcon: IconButton(
-          icon: Icon(
-            _obscurePassword ? Icons.visibility_off : Icons.visibility,
-            size: 20,
-          ),
-          onPressed: () {
-            setState(() {
-              _obscurePassword = !_obscurePassword;
-            });
-          },
-        ),
-        enabledBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFB5B5B5), width: 0.5),
-        ),
-        focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFB5B5B5), width: 0.9),
-        ),
-        contentPadding: EdgeInsets.symmetric(vertical: 12.h),
-      ),
-    );
-  }
-
   Widget _passwordRules() {
-    return Obx(() => Wrap(
-          spacing: 12.w,
-          runSpacing: 8.h,
+    return Obx(() => Column(
           children: [
-            _Rule(
-              text: '1 Uppercase',
-              active: controller.hasUppercase.value,
+            Row(
+              children: [
+                Expanded(child: _Rule(text: '1 Uppercase', active: controller.hasUppercase.value)),
+                Expanded(child: _Rule(text: '1 Lowercase', active: controller.hasLowercase.value)),
+                Expanded(child: _Rule(text: '1 Number', active: controller.hasNumber.value)),
+              ],
             ),
-            _Rule(
-              text: '1 Lowercase',
-              active: controller.hasLowercase.value,
-            ),
-            _Rule(
-              text: '1 Number',
-              active: controller.hasNumber.value,
-            ),
-            _Rule(
-              text: '8 characters',
-              active: controller.hasMinLength.value,
-            ),
-            _Rule(
-              text: '1 special character',
-              active: controller.hasSpecialChar.value,
+            SizedBox(height: 8.h),
+            Row(
+              children: [
+                Expanded(child: _Rule(text: '8 characters', active: controller.hasMinLength.value)),
+                Expanded(flex: 2, child: _Rule(text: '1 special character', active: controller.hasSpecialChar.value)),
+              ],
             ),
           ],
         ));
@@ -483,10 +427,10 @@ class _SignUpViewState extends State<SignUpView> {
                   _agreeToCreateBroker
                       ? 'Create a broker Account'
                       : 'Create an Account',
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.poppins(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: isValid ? AppColors.textWhite : AppColors.textHint,
                   ),
                 ),
         ),
@@ -514,6 +458,51 @@ class _SignUpViewState extends State<SignUpView> {
     );
   }
 
+  Widget _buildOrDivider() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(height: 0.5, color: const Color(0xFFB5B5B5)),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.w),
+          child: Text(
+            'Or Sign Up With',
+            style: GoogleFonts.inter(color: Colors.grey, fontSize: 13.sp),
+          ),
+        ),
+        Expanded(
+          child: Container(height: 0.5, color: const Color(0xFFB5B5B5)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSocialButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        GestureDetector(
+          onTap: socialController.signInWithGoogle,
+          child: Image.asset(
+            'assets/images/google_icon.png',
+            width: 56.w,
+            height: 56.w,
+          ),
+        ),
+        SizedBox(width: 20.w),
+        GestureDetector(
+          onTap: socialController.signInWithApple,
+          child: Image.asset(
+            'assets/images/apple_icon.png',
+            width: 56.w,
+            height: 56.w,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _bottomCityImage() {
     return Image.asset(
       'assets/images/city.png',
@@ -538,15 +527,19 @@ class _Rule extends StatelessWidget {
         Icon(
           Icons.check_circle,
           size: 14.sp,
-          color: active ? Colors.green : Colors.grey.shade400,
+          color: active ? AppColors.primary : Colors.grey.shade400,
         ),
         SizedBox(width: 4.w),
-        Text(
-          text,
-          style: GoogleFonts.inter(
-            fontSize: 10.sp,
-            color: active ? Colors.black87 : Colors.grey.shade500,
-            fontWeight: active ? FontWeight.w500 : FontWeight.normal,
+        Flexible(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: GoogleFonts.inter(
+              fontSize: 10.sp,
+              color: active ? Colors.black87 : Colors.grey.shade500,
+              fontWeight: active ? FontWeight.w500 : FontWeight.normal,
+            ),
           ),
         ),
       ],

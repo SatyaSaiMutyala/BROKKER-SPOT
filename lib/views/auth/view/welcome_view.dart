@@ -31,11 +31,11 @@ class WelcomeView extends StatelessWidget {
                   end: Alignment.bottomCenter,
                   stops: [0.0, 0.3, 0.55, 0.75, 1.0],
                   colors: [
+                    Color(0x00000000),
                     Color(0x10000000),
-                    Color(0x40000000),
-                    Color(0x90000000),
-                    Color(0xCC000000),
-                    Color(0xF0000000),
+                    Color(0x30000000),
+                    Color(0x50000000),
+                    Color(0x70000000),
                   ],
                 ),
               ),
@@ -52,8 +52,8 @@ class WelcomeView extends StatelessWidget {
                     // App Logo
                     Image.asset(AppAssets.appName, width: 170.w),
 
-                    const Spacer(flex: 3),
-
+                    const Spacer(flex: 1),
+                    SizedBox(height: 20.h),
                     // Login or Create Account
                     Align(
                       alignment: Alignment.centerLeft,
@@ -61,7 +61,7 @@ class WelcomeView extends StatelessWidget {
                         'Login or Create Account',
                         style: TextStyle(
                           fontFamily: 'Lato',
-                          fontSize: 16.sp,
+                          fontSize: 15.sp,
                           color: AppColors.textWhite,
                           fontWeight: FontWeight.w400,
                         ),
@@ -168,7 +168,7 @@ class WelcomeView extends StatelessWidget {
                             'Need Help?',
                             style: TextStyle(
                               fontFamily: 'Lato',
-                              fontSize: 15.sp,
+                              fontSize: 14.sp,
                               color: AppColors.textWhite,
                               fontWeight: FontWeight.w400,
                             ),
@@ -188,7 +188,7 @@ class WelcomeView extends StatelessWidget {
                               'Continue As Guest',
                               style: TextStyle(
                                 fontFamily: 'Lato',
-                                fontSize: 15.sp,
+                                fontSize: 14.sp,
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -229,7 +229,7 @@ class WelcomeView extends StatelessWidget {
         width: double.infinity,
         height: 54.h,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.35),
+          color: Colors.white.withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(30.r),
           border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
         ),
@@ -241,8 +241,8 @@ class WelcomeView extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontFamily: 'Lato',
-                fontSize: 16.sp,
+                fontFamily: 'Poppins',
+                fontSize: 14.sp,
                 color: Colors.black,
                 fontWeight: FontWeight.w500,
               ),

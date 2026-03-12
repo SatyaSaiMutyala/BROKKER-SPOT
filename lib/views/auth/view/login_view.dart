@@ -1,6 +1,8 @@
 import 'package:brokkerspot/views/auth/view/foreget_password_view.dart';
 import 'package:brokkerspot/views/auth/view/signup_view.dart';
 import 'package:brokkerspot/views/auth/controller/welcome_view_controller.dart';
+import 'package:brokkerspot/widgets/common/custom_text_field.dart';
+import 'package:brokkerspot/widgets/common/top_curve_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -79,72 +81,33 @@ class LoginView extends StatelessWidget {
                       SizedBox(height: 40.h),
 
                       // Email field
-                      TextField(
+                      CustomTextField(
                         controller: controller.emailController,
+                        hintText: 'Email',
                         keyboardType: TextInputType.emailAddress,
                         onChanged: (_) => controller.validateForm(),
-                        style: GoogleFonts.roboto(
-                          fontSize: 15.sp,
-                          color: Colors.black87,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Email',
-                          hintStyle: GoogleFonts.roboto(
-                            fontSize: 15.sp,
-                            color: Colors.grey,
-                          ),
-                          suffixIcon: Icon(
-                            Icons.person_outline,
-                            color: AppColors.primary,
-                            size: 22.sp,
-                          ),
-                          enabledBorder: const UnderlineInputBorder(
-                            borderSide:
-                                BorderSide(color: Color(0xFFB5B5B5)),
-                          ),
-                          focusedBorder: const UnderlineInputBorder(
-                            borderSide:
-                                BorderSide(color: Color(0xFFB5B5B5)),
-                          ),
+                        isDark: false,
+                        suffixWidget: Image.asset(
+                          'assets/images/email_profile_icon.png',
+                          color: AppColors.primary,
+                          width: 22.sp,
+                          height: 22.sp,
                         ),
                       ),
 
                       SizedBox(height: 20.h),
 
                       // Password field
-                      Obx(() => TextField(
+                      Obx(() => CustomTextField(
                             controller: controller.passwordController,
+                            hintText: 'Password',
                             obscureText: controller.obscurePassword.value,
                             onChanged: (_) => controller.validateForm(),
-                            style: GoogleFonts.roboto(
-                              fontSize: 14.sp,
-                              color: Colors.black87,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Password',
-                              hintStyle: GoogleFonts.roboto(
-                                fontSize: 15.sp,
-                                color: Colors.grey,
-                              ),
-                              suffixIcon: GestureDetector(
-                                onTap: controller.togglePasswordVisibility,
-                                child: Icon(
-                                  controller.obscurePassword.value
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: AppColors.primary,
-                                  size: 22.sp,
-                                ),
-                              ),
-                              enabledBorder: const UnderlineInputBorder(
-                                borderSide:
-                                    BorderSide(color: Color(0xFFB5B5B5)),
-                              ),
-                              focusedBorder: const UnderlineInputBorder(
-                                borderSide:
-                                    BorderSide(color: Color(0xFFB5B5B5)),
-                              ),
-                            ),
+                            isDark: false,
+                            suffixIcon: controller.obscurePassword.value
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            onSuffixTap: controller.togglePasswordVisibility,
                           )),
 
                       SizedBox(height: 14.h),
@@ -186,45 +149,10 @@ class LoginView extends StatelessWidget {
     );
   }
 
-  // ---------------- TOP SECTION ----------------
   Widget _topSection(BuildContext context) {
-    return SizedBox(
-      height: 220.h,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Top curve
-          Positioned(
-            top: -100.h,
-            right: -10.w,
-            child: Image.asset(
-              'assets/images/top_curve.png',
-              width: 300.w,
-              height: 349.h,
-              fit: BoxFit.contain,
-            ),
-          ),
-
-          // Back button
-          Positioned(
-            top: 5.h,
-            left: 20.w,
-            child: InkWell(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE5E5E5)),
-                ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 18),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return TopCurveSection(onBack: () => Navigator.pop(context));
   }
+
 
   // ---------------- REMEMBER + FORGOT ----------------
   Widget _buildRememberForgotRow() {

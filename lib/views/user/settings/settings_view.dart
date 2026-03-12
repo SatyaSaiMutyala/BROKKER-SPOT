@@ -244,10 +244,14 @@ class SettingsView extends StatelessWidget {
         child: Switch(
           value: false,
           onChanged: (val) {},
-          activeThumbColor: Colors.white,
-          activeTrackColor: AppColors.primary,
-          inactiveThumbColor: Colors.white,
-          inactiveTrackColor: Colors.grey.shade300,
+          thumbColor: WidgetStateProperty.all(Colors.white),
+          trackColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return AppColors.primary;
+            }
+            return Colors.grey.shade300;
+          }),
+          trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
         ),
       ),
     );

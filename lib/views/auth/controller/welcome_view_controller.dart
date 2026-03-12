@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/models/login_model.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
@@ -42,11 +46,32 @@ class WelcomeViewController extends GetxController {
       final userCredential = await _auth.signInWithCredential(credential);
       print('Firebase sign-in success: ${userCredential.user?.email}');
 
-      // Save Firebase token to LocalStorage so isLoggedIn() returns true
+      // Get Firebase ID token to send to backend
       final firebaseToken = await userCredential.user?.getIdToken();
-      if (firebaseToken != null) {
+      if (firebaseToken == null) {
+        AppToast.error("Failed to get authentication token");
+        return;
+      }
+      print('Got Firebase token, calling backend social login...');
+
+      // Call backend social login API to exchange Firebase token for backend token
+      final backendSaved = await _exchangeTokenWithBackend(firebaseToken);
+
+      if (!backendSaved) {
+        // Fallback: save Firebase token so user can at least navigate
         await LocalStorageService.saveAccessToken(firebaseToken);
-        print('Token saved to LocalStorage');
+        print('Backend social login failed, saved Firebase token as fallback');
+      }
+
+      // Refresh profile so name/image show on home screen
+      final profileCtrl = Get.put(ProfileController());
+      await profileCtrl.getProfile();
+      // If backend didn't return a name, use Google's display name
+      if (profileCtrl.userName.value.isEmpty) {
+        profileCtrl.userName.value = userCredential.user?.displayName ?? '';
+      }
+      if (profileCtrl.profileImage.value.isEmpty) {
+        profileCtrl.profileImage.value = userCredential.user?.photoURL ?? '';
       }
 
       Get.offAll(() => DashboardView());
@@ -89,10 +114,28 @@ class WelcomeViewController extends GetxController {
 
       final userCredential = await _auth.signInWithCredential(oauthCredential);
 
-      // Save Firebase token to LocalStorage so isLoggedIn() returns true
+      // Get Firebase ID token to send to backend
       final firebaseToken = await userCredential.user?.getIdToken();
-      if (firebaseToken != null) {
+      if (firebaseToken == null) {
+        AppToast.error("Failed to get authentication token");
+        return;
+      }
+
+      // Call backend social login API to exchange Firebase token for backend token
+      final backendSaved = await _exchangeTokenWithBackend(firebaseToken);
+
+      if (!backendSaved) {
         await LocalStorageService.saveAccessToken(firebaseToken);
+      }
+
+      // Refresh profile so name/image show on home screen
+      final profileCtrl = Get.put(ProfileController());
+      await profileCtrl.getProfile();
+      if (profileCtrl.userName.value.isEmpty) {
+        profileCtrl.userName.value = userCredential.user?.displayName ?? '';
+      }
+      if (profileCtrl.profileImage.value.isEmpty) {
+        profileCtrl.profileImage.value = userCredential.user?.photoURL ?? '';
       }
 
       Get.offAll(() => DashboardView());
@@ -107,6 +150,40 @@ class WelcomeViewController extends GetxController {
       }
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// Calls backend social-login API to exchange Firebase token for a backend access token.
+  Future<bool> _exchangeTokenWithBackend(String firebaseToken) async {
+    try {
+      final response = await postRequest(
+        "SocialLogin",
+        endPoint: "user/auth/social-login",
+        body: {"token": firebaseToken},
+      );
+
+      print('=== Backend Social Login Response ===');
+      print('Status: ${response.statusCode}');
+      print('Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final loginModel =
+            LoginResponseModel.fromJson(jsonDecode(response.body));
+
+        if (loginModel.success && loginModel.data != null) {
+          final user = loginModel.data!;
+          await LocalStorageService.saveAccessToken(user.accessToken);
+          await LocalStorageService.saveRefreshToken(user.refreshToken);
+          await LocalStorageService.saveUser(loginModel);
+          print('Backend tokens saved successfully');
+          return true;
+        }
+      }
+      return false;
+    } catch (e, s) {
+      print('Backend social login error: $e');
+      print('Stack: $s');
+      return false;
     }
   }
 }

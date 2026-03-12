@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/widgets/announcements/form_section_tile.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 
 class CreateAnnouncementView extends StatefulWidget {
@@ -21,7 +21,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
+            const CustomHeader(title: 'ANNOUNCEMENT', showBackButton: true),
             Divider(height: 1.h, color: Colors.grey.shade200),
             Expanded(
               child: SingleChildScrollView(
@@ -83,35 +83,6 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Icon(
-              Icons.chevron_left,
-              size: 28.sp,
-              color: Colors.black,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            'ANNOUNCEMENT',
-            style: GoogleFonts.inter(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-            ),
-          ),
-          const Spacer(),
-          SizedBox(width: 28.w),
-        ],
       ),
     );
   }

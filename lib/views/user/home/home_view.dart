@@ -30,10 +30,23 @@ class HomeView extends StatelessWidget {
               SizedBox(height: 12.h),
               // Header
               Padding(
-                padding: EdgeInsets.only(left: 16),
+                padding: EdgeInsets.only(left: 16.h, bottom: 16.h, top: 4.h),
                 child: _buildHeader(),
               ),
-              SizedBox(height: 16.h),
+              Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.1),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: 12.h),
               // New Launch Banner
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -44,10 +57,14 @@ class HomeView extends StatelessWidget {
                   imageUrl: 'assets/images/banner-img.png',
                 ),
               ),
-              SizedBox(height: 20.h),
+              SizedBox(height: 14.h),
+              Divider(height: 1, color: Colors.grey.shade200),
+              SizedBox(height: 8.h),
               // All Story section
               _buildStorySection(),
-              SizedBox(height: 20.h),
+              SizedBox(height: 14.h),
+              Divider(height: 1, color: Colors.grey.shade200),
+              SizedBox(height: 6.h),
               // Announcements section
               _buildAnnouncementsSection(),
               SizedBox(height: 20.h),
@@ -75,23 +92,39 @@ class HomeView extends StatelessWidget {
             },
             child: Row(
               children: [
-                Container(
-                  width: 46.w,
-                  height: 46.w,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.grey.shade200,
-                    border: Border.all(color: Colors.grey.shade300, width: 1),
-                  ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/images/home-profile-icon.jpg',
-                      fit: BoxFit.cover,
-                      width: 46.w,
-                      height: 46.w,
+                Obx(() {
+                  final imgUrl = profileController.profileImage.value;
+                  return Container(
+                    width: 46.w,
+                    height: 46.w,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey.shade200,
+                      border: Border.all(color: AppColors.primary, width: 1),
                     ),
-                  ),
-                ),
+                    child: ClipOval(
+                      child: imgUrl.isNotEmpty
+                          ? Image.network(
+                              imgUrl,
+                              fit: BoxFit.cover,
+                              width: 46.w,
+                              height: 46.w,
+                              errorBuilder: (_, __, ___) => Image.asset(
+                                'assets/images/home-profile-icon.jpg',
+                                fit: BoxFit.cover,
+                                width: 46.w,
+                                height: 46.w,
+                              ),
+                            )
+                          : Image.asset(
+                              'assets/images/home-profile-icon.jpg',
+                              fit: BoxFit.cover,
+                              width: 46.w,
+                              height: 46.w,
+                            ),
+                    ),
+                  );
+                }),
                 SizedBox(width: 10.w),
                 Expanded(
                   child: Obx(() {
@@ -113,9 +146,9 @@ class HomeView extends StatelessWidget {
                               : name.isNotEmpty
                                   ? name
                                   : '...',
-                          style: GoogleFonts.inter(
+                          style: GoogleFonts.poppins(
                             fontSize: 17.sp,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w500,
                             color: Colors.black,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -129,6 +162,7 @@ class HomeView extends StatelessWidget {
             ),
           ),
         ),
+
         SizedBox(width: 10.w),
         // Search box
         _buildSearchBox(),
@@ -149,11 +183,16 @@ class HomeView extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 12.w),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(30.r),
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: AppColors.primary, width: 1.2),
         ),
         child: Row(
           children: [
-            Icon(Icons.search, size: 18.sp, color: Colors.grey),
+            Image.asset(
+              'assets/images/search_icon.png',
+              width: 18.sp,
+              height: 18.sp,
+              color: AppColors.primary,
+            ),
             SizedBox(width: 6.w),
             Text(
               'Search...',
@@ -281,78 +320,81 @@ class HomeView extends StatelessWidget {
       color: Colors.white,
       padding: EdgeInsets.symmetric(vertical: 10.h),
       child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.w),
-          child: Row(
-            children: [
-              Text(
-                'Announcements',
-                style: GoogleFonts.carlito(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
-                ),
-              ),
-              SizedBox(width: 6.w),
-              InkWell(
-                onTap: () => Get.to(() => PropertyDetailView(
-                      announcement: announcements.first,
-                      sectionTitle: announcements.first.propertyName ?? 'Details',
-                    )),
-                borderRadius: BorderRadius.circular(9.r),
-                child: Container(
-                  width: 18.w,
-                  height: 18.w,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.primary,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w),
+            child: Row(
+              children: [
+                Text(
+                  'Announcements',
+                  style: GoogleFonts.carlito(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
                   ),
-                  child: Center(
-                    child: Text(
-                      'i',
-                      style: GoogleFonts.inter(
-                        fontSize: 11.sp,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                ),
+                SizedBox(width: 6.w),
+                InkWell(
+                  onTap: () => Get.to(() => PropertyDetailView(
+                        announcement: announcements.first,
+                        sectionTitle:
+                            announcements.first.propertyName ?? 'Details',
+                      )),
+                  borderRadius: BorderRadius.circular(9.r),
+                  child: Container(
+                    width: 18.w,
+                    height: 18.w,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.primary,
+                    ),
+                    child: Center(
+                      child: Text(
+                        'i',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const Spacer(),
-              InkWell(
-                onTap: () => Get.to(() => MorePropertyView(announcements: announcements)),
-                child: Text(
-                  'More',
-                  style: GoogleFonts.carlito(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey.shade600,
+                const Spacer(),
+                InkWell(
+                  onTap: () => Get.to(
+                      () => MorePropertyView(announcements: announcements)),
+                  child: Text(
+                    'More',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.backgroundDark,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: 12.h),
-        SizedBox(
-          height: 370.h,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            itemCount: announcements.length,
-            separatorBuilder: (_, __) => SizedBox(width: 14.w),
-            itemBuilder: (_, index) {
-              return HomeAnnouncementCard(
-                announcement: announcements[index],
-              );
-            },
+          SizedBox(height: 12.h),
+          SizedBox(
+            height: 325.h,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              itemCount: announcements.length,
+              separatorBuilder: (_, __) => SizedBox(width: 14.w),
+              itemBuilder: (_, index) {
+                return HomeAnnouncementCard(
+                  announcement: announcements[index],
+                  index: index,
+                );
+              },
+            ),
           ),
-        ),
-      ],
-    ),
+        ],
+      ),
     );
   }
 
@@ -406,7 +448,8 @@ class HomeView extends StatelessWidget {
                 ),
                 const Spacer(),
                 InkWell(
-                  onTap: () => Get.to(() => MorePropertyView(announcements: damacAnnouncements)),
+                  onTap: () => Get.to(() =>
+                      MorePropertyView(announcements: damacAnnouncements)),
                   child: Text(
                     'More',
                     style: GoogleFonts.carlito(
@@ -421,7 +464,7 @@ class HomeView extends StatelessWidget {
           ),
           SizedBox(height: 12.h),
           SizedBox(
-            height: 370.h,
+            height: 325.h,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.symmetric(horizontal: 16.w),

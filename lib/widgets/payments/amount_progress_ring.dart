@@ -2,18 +2,19 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:brokkerspot/core/constants/app_colors.dart';
 
 class AmountProgressRing extends StatelessWidget {
   final double progress;
   final String currencyLabel;
   final String amountText;
+  final Color progressColor;
 
   const AmountProgressRing({
     super.key,
     required this.progress,
     required this.currencyLabel,
     required this.amountText,
+    required this.progressColor,
   });
 
   @override
@@ -24,30 +25,29 @@ class AmountProgressRing extends StatelessWidget {
       child: CustomPaint(
         painter: _RingPainter(
           progress: progress,
-          trackColor: Colors.grey.shade300,
-          progressColor: AppColors.primary,
-          strokeWidth: 8.w,
+          trackColor: Colors.grey.shade200,
+          progressColor: progressColor,
+          strokeWidth: 16.w,
         ),
         child: Center(
-          child: Row(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                '$currencyLabel ',
+                currencyLabel,
                 style: GoogleFonts.inter(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black54,
                 ),
               ),
+              SizedBox(height: 2.h),
               Text(
                 amountText,
                 style: GoogleFonts.inter(
-                  fontSize: 24.sp,
+                  fontSize: 22.sp,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+                  color: Colors.black,
                 ),
               ),
             ],
@@ -111,6 +111,7 @@ class _RingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RingPainter oldDelegate) {
-    return oldDelegate.progress != progress;
+    return oldDelegate.progress != progress ||
+        oldDelegate.progressColor != progressColor;
   }
 }

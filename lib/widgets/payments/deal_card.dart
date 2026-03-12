@@ -36,7 +36,7 @@ class DealCard extends StatelessWidget {
           _buildPropertyImage(),
           SizedBox(width: 12.w),
           Expanded(child: _buildProjectInfo()),
-          _buildRightSection(),
+          _buildAvatarStack(),
         ],
       ),
     );
@@ -45,14 +45,20 @@ class DealCard extends StatelessWidget {
   Widget _buildPropertyImage() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10.r),
-      child: Container(
+      child: SizedBox(
         width: 70.w,
         height: 70.w,
-        color: Colors.grey.shade300,
-        child: Icon(
-          Icons.apartment,
-          size: 32.sp,
-          color: Colors.grey.shade500,
+        child: Image.asset(
+          deal.imageUrl ?? 'assets/images/room.png',
+          fit: BoxFit.cover,
+          width: 70.w,
+          height: 70.w,
+          errorBuilder: (_, __, ___) => Image.asset(
+            'assets/images/room.png',
+            fit: BoxFit.cover,
+            width: 70.w,
+            height: 70.w,
+          ),
         ),
       ),
     );
@@ -60,7 +66,7 @@ class DealCard extends StatelessWidget {
 
   Widget _buildProjectInfo() {
     final bool isSuccess = deal.status?.toLowerCase() == 'successfully';
-    final Color statusColor = isSuccess ? AppColors.successGreen : AppColors.primary;
+    final Color statusColor = isSuccess ? Color(0xFF6CBB1D) : const Color(0xFFD4A017);
     final String statusText = isSuccess ? 'Successfully' : 'Inprocess';
 
     return Column(
@@ -135,18 +141,67 @@ class DealCard extends StatelessWidget {
     );
   }
 
-  Widget _buildRightSection() {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 20.h),
-      child: Container(
-        width: 36.w,
-        height: 36.w,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.goldAccent, width: 2),
-          color: Colors.grey.shade200,
-        ),
-        child: Icon(Icons.person, size: 18.sp, color: Colors.grey),
+  Widget _buildAvatarStack() {
+    return SizedBox(
+      width: 50.w,
+      height: 50.w,
+      child: Stack(
+        children: [
+          // Large avatar (property/main)
+          Positioned(
+            left: 0,
+            top: 0,
+            child: Container(
+              width: 42.w,
+              height: 42.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.goldAccent, width: 2),
+              ),
+              child: ClipOval(
+                child: Image.asset(
+                  deal.brokerAvatarUrl ?? 'assets/images/story1.png',
+                  fit: BoxFit.cover,
+                  width: 42.w,
+                  height: 42.w,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/story1.png',
+                    fit: BoxFit.cover,
+                    width: 42.w,
+                    height: 42.w,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Small overlapping avatar (broker)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: 24.w,
+              height: 24.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: ClipOval(
+                child: Image.asset(
+                  deal.imageUrl ?? 'assets/images/story2.png',
+                  fit: BoxFit.cover,
+                  width: 24.w,
+                  height: 24.w,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/story2.png',
+                    fit: BoxFit.cover,
+                    width: 24.w,
+                    height: 24.w,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

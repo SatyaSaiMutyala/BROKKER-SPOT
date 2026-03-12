@@ -32,12 +32,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
             Container(
               height: 250,
               child: Center(
-                child: Icon(Icons.hourglass_bottom_rounded,
-                    size: 100, color: Colors.grey[400]),
-                // In a real app, use: Image.asset('assets/verification_img.png')
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final size = MediaQuery.of(context).size.width * 0.55;
+                    return Image.asset('assets/images/wait_image.png',
+                        width: size, height: size, fit: BoxFit.contain);
+                  },
+                ),
               ),
             ),
-            SizedBox(height: 40),
+            SizedBox(height: 0),
             Text(
               "Your Account Is In Under Verification Process, Please Wait We Will Activate Your Account Soon.",
               textAlign: TextAlign.center,

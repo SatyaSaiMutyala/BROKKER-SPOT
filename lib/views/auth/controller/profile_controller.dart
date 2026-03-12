@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 
 class ProfileController extends GetxController {
@@ -63,12 +64,32 @@ class ProfileController extends GetxController {
         }
       } else {
         print('Profile API failed: ${response.statusCode}');
+        // Fallback to Firebase Auth user data
+        _loadFromFirebaseUser();
       }
     } catch (e, s) {
       print('Profile API Error: $e');
       print('Stack: $s');
+      // Fallback to Firebase Auth user data
+      _loadFromFirebaseUser();
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  void _loadFromFirebaseUser() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      if (userName.value.isEmpty) {
+        userName.value = user.displayName ?? '';
+      }
+      if (userEmail.value.isEmpty) {
+        userEmail.value = user.email ?? '';
+      }
+      if (profileImage.value.isEmpty) {
+        profileImage.value = user.photoURL ?? '';
+      }
+      print('Profile loaded from Firebase: ${userName.value}');
     }
   }
 }

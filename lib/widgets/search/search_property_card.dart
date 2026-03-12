@@ -11,10 +11,16 @@ class SearchPropertyCard extends StatefulWidget {
   final String? timeAgo;
   final String? badge;
   final int? unitsLeft;
+  final int index;
   final VoidCallback? onTap;
   final VoidCallback? onWishlistTap;
   final VoidCallback? onCallTap;
   final VoidCallback? onChatTap;
+
+  static const List<String> _avatarAssets = [
+    'assets/images/story1.png',
+    'assets/images/story2.png',
+  ];
 
   const SearchPropertyCard({
     super.key,
@@ -24,6 +30,7 @@ class SearchPropertyCard extends StatefulWidget {
     this.timeAgo,
     this.badge,
     this.unitsLeft,
+    this.index = 0,
     this.onTap,
     this.onWishlistTap,
     this.onCallTap,
@@ -120,32 +127,25 @@ class _SearchPropertyCardState extends State<SearchPropertyCard> {
           child: Row(
             children: [
               Container(
-                width: 34.w,
-                height: 34.w,
-                decoration: BoxDecoration(
+                width: 55.w,
+                height: 55.h,
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
-                  color: Colors.grey.shade300,
                 ),
                 child: ClipOval(
-                  child: widget.ownerAvatarUrl != null
-                      ? Image.asset(
-                          widget.ownerAvatarUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(
-                              Icons.person,
-                              size: 18.sp,
-                              color: Colors.grey),
-                        )
-                      : Icon(Icons.person,
-                          size: 18.sp, color: Colors.grey),
+                  child: Image.asset(
+                    SearchPropertyCard._avatarAssets[widget.index % SearchPropertyCard._avatarAssets.length],
+                    width: 55.w,
+                    height: 55.h,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
               SizedBox(width: 8.w),
               Text(
                 widget.ownerName ?? '',
-                style: GoogleFonts.inter(
-                  fontSize: 14.sp,
+                style: GoogleFonts.poppins(
+                  fontSize: 18.sp,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
@@ -161,8 +161,8 @@ class _SearchPropertyCardState extends State<SearchPropertyCard> {
             right: 14.w,
             child: Text(
               widget.timeAgo!,
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
+              style: GoogleFonts.poppins(
+                fontSize: 14.sp,
                 fontWeight: FontWeight.w500,
                 color: Colors.white,
               ),
@@ -172,19 +172,21 @@ class _SearchPropertyCardState extends State<SearchPropertyCard> {
         // Badge (bottom right, e.g. "RENT")
         if (widget.badge != null)
           Positioned(
-            bottom: 24.h,
-            right: 14.w,
+            bottom: 0.h,
+            right: 0.w,
             child: Container(
               padding:
-                  EdgeInsets.symmetric(horizontal: 14.w, vertical: 5.h),
+                  EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
               decoration: BoxDecoration(
                 color: AppColors.goldAccent,
-                borderRadius: BorderRadius.circular(6.r),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12.r),
+                ),
               ),
               child: Text(
                 widget.badge!,
-                style: GoogleFonts.inter(
-                  fontSize: 11.sp,
+                style: GoogleFonts.poppins(
+                  fontSize: 14.sp,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
@@ -266,9 +268,9 @@ class _SearchPropertyCardState extends State<SearchPropertyCard> {
                   a.propertyName ?? '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w700,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
                     color: Colors.black,
                   ),
                 ),
@@ -284,22 +286,18 @@ class _SearchPropertyCardState extends State<SearchPropertyCard> {
                   a.location ?? '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 12.sp,
-                    color: Colors.grey.shade600,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    color: AppColors.textHint,
                   ),
                 ),
               ),
               GestureDetector(
                 onTap: widget.onWishlistTap,
-                child: Icon(
-                  a.isWishlisted == true
-                      ? Icons.favorite
-                      : Icons.favorite_border,
-                  size: 22.sp,
-                  color: a.isWishlisted == true
-                      ? Colors.red
-                      : Colors.grey.shade400,
+                child: Image.asset(
+                  'assets/images/like_icon.png',
+                  width: 22.sp,
+                  height: 22.sp,
                 ),
               ),
             ],
@@ -311,49 +309,58 @@ class _SearchPropertyCardState extends State<SearchPropertyCard> {
 
   // ─── Call / Chat buttons ───
   Widget _buildActionButtons() {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(14.w, 4.h, 14.w, 14.h),
-      child: Row(
-        children: [
-          Expanded(
-            child: _actionButton(
-              label: 'Call',
-              onTap: widget.onCallTap,
-            ),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: _actionButton(
-              label: 'Chat',
-              onTap: widget.onChatTap,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _actionButton({
-    required String label,
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 40.h,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10.r),
-          border: Border.all(color: AppColors.goldAccent, width: 1.2),
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: AppColors.primary, width: 0.8),
+          bottom: BorderSide(color: AppColors.primary, width: 0.8),
+          left: BorderSide(color: AppColors.primary, width: 0.8),
+          right: BorderSide(color: AppColors.primary, width: 0.8),
         ),
-        child: Center(
-          child: Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: AppColors.goldAccent,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(16.r),
+          bottomRight: Radius.circular(16.r),
+        ),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: widget.onCallTap,
+                child: Container(
+                  height: 44.h,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Call',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
+            VerticalDivider(width: 1, thickness: 0.8, color: AppColors.primary),
+            Expanded(
+              child: GestureDetector(
+                onTap: widget.onChatTap,
+                child: Container(
+                  height: 44.h,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Chat',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

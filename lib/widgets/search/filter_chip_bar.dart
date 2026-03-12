@@ -32,7 +32,7 @@ class FilterChipBar extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 8.h),
               decoration: BoxDecoration(
                 color: isActive ? AppColors.goldAccent : Colors.white,
-                borderRadius: BorderRadius.circular(20.r),
+                borderRadius: BorderRadius.circular(4.r),
                 border: Border.all(
                   color: isActive
                       ? AppColors.goldAccent

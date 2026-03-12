@@ -22,20 +22,12 @@ class BrokerPaymentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.05)
-              : Colors.transparent,
-          border: isSelected
-              ? Border.all(color: AppColors.primary.withValues(alpha: 0.2), width: 1)
-              : null,
-          borderRadius: BorderRadius.circular(8.r),
-        ),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         child: Row(
           children: [
-            _buildAvatar(),
+            _buildAvatarStack(),
             SizedBox(width: 12.w),
             Expanded(child: _buildNameColumn()),
             _buildAmount(),
@@ -45,24 +37,67 @@ class BrokerPaymentTile extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar() {
-    return Container(
-      width: 44.w,
-      height: 44.w,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.goldAccent, width: 2),
-      ),
-      child: CircleAvatar(
-        backgroundColor: Colors.grey.shade200,
-        child: Text(
-          (payment.brokerName ?? 'B')[0].toUpperCase(),
-          style: GoogleFonts.inter(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade600,
+  Widget _buildAvatarStack() {
+    return SizedBox(
+      width: 56.w,
+      height: 56.w,
+      child: Stack(
+        children: [
+          // Main large avatar
+          Positioned(
+            left: 0,
+            top: 0,
+            child: Container(
+              width: 48.w,
+              height: 48.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.goldAccent, width: 2),
+              ),
+              child: ClipOval(
+                child: Image.asset(
+                  payment.avatarUrl ?? 'assets/images/story1.png',
+                  fit: BoxFit.cover,
+                  width: 48.w,
+                  height: 48.w,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/story1.png',
+                    fit: BoxFit.cover,
+                    width: 48.w,
+                    height: 48.w,
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
+          // Small overlapping avatar at bottom-right
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: 26.w,
+              height: 26.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: ClipOval(
+                child: Image.asset(
+                  payment.secondAvatarUrl ?? 'assets/images/story2.png',
+                  fit: BoxFit.cover,
+                  width: 26.w,
+                  height: 26.w,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/story2.png',
+                    fit: BoxFit.cover,
+                    width: 26.w,
+                    height: 26.w,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -73,18 +108,19 @@ class BrokerPaymentTile extends StatelessWidget {
       children: [
         Text(
           payment.brokerName ?? '',
-          style: GoogleFonts.inter(
+          style: GoogleFonts.poppins(
             fontSize: 14.sp,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-            color: Colors.black,
+            color: AppColors.textBlack.withValues(alpha: 0.6),
           ),
         ),
         SizedBox(height: 2.h),
         Text(
           payment.projectName ?? '',
-          style: GoogleFonts.inter(
-            fontSize: 11.sp,
-            color: Colors.grey.shade500,
+          style: GoogleFonts.poppins(
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textHint,
           ),
         ),
       ],
@@ -94,10 +130,10 @@ class BrokerPaymentTile extends StatelessWidget {
   Widget _buildAmount() {
     return Text(
       'AED $formattedAmount',
-      style: GoogleFonts.inter(
-        fontSize: 14.sp,
+      style: GoogleFonts.poppins(
+        fontSize: 13.sp,
         fontWeight: FontWeight.w600,
-        color: isSelected ? AppColors.primary : Colors.black87,
+        color: Colors.black87,
       ),
     );
   }

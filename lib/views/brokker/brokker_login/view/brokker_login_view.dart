@@ -86,7 +86,7 @@ class _BrokerOnboardingViewState extends State<BrokerOnboardingView> {
 
   Widget _buildPage(OnboardingItem item) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 25),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -121,12 +121,13 @@ class _BrokerOnboardingViewState extends State<BrokerOnboardingView> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 5,
+                crossAxisSpacing: 22,
+                childAspectRatio: 4.5,
               ),
               itemCount: item.benefits!.length,
               itemBuilder: (context, i) => Row(
                 children: [
-                  const Icon(Icons.circle, size: 4, color: Colors.grey),
+                  const Icon(Icons.circle, size: 6, color: Colors.grey),
                   const SizedBox(width: 8),
                   Expanded(
                       child: Text(item.benefits![i],

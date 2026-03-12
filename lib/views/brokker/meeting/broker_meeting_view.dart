@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/meeting_model.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/meetings/meeting_tile.dart';
 import 'package:brokkerspot/widgets/common/support_fab.dart';
 
@@ -20,8 +20,19 @@ class BrokerMeetingView extends StatelessWidget {
           children: [
             Column(
               children: [
-                _buildHeader(),
-                Divider(height: 1.h, color: Colors.grey.shade200),
+                CustomHeader(
+                  title: 'MEETING',
+                  trailing: GestureDetector(
+                    onTap: () {
+                      // Handle filter
+                    },
+                    child: Icon(
+                      Icons.tune,
+                      size: 22.sp,
+                      color: AppColors.goldAccent,
+                    ),
+                  ),
+                ),
                 Expanded(child: _buildMeetingList(meetings)),
               ],
             ),
@@ -41,42 +52,19 @@ class BrokerMeetingView extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-      child: Row(
-        children: [
-          const Spacer(),
-          Text(
-            'MEETING',
-            style: GoogleFonts.inter(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-            ),
-          ),
-          const Spacer(),
-          GestureDetector(
-            onTap: () {
-              // Handle filter
-            },
-            child: Icon(
-              Icons.tune,
-              size: 22.sp,
-              color: AppColors.goldAccent,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMeetingList(List<MeetingModel> meetings) {
     return ListView.builder(
-      padding: EdgeInsets.symmetric(vertical: 8.h),
-      itemCount: meetings.length,
+      padding: EdgeInsets.symmetric(vertical: 4.h),
+      itemCount: meetings.length * 2 - 1,
       itemBuilder: (_, index) {
-        final meeting = meetings[index];
+        // Odd indices are dividers
+        if (index.isOdd) {
+          return Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w),
+            child: Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+          );
+        }
+        final meeting = meetings[index ~/ 2];
         return MeetingTile(
           meeting: meeting,
           formattedAmount: _formatAmount(meeting.dealAmount ?? 0),
@@ -109,6 +97,8 @@ class BrokerMeetingView extends StatelessWidget {
         id: '1',
         clientName: 'Aman',
         projectName: 'AVANTI',
+        avatarUrl: 'assets/images/story4.png',
+        secondAvatarUrl: 'assets/images/story1.png',
         dealAmount: 5000,
         fromAmount: '99 0000',
         timeAgo: '2 min ago',
@@ -118,6 +108,8 @@ class BrokerMeetingView extends StatelessWidget {
         id: '2',
         clientName: 'Neha',
         projectName: 'AVANTI',
+        avatarUrl: 'assets/images/story2.png',
+        secondAvatarUrl: 'assets/images/story3.png',
         dealAmount: 8000,
         fromAmount: '99 0000',
         timeAgo: '2 min ago',
@@ -127,6 +119,8 @@ class BrokerMeetingView extends StatelessWidget {
         id: '3',
         clientName: 'Ankita',
         projectName: 'SAFA / TWO',
+        avatarUrl: 'assets/images/story3.png',
+        secondAvatarUrl: 'assets/images/story2.png',
         dealAmount: 15000,
         fromAmount: '99 0000',
         timeAgo: '2 min ago',
@@ -136,6 +130,8 @@ class BrokerMeetingView extends StatelessWidget {
         id: '4',
         clientName: 'Anamika',
         projectName: 'Zada',
+        avatarUrl: 'assets/images/story1.png',
+        secondAvatarUrl: 'assets/images/story4.png',
         dealAmount: 12000,
         fromAmount: '99 0000',
         timeAgo: '2 min ago',

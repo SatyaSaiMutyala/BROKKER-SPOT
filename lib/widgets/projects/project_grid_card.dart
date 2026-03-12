@@ -60,13 +60,13 @@ class ProjectGridCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Placeholder image
-            Container(
-              color: Colors.grey.shade300,
-              child: Icon(
-                Icons.apartment,
-                size: 36.sp,
-                color: Colors.grey.shade400,
+            // Property image from asset
+            Image.asset(
+              project.imageUrl ?? 'assets/images/city.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Image.asset(
+                'assets/images/city.png',
+                fit: BoxFit.cover,
               ),
             ),
             // Brokerage banner (top)
@@ -104,12 +104,16 @@ class ProjectGridCard extends StatelessWidget {
                 color: Colors.black.withValues(alpha: 0.5),
                 child: Row(
                   children: [
-                    Text(
-                      '€ ${_formatAmount(project.price ?? 0)}',
-                      style: GoogleFonts.inter(
-                        fontSize: 9.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                    Flexible(
+                      child: Text(
+                        'AED ${_formatAmount(project.price ?? 0)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 9.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     SizedBox(width: 4.w),

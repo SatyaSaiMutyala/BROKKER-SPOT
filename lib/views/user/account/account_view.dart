@@ -12,6 +12,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 
 class AccountView extends StatelessWidget {
   const AccountView({super.key});
@@ -20,6 +21,8 @@ class AccountView extends StatelessWidget {
   Widget build(BuildContext context) {
     Get.put(AccountController());
     final bool isGuest = !LocalStorageService.isLoggedIn();
+    final user = LocalStorageService.getUser()?.data;
+    final int accountType = user?.accountType ?? 0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -32,7 +35,7 @@ class AccountView extends StatelessWidget {
         body: SafeArea(
           child: Column(
             children: [
-              _buildHeader(context),
+              const CustomHeader(title: 'My Account'),
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
@@ -78,7 +81,7 @@ class AccountView extends StatelessWidget {
                         children: [
                           _accountTile(
                             icon: Icons.people_outline,
-                            title: 'Become Broker',
+                            title: accountType == 2 ? 'Switch to Broker' : 'Become Broker',
                             enabled: true,
                             onTap: () {
                               Get.to(() => BrokerOnboardingView());
@@ -100,30 +103,6 @@ class AccountView extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // ---------------- HEADER ----------------
-  Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      child: Row(
-        children: [
-          Expanded(
-            child: Center(
-              child: Text(
-                'My Account',
-                style: GoogleFonts.inter(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: 40.w),
-        ],
       ),
     );
   }
@@ -211,9 +190,9 @@ void showLoginRequiredDialog(BuildContext context) {
           children: [
             Text(
               'Please Login.',
-              style: GoogleFonts.inter(
+              style: GoogleFonts.poppins(
                 fontSize: 20.sp,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
                 color: Colors.black,
               ),
             ),
@@ -221,9 +200,10 @@ void showLoginRequiredDialog(BuildContext context) {
             Text(
               'Without login you cannot use all features in this app.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 13.sp,
+              style: GoogleFonts.poppins(
+                fontSize: 12.sp,
                 color: Colors.black54,
+                fontWeight: FontWeight.w600,
               ),
             ),
             SizedBox(height: 24.h),
@@ -243,8 +223,8 @@ void showLoginRequiredDialog(BuildContext context) {
                 },
                 child: Text(
                   'Login',
-                  style: GoogleFonts.inter(
-                    fontSize: 14.sp,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
                     fontWeight: FontWeight.w500,
                     color: AppColors.primary,
                   ),
@@ -268,8 +248,8 @@ void showLoginRequiredDialog(BuildContext context) {
                 },
                 child: Text(
                   'Signup',
-                  style: GoogleFonts.inter(
-                    fontSize: 14.sp,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
                     fontWeight: FontWeight.w500,
                     color: AppColors.primary,
                   ),

@@ -20,17 +20,12 @@ class MeetingTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
-        padding: EdgeInsets.all(12.w),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         child: Row(
           children: [
-            _buildAvatar(),
+            _buildAvatarStack(),
             SizedBox(width: 12.w),
             Expanded(child: _buildInfo()),
             _buildRight(),
@@ -40,24 +35,75 @@ class MeetingTile extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar() {
-    return Container(
-      width: 52.w,
-      height: 52.w,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.goldAccent, width: 2),
-      ),
-      child: CircleAvatar(
-        backgroundColor: Colors.grey.shade200,
-        child: Text(
-          (meeting.clientName ?? 'U')[0].toUpperCase(),
-          style: GoogleFonts.inter(
-            fontSize: 18.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade600,
+  Widget _buildAvatarStack() {
+    return SizedBox(
+      width: 62.w,
+      height: 62.w,
+      child: Stack(
+        children: [
+          // Main large avatar
+          Positioned(
+            left: 0,
+            top: 0,
+            child: Container(
+              width: 54.w,
+              height: 54.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.goldAccent, width: 2),
+              ),
+              child: ClipOval(
+                child: meeting.avatarUrl != null && meeting.avatarUrl!.isNotEmpty
+                    ? Image.asset(
+                        meeting.avatarUrl!,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        color: Colors.grey.shade200,
+                        child: Center(
+                          child: Text(
+                            (meeting.clientName ?? 'U')[0].toUpperCase(),
+                            style: GoogleFonts.poppins(
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
           ),
-        ),
+          // Small overlapping avatar at bottom-right
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: 28.w,
+              height: 28.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                color: AppColors.goldAccent.withValues(alpha: 0.15),
+              ),
+              child: ClipOval(
+                child: meeting.secondAvatarUrl != null && meeting.secondAvatarUrl!.isNotEmpty
+                    ? Image.asset(
+                        meeting.secondAvatarUrl!,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        color: AppColors.goldAccent.withValues(alpha: 0.15),
+                        child: Icon(
+                          Icons.person,
+                          size: 14.sp,
+                          color: AppColors.goldAccent,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -68,37 +114,35 @@ class MeetingTile extends StatelessWidget {
       children: [
         Text(
           meeting.clientName ?? '',
-          style: GoogleFonts.inter(
+          style: GoogleFonts.poppins(
             fontSize: 14.sp,
             fontWeight: FontWeight.w700,
-            color: Colors.black,
+            color: AppColors.textBlack.withOpacity(0.6),
           ),
         ),
-        SizedBox(height: 2.h),
+        SizedBox(height: 1.h),
         Text(
           meeting.projectName ?? '',
-          style: GoogleFonts.inter(
+          style: GoogleFonts.poppins(
             fontSize: 13.sp,
             fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            color: AppColors.textBlack.withOpacity(0.6),
           ),
         ),
         SizedBox(height: 4.h),
         Row(
           children: [
-            Icon(Icons.people_outline, size: 14.sp, color: AppColors.goldAccent),
-            SizedBox(width: 4.w),
             Text(
               'From AED ',
-              style: GoogleFonts.inter(
+              style: GoogleFonts.poppins(
                 fontSize: 11.sp,
-                color: AppColors.goldAccent,
+                color: AppColors.textHint,
                 fontWeight: FontWeight.w500,
               ),
             ),
             Text(
               meeting.fromAmount ?? '99 0000',
-              style: GoogleFonts.inter(
+              style: GoogleFonts.poppins(
                 fontSize: 11.sp,
                 color: AppColors.goldAccent,
                 fontWeight: FontWeight.w600,
@@ -118,15 +162,15 @@ class MeetingTile extends StatelessWidget {
         Container(
           padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
           decoration: BoxDecoration(
-            color: AppColors.goldAccent.withValues(alpha: 0.12),
+            color: AppColors.primary,
             borderRadius: BorderRadius.circular(6.r),
           ),
           child: Text(
             '€ $formattedAmount*',
-            style: GoogleFonts.inter(
+            style: GoogleFonts.poppins(
               fontSize: 12.sp,
               fontWeight: FontWeight.w700,
-              color: AppColors.goldAccent,
+              color: AppColors.textWhite,
             ),
           ),
         ),
@@ -138,15 +182,15 @@ class MeetingTile extends StatelessWidget {
             height: 20.w,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.goldAccent.withValues(alpha: 0.15),
+              color: AppColors.primary,
             ),
             child: Center(
               child: Text(
                 '${meeting.messageCount}',
-                style: GoogleFonts.inter(
+                style: GoogleFonts.poppins(
                   fontSize: 10.sp,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.goldAccent,
+                  color: AppColors.textWhite,
                 ),
               ),
             ),
@@ -155,9 +199,10 @@ class MeetingTile extends StatelessWidget {
         // Time ago
         Text(
           meeting.timeAgo ?? '',
-          style: GoogleFonts.inter(
+          style: GoogleFonts.poppins(
             fontSize: 10.sp,
-            color: Colors.grey.shade500,
+            color: AppColors.textHint,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],

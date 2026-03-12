@@ -9,16 +9,18 @@ class CustomPrimaryButton extends StatelessWidget {
   final Color? backgroundColor;
   final bool isDisabled;
   final Color defaultColor;
+  final FontWeight fontWeight;
 
   const CustomPrimaryButton({
     super.key,
     required this.title,
     required this.onPressed,
     this.height = 50,
-    this.radius = 8,
+    this.radius = 4 ,
     this.backgroundColor,
     this.isDisabled = false,
     this.defaultColor = Colors.white,
+    this.fontWeight = FontWeight.bold,
   });
 
   @override
@@ -39,7 +41,7 @@ class CustomPrimaryButton extends StatelessWidget {
           title,
           style: GoogleFonts.roboto(
             color: defaultColor,
-            fontWeight: FontWeight.bold,
+            fontWeight: fontWeight,
           ),
         ),
       ),

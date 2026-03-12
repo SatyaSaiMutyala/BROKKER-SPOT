@@ -8,13 +8,21 @@ class HomeAnnouncementCard extends StatelessWidget {
   final AnnouncementModel announcement;
   final VoidCallback? onTap;
   final bool showAvatar;
+  final int index;
 
   const HomeAnnouncementCard({
     super.key,
     required this.announcement,
     this.onTap,
     this.showAvatar = true,
+    this.index = 0,
   });
+
+  static const List<String> _avatarAssets = [
+    'assets/images/announcement_proffile_icon.png',
+    'assets/images/story1.png',
+    'assets/images/story2.png',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +32,7 @@ class HomeAnnouncementCard extends StatelessWidget {
       child: GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 300.w,
+        width: 330.w,
         decoration: BoxDecoration(
           color: const Color(0xFFF8F8F8),
           borderRadius: BorderRadius.circular(16.r),
@@ -56,7 +64,7 @@ class HomeAnnouncementCard extends StatelessWidget {
 
   Widget _buildImageSection(AnnouncementModel a) {
     return SizedBox(
-      height: 230.h,
+      height: 215.h,
       child: Stack(
         children: [
           // Property image - full height
@@ -73,15 +81,15 @@ class HomeAnnouncementCard extends StatelessWidget {
           // "For Rent" badge - top left
           if (a.listingType != null)
             Positioned(
-              top: 12.h,
+              top: 26.h,
               left: 0,
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
                 decoration: BoxDecoration(
                   color: AppColors.goldAccent,
                   borderRadius: BorderRadius.only(
-                    topRight: Radius.circular(6.r),
-                    bottomRight: Radius.circular(6.r),
+                    topRight: Radius.circular(12.r),
+                    bottomRight: Radius.circular(12.r),
                   ),
                 ),
                 child: Text(
@@ -97,7 +105,7 @@ class HomeAnnouncementCard extends StatelessWidget {
           // Owner avatar - bottom left
           if (showAvatar)
             Positioned(
-              bottom: 0,
+              bottom: 10.h,
               left: 14.w,
               child: Container(
                 width: 44.w,
@@ -117,7 +125,12 @@ class HomeAnnouncementCard extends StatelessWidget {
                 child: ClipOval(
                   child: a.ownerAvatarUrl != null && a.ownerAvatarUrl!.isNotEmpty
                       ? Image.network(a.ownerAvatarUrl!, fit: BoxFit.cover)
-                      : Icon(Icons.person, size: 22.sp, color: Colors.grey),
+                      : Image.asset(
+                          _avatarAssets[index % _avatarAssets.length],
+                          fit: BoxFit.cover,
+                          width: 44.w,
+                          height: 44.w,
+                        ),
                 ),
               ),
             ),
@@ -128,7 +141,7 @@ class HomeAnnouncementCard extends StatelessWidget {
 
   Widget _buildInfoSection(AnnouncementModel a) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(14.w, 6.h, 14.w, 10.h),
+      padding: EdgeInsets.fromLTRB(14.w, 6.h, 8.w, 0.h),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -140,23 +153,23 @@ class HomeAnnouncementCard extends StatelessWidget {
               Text(
                 'AED ',
                 style: GoogleFonts.poppins(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w300,
                   color: Colors.black,
                 ),
               ),
               Text(
                 _formatPrice(a.price ?? 0),
                 style: GoogleFonts.poppins(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.primary,
                 ),
               ),
               Text(
                 ' yearly',
                 style: GoogleFonts.poppins(
-                  fontSize: 14.sp,
+                  fontSize: 18.sp,
                   fontWeight: FontWeight.w400,
                   color: Colors.black87,
                 ),
@@ -165,8 +178,9 @@ class HomeAnnouncementCard extends StatelessWidget {
               Text(
                 a.timeAgo ?? '',
                 style: GoogleFonts.poppins(
-                  fontSize: 11.sp,
-                  color: Colors.grey,
+                  fontSize: 12.sp,
+                  color: AppColors.textBlack.withOpacity(0.6),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -177,9 +191,9 @@ class HomeAnnouncementCard extends StatelessWidget {
             a.propertyName ?? '',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.poppins(
               fontSize: 14.sp,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: Colors.black,
             ),
           ),
@@ -195,9 +209,10 @@ class HomeAnnouncementCard extends StatelessWidget {
                   a.location ?? '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 13.sp,
-                    color: Colors.black,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14.sp,
+                    color: AppColors.textHint,
+                    fontWeight: FontWeight.w500
                   ),
                 ),
               ),

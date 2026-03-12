@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/project_model.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/projects/tab_toggle.dart';
 import 'package:brokkerspot/widgets/projects/project_grid_card.dart';
 import 'package:brokkerspot/widgets/projects/premium_lock_banner.dart';
@@ -28,8 +29,30 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
-            Divider(height: 1.h, color: Colors.grey.shade200),
+            CustomHeader(
+              title: 'Projects',
+              trailing: Container(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20.r),
+                  border: Border.all(color: AppColors.goldAccent),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset('assets/images/search_icon.png', width: 16.sp, height: 16.sp),
+                    SizedBox(width: 4.w),
+                    Text(
+                      'Search..',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             SizedBox(height: 12.h),
             // Tab Toggle
             TabToggle(
@@ -48,48 +71,6 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-      child: Row(
-        children: [
-          Text(
-            'Projects',
-            style: GoogleFonts.inter(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
-            ),
-          ),
-          const Spacer(),
-          // Search bar
-          Container(
-            width: 140.w,
-            height: 36.h,
-            padding: EdgeInsets.symmetric(horizontal: 12.w),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20.r),
-              border: Border.all(color: AppColors.goldAccent),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.search, size: 18.sp, color: AppColors.goldAccent),
-                SizedBox(width: 6.w),
-                Text(
-                  'Search...',
-                  style: GoogleFonts.inter(
-                    fontSize: 12.sp,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -113,8 +94,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 12.w,
-              mainAxisSpacing: 14.h,
-              childAspectRatio: 0.78,
+              childAspectRatio: 0.99,
             ),
             itemCount: projects.length,
             itemBuilder: (_, index) {
@@ -146,12 +126,10 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
           ),
           SizedBox(height: 8.h),
           // Announcement cards
-          ...announcements.map(
-            (a) => AnnouncementPropertyCard(
-              announcement: a,
-              showWishlist: false,
-              showStatusBadge: false,
-              showBrokerAvatar: false,
+          ...announcements.asMap().entries.map(
+            (entry) => AnnouncementPropertyCard(
+              announcement: entry.value,
+              index: entry.key,
               onTap: () {},
             ),
           ),
@@ -210,6 +188,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         name: 'AL JAWHARAH',
         developer: 'DAMAC',
         location: 'Dubai | United Arab...',
+        imageUrl: 'assets/images/room.png',
         price: 1000000,
         brokerage: 65000,
         units: 5,
@@ -219,6 +198,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         name: 'CAVALLI TOWER',
         developer: 'DAMAC',
         location: 'Dubai | United Arab...',
+        imageUrl: 'assets/images/rent1.png',
         price: 1000000,
         brokerage: 65000,
         units: 5,
@@ -228,6 +208,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         name: 'AL JAWHARAH',
         developer: 'DAMAC',
         location: 'Dubai | United Arab...',
+        imageUrl: 'assets/images/rent2.png',
         price: 1000000,
         brokerage: 65000,
         units: 5,
@@ -237,6 +218,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         name: 'AVANTI',
         developer: 'DAMAC',
         location: 'Dubai | United Arab...',
+        imageUrl: 'assets/images/room.png',
         price: 1000000,
         brokerage: 65000,
         units: 5,
@@ -246,6 +228,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         name: 'AL JAWHARAH',
         developer: 'DAMAC',
         location: 'Dubai | United Arab...',
+        imageUrl: 'assets/images/rent1.png',
         price: 1000000,
         brokerage: 65000,
         units: 5,
@@ -255,6 +238,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         name: 'AL JAWHARAH',
         developer: 'DAMAC',
         location: 'Dubai | United Arab...',
+        imageUrl: 'assets/images/rent2.png',
         price: 1000000,
         brokerage: 65000,
         units: 5,

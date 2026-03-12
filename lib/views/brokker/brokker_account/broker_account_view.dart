@@ -1,6 +1,9 @@
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AccountMenuView extends StatelessWidget {
   const AccountMenuView({super.key});
@@ -8,61 +11,112 @@ class AccountMenuView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6F8),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           "My Account",
-          style: TextStyle(color: Colors.black),
+          style: GoogleFonts.inter(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
-        elevation: 0.5,
+        elevation: 0,
       ),
-      body: ListView(
-        children: [
-          _menuItem(Icons.person_outline, "My Information", () {}),
-          _menuItem(Icons.group_outlined, "My Sub broker Team", () {}),
-          _menuItem(
-              Icons.account_balance_outlined, "My Bank Account Details", () {}),
-          _menuItem(
-            Icons.swap_horiz,
-            "Switch to User side",
-            () => Get.offAll(() => const DashboardView()),
+      body: Builder(builder: (context) {
+        final bool isLoggedIn = LocalStorageService.isLoggedIn();
+        return SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
+          child: Column(
+            children: [
+              // First card group
+              _buildCardGroup([
+                _menuItem('assets/images/broker_my_profile_icon.png', 'My Information', () {}, enabled: isLoggedIn),
+                _menuItem('assets/images/broker_mydeal_icon.png', 'My Deals', () {}, enabled: isLoggedIn),
+                _menuItem('assets/images/broker_bank_icon.png', 'My Bank Account Details', () {}, enabled: isLoggedIn),
+                _menuItem('assets/images/broker_announcement.png', 'Announcement', () {}, enabled: isLoggedIn),
+                _menuItem('assets/images/broker_wishlist_icon.png', 'My Wishlist', () {}, showDivider: false, enabled: isLoggedIn),
+              ]),
+              SizedBox(height: 16.h),
+              // Second card group
+              _buildCardGroup([
+                _menuItem('assets/images/switch_to_user_icon.png', 'Switch to User side', () => Get.offAll(() => const DashboardView())),
+                _menuItem('assets/images/subscription_icon.png', 'My Subscription', () {}, enabled: isLoggedIn),
+                _menuItem('assets/images/broker_settings_icon.png', 'Setting', () {}, showDivider: false, enabled: isLoggedIn),
+              ]),
+            ],
           ),
-          _menuItem(Icons.favorite_border, "My Wishlist", () {}),
-          _menuItem(Icons.subscriptions_outlined, "My Subscription", () {}),
-          _menuItem(Icons.settings_outlined, "Setting", () {}),
-        ],
-      ),
+        );
+      }),
     );
   }
 
-  // ---------------- MENU TILE ----------------
+  Widget _buildCardGroup(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
   Widget _menuItem(
-    IconData icon,
+    String assetPath,
     String title,
-    VoidCallback onTap,
-  ) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: Colors.orangeAccent.withOpacity(0.7),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 15),
-      ),
-      trailing: const Icon(
-        Icons.chevron_right,
-        color: Colors.grey,
-      ),
-      onTap: onTap,
-      shape: const Border(
-        bottom: BorderSide(color: Colors.black12, width: 0.5),
-      ),
+    VoidCallback onTap, {
+    bool showDivider = true,
+    bool enabled = true,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(16.r),
+          child: Opacity(
+            opacity: enabled ? 1.0 : 0.4,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
+              child: Row(
+                children: [
+                  Image.asset(assetPath, width: 24.w, height: 24.w),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, size: 22.sp, color: Colors.grey.shade400),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (showDivider)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20.w),
+            child: Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+          ),
+      ],
     );
   }
 }

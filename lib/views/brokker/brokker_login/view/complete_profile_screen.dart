@@ -2,16 +2,19 @@ import 'dart:io';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/controller/complete_profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/rules_screen.dart';
+import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({super.key});
   @override
   State<CompleteProfileScreen> createState() => _CompleteProfileScreenState();
 }
+
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final controller = Get.put(CompleteProfileController());
@@ -25,6 +28,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     bnrValueController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,15 +64,17 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         elevation: 0,
+        toolbarHeight: 75.h,
         centerTitle: true,
         actions: [
           Center(
             child: Padding(
               padding: EdgeInsets.only(right: 12.w),
               child: GestureDetector(
-                onTap: () => Get.to(() => const RulesScreen()),
+                onTap: () => Get.offAll(() => BrokerDashBoardView()),
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 7.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 20.w, vertical: 5.h),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20.r),
                     border: Border.all(color: AppColors.primary),
@@ -87,8 +93,20 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Container(height: 0.5, color: Colors.grey.shade200),
+          preferredSize: Size.fromHeight(6),
+          child: Container(
+            height: 4,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.08),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
         ),
       ),
       body: SingleChildScrollView(
@@ -109,7 +127,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 label: "",
                 image: controller.passportImage,
               ),
-              SizedBox(height: 4.h),
+              SizedBox(height: 12.h),
               _noteText("Note : Passport Photo should be clear."),
               SizedBox(height: 20.h),
               // Upload Local ID
@@ -138,7 +156,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               _noteText("Note : ID Photo should be clear."),
               SizedBox(height: 24.h),
               // Country Dropdown
-              _sectionLabel("Select the country where you are dealing", isRequired: true),
+              _sectionLabel("Select the country where you are dealing",
+                  isRequired: true),
               SizedBox(height: 8.h),
               _styledDropdown(
                 hint: "Select Country",
@@ -147,7 +166,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               ),
               SizedBox(height: 20.h),
               // City Dropdown
-              _sectionLabel("Select the City where you are dealing", isRequired: true),
+              _sectionLabel("Select the City where you are dealing",
+                  isRequired: true),
               SizedBox(height: 8.h),
               _styledDropdown(
                 hint: "Select city",
@@ -156,11 +176,18 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               ),
               SizedBox(height: 20.h),
               // Areas Dropdown
-              _sectionLabel("Describe Your Specialized Dealing Areas", isRequired: true),
+              _sectionLabel("Describe Your Specialized Dealing Areas",
+                  isRequired: true),
               SizedBox(height: 8.h),
               _styledDropdown(
                 hint: "Select Areas",
-                items: ["Residential", "Commercial", "Industrial", "Land", "Mixed Use"],
+                items: [
+                  "Residential",
+                  "Commercial",
+                  "Industrial",
+                  "Land",
+                  "Mixed Use"
+                ],
                 value: controller.selectedAreas,
               ),
               SizedBox(height: 20.h),
@@ -176,10 +203,16 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               // Languages Dropdown
               _sectionLabel("You know languages", isRequired: true),
               SizedBox(height: 8.h),
-              _styledDropdown(
+              _languageMultiSelect(
                 hint: "Select languages",
-                items: ["English", "Hindi", "Arabic", "Telugu", "Tamil", "Urdu"],
-                value: controller.selectedLanguage,
+                items: [
+                  "English",
+                  "Hindi",
+                  "Arabic",
+                  "Telugu",
+                  "Tamil",
+                  "Urdu"
+                ],
               ),
               SizedBox(height: 20.h),
               // Professional Email
@@ -243,10 +276,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       ),
                     ),
                     TextSpan(
-                      text: 'Your data will be deleted 72h after verification of your identity',
+                      text:
+                          'Your data will be deleted 72h after verification of your identity',
                       style: GoogleFonts.poppins(
                         fontSize: 12.sp,
-                        color: Colors.black87,
+                        color: Colors.black54,
                       ),
                     ),
                   ],
@@ -259,6 +293,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       ),
     );
   }
+
   // ---------------- Profile Image ----------------
   Widget _profileImage() {
     return Column(
@@ -302,7 +337,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                         : null,
                     backgroundColor: Colors.grey.shade200,
                     child: controller.profileImage.value == null
-                        ? Icon(Icons.person, size: 50.sp, color: Colors.grey.shade400)
+                        ? Icon(Icons.person,
+                            size: 50.sp, color: Colors.grey.shade400)
                         : null,
                   );
                 }),
@@ -312,29 +348,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Container(
+                      Image.asset(
+                        'assets/images/camera_icon.png',
                         width: 34.w,
                         height: 34.w,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primary,
-                          border: Border.all(color: Colors.white, width: 2.5),
-                        ),
-                        child: Icon(Icons.camera_alt, size: 16.sp, color: Colors.white),
-                      ),
-                      Positioned(
-                        top: -2,
-                        left: -2,
-                        child: Container(
-                          width: 14.w,
-                          height: 14.w,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.primary,
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          child: Icon(Icons.add, size: 8.sp, color: Colors.white),
-                        ),
                       ),
                     ],
                   ),
@@ -346,6 +363,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       ],
     );
   }
+
   // ---------------- Upload Box ----------------
   Widget _uploadBox({
     required double height,
@@ -383,31 +401,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        Container(
+                        Image.asset(
+                          'assets/images/camera_icon.png',
                           width: 44.w,
                           height: 44.w,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.primary.withValues(alpha: 0.12),
-                          ),
-                          child: Icon(
-                            Icons.camera_alt_outlined,
-                            color: AppColors.primary,
-                            size: 22.sp,
-                          ),
-                        ),
-                        Positioned(
-                          top: -2,
-                          left: -2,
-                          child: Container(
-                            width: 16.w,
-                            height: 16.w,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.primary,
-                            ),
-                            child: Icon(Icons.add, size: 10.sp, color: Colors.white),
-                          ),
                         ),
                       ],
                     ),
@@ -427,52 +424,235 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       }),
     );
   }
-  // ---------------- Styled Dropdown ----------------
+
+  // ---------------- Language Multi-Select Dropdown ----------------
+  final RxBool _languageDropdownOpen = false.obs;
+
+  Widget _languageMultiSelect({
+    required String hint,
+    required List<String> items,
+  }) {
+    return Obx(() {
+      final selected = controller.selectedLanguages;
+      final displayText = selected.isEmpty ? null : selected.join(', ');
+      final isOpen = _languageDropdownOpen.value;
+
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () {
+              _languageDropdownOpen.value = !_languageDropdownOpen.value;
+            },
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey, width: 1),
+                borderRadius: isOpen
+                    ? BorderRadius.vertical(top: Radius.circular(4.r))
+                    : BorderRadius.circular(4.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      displayText ?? hint,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14.sp,
+                        color:
+                            displayText != null ? Colors.black87 : Colors.grey,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    isOpen
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.grey.shade600,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isOpen)
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey, width: 1),
+                borderRadius:
+                    BorderRadius.vertical(bottom: Radius.circular(4.r)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: items.map((lang) {
+                  final isSelected = selected.contains(lang);
+                  return InkWell(
+                    onTap: () {
+                      if (isSelected) {
+                        selected.remove(lang);
+                      } else {
+                        selected.add(lang);
+                      }
+                    },
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 16.w, vertical: 12.h),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 22.w,
+                            height: 22.w,
+                            decoration: BoxDecoration(
+                              color:
+                                  isSelected ? AppColors.primary : Colors.white,
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : Colors.grey.shade400,
+                                width: 1.5,
+                              ),
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                            child: isSelected
+                                ? Icon(Icons.check,
+                                    size: 16.sp, color: Colors.white)
+                                : null,
+                          ),
+                          SizedBox(width: 12.w),
+                          Text(
+                            lang.toUpperCase(),
+                            style: GoogleFonts.poppins(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      );
+    });
+  }
+
+  final RxMap<String, bool> _dropdownOpenState = <String, bool>{}.obs;
+
   Widget _styledDropdown({
     required String hint,
     required List<String> items,
     required RxString value,
   }) {
     return Obx(() {
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.grey, width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: EdgeInsets.only(right: 12.w),
-        child: DropdownButtonFormField<String>(
-          initialValue: value.value.isEmpty ? null : value.value,
-          hint: Text(
-            hint,
-            style: GoogleFonts.poppins(fontSize: 14.sp, color: Colors.grey),
-          ),
-          icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey.shade600),
-          items: items
-              .map((e) => DropdownMenuItem(
-                    value: e,
+      final isOpen = _dropdownOpenState[hint] == true;
+      final displayText = value.value.isEmpty ? null : value.value;
+
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () {
+              _dropdownOpenState[hint] = !isOpen;
+            },
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey, width: 1),
+                borderRadius: isOpen
+                    ? BorderRadius.vertical(top: Radius.circular(4.r))
+                    : BorderRadius.circular(4.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
                     child: Text(
-                      e,
-                      style: GoogleFonts.poppins(fontSize: 14.sp, color: Colors.black87),
+                      displayText ?? hint,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14.sp,
+                        color:
+                            displayText != null ? Colors.black87 : Colors.grey,
+                      ),
                     ),
-                  ))
-              .toList(),
-          onChanged: (val) => value.value = val ?? '',
-          decoration: InputDecoration(
-            contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-            border: InputBorder.none,
+                  ),
+                  Icon(
+                    isOpen
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.grey.shade600,
+                  ),
+                ],
+              ),
+            ),
           ),
-          dropdownColor: Colors.white,
-        ),
+          if (isOpen)
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey, width: 1),
+                borderRadius:
+                    BorderRadius.vertical(bottom: Radius.circular(4.r)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: items.map((item) {
+                  final isSelected = value.value == item;
+                  return InkWell(
+                    onTap: () {
+                      value.value = item;
+                      _dropdownOpenState[hint] = false;
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 16.w, vertical: 12.h),
+                      color: isSelected
+                          ? AppColors.primary.withValues(alpha: 0.08)
+                          : null,
+                      child: Text(
+                        item,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color:
+                              isSelected ? AppColors.primary : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
       );
     });
   }
+
   // ---------------- Styled TextField ----------------
   Widget _styledTextField({
     required TextEditingController controller,
@@ -498,12 +678,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.poppins(fontSize: 14.sp, color: Colors.grey),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+          contentPadding:
+              EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
           border: InputBorder.none,
         ),
       ),
     );
   }
+
   // ---------------- Agent / Broker Toggle ----------------
   Widget _agentBrokerToggle() {
     return Row(
@@ -556,6 +738,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       ],
     );
   }
+
   // ---------------- Section Label ----------------
   Widget _sectionLabel(String text, {bool isRequired = false}) {
     return RichText(
@@ -582,6 +765,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       ),
     );
   }
+
   // ---------------- Note Text ----------------
   Widget _noteText(String text) {
     return RichText(

@@ -30,9 +30,7 @@ class MyAnnouncementsView extends StatelessWidget {
                     itemBuilder: (_, index) {
                       return AnnouncementPropertyCard(
                         announcement: announcements[index],
-                        showWishlist: false,
-                        showStatusBadge: true,
-                        showBrokerAvatar: true,
+                        index: index,
                         onTap: () {},
                         onLocationTap: () {},
                       );

@@ -1,3 +1,4 @@
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,26 +22,12 @@ class _MyProjectDealsViewState extends State<MyProjectDealsView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, size: 20.sp, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        centerTitle: true,
-        title: Text(
-          'My Project Deal',
-          style: GoogleFonts.inter(
-            fontSize: 18.sp,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
-        ),
-      ),
-      body: Column(
+      
+      body: SafeArea(
+        child: Column(
         children: [
+            const CustomHeader(title: 'My Project Deal', showBackButton: true),
+
           SizedBox(height: 12.h),
           // Tab toggle
           DealTabToggle(
@@ -55,6 +42,7 @@ class _MyProjectDealsViewState extends State<MyProjectDealsView> {
                 : _buildCompletedDeals(),
           ),
         ],
+      ),
       ),
     );
   }

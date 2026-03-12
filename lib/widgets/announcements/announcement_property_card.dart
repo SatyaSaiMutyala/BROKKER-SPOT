@@ -9,9 +9,17 @@ class AnnouncementPropertyCard extends StatefulWidget {
   final bool showWishlist;
   final bool showStatusBadge;
   final bool showBrokerAvatar;
+  final int index;
   final VoidCallback? onTap;
   final VoidCallback? onWishlistTap;
   final VoidCallback? onLocationTap;
+  final VoidCallback? onCallTap;
+  final VoidCallback? onChatTap;
+
+  static const List<String> _avatarAssets = [
+    'assets/images/story1.png',
+    'assets/images/story2.png',
+  ];
 
   const AnnouncementPropertyCard({
     super.key,
@@ -19,9 +27,12 @@ class AnnouncementPropertyCard extends StatefulWidget {
     this.showWishlist = true,
     this.showStatusBadge = false,
     this.showBrokerAvatar = false,
+    this.index = 0,
     this.onTap,
     this.onWishlistTap,
     this.onLocationTap,
+    this.onCallTap,
+    this.onChatTap,
   });
 
   @override
@@ -31,6 +42,11 @@ class AnnouncementPropertyCard extends StatefulWidget {
 
 class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
   int _currentImageIndex = 0;
+
+  static const List<String> _fallbackImages = [
+    'assets/images/rent1.png',
+    'assets/images/rent2.png',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -42,84 +58,63 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
         margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14.r),
+          borderRadius: BorderRadius.circular(16.r),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: Colors.black.withValues(alpha: 0.07),
               blurRadius: 10,
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 3),
             ),
           ],
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image carousel with owner row overlay
-            _buildImageCarousel(a),
-            // Details
-            Padding(
-              padding: EdgeInsets.all(14.w),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildPriceRow(a),
-                  SizedBox(height: 4.h),
-                  _buildPropertyName(a),
-                  SizedBox(height: 6.h),
-                  _buildPropertyDetails(a),
-                  SizedBox(height: 8.h),
-                  _buildLocationRow(a),
-                ],
-              ),
-            ),
+            _buildImageSection(a),
+            _buildInfoSection(a),
+            _buildActionButtons(),
           ],
         ),
       ),
     );
   }
 
-  static const List<String> _fallbackImages = [
-    'assets/images/rent1.png',
-    'assets/images/rent2.png',
-  ];
-
-  Widget _buildImageCarousel(AnnouncementModel a) {
+  // ─── Image carousel with owner overlay ───
+  Widget _buildImageSection(AnnouncementModel a) {
     final hasImages = (a.imageUrls?.length ?? 0) > 0;
     final images = hasImages ? a.imageUrls! : _fallbackImages;
     final totalDots = images.length;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(14.r)),
-      child: Stack(
+    return Stack(
       children: [
-        // Image
+        // Image carousel
         SizedBox(
-          height: 220.h,
+          height: 200.h,
           width: double.infinity,
           child: PageView.builder(
             itemCount: images.length,
-            onPageChanged: (index) {
-              setState(() => _currentImageIndex = index);
-            },
-            itemBuilder: (_, index) => hasImages
+            onPageChanged: (i) => setState(() => _currentImageIndex = i),
+            itemBuilder: (_, i) => hasImages
                 ? Image.network(
-                    images[index],
+                    images[i],
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => _imagePlaceholder(),
                   )
                 : Image.asset(
-                    images[index],
+                    images[i],
                     fit: BoxFit.cover,
                   ),
           ),
         ),
-        // Owner row overlay
+
+        // Dark gradient overlay at top for readability
         Positioned(
           top: 0,
           left: 0,
           right: 0,
+          height: 70.h,
           child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
@@ -130,94 +125,83 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
                 ],
               ),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36.w,
-                  height: 36.w,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.grey.shade200,
-                    border: Border.all(color: Colors.white, width: 1),
-                  ),
-                  child: ClipOval(
-                    child: a.ownerAvatarUrl != null && a.ownerAvatarUrl!.isNotEmpty
-                        ? Image.network(a.ownerAvatarUrl!, fit: BoxFit.cover)
-                        : Icon(Icons.person, size: 20.sp, color: Colors.grey),
+          ),
+        ),
+
+        // Owner avatar + name (top left)
+        Positioned(
+          top: 14.h,
+          left: 14.w,
+          child: Row(
+            children: [
+              Container(
+                width: 55.w,
+                height: 55.h,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    AnnouncementPropertyCard._avatarAssets[widget.index %
+                        AnnouncementPropertyCard._avatarAssets.length],
+                    width: 55.w,
+                    height: 55.h,
+                    fit: BoxFit.cover,
                   ),
                 ),
-                SizedBox(width: 10.w),
-                Text(
-                  a.ownerName ?? '',
-                  style: GoogleFonts.inter(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+              ),
+              SizedBox(width: 8.w),
+              Text(
+                a.ownerName ?? '',
+                style: GoogleFonts.poppins(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+
+        Positioned(
+          top: 18.h,
+          right: 14.w,
+          child: GestureDetector(
+            onTap: widget.onWishlistTap,
+            child: Image.asset(
+              'assets/images/like_icon.png',
+              width: 42.sp,
+              height: 42.sp,
+              color: Colors.white,
             ),
           ),
         ),
-        // Wishlist heart
-        if (widget.showWishlist)
+
+        // Listing type badge (bottom right)
+        if (a.listingType != null && a.listingType!.isNotEmpty)
           Positioned(
-            top: 12.h,
-            right: 14.w,
-            child: GestureDetector(
-              onTap: widget.onWishlistTap,
-              child: Icon(
-                a.isWishlisted == true
-                    ? Icons.favorite
-                    : Icons.favorite_border,
-                color: Colors.white,
-                size: 26.sp,
-              ),
-            ),
-          ),
-        // Status badge
-        if (widget.showStatusBadge && a.status != null)
-          Positioned(
-            top: 12.h,
-            right: 14.w,
+            bottom: 0.h,
+            right: 0.w,
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
               decoration: BoxDecoration(
-                color: AppColors.activeGreen,
-                borderRadius: BorderRadius.circular(4.r),
+                color: AppColors.goldAccent,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12.r),
+                ),
               ),
               child: Text(
-                a.status!,
-                style: GoogleFonts.inter(
-                  fontSize: 11.sp,
+                a.listingType!,
+                style: GoogleFonts.poppins(
+                  fontSize: 14.sp,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
               ),
             ),
           ),
-        // Listing type badge
-        if (a.listingType != null && a.listingType!.isNotEmpty)
-          Positioned(
-            bottom: 30.h,
-            right: 14.w,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(6.r),
-              ),
-              child: Text(
-                a.listingType!,
-                style: GoogleFonts.inter(
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        // Dot indicators
+
+        // Dot indicators (bottom center)
         Positioned(
           bottom: 10.h,
           left: 0,
@@ -226,178 +210,179 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
               totalDots,
-              (index) => Container(
+              (i) => Container(
                 width: 7.w,
                 height: 7.w,
                 margin: EdgeInsets.symmetric(horizontal: 3.w),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: index == _currentImageIndex
-                      ? AppColors.teal
-                      : Colors.white.withValues(alpha: 0.7),
+                  color: i == _currentImageIndex
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.4),
                 ),
               ),
             ),
           ),
         ),
       ],
-    ),
+    );
+  }
+
+  // ─── Price, name, location ───
+  Widget _buildInfoSection(AnnouncementModel a) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 8.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Price row
+          Row(
+            children: [
+              Text(
+                'AED ',
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+              Text(
+                _formatPrice(a.price ?? 0),
+                style: GoogleFonts.inter(
+                  fontSize: 17.sp,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.goldAccent,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6.h),
+          // Property name
+          Text(
+            a.propertyName ?? '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.poppins(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+          ),
+          SizedBox(height: 6.h),
+          // Bedrooms + Sqft
+          Row(
+            children: [
+              Icon(Icons.bed_outlined, size: 16.sp, color: AppColors.primary),
+              SizedBox(width: 4.w),
+              Text(
+                '${a.bedrooms ?? 0} Bedroom',
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  color: AppColors.textHint,
+                ),
+              ),
+              SizedBox(width: 16.w),
+              Icon(Icons.square_foot, size: 16.sp, color: AppColors.primary),
+              SizedBox(width: 4.w),
+              Text(
+                '${a.sqft ?? 0} / Sqft',
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  color: AppColors.textHint,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6.h),
+          // Location + heart
+          GestureDetector(
+            onTap: widget.onLocationTap,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    a.location ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      color: AppColors.textHint,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right, size: 22.sp, color: AppColors.primary),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Call / Chat buttons ───
+  Widget _buildActionButtons() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: AppColors.primary, width: 0.8),
+          bottom: BorderSide(color: AppColors.primary, width: 0.8),
+          left: BorderSide(color: AppColors.primary, width: 0.8),
+          right: BorderSide(color: AppColors.primary, width: 0.8),
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(16.r),
+          bottomRight: Radius.circular(16.r),
+        ),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: widget.onCallTap,
+                child: Container(
+                  height: 44.h,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Call',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            VerticalDivider(width: 1, thickness: 0.8, color: AppColors.primary),
+            Expanded(
+              child: GestureDetector(
+                onTap: widget.onChatTap,
+                child: Container(
+                  height: 44.h,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Chat',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _imagePlaceholder() {
     return Container(
       color: Colors.grey.shade300,
-      child: Icon(
-        Icons.home_outlined,
-        size: 48.sp,
-        color: Colors.grey.shade400,
-      ),
-    );
-  }
-
-  Widget _buildPriceRow(AnnouncementModel a) {
-    return Row(
-      children: [
-        Text(
-          'AED ',
-          style: GoogleFonts.inter(
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        Text(
-          _formatPrice(a.price ?? 0),
-          style: GoogleFonts.inter(
-            fontSize: 18.sp,
-            fontWeight: FontWeight.w800,
-            color: AppColors.primary,
-          ),
-        ),
-        Text(
-          ' Yearly',
-          style: GoogleFonts.inter(
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        const Spacer(),
-        if (!widget.showBrokerAvatar)
-          Text(
-            a.timeAgo ?? '',
-            style: GoogleFonts.inter(
-              fontSize: 11.sp,
-              color: Colors.grey.shade500,
-            ),
-          ),
-        // Broker avatar with badge
-        if (widget.showBrokerAvatar) _buildBrokerBadge(a),
-      ],
-    );
-  }
-
-  Widget _buildBrokerBadge(AnnouncementModel a) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 36.w,
-          height: 36.w,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.grey.shade200,
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child: ClipOval(
-            child: Icon(Icons.person, size: 20.sp, color: Colors.grey),
-          ),
-        ),
-        if (a.proposalCount != null && a.proposalCount! > 0)
-          Positioned(
-            top: -4.h,
-            right: -4.w,
-            child: Container(
-              width: 18.w,
-              height: 18.w,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.teal,
-              ),
-              child: Center(
-                child: Text(
-                  '${a.proposalCount}',
-                  style: GoogleFonts.inter(
-                    fontSize: 9.sp,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildPropertyName(AnnouncementModel a) {
-    return Text(
-      a.propertyName ?? '',
-      style: GoogleFonts.inter(
-        fontSize: 15.sp,
-        fontWeight: FontWeight.w700,
-        color: Colors.black,
-      ),
-    );
-  }
-
-  Widget _buildPropertyDetails(AnnouncementModel a) {
-    return Row(
-      children: [
-        Icon(Icons.bed_outlined, size: 16.sp, color: Colors.grey.shade600),
-        SizedBox(width: 4.w),
-        Text(
-          '${a.bedrooms ?? 0} Bedroom',
-          style: GoogleFonts.inter(
-            fontSize: 12.sp,
-            color: Colors.grey.shade600,
-          ),
-        ),
-        SizedBox(width: 16.w),
-        Icon(Icons.square_foot, size: 16.sp, color: Colors.grey.shade600),
-        SizedBox(width: 4.w),
-        Text(
-          '${a.sqft ?? 0} / Sqft',
-          style: GoogleFonts.inter(
-            fontSize: 12.sp,
-            color: Colors.grey.shade600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLocationRow(AnnouncementModel a) {
-    return GestureDetector(
-      onTap: widget.onLocationTap,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              a.location ?? '',
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ),
-          Icon(
-            Icons.chevron_right,
-            size: 20.sp,
-            color: AppColors.teal,
-          ),
-        ],
+      child: Center(
+        child: Icon(Icons.home_outlined, size: 48.sp, color: Colors.grey),
       ),
     );
   }

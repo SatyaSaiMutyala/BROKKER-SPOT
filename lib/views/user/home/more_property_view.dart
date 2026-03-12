@@ -54,6 +54,7 @@ class MorePropertyViewState extends State<MorePropertyView> {
         itemBuilder: (_, index) {
           return HomeAnnouncementCard(
             announcement: widget.announcements[index],
+            index: index,
             onTap: () => Get.to(() => PropertyDetailView(
                   announcement: widget.announcements[index],
                   sectionTitle:

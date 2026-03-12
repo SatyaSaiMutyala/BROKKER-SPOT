@@ -51,6 +51,7 @@ class BrokerPaymentModel {
   final String? brokerName;
   final String? projectName;
   final String? avatarUrl;
+  final String? secondAvatarUrl;
   final double? amount;
   final String? dealId;
 
@@ -59,6 +60,7 @@ class BrokerPaymentModel {
     this.brokerName,
     this.projectName,
     this.avatarUrl,
+    this.secondAvatarUrl,
     this.amount,
     this.dealId,
   });
@@ -69,6 +71,7 @@ class BrokerPaymentModel {
       brokerName: json['broker_name'],
       projectName: json['project_name'],
       avatarUrl: json['avatar_url'],
+      secondAvatarUrl: json['second_avatar_url'],
       amount: (json['amount'] as num?)?.toDouble(),
       dealId: json['deal_id'],
     );
@@ -80,6 +83,7 @@ class BrokerPaymentModel {
       'broker_name': brokerName,
       'project_name': projectName,
       'avatar_url': avatarUrl,
+      'second_avatar_url': secondAvatarUrl,
       'amount': amount,
       'deal_id': dealId,
     };

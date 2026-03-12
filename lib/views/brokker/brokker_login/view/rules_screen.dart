@@ -1,5 +1,6 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/verification_screen.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -11,69 +12,54 @@ class RulesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        leading: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => Get.back(),
-          child: Padding(
-            padding: EdgeInsets.all(12),
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFE5E5E5)),
-              ),
-              child: Icon(
-                Icons.arrow_back_ios_new,
-                size: 18,
-                color: Colors.black,
-              ),
-            ),
-          ),
-        ),
-        title:
-            Text("Rules", style: TextStyle(color: Colors.black, fontSize: 16)),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        elevation: 0.5,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.all(24.0),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const CustomHeader(title: 'Rules', showBackButton: true),
+            Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Image.asset(
-                      'assets/images/appname.png', // Replace with your asset
-                      height: 60,
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.only(top: 10, bottom:24.0, right: 24, left: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Image.asset(
+                              'assets/images/realestate_logo.png', // Replace with your asset
+                              height: 60,
+                            ),
+                          ),
+                          SizedBox(height: 20),
+                          Text(
+                            "BrokerSpot Terms & conditions.",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontFamily: 'calibri',
+                              fontWeight: FontWeight.w400,
+                              color: Color(0xFFD4AF37), // Gold color from image
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            "Lorem ipsum dolor sit amet, consectetur adipiscing elit... " *
+                                20,
+                            style: TextStyle(
+                                color: Colors.grey[700],
+                                fontSize: 14,
+                                height: 1.5),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  SizedBox(height: 30),
-                  Text(
-                    "BrokerSpot Terms & conditions.",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFD4AF37), // Gold color from image
-                    ),
-                  ),
-                  SizedBox(height: 15),
-                  Text(
-                    "Lorem ipsum dolor sit amet, consectetur adipiscing elit... " *
-                        20,
-                    style: TextStyle(
-                        color: Colors.grey[700], fontSize: 14, height: 1.5),
-                  ),
+                  _buildFooter(context),
                 ],
               ),
             ),
-          ),
-          _buildFooter(context),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -97,7 +83,7 @@ class RulesScreen extends StatelessWidget {
           ),
           SizedBox(height: 12),
           RichText(
-            textAlign: TextAlign.center,
+            textAlign: TextAlign.left,
             text: TextSpan(
               style: TextStyle(color: Colors.grey, fontSize: 12),
               children: [
@@ -107,7 +93,7 @@ class RulesScreen extends StatelessWidget {
                 TextSpan(
                   text: "Terms & conditions.",
                   style: TextStyle(
-                      color: Color(0xFFD4AF37), fontWeight: FontWeight.bold),
+                      color: Color(0xFFD4AF37), fontWeight: FontWeight.bold,),
                 ),
               ],
             ),

@@ -3,6 +3,7 @@ class MeetingModel {
   final String? clientName;
   final String? projectName;
   final String? avatarUrl;
+  final String? secondAvatarUrl;
   final double? dealAmount;
   final String? fromAmount;
   final String? timeAgo;
@@ -13,6 +14,7 @@ class MeetingModel {
     this.clientName,
     this.projectName,
     this.avatarUrl,
+    this.secondAvatarUrl,
     this.dealAmount,
     this.fromAmount,
     this.timeAgo,
@@ -25,6 +27,7 @@ class MeetingModel {
       clientName: json['client_name'],
       projectName: json['project_name'],
       avatarUrl: json['avatar_url'],
+      secondAvatarUrl: json['second_avatar_url'],
       dealAmount: (json['deal_amount'] as num?)?.toDouble(),
       fromAmount: json['from_amount'],
       timeAgo: json['time_ago'],
@@ -38,6 +41,7 @@ class MeetingModel {
       'client_name': clientName,
       'project_name': projectName,
       'avatar_url': avatarUrl,
+      'second_avatar_url': secondAvatarUrl,
       'deal_amount': dealAmount,
       'from_amount': fromAmount,
       'time_ago': timeAgo,

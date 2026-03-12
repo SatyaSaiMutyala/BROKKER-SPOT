@@ -4,6 +4,7 @@ import 'package:brokkerspot/views/brokker/brokker_login/view/complete_profile_sc
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
+import 'package:brokkerspot/widgets/common/top_curve_section.dart';
 import 'package:flutter/material.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -21,7 +22,12 @@ class CreateBrokerAccountView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _topSection(context),
+            TopCurveSection(
+              onBack: () => Get.offAll(() => const DashboardView(initialIndex: 3)),
+              curveTop: -70.h,
+              curveRight: -20.w,
+              backButtonTop: MediaQuery.of(context).padding.top + 30.h,
+            ),
             const Spacer(flex: 1),
 
             // Text Content
@@ -36,14 +42,14 @@ class CreateBrokerAccountView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w400),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
 
             // Document Cards
             Builder(builder: (context) {
               final cardWidth = (MediaQuery.of(context).size.width - 64) / 2;
               return Wrap(
-                spacing: 16,
-                runSpacing: 16,
+                spacing: 8,
+                runSpacing: 8,
                 alignment: WrapAlignment.center,
                 children: [
                   SizedBox(
@@ -83,26 +89,27 @@ class CreateBrokerAccountView extends StatelessWidget {
             ),
 
             const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: TextButton(
-                onPressed: () {
-                  Get.offAll(() => BrokerDashBoardView());
-                },
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text(
-                      "Visit as Guest",
-                      style: TextStyle(color: Color(0xFFD4AF37), fontSize: 16),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward,
-                        color: Color(0xFFD4AF37), size: 18),
-                  ],
+            if (!LocalStorageService.isLoggedIn())
+              Align(
+                alignment: Alignment.bottomRight,
+                child: TextButton(
+                  onPressed: () {
+                    Get.offAll(() => BrokerDashBoardView());
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        "Visit as Guest",
+                        style: TextStyle(color: Color(0xFFD4AF37), fontSize: 16),
+                      ),
+                      SizedBox(width: 8),
+                      Icon(Icons.arrow_forward,
+                          color: Color(0xFFD4AF37), size: 18),
+                    ],
+                  ),
                 ),
               ),
-            ),
             const SizedBox(height: 20),
           ],
         ),
@@ -110,41 +117,7 @@ class CreateBrokerAccountView extends StatelessWidget {
     );
   }
 
-  Widget _topSection(BuildContext context) {
-    return SizedBox(
-      height: 220.h,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: -35.h,
-            right: -20.w,
-            child: SizedBox(
-              width: 300.w,
-              height: 349.h,
-              child: Image.asset(
-                'assets/images/top_curve.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-          Positioned(
-            top: MediaQuery.of(context).padding.top,
-            left: 6.w,
-            child: IconButton(
-              onPressed: () => Get.offAll(() => const DashboardView(initialIndex: 3)),
-              icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.white,
-                elevation: 2,
-                shadowColor: Colors.black26,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 }
 
 class DocumentCard extends StatelessWidget {
@@ -156,10 +129,10 @@ class DocumentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -187,6 +160,8 @@ class DocumentCard extends StatelessWidget {
           Flexible(
             child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
             ),
           ),

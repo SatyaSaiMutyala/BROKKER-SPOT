@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/controllers/brokerage_payment_controller.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/payments/amount_progress_ring.dart';
 import 'package:brokkerspot/widgets/payments/deal_card.dart';
 import 'package:brokkerspot/widgets/payments/broker_payment_tile.dart';
@@ -23,17 +23,21 @@ class BrokerPaymentsView extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
+          final bool isSuccess = deal.status?.toLowerCase() == 'successfully';
+          final Color ringColor = isSuccess
+              ? const Color(0xFF6CBB1D)
+              : const Color(0xFFD4A017);
+
           return Column(
             children: [
-              // Title
-              _buildTitle(),
-              Divider(height: 1.h, color: Colors.grey.shade200),
+              const CustomHeader(title: 'Brokerage payments'),
               // Top section: ring + deal card
               SizedBox(height: 16.h),
               AmountProgressRing(
                 progress: controller.progressFraction,
                 currencyLabel: 'AED',
                 amountText: controller.formatAmount(controller.selectedAmount),
+                progressColor: ringColor,
               ),
               SizedBox(height: 20.h),
               DealCard(deal: deal),
@@ -43,20 +47,6 @@ class BrokerPaymentsView extends StatelessWidget {
             ],
           );
         }),
-      ),
-    );
-  }
-
-  Widget _buildTitle() {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 14.h),
-      child: Text(
-        'Brokerage payments',
-        style: GoogleFonts.inter(
-          fontSize: 16.sp,
-          fontWeight: FontWeight.w600,
-          color: Colors.black,
-        ),
       ),
     );
   }
