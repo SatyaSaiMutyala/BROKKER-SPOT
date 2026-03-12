@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
+import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/login_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
