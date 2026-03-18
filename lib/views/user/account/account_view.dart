@@ -24,7 +24,7 @@ class AccountView extends StatelessWidget {
     Get.put(AccountController());
     final bool isGuest = !LocalStorageService.isLoggedIn();
     final user = LocalStorageService.getUser()?.data;
-    final int accountType = user?.accountType ?? 0;
+    final int role = user?.role ?? 0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -83,10 +83,10 @@ class AccountView extends StatelessWidget {
                         children: [
                           Obx(() {
                             final profileCtrl = Get.find<ProfileController>();
-                            final isBroker = profileCtrl.accountType.value == 2;
+                            final isBroker = profileCtrl.role.value == 2;
                             return _accountTile(
                               icon: Icons.people_outline,
-                              title: isBroker ? 'Switch to Broker Side' : accountType == 2 ? 'Switch to Broker' : 'Become Broker',
+                              title: isBroker ? 'Switch to Broker Side' : role == 2 ? 'Switch to Broker' : 'Become Broker',
                               enabled: true,
                               onTap: () {
                                 if (isBroker) {
@@ -190,6 +190,7 @@ void showLoginRequiredDialog(BuildContext context) {
   showDialog(
     context: context,
     builder: (_) => Dialog(
+      backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20.r),
       ),
@@ -203,6 +204,7 @@ void showLoginRequiredDialog(BuildContext context) {
               style: GoogleFonts.poppins(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.w600,
+                
                 color: Colors.black,
               ),
             ),
@@ -211,9 +213,10 @@ void showLoginRequiredDialog(BuildContext context) {
               'Without login you cannot use all features in this app.',
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
-                fontSize: 12.sp,
+                fontSize: 13.sp,
                 color: Colors.black54,
                 fontWeight: FontWeight.w600,
+              
               ),
             ),
             SizedBox(height: 24.h),

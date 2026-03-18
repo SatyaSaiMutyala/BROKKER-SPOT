@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
+import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 
 class LoginController extends GetxController {
@@ -70,7 +71,11 @@ class LoginController extends GetxController {
           AppToast.success(loginModel.message);
 
           DeviceService.registerDevice();
-          Get.offAll(() => DashboardView());
+          if (user.role == 2) {
+            Get.offAll(() => BrokerDashBoardView());
+          } else {
+            Get.offAll(() => DashboardView());
+          }
         } else {
           AppToast.error(loginModel.message);
         }

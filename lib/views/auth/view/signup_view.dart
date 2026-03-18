@@ -165,53 +165,50 @@ class _SignUpViewState extends State<SignUpView> {
   }
 
   Widget _topSection(BuildContext context) {
-    return SizedBox(
-      height: 180.h,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          TopCurveSection(
-            onBack: () => Navigator.pop(context),
-          ),
-          Positioned(
-            bottom: 24.h,
-            left: 20.w,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'SIGN UP',
-                  style: GoogleFonts.inter(
-                    fontSize: 24.sp,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        TopCurveSection(
+          onBack: () => Navigator.pop(context),
+        ),
+        Positioned(
+          bottom: 24.h,
+          left: 20.w,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'SIGN UP',
+                style: GoogleFonts.inter(
+                  fontSize: 24.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
                 ),
-                SizedBox(height: 6.h),
-                InkWell(
-                  onTap: () => Navigator.pop(context),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Already have an Account? ',
-                        style: GoogleFonts.inter(fontSize: 13.sp),
+              ),
+              SizedBox(height: 6.h),
+              InkWell(
+                onTap: () => Navigator.pop(context),
+                child: Row(
+                  children: [
+                    Text(
+                      'Already have an Account? ',
+                      style: GoogleFonts.inter(fontSize: 13.sp),
+                    ),
+                    Text(
+                      'Login',
+                      style: GoogleFonts.inter(
+                        fontSize: 13.sp,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
                       ),
-                      Text(
-                        'Login',
-                        style: GoogleFonts.inter(
-                          fontSize: 13.sp,
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -393,7 +390,8 @@ class _SignUpViewState extends State<SignUpView> {
   // ---------------- BUTTON ----------------
   Widget _createAccountButton() {
     return Obx(() {
-      final isValid = controller.isFormValid.value;
+      final isValid = controller.isFormValid.value &&
+          (!widget.isBrokerSignup || _agreeToCreateBroker);
       return SizedBox(
         width: double.infinity,
         height: 46.h,

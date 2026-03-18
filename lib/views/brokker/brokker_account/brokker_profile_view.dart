@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:brokkerspot/core/common_widget/full_screen_image_view.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_account/broker_account_view.dart';
@@ -188,8 +189,8 @@ class BrokerProfileView extends StatelessWidget {
   }
 
   Widget _buildProfileHeader() {
-    final bool isVerified =
-        controller.profileData.value?['isEmailVerified'] == true;
+    final data = controller.profileData.value;
+    final bool isVerified = data?['verificationStatus'] == 'verified';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,11 +199,21 @@ class BrokerProfileView extends StatelessWidget {
         Column(
           children: [
             // Profile image with verified arc + star
-            SizedBox(
-              width: 110.w,
-              height: 110.w,
-              child: CustomPaint(
-                foregroundPainter: _VerifiedArcPainter(isVerified: isVerified),
+            GestureDetector(
+              onTap: () => FullScreenImageView.show(
+                imageUrl: controller.profileImage.value.isNotEmpty
+                    ? controller.profileImage.value
+                    : null,
+                assetPath: controller.profileImage.value.isEmpty
+                    ? 'assets/images/profile.jpg'
+                    : null,
+              ),
+              child: SizedBox(
+                width: 110.w,
+                height: 110.w,
+                child: CustomPaint(
+                  foregroundPainter:
+                      _VerifiedArcPainter(isVerified: isVerified),
                 child: Center(
                   child: Container(
                     width: 96.w,
@@ -236,6 +247,7 @@ class BrokerProfileView extends StatelessWidget {
                 ),
               ),
             ),
+            ),
             SizedBox(height: 6.h),
             // Name
             Text(
@@ -266,15 +278,13 @@ class BrokerProfileView extends StatelessWidget {
                     Expanded(
                       child: _buildStatColumn(
                         'Experience',
-                        controller.profileData.value?['experience'] ?? '-',
+                        data?['experience']?.toString() ?? '-',
                       ),
                     ),
                     Expanded(
                       child: _buildStatColumn(
                         'Following',
-                        controller.profileData.value?['following']
-                                ?.toString() ??
-                            '0',
+                        data?['following']?.toString() ?? '0',
                       ),
                     ),
                   ],
@@ -295,7 +305,7 @@ class BrokerProfileView extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'BRN : ${controller.profileData.value?['brn'] ?? '-'}',
+                        'BRN : ${data?['bnrNumber'] ?? '-'}',
                         style: GoogleFonts.inter(
                           fontSize: 12.sp,
                           color: Colors.black87,
@@ -304,7 +314,7 @@ class BrokerProfileView extends StatelessWidget {
                     ),
                     Expanded(
                       child: Text(
-                        'ORN : ${controller.profileData.value?['orn'] ?? '-'}',
+                        'ORN : ${data?['orn'] ?? '-'}',
                         style: GoogleFonts.inter(
                           fontSize: 12.sp,
                           color: Colors.black87,

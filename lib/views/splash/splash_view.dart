@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -68,11 +69,16 @@ class _SplashViewState extends State<SplashView>
     final isLoggedIn = token != null && (user != null || firebaseUser != null);
 
     if (isLoggedIn) {
-      // User has token - show splash image briefly then go to dashboard
+      // User has token - show splash briefly then navigate based on role
       _fadeController.value = 1.0;
       _logoScale = AlwaysStoppedAnimation(1.0);
       await Future.delayed(const Duration(milliseconds: 1500));
-      Get.offAll(() => DashboardView());
+      final role = user?.data?.role ?? 0;
+      if (role == 2) {
+        Get.offAll(() => BrokerDashBoardView());
+      } else {
+        Get.offAll(() => DashboardView());
+      }
     } else {
       // No token - play full animation then go to welcome
       await _startAnimation();
@@ -101,7 +107,12 @@ class _SplashViewState extends State<SplashView>
     final firebaseUser = FirebaseAuth.instance.currentUser;
 
     if (token != null && (user != null || firebaseUser != null)) {
-      Get.offAll(() => DashboardView());
+      final role = user?.data?.role ?? 0;
+      if (role == 2) {
+        Get.offAll(() => BrokerDashBoardView());
+      } else {
+        Get.offAll(() => DashboardView());
+      }
     } else {
       Get.offAll(() => WelcomeView());
     }

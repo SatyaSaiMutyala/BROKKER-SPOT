@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/controller/complete_profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/rules_screen.dart';
@@ -126,6 +127,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 height: 140.h,
                 label: "",
                 image: controller.passportImage,
+                uploading: controller.uploadingPassport,
+                onTap: () => controller.showImagePicker(
+                  context,
+                  imageTarget: controller.passportImage,
+                  uploadingFlag: controller.uploadingPassport,
+                  urlTarget: controller.passportImageUrl,
+                  fileType: 'passport-image',
+                ),
               ),
               SizedBox(height: 12.h),
               _noteText("Note : Passport Photo should be clear."),
@@ -140,6 +149,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       height: 120.h,
                       label: "Front Side Photo",
                       image: controller.idFrontImage,
+                      uploading: controller.uploadingIdFront,
+                      onTap: () => controller.showImagePicker(
+                        context,
+                        imageTarget: controller.idFrontImage,
+                        uploadingFlag: controller.uploadingIdFront,
+                        urlTarget: controller.idFrontImageUrl,
+                        fileType: 'local-id-front',
+                      ),
                     ),
                   ),
                   SizedBox(width: 12.w),
@@ -148,6 +165,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       height: 120.h,
                       label: "Back Side Photo",
                       image: controller.idBackImage,
+                      uploading: controller.uploadingIdBack,
+                      onTap: () => controller.showImagePicker(
+                        context,
+                        imageTarget: controller.idBackImage,
+                        uploadingFlag: controller.uploadingIdBack,
+                        urlTarget: controller.idBackImageUrl,
+                        fileType: 'local-id-back',
+                      ),
                     ),
                   ),
                 ],
@@ -238,30 +263,43 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 SizedBox(height: 20.h),
               ],
               // Next Button
-              SizedBox(
-                width: double.infinity,
-                height: 50.h,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Get.to(() => const RulesScreen());
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey.shade300,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r),
+              Obx(() {
+                final valid = controller.isFormValid;
+                return SizedBox(
+                  width: double.infinity,
+                  height: 50.h,
+                  child: ElevatedButton(
+                    onPressed: !valid
+                        ? null
+                        : () {
+                            Get.to(() => RulesScreen(
+                                  professionalEmail:
+                                      emailController.text.trim(),
+                                  bnrNumber: isAgent
+                                      ? null
+                                      : bnrValueController.text.trim(),
+                                ));
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                          valid ? AppColors.primary : Colors.grey.shade300,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                    ),
+                    child: Text(
+                      'Next',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w400,
+                        color: valid ? Colors.white : Colors.black54,
+                      ),
                     ),
                   ),
-                  child: Text(
-                    'Next',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.black54,
-                    ),
-                  ),
-                ),
-              ),
+                );
+              }),
               SizedBox(height: 16.h),
               // GDPR Text
               RichText(
@@ -325,11 +363,20 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         SizedBox(height: 12.h),
         Center(
           child: GestureDetector(
-            onTap: () => controller.pickImage(controller.profileImage),
+            onTap: () => controller.showImagePicker(
+              context,
+              imageTarget: controller.profileImage,
+              uploadingFlag: controller.uploadingProfile,
+              urlTarget: controller.profileImageUrl,
+              fileType: 'profile-image',
+            ),
             child: Stack(
               clipBehavior: Clip.none,
               children: [
                 Obx(() {
+                  if (controller.uploadingProfile.value) {
+                    return ShimmerCircle(radius: 50.r);
+                  }
                   return CircleAvatar(
                     radius: 50.r,
                     backgroundImage: controller.profileImage.value != null
@@ -369,9 +416,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     required double height,
     required String label,
     required Rx<File?> image,
+    required RxBool uploading,
+    required VoidCallback onTap,
   }) {
     return GestureDetector(
-      onTap: () => controller.pickImage(image),
+      onTap: onTap,
       child: Obx(() {
         return Container(
           height: height,
@@ -387,39 +436,41 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               ),
             ],
           ),
-          child: image.value != null
-              ? ClipRRect(
-                  child: Image.file(
-                    image.value!,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                  ),
-                )
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Stack(
-                      clipBehavior: Clip.none,
+          child: uploading.value
+              ? ShimmerBox(width: double.infinity, height: height)
+              : image.value != null
+                  ? ClipRRect(
+                      child: Image.file(
+                        image.value!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                      ),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.asset(
-                          'assets/images/camera_icon.png',
-                          width: 44.w,
-                          height: 44.w,
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Image.asset(
+                              'assets/images/camera_icon.png',
+                              width: 44.w,
+                              height: 44.w,
+                            ),
+                          ],
                         ),
+                        if (label.isNotEmpty) ...[
+                          SizedBox(height: 8.h),
+                          Text(
+                            label,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11.sp,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                    if (label.isNotEmpty) ...[
-                      SizedBox(height: 8.h),
-                      Text(
-                        label,
-                        style: GoogleFonts.poppins(
-                          fontSize: 11.sp,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
         );
       }),
     );

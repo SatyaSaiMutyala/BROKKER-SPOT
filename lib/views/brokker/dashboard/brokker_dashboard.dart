@@ -1,8 +1,7 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
-import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
-import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_account/broker_account_view.dart';
+import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_account/brokker_profile_view.dart';
 import 'package:brokkerspot/views/brokker/dashboard/bottom_nav_controller.dart';
 import 'package:brokkerspot/views/brokker/home/brokker_home_view.dart';
@@ -25,7 +24,7 @@ class BrokerDashBoardView extends StatelessWidget {
     BrokerProfileView(),
   ];
 
-  Widget _navItem(int index, String assetPath, String label) {
+  Widget _navItem(BuildContext context, int index, String assetPath, String label) {
     final isSelected = controller.currentIndex.value == index;
     final color = isSelected ? AppColors.primary : Colors.grey;
     // Tabs 1 (Projects), 2 (Meeting), 3 (Payments) require login
@@ -33,8 +32,7 @@ class BrokerDashBoardView extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         if (loginRequiredTabs.contains(index) && !LocalStorageService.isLoggedIn()) {
-          AppToast.warning("Please login to access this feature");
-          Get.to(() => LoginView());
+          showLoginRequiredDialog(context);
           return;
         }
         controller.changeTab(index);
@@ -70,11 +68,11 @@ class BrokerDashBoardView extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _navItem(0, 'assets/images/broker_home_icon.png', 'Dashboard'),
-              _navItem(1, 'assets/images/broker_project_icon.png', 'Projects'),
-              _navItem(2, 'assets/images/broker_meeting_icon.png', 'Meeting'),
-              _navItem(3, 'assets/images/broker_payment_icon.png', 'Payments'),
-              _navItem(4, 'assets/images/broker_profile_icon.png', 'Account'),
+              _navItem(context, 0, 'assets/images/broker_home_icon.png', 'Dashboard'),
+              _navItem(context, 1, 'assets/images/broker_project_icon.png', 'Projects'),
+              _navItem(context, 2, 'assets/images/broker_meeting_icon.png', 'Meeting'),
+              _navItem(context, 3, 'assets/images/broker_payment_icon.png', 'Payments'),
+              _navItem(context, 4, 'assets/images/broker_profile_icon.png', 'Account'),
             ],
           ),
         ),

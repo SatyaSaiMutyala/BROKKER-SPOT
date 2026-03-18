@@ -25,7 +25,7 @@ class CreateBrokerAccountView extends StatelessWidget {
             TopCurveSection(
               onBack: () => Get.offAll(() => const DashboardView(initialIndex: 3)),
               curveTop: -70.h,
-              curveRight: -20.w,
+              curveRight: -30.w,
               backButtonTop: MediaQuery.of(context).padding.top + 30.h,
             ),
             const Spacer(flex: 1),

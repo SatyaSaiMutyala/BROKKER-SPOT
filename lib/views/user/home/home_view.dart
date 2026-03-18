@@ -93,7 +93,7 @@ class HomeView extends StatelessWidget {
             child: Row(
               children: [
                 Obx(() {
-                  final imgUrl = profileController.profileImage.value;
+                  final imgUrl = profileController.profileImage.value.trim();
                   return Container(
                     width: 46.w,
                     height: 46.w,
@@ -106,6 +106,7 @@ class HomeView extends StatelessWidget {
                       child: imgUrl.isNotEmpty
                           ? Image.network(
                               imgUrl,
+                              key: ValueKey(imgUrl),
                               fit: BoxFit.cover,
                               width: 46.w,
                               height: 46.w,
@@ -452,10 +453,10 @@ class HomeView extends StatelessWidget {
                       MorePropertyView(announcements: damacAnnouncements)),
                   child: Text(
                     'More',
-                    style: GoogleFonts.carlito(
-                      fontSize: 13.sp,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
                       fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade600,
+                      color: AppColors.backgroundDark,
                     ),
                   ),
                 ),

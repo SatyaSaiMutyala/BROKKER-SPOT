@@ -1,9 +1,11 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
+import 'package:brokkerspot/views/user/settings/settings_view.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:get/get.dart';
 
 class AccountMenuView extends StatelessWidget {
   const AccountMenuView({super.key});
@@ -12,24 +14,16 @@ class AccountMenuView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6F8),
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          "My Account",
-          style: GoogleFonts.inter(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Builder(builder: (context) {
+      body: SafeArea(
+        child: Column(
+          children: [
+            CustomHeader(
+              title: 'My Account',
+              showBackButton: LocalStorageService.isLoggedIn(),
+              onBack: () => Get.back(),
+            ),
+            Expanded(
+              child: Builder(builder: (context) {
         final bool isLoggedIn = LocalStorageService.isLoggedIn();
         return SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
@@ -48,12 +42,16 @@ class AccountMenuView extends StatelessWidget {
               _buildCardGroup([
                 _menuItem('assets/images/switch_to_user_icon.png', 'Switch to User side', () => Get.offAll(() => const DashboardView())),
                 _menuItem('assets/images/subscription_icon.png', 'My Subscription', () {}, enabled: isLoggedIn),
-                _menuItem('assets/images/broker_settings_icon.png', 'Setting', () {}, showDivider: false, enabled: isLoggedIn),
+                _menuItem('assets/images/broker_settings_icon.png', 'Setting', () => Get.to(() => SettingsView()), showDivider: false, enabled: isLoggedIn),
               ]),
             ],
           ),
         );
       }),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -28,7 +28,7 @@ class HomeAnnouncementCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final a = announcement;
     return Padding(
-      padding: EdgeInsets.only(bottom: 10.h),
+      padding: EdgeInsets.only(bottom: 20.h),
       child: GestureDetector(
       onTap: onTap,
       child: Container(
@@ -197,7 +197,7 @@ class HomeAnnouncementCard extends StatelessWidget {
               color: Colors.black,
             ),
           ),
-          SizedBox(height: 8.h),
+          SizedBox(height: 4.h),
           // Divider
           // Divider(height: 1, thickness: 0.5, color: Colors.grey.shade300),
           // SizedBox(height: 8.h),

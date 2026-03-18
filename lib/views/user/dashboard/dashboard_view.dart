@@ -1,6 +1,4 @@
-import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
-import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcements_view.dart';
 import 'package:brokkerspot/views/user/home/home_view.dart';
@@ -45,11 +43,7 @@ class _DashboardViewState extends State<DashboardView> {
         unselectedItemColor: Colors.black54,
         onTap: (index) {
           if (index == 2 && !LocalStorageService.isLoggedIn()) {
-            AppToast.warning('Please login to access your meeting');
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => LoginView()),
-            );
+            showLoginRequiredDialog(context);
             return;
           }
           setState(() => _currentIndex = index);

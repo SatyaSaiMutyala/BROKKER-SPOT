@@ -48,7 +48,7 @@ class MorePropertyViewState extends State<MorePropertyView> {
       ),
       body: ListView.separated(
         scrollDirection: Axis.vertical,
-        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        padding: EdgeInsets.symmetric(horizontal: 16.w,),
         itemCount: widget.announcements.length,
         separatorBuilder: (_, __) => SizedBox(width: 14.w),
         itemBuilder: (_, index) {

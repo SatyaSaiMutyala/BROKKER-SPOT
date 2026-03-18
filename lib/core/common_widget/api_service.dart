@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:brokkerspot/core/common_widget/network_info.dart';
+import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -24,7 +25,11 @@ Map<String, String> buildHeaders() {
   String token = LocalStorageService.getAccessToken() ?? "";
   print("Bearer $token");
 
-  return {'Content-Type': 'application/json', 'Authorization': token};
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': token,
+    'Accept-Language': 'en',
+  };
 }
 
 // Map<String, String> buildImageHeader() {
@@ -182,13 +187,9 @@ Future<Response> uploadFile({
   var postUri = Uri.parse(url);
   var request = http.MultipartRequest("POST", postUri);
   request.fields.clear();
-  // final tokenAuth = await AuthLocalStorage.getToken();
-  // if (tokenAuth == null) {
-  //   throw 'No auth token found';
-  // }
-  // request.headers['Content-Type'] = "application/json";
-  request.headers['Content-Type'] = "multipart/form-data";
-  // request.headers['USER_API_TOKEN'] = "Bearer $tokenAuth";
+  final token = LocalStorageService.getAccessToken() ?? '';
+  request.headers['Authorization'] = token;
+  request.headers['Accept-Language'] = 'en';
 
   request.fields.addAll(body);
 
@@ -196,15 +197,29 @@ Future<Response> uploadFile({
   print(request.fields);
 
   request.files.add(await http.MultipartFile.fromPath('file', file.path));
-  // this line is previously i used but it gives me "http.StreamedResponse"
-  // final response = await request.send();
-// in the below line gives me "http.response" i will get the body
   final response = await http.Response.fromStream(await request.send());
   print(response.statusCode);
-  final picBody = response.body;
-  print(picBody);
+  print(response.body);
 
   return response;
+}
+
+/// Global image upload — use this everywhere instead of writing separate upload methods.
+/// Pass the [fileType] value required by the API (e.g. 'profile-image', 'passport-image').
+Future<String?> uploadImage({
+  required File file,
+  required String fileType,
+}) async {
+  final response = await uploadFile(
+    url: '$baseUrl${ApiEndpoints.fileUpload}',
+    file: file,
+    body: {'file_type': fileType},
+  );
+  final json = jsonDecode(response.body) as Map<String, dynamic>;
+  if (json['success'] == true) {
+    return json['data']?['url'] ?? json['data']?['fileUrl'] ?? json['url'];
+  }
+  throw json['message'] ?? 'Upload failed';
 }
 
 Future<http.Response> deleteRequest(
