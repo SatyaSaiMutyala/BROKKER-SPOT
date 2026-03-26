@@ -49,8 +49,20 @@ class LocalStorageService {
     await _prefs?.remove("user_data");
   }
 
+  // Save which side user last logged out from ('user' or 'broker')
+  static Future<void> saveLastSide(String side) async {
+    await _prefs?.setString("last_side", side);
+  }
+
+  static String getLastSide() {
+    return _prefs?.getString("last_side") ?? 'user';
+  }
+
   static Future<void> clearAll() async {
+    // Preserve last_side across logout
+    final lastSide = getLastSide();
     await _prefs?.clear();
+    await saveLastSide(lastSide);
   }
 
   static bool isLoggedIn() {

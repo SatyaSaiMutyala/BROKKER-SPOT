@@ -49,7 +49,11 @@ class WelcomeViewController extends GetxController {
       print('Got Google ID token, sending to backend...');
 
       // Send Google ID token to backend
-      final backendSaved = await _googleLoginWithBackend(googleIdToken);
+      final backendSaved = await _googleLoginWithBackend(
+        googleIdToken,
+        googleUser.email,
+        googleUser.displayName ?? '',
+      );
 
       if (!backendSaved) {
         // Fallback: Firebase sign-in so user can still navigate
@@ -107,13 +111,16 @@ class WelcomeViewController extends GetxController {
           AppleIDAuthorizationScopes.email,
           AppleIDAuthorizationScopes.fullName,
         ],
-        // Web authentication options required for Android
-        webAuthenticationOptions: WebAuthenticationOptions(
-          clientId: 'com.brokersport.service', // TODO: Replace with your Apple Services ID
-          redirectUri: Uri.parse(
-            'https://api.dev.brokkerspot.com/callbacks/sign_in_with_apple', // TODO: Replace with your redirect URL
-          ),
-        ),
+        // Web authentication options required for Android only
+        // iOS uses native Apple Sign-In (no web view needed)
+        webAuthenticationOptions: GetPlatform.isAndroid
+            ? WebAuthenticationOptions(
+                clientId: 'com.brokersport.service',
+                redirectUri: Uri.parse(
+                  'https://api.dev.brokkerspot.com/callbacks/sign_in_with_apple',
+                ),
+              )
+            : null,
       );
       print('Apple credential received');
       print('Email: ${appleCredential.email}');
@@ -130,7 +137,11 @@ class WelcomeViewController extends GetxController {
       print('Got Apple ID token, sending to backend...');
 
       // Send Apple ID token to backend
-      final backendSaved = await _appleLoginWithBackend(appleIdToken);
+      final appleEmail = appleCredential.email ?? '';
+      final appleName = [appleCredential.givenName ?? '', appleCredential.familyName ?? '']
+          .where((s) => s.isNotEmpty)
+          .join(' ');
+      final backendSaved = await _appleLoginWithBackend(appleIdToken, appleEmail, appleName);
 
       if (!backendSaved) {
         // Fallback: Firebase sign-in so user can still navigate
@@ -172,12 +183,16 @@ class WelcomeViewController extends GetxController {
   }
 
   /// Calls backend google-login API with Google ID token.
-  Future<bool> _googleLoginWithBackend(String googleIdToken) async {
+  Future<bool> _googleLoginWithBackend(String googleIdToken, String email, String name) async {
     try {
       final response = await postRequest(
         "GoogleLogin",
         endPoint: ApiEndpoints.googleSignIn,
-        body: {"google_id_token": googleIdToken},
+        body: {
+          "google_id_token": googleIdToken,
+          "email": email,
+          "name": name,
+        },
       );
 
       print('=== Backend Google Login Response ===');
@@ -192,13 +207,17 @@ class WelcomeViewController extends GetxController {
     }
   }
 
-  /// Calls backend apple-signin API with Apple identity token.
-  Future<bool> _appleLoginWithBackend(String appleIdToken) async {
+  /// Calls backend apple-login API with Apple identity token.
+  Future<bool> _appleLoginWithBackend(String appleToken, String email, String name) async {
     try {
       final response = await postRequest(
         "AppleLogin",
         endPoint: ApiEndpoints.appleSignIn,
-        body: {"apple_id_token": appleIdToken},
+        body: {
+          "apple_token": appleToken,
+          "email": email,
+          "name": name,
+        },
       );
 
       print('=== Backend Apple Login Response ===');
@@ -232,7 +251,10 @@ class WelcomeViewController extends GetxController {
   }
 
   void _navigateByRole(int role) {
-    if (role == 2) {
+    final lastSide = LocalStorageService.getLastSide();
+    // Navigate to where they last logged out from
+    // For fresh installs (no lastSide), fall back to role
+    if (lastSide == 'broker') {
       Get.offAll(() => BrokerDashBoardView());
     } else {
       Get.offAll(() => DashboardView());

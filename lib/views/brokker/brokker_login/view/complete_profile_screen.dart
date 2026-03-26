@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/controller/complete_profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/rules_screen.dart';
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
@@ -22,7 +23,40 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController bnrValueController = TextEditingController();
   bool isAgent = true;
-  bool isShowBNR = false;
+
+  @override
+  void initState() {
+    super.initState();
+    bnrValueController.addListener(() => setState(() {}));
+    emailController.addListener(() => setState(() {}));
+    _prefillData();
+  }
+
+  Future<void> _prefillData() async {
+    final profileCtrl = Get.put(ProfileController());
+
+    // If data already available, use it
+    if (profileCtrl.profileData.value != null) {
+      _applyProfileData(profileCtrl.profileData.value!);
+      return;
+    }
+
+    // Otherwise wait for the profile to load
+    await profileCtrl.getProfile();
+    if (profileCtrl.profileData.value != null) {
+      _applyProfileData(profileCtrl.profileData.value!);
+    }
+  }
+
+  void _applyProfileData(Map<String, dynamic> data) {
+    controller.prefillFromProfile(data);
+    emailController.text = data['professionalEmail'] ?? '';
+    bnrValueController.text = data['bnrNumber'] ?? '';
+    if ((data['bnrNumber'] ?? '').toString().isNotEmpty) {
+      setState(() => isAgent = false);
+    }
+  }
+
   @override
   void dispose() {
     emailController.dispose();
@@ -128,6 +162,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 label: "",
                 image: controller.passportImage,
                 uploading: controller.uploadingPassport,
+                urlTarget: controller.passportImageUrl,
                 onTap: () => controller.showImagePicker(
                   context,
                   imageTarget: controller.passportImage,
@@ -150,6 +185,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       label: "Front Side Photo",
                       image: controller.idFrontImage,
                       uploading: controller.uploadingIdFront,
+                      urlTarget: controller.idFrontImageUrl,
                       onTap: () => controller.showImagePicker(
                         context,
                         imageTarget: controller.idFrontImage,
@@ -166,6 +202,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       label: "Back Side Photo",
                       image: controller.idBackImage,
                       uploading: controller.uploadingIdBack,
+                      urlTarget: controller.idBackImageUrl,
                       onTap: () => controller.showImagePicker(
                         context,
                         imageTarget: controller.idBackImage,
@@ -186,18 +223,17 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               SizedBox(height: 8.h),
               _styledDropdown(
                 hint: "Select Country",
-                items: ["India", "UAE", "USA", "UK", "Canada"],
+                items: ["India", "UAE", "USA", "UK", "Canada", "France"],
                 value: controller.selectedCountry,
               ),
               SizedBox(height: 20.h),
-              // City Dropdown
+              // City Multi-Select
               _sectionLabel("Select the City where you are dealing",
                   isRequired: true),
               SizedBox(height: 8.h),
-              _styledDropdown(
+              _cityMultiSelect(
                 hint: "Select city",
-                items: ["Hyderabad", "Dubai", "New York", "London", "Toronto"],
-                value: controller.selectedCity,
+                items: ["Hyderabad", "Dubai", "New York", "London", "Toronto", "Paris", "Lyon", "Marseille"],
               ),
               SizedBox(height: 20.h),
               // Areas Dropdown
@@ -236,7 +272,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   "Arabic",
                   "Telugu",
                   "Tamil",
-                  "Urdu"
+                  "Urdu",
+                  "French"
                 ],
               ),
               SizedBox(height: 20.h),
@@ -246,14 +283,27 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               _styledTextField(
                 controller: emailController,
                 hint: "Email",
+                keyboardType: TextInputType.emailAddress,
               ),
+              if (emailController.text.trim().isNotEmpty &&
+                  !_isValidEmail(emailController.text.trim()))
+                Padding(
+                  padding: EdgeInsets.only(top: 6.h, left: 4.w),
+                  child: Text(
+                    'Enter a valid email',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.sp,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
               SizedBox(height: 24.h),
               // Agent / Broker Toggle
               _agentBrokerToggle(),
               SizedBox(height: 20.h),
               // BNR field (conditional)
               if (!isAgent) ...[
-                _sectionLabel("BNR"),
+                _sectionLabel("BNR", isRequired: true),
                 SizedBox(height: 8.h),
                 _styledTextField(
                   controller: bnrValueController,
@@ -264,7 +314,13 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               ],
               // Next Button
               Obx(() {
-                final valid = controller.isFormValid;
+                final brokerBrnValid =
+                    isAgent || bnrValueController.text.trim().isNotEmpty;
+                final emailText = emailController.text.trim();
+                final emailValid =
+                    emailText.isEmpty || _isValidEmail(emailText);
+                final valid =
+                    controller.isFormValid && brokerBrnValid && emailValid;
                 return SizedBox(
                   width: double.infinity,
                   height: 50.h,
@@ -273,8 +329,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                         ? null
                         : () {
                             Get.to(() => RulesScreen(
-                                  professionalEmail:
-                                      emailController.text.trim(),
+                                  professionalEmail: emailText,
                                   bnrNumber: isAgent
                                       ? null
                                       : bnrValueController.text.trim(),
@@ -377,13 +432,19 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   if (controller.uploadingProfile.value) {
                     return ShimmerCircle(radius: 50.r);
                   }
+                  final hasFile = controller.profileImage.value != null;
+                  final hasUrl = controller.profileImageUrl.value.isNotEmpty;
+                  ImageProvider? bgImage;
+                  if (hasFile) {
+                    bgImage = FileImage(controller.profileImage.value!);
+                  } else if (hasUrl) {
+                    bgImage = NetworkImage(controller.profileImageUrl.value);
+                  }
                   return CircleAvatar(
                     radius: 50.r,
-                    backgroundImage: controller.profileImage.value != null
-                        ? FileImage(controller.profileImage.value!)
-                        : null,
+                    backgroundImage: bgImage,
                     backgroundColor: Colors.grey.shade200,
-                    child: controller.profileImage.value == null
+                    child: bgImage == null
                         ? Icon(Icons.person,
                             size: 50.sp, color: Colors.grey.shade400)
                         : null,
@@ -417,11 +478,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     required String label,
     required Rx<File?> image,
     required RxBool uploading,
+    required RxString urlTarget,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Obx(() {
+        final hasFile = image.value != null;
+        final hasUrl = urlTarget.value.isNotEmpty;
         return Container(
           height: height,
           width: double.infinity,
@@ -438,7 +502,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           ),
           child: uploading.value
               ? ShimmerBox(width: double.infinity, height: height)
-              : image.value != null
+              : hasFile
                   ? ClipRRect(
                       child: Image.file(
                         image.value!,
@@ -446,34 +510,204 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                         width: double.infinity,
                       ),
                     )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Stack(
-                          clipBehavior: Clip.none,
+                  : hasUrl
+                      ? ClipRRect(
+                          child: Image.network(
+                            urlTarget.value,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            errorBuilder: (_, __, ___) =>
+                                _uploadPlaceholder(label),
+                          ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Image.asset(
-                              'assets/images/camera_icon.png',
-                              width: 44.w,
-                              height: 44.w,
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Image.asset(
+                                  'assets/images/camera_icon.png',
+                                  width: 44.w,
+                                  height: 44.w,
+                                ),
+                              ],
                             ),
+                            if (label.isNotEmpty) ...[
+                              SizedBox(height: 8.h),
+                              Text(
+                                label,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11.sp,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                        if (label.isNotEmpty) ...[
-                          SizedBox(height: 8.h),
-                          Text(
-                            label,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11.sp,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
         );
       }),
     );
+  }
+
+  Widget _uploadPlaceholder(String label) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Image.asset('assets/images/camera_icon.png', width: 44.w, height: 44.w),
+        if (label.isNotEmpty) ...[
+          SizedBox(height: 8.h),
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 11.sp, color: Colors.grey.shade500)),
+        ],
+      ],
+    );
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w\.\-\+]+@[\w\-]+\.\w{2,}$').hasMatch(email);
+  }
+
+  // Close all dropdowns
+  void _closeAllDropdowns() {
+    _closeOtherDropdowns('');
+  }
+
+  // Close all dropdowns except the one being opened
+  void _closeOtherDropdowns(String except) {
+    for (final key in _dropdownOpenState.keys.toList()) {
+      if (key != except) _dropdownOpenState[key] = false;
+    }
+    if (except != '_language') _languageDropdownOpen.value = false;
+    if (except != '_city') _cityDropdownOpen.value = false;
+  }
+
+  // ---------------- City Multi-Select Dropdown ----------------
+  final RxBool _cityDropdownOpen = false.obs;
+
+  Widget _cityMultiSelect({
+    required String hint,
+    required List<String> items,
+  }) {
+    return Obx(() {
+      final selected = controller.selectedCities;
+      final displayText = selected.isEmpty ? null : selected.join(', ');
+      final isOpen = _cityDropdownOpen.value;
+
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () {
+              _closeOtherDropdowns('_city');
+              _cityDropdownOpen.value = !_cityDropdownOpen.value;
+            },
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey, width: 1),
+                borderRadius: isOpen
+                    ? BorderRadius.vertical(top: Radius.circular(4.r))
+                    : BorderRadius.circular(4.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      displayText ?? hint,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14.sp,
+                        color:
+                            displayText != null ? Colors.black87 : Colors.grey,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    isOpen
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.grey.shade600,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isOpen)
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey, width: 1),
+                borderRadius:
+                    BorderRadius.vertical(bottom: Radius.circular(4.r)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: items.map((city) {
+                  final isSelected = selected.contains(city);
+                  return InkWell(
+                    onTap: () {
+                      if (isSelected) {
+                        selected.remove(city);
+                      } else {
+                        selected.add(city);
+                      }
+                    },
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 16.w, vertical: 12.h),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 22.w,
+                            height: 22.w,
+                            decoration: BoxDecoration(
+                              color:
+                                  isSelected ? AppColors.primary : Colors.white,
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : Colors.grey.shade400,
+                                width: 1.5,
+                              ),
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                            child: isSelected
+                                ? Icon(Icons.check,
+                                    size: 16.sp, color: Colors.white)
+                                : null,
+                          ),
+                          SizedBox(width: 12.w),
+                          Text(
+                            city,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      );
+    });
   }
 
   // ---------------- Language Multi-Select Dropdown ----------------
@@ -493,6 +727,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         children: [
           GestureDetector(
             onTap: () {
+              _closeOtherDropdowns('_language');
               _languageDropdownOpen.value = !_languageDropdownOpen.value;
             },
             child: Container(
@@ -618,6 +853,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         children: [
           GestureDetector(
             onTap: () {
+              _closeOtherDropdowns(hint);
               _dropdownOpenState[hint] = !isOpen;
             },
             child: Container(
@@ -725,6 +961,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
+        onTap: () => _closeAllDropdowns(),
         style: GoogleFonts.poppins(fontSize: 14.sp, color: Colors.black87),
         decoration: InputDecoration(
           hintText: hint,

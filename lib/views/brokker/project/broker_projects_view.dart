@@ -32,7 +32,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
             CustomHeader(
               title: 'Projects',
               trailing: Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20.r),
                   border: Border.all(color: AppColors.goldAccent),
@@ -40,12 +40,12 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset('assets/images/search_icon.png', width: 16.sp, height: 16.sp),
+                    Image.asset('assets/images/search_icon.png', width: 18.sp, height: 18.sp),
                     SizedBox(width: 4.w),
                     Text(
                       'Search..',
                       style: GoogleFonts.inter(
-                        fontSize: 11.sp,
+                        fontSize: 14.sp,
                         color: Colors.grey.shade400,
                       ),
                     ),

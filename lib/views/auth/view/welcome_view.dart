@@ -92,7 +92,7 @@ class WelcomeView extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Container(
+                          child: Container( 
                             height: 0.5,
                             color: Colors.white,
                           ),

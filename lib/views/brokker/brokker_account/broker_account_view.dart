@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:brokkerspot/views/user/settings/settings_view.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
@@ -23,26 +24,34 @@ class AccountMenuView extends StatelessWidget {
               onBack: () => Get.back(),
             ),
             Expanded(
-              child: Builder(builder: (context) {
+              child: Obx(() {
         final bool isLoggedIn = LocalStorageService.isLoggedIn();
+        final profileCtrl = Get.put(ProfileController());
+        final isPending = isLoggedIn &&
+            profileCtrl.role.value == 2 &&
+            profileCtrl.profileData.value?['verificationStatus'] == 'pending';
+        final bool canAccess = isLoggedIn && !isPending;
         return SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
           child: Column(
             children: [
               // First card group
               _buildCardGroup([
-                _menuItem('assets/images/broker_my_profile_icon.png', 'My Information', () {}, enabled: isLoggedIn),
-                _menuItem('assets/images/broker_mydeal_icon.png', 'My Deals', () {}, enabled: isLoggedIn),
-                _menuItem('assets/images/broker_bank_icon.png', 'My Bank Account Details', () {}, enabled: isLoggedIn),
-                _menuItem('assets/images/broker_announcement.png', 'Announcement', () {}, enabled: isLoggedIn),
-                _menuItem('assets/images/broker_wishlist_icon.png', 'My Wishlist', () {}, showDivider: false, enabled: isLoggedIn),
+                _menuItem('assets/images/broker_my_profile_icon.png', 'My Information', () {}, enabled: canAccess),
+                _menuItem('assets/images/broker_mydeal_icon.png', 'My Deals', () {}, enabled: canAccess),
+                _menuItem('assets/images/broker_bank_icon.png', 'My Bank Account Details', () {}, enabled: canAccess),
+                _menuItem('assets/images/broker_announcement.png', 'Announcement', () {}, enabled: canAccess),
+                _menuItem('assets/images/broker_wishlist_icon.png', 'My Wishlist', () {}, showDivider: false, enabled: canAccess),
               ]),
               SizedBox(height: 16.h),
               // Second card group
               _buildCardGroup([
-                _menuItem('assets/images/switch_to_user_icon.png', 'Switch to User side', () => Get.offAll(() => const DashboardView())),
-                _menuItem('assets/images/subscription_icon.png', 'My Subscription', () {}, enabled: isLoggedIn),
-                _menuItem('assets/images/broker_settings_icon.png', 'Setting', () => Get.to(() => SettingsView()), showDivider: false, enabled: isLoggedIn),
+                _menuItem('assets/images/switch_to_user_icon.png', 'Switch to User side', () {
+                  LocalStorageService.saveLastSide('user');
+                  Get.offAll(() => const DashboardView());
+                }),
+                _menuItem('assets/images/subscription_icon.png', 'My Subscription', () {}, enabled: canAccess),
+                _menuItem('assets/images/broker_settings_icon.png', 'Setting', () => Get.to(() => SettingsView(side: 'broker')), showDivider: false, enabled: isLoggedIn),
               ]),
             ],
           ),
@@ -88,11 +97,11 @@ class AccountMenuView extends StatelessWidget {
           child: Opacity(
             opacity: enabled ? 1.0 : 0.4,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
               child: Row(
                 children: [
-                  Image.asset(assetPath, width: 24.w, height: 24.w),
-                  SizedBox(width: 16.w),
+                  Image.asset(assetPath, width: 20.w, height: 20.w),
+                  SizedBox(width: 20.w),
                   Expanded(
                     child: Text(
                       title,

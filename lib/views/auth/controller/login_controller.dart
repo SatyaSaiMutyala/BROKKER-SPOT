@@ -71,7 +71,8 @@ class LoginController extends GetxController {
           AppToast.success(loginModel.message);
 
           DeviceService.registerDevice();
-          if (user.role == 2) {
+          final lastSide = LocalStorageService.getLastSide();
+          if (lastSide == 'broker') {
             Get.offAll(() => BrokerDashBoardView());
           } else {
             Get.offAll(() => DashboardView());

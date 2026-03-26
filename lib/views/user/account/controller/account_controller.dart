@@ -9,7 +9,8 @@ import 'package:brokkerspot/core/constants/local_storage.dart';
 class AccountController extends GetxController {
   var isLoading = false.obs;
 
-  Future<void> logout() async {
+  /// [side] = 'user' or 'broker' — saves which side logged out from
+  Future<void> logout({String side = 'user'}) async {
     try {
       isLoading.value = true;
 
@@ -32,17 +33,20 @@ class AccountController extends GetxController {
         }
       }
 
+      // Save which side we logged out from (persists across clearAll)
+      await LocalStorageService.saveLastSide(side);
+
       // Sign out from Firebase (for Google/Apple sign-in)
       await FirebaseAuth.instance.signOut();
 
-      // Clear all local storage
+      // Clear all local storage (preserves last_side)
       await LocalStorageService.clearAll();
 
       Get.offAll(() => WelcomeView());
     } catch (e, s) {
       print(e);
       print(s);
-      // Even if API fails, still clear local data and navigate out
+      await LocalStorageService.saveLastSide(side);
       await FirebaseAuth.instance.signOut();
       await LocalStorageService.clearAll();
       Get.offAll(() => WelcomeView());

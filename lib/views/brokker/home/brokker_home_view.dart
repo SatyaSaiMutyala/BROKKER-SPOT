@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 
 class BrokerHomeView extends StatefulWidget {
   const BrokerHomeView({super.key});
@@ -92,104 +93,119 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
               }
             },
             child: Obx(() {
+              final isLoading = profileCtrl.isLoading.value;
               final image = profileCtrl.profileImage.value;
+              if (isLoading) {
+                return ShimmerCircle(radius: 23.w);
+              }
+              Widget placeholder = Center(
+                child: Icon(
+                  Icons.person,
+                  size: 24.w,
+                  color: Colors.grey,
+                ),
+              );
               return Container(
-                width: 50.w,
-                height: 50.w,
-                decoration: const BoxDecoration(shape: BoxShape.circle),
+                width: 46.w,
+                height: 46.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade200,
+                  border: Border.all(color: AppColors.primary, width: 1),
+                ),
                 child: ClipOval(
-                  child: image.isNotEmpty
-                      ? Image.network(
-                          image,
-                          width: 50.w,
-                          height: 50.w,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Image.asset(
-                            'assets/images/story1.png',
+                    child: image.isNotEmpty
+                        ? Image.network(image,
                             width: 50.w,
                             height: 50.w,
                             fit: BoxFit.cover,
-                          ),
-                        )
-                      : Image.asset(
-                          'assets/images/story1.png',
-                          width: 50.w,
-                          height: 50.w,
-                          fit: BoxFit.cover,
-                        ),
-                ),
+                            errorBuilder: (_, __, ___) => placeholder)
+                        : placeholder),
               );
             }),
           ),
           SizedBox(width: 10.w),
           // Name + badge
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hello,',
-                style: GoogleFonts.poppins(
-                  fontSize: 12.sp,
-                  color: Colors.grey,
-                ),
-              ),
-              Row(
+          Obx(() {
+            final isLoading = profileCtrl.isLoading.value;
+            if (isLoading) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Obx(() => Text(
-                    profileCtrl.userName.value.isNotEmpty
-                        ? profileCtrl.userName.value
-                        : 'Guest User',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textHint,
-                    ),
-                  )),
-                  if (LocalStorageService.isLoggedIn()) ...[
-                    SizedBox(width: 8.w),
-                    Obx(() {
-                      final vs =
-                          profileCtrl.profileData.value?['verificationStatus']
-                              as String?;
-                      if (vs == null) return const SizedBox.shrink();
-                      final label = vs == 'inactive'
-                          ? 'Inactive'
-                          : vs == 'verified'
-                              ? 'Verified'
-                              : 'In Process';
-                      final color = vs == 'inactive'
-                          ? Colors.red
-                          : vs == 'verified'
-                              ? Colors.green
-                              : Colors.amber;
-                      return Container(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 10.w, vertical: 3.h),
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(6.r),
-                        ),
-                        child: Text(
-                          label,
-                          style: GoogleFonts.poppins(
-                            fontSize: 10.sp,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
+                  ShimmerBox(width: 40.w, height: 12.h, borderRadius: BorderRadius.circular(4.r)),
+                  SizedBox(height: 6.h),
+                  ShimmerBox(width: 120.w, height: 20.h, borderRadius: BorderRadius.circular(4.r)),
                 ],
-              ),
-            ],
-          ),
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hello,',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12.sp,
+                    color: Colors.grey,
+                  ),
+                ),
+                Row(
+                  children: [
+                    Text(
+                      profileCtrl.userName.value.isNotEmpty
+                          ? profileCtrl.userName.value
+                          : 'Guest User',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textHint,
+                      ),
+                    ),
+                    if (LocalStorageService.isLoggedIn()) ...[
+                      SizedBox(width: 8.w),
+                      Obx(() {
+                        final vs = profileCtrl
+                            .profileData.value?['verificationStatus'] as String?;
+                        if (vs == null) return const SizedBox.shrink();
+                        final label = vs == 'inactive'
+                            ? 'Inactive'
+                            : vs == 'verified'
+                                ? 'Verified'
+                                : 'In Process';
+                        final color = vs == 'inactive'
+                            ? Colors.red
+                            : vs == 'verified'
+                                ? Colors.green
+                                : Colors.amber;
+                        return Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 10.w, vertical: 3.h),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(6.r),
+                          ),
+                          child: Text(
+                            label,
+                            style: GoogleFonts.poppins(
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ],
+                ),
+              ],
+            );
+          }),
           const Spacer(),
           // Notification bell with badge
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Icon(Icons.notifications_none_rounded, size: 28.sp, color: AppColors.primary),
+              Icon(Icons.notifications_none_rounded,
+                  size: 28.sp, color: AppColors.primary),
               Positioned(
                 top: -2,
                 right: -2,
@@ -258,17 +274,17 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: 16.w),
             itemCount: _stories.length,
-            separatorBuilder: (_, __) => SizedBox(width: 16.w),
+            separatorBuilder: (_, __) => SizedBox(width: 8.w),
             itemBuilder: (_, index) {
               final story = _stories[index];
               final isFirst = index == 0;
               return SizedBox(
-                width: 64.w,
+                width: 72.w,
                 child: Column(
                   children: [
                     Container(
-                      width: 62.w,
-                      height: 62.w,
+                      width: 72.w,
+                      height: 72.w,
                       padding: EdgeInsets.all(2.w),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
@@ -449,113 +465,67 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
     return Opacity(
       opacity: opacity,
       child: Container(
-      width: 46.w,
-      height: 46.w,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.goldAccent,
-            AppColors.goldAccent.withValues(alpha: 0.7),
-          ],
-        ),
-      ),
-      child: Center(
-        child: Text(
-          '-',
-          style: GoogleFonts.poppins(
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            height: 1,
+        width: 46.w,
+        height: 46.w,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.goldAccent,
+              AppColors.goldAccent.withValues(alpha: 0.7),
+            ],
           ),
         ),
-      ),
+        child: Center(
+          child: Text(
+            '-',
+            style: GoogleFonts.poppins(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              height: 1,
+            ),
+          ),
+        ),
       ),
     );
   }
 
   // ─── BOOST BANNER ───
   Widget _buildBoostBanner() {
+    final banners = [
+      'assets/images/brokker_boost_banner.png',
+      'assets/images/brokker_boost_commision.png',
+    ];
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
       child: Column(
         children: [
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14.r),
-              border: Border.all(color: const Color(0xFFCDE3F0), width: 1),
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(16.w),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Left text content
-                  Expanded(
-                    flex: 5,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Gold banner box for title
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 10.w, vertical: 6.h),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Text(
-                            'BROKKERSPOT BOOSTS',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 6.h),
-                        Text(
-                          ' YOUR BUSINESS',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.goldAccent,
-                          ),
-                        ),
-                        SizedBox(height: 10.h),
-                        _buildBoostItem('STORY & ANNOUNCEMENTS'),
-                        _buildBoostItem('BROKER COMMUNITY'),
-                        _buildBoostItem('PLATFORM LEADS'),
-                        _buildBoostItem('OWNER ANNOUNCEMENTS',
-                            hasNew: true),
-                      ],
-                    ),
+          SizedBox(
+            height: 180.h,
+            child: PageView.builder(
+              controller: _bannerController,
+              onPageChanged: (i) => setState(() => _bannerPage = i),
+              itemCount: banners.length,
+              itemBuilder: (context, index) {
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(14.r),
+                  child: Image.asset(
+                    banners[index],
+                    width: double.infinity,
+                    fit: BoxFit.fill,
                   ),
-                  SizedBox(width: 4.w),
-                  // Right world map image
-                  Expanded(
-                    flex: 4,
-                    child: Image.asset(
-                      'assets/images/broker_boost_icon.png',
-                      height: 130.h,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ),
           SizedBox(height: 10.h),
-          // Dot indicators
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
-              2,
+              banners.length,
               (i) => Container(
                 width: i == _bannerPage ? 18.w : 8.w,
                 height: 8.w,
@@ -574,48 +544,4 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
     );
   }
 
-  Widget _buildBoostItem(String text, {bool hasNew = false}) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 6.h),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/images/cup_icon.png',
-            width: 16.sp,
-            height: 16.sp,
-          ),
-          SizedBox(width: 6.w),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Text(
-                text,
-                style: GoogleFonts.poppins(
-                  fontSize: 10.sp,
-                  fontWeight: FontWeight.w400,
-                  color: AppColors.textBlack,
-                ),
-              ),
-              if (hasNew)
-                Positioned(
-                  top: -6.h,
-                  right: -24.w,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
-                    child: Text(
-                      'NEW',
-                      style: GoogleFonts.poppins(
-                        fontSize: 7.sp,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.red,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }

@@ -8,7 +8,8 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class SettingsView extends StatelessWidget {
-  SettingsView({super.key});
+  final String side;
+  SettingsView({super.key, this.side = 'user'});
 
   final AccountController _accountController = Get.put(AccountController());
 
@@ -308,7 +309,7 @@ class SettingsView extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () {
                   Get.back();
-                  _accountController.logout();
+                  _accountController.logout(side: side);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF6B6B),

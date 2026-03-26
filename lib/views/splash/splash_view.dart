@@ -69,12 +69,12 @@ class _SplashViewState extends State<SplashView>
     final isLoggedIn = token != null && (user != null || firebaseUser != null);
 
     if (isLoggedIn) {
-      // User has token - show splash briefly then navigate based on role
+      // User has token - show splash briefly then navigate based on last side
       _fadeController.value = 1.0;
       _logoScale = AlwaysStoppedAnimation(1.0);
       await Future.delayed(const Duration(milliseconds: 1500));
-      final role = user?.data?.role ?? 0;
-      if (role == 2) {
+      final lastSide = LocalStorageService.getLastSide();
+      if (lastSide == 'broker') {
         Get.offAll(() => BrokerDashBoardView());
       } else {
         Get.offAll(() => DashboardView());
@@ -107,8 +107,8 @@ class _SplashViewState extends State<SplashView>
     final firebaseUser = FirebaseAuth.instance.currentUser;
 
     if (token != null && (user != null || firebaseUser != null)) {
-      final role = user?.data?.role ?? 0;
-      if (role == 2) {
+      final lastSide = LocalStorageService.getLastSide();
+      if (lastSide == 'broker') {
         Get.offAll(() => BrokerDashBoardView());
       } else {
         Get.offAll(() => DashboardView());

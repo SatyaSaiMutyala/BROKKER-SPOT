@@ -16,6 +16,11 @@ void main() async {
   );
   await LocalStorageService.init();
 
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -45,10 +50,15 @@ class MyApp extends StatelessWidget {
             useMaterial3: true,
           ),
           builder: (context, widget) {
-            // Clamp text scaling to prevent font scaling issues
-            return MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
-              child: EasyLoading.init()(context, widget),
+            final child = EasyLoading.init()(context, widget);
+            return GestureDetector(
+              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.noScaling,
+                ),
+                child: child,
+              ),
             );
           },
           home: const SplashView(),

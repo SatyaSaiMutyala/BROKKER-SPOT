@@ -21,14 +21,14 @@ class StoryCircle extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        width: 64.w,
+        width: 72.w,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Gold-bordered circle
             Container(
-              width: 66.w,
-              height: 66.w,
+              width: 72.w,
+              height: 72.w,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: hasStory

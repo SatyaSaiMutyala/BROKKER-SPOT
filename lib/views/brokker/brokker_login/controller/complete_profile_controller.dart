@@ -34,17 +34,56 @@ class CompleteProfileController extends GetxController {
 
   bool get isFormValid =>
       selectedCountry.value.isNotEmpty &&
-      selectedCity.value.isNotEmpty &&
+      selectedCities.isNotEmpty &&
       selectedAreas.value.isNotEmpty &&
       selectedExperience.value.isNotEmpty &&
       selectedLanguages.isNotEmpty;
 
   // Form fields
   RxString selectedCountry = ''.obs;
-  RxString selectedCity = ''.obs;
+  RxList<String> selectedCities = <String>[].obs;
   RxString selectedAreas = ''.obs;
   RxString selectedExperience = ''.obs;
   RxList<String> selectedLanguages = <String>[].obs;
+
+  /// Pre-fill form from existing profile data
+  void prefillFromProfile(Map<String, dynamic>? data) {
+    if (data == null) return;
+
+    if (data['dealingCountry'] != null) {
+      selectedCountry.value = data['dealingCountry'];
+    }
+    if (data['dealingCities'] is List) {
+      selectedCities.value = List<String>.from(data['dealingCities']);
+    }
+    if (data['dealingAreas'] is List && (data['dealingAreas'] as List).isNotEmpty) {
+      selectedAreas.value = (data['dealingAreas'] as List).first.toString();
+    }
+    if (data['experience'] != null) {
+      final exp = data['experience'];
+      if (exp is int) {
+        if (exp <= 1) selectedExperience.value = '0-1 Years';
+        else if (exp <= 3) selectedExperience.value = '1-3 Years';
+        else if (exp <= 5) selectedExperience.value = '3-5 Years';
+        else selectedExperience.value = '5+ Years';
+      }
+    }
+    if (data['knownLanguages'] is List) {
+      selectedLanguages.value = List<String>.from(data['knownLanguages']);
+    }
+    if (data['profileImage'] != null && data['profileImage'].toString().isNotEmpty) {
+      profileImageUrl.value = data['profileImage'];
+    }
+    if (data['passportImage'] != null && data['passportImage'].toString().isNotEmpty) {
+      passportImageUrl.value = data['passportImage'];
+    }
+    if (data['localIdFrontImage'] != null && data['localIdFrontImage'].toString().isNotEmpty) {
+      idFrontImageUrl.value = data['localIdFrontImage'];
+    }
+    if (data['localIdBackImage'] != null && data['localIdBackImage'].toString().isNotEmpty) {
+      idBackImageUrl.value = data['localIdBackImage'];
+    }
+  }
 
   /// Shows a bottom sheet to pick camera or gallery, then uploads immediately.
   void showImagePicker(
@@ -134,7 +173,7 @@ class CompleteProfileController extends GetxController {
       AppToast.warning('Please select a country');
       return false;
     }
-    if (selectedCity.value.isEmpty) {
+    if (selectedCities.isEmpty) {
       AppToast.warning('Please select a city');
       return false;
     }
@@ -175,7 +214,7 @@ class CompleteProfileController extends GetxController {
         localIdBackImage:
             idBackImageUrl.value.isNotEmpty ? idBackImageUrl.value : null,
         dealingCountry: selectedCountry.value,
-        dealingCities: [selectedCity.value],
+        dealingCities: selectedCities.toList(),
         dealingAreas: [selectedAreas.value],
         experience: experience,
         knownLanguages: selectedLanguages.toList(),

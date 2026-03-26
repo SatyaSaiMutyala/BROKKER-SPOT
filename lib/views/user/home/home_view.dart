@@ -12,6 +12,7 @@ import 'package:brokkerspot/widgets/home/new_launch_banner.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:brokkerspot/views/user/home/property_detail_view.dart';
 import 'package:brokkerspot/views/user/home/search_view.dart';
+import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 
 class HomeView extends StatelessWidget {
   HomeView({super.key});
@@ -93,7 +94,18 @@ class HomeView extends StatelessWidget {
             child: Row(
               children: [
                 Obx(() {
+                  final isLoading = profileController.isLoading.value;
                   final imgUrl = profileController.profileImage.value.trim();
+                  if (isLoading && !profileController.isGuest) {
+                    return ShimmerCircle(radius: 23.w);
+                  }
+                  Widget placeholder = Center(
+                    child: Icon(
+                      Icons.person,
+                      size: 24.w,
+                      color: Colors.grey,
+                    ),
+                  );
                   return Container(
                     width: 46.w,
                     height: 46.w,
@@ -103,33 +115,31 @@ class HomeView extends StatelessWidget {
                       border: Border.all(color: AppColors.primary, width: 1),
                     ),
                     child: ClipOval(
-                      child: imgUrl.isNotEmpty
-                          ? Image.network(
-                              imgUrl,
-                              key: ValueKey(imgUrl),
-                              fit: BoxFit.cover,
-                              width: 46.w,
-                              height: 46.w,
-                              errorBuilder: (_, __, ___) => Image.asset(
-                                'assets/images/home-profile-icon.jpg',
+                        child: imgUrl.isNotEmpty
+                            ? Image.network(imgUrl,
+                                key: ValueKey(imgUrl),
                                 fit: BoxFit.cover,
                                 width: 46.w,
                                 height: 46.w,
-                              ),
-                            )
-                          : Image.asset(
-                              'assets/images/home-profile-icon.jpg',
-                              fit: BoxFit.cover,
-                              width: 46.w,
-                              height: 46.w,
-                            ),
-                    ),
+                                errorBuilder: (_, __, ___) => placeholder)
+                            : placeholder),
                   );
                 }),
                 SizedBox(width: 10.w),
                 Expanded(
                   child: Obx(() {
+                    final isLoading = profileController.isLoading.value;
                     final name = profileController.userName.value;
+                    if (isLoading && !profileController.isGuest) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ShimmerBox(width: 40.w, height: 12.h, borderRadius: BorderRadius.circular(4.r)),
+                          SizedBox(height: 6.h),
+                          ShimmerBox(width: 120.w, height: 18.h, borderRadius: BorderRadius.circular(4.r)),
+                        ],
+                      );
+                    }
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -295,7 +305,7 @@ class HomeView extends StatelessWidget {
         ),
         SizedBox(height: 12.h),
         SizedBox(
-          height: 85.h,
+          height: 95.h,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: 16.w),

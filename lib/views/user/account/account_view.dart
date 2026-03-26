@@ -2,6 +2,7 @@ import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:brokkerspot/views/auth/view/signup_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/brokker_login_view.dart';
+import 'package:brokkerspot/views/brokker/brokker_login/view/complete_profile_screen.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/create_brokker_account_view.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
 import 'package:brokkerspot/views/user/deals/my_project_deals_view.dart';
@@ -40,37 +41,35 @@ class AccountView extends StatelessWidget {
               const CustomHeader(title: 'My Account'),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
                   child: Column(
                     children: [
                       // First card
                       _buildCard(
                         children: [
                           _accountTile(
-                            icon: Icons.person_outline,
+                            iconAsset: 'broker_my_profile_icon.png',
                             title: 'My Information',
                             enabled: !isGuest,
                             onTap: () {},
                           ),
-                          // _tileDivider(),
                           _accountTile(
-                            icon: Icons.handshake_outlined,
+                            iconAsset: 'broker_mydeal_icon.png',
                             title: 'My Deals',
                             enabled: !isGuest,
                             onTap: () {
                               Get.to(() => const MyProjectDealsView());
                             },
                           ),
-                          // _tileDivider(),
                           _accountTile(
-                            icon: Icons.campaign_outlined,
+                            iconAsset: 'broker_announcement.png',
                             title: 'Announcement',
                             enabled: !isGuest,
                             onTap: () {},
                           ),
-                          // _tileDivider(),
                           _accountTile(
-                            icon: Icons.favorite,
+                            iconAsset: 'broker_wishlist_icon.png',
                             title: 'My Wishlist',
                             enabled: !isGuest,
                             onTap: () {},
@@ -85,11 +84,16 @@ class AccountView extends StatelessWidget {
                             final profileCtrl = Get.find<ProfileController>();
                             final isBroker = profileCtrl.role.value == 2;
                             return _accountTile(
-                              icon: Icons.people_outline,
-                              title: isBroker ? 'Switch to Broker Side' : role == 2 ? 'Switch to Broker' : 'Become Broker',
+                              iconAsset: 'switch_to_user_icon.png',
+                              title: isBroker
+                                  ? 'Switch to Broker Side'
+                                  : role == 2
+                                      ? 'Switch to Broker'
+                                      : 'Become Broker',
                               enabled: true,
                               onTap: () {
                                 if (isBroker) {
+                                  LocalStorageService.saveLastSide('broker');
                                   Get.offAll(() => BrokerDashBoardView());
                                 } else {
                                   Get.to(() => BrokerOnboardingView());
@@ -97,9 +101,8 @@ class AccountView extends StatelessWidget {
                               },
                             );
                           }),
-                          // _tileDivider(),
                           _accountTile(
-                            icon: Icons.settings_outlined,
+                            iconAsset: 'broker_settings_icon.png',
                             title: 'Setting',
                             enabled: !isGuest,
                             onTap: () => Get.to(() => SettingsView()),
@@ -132,7 +135,7 @@ class AccountView extends StatelessWidget {
 
   // ---------------- TILE ----------------
   Widget _accountTile({
-    required IconData icon,
+    required String iconAsset,
     required String title,
     required VoidCallback onTap,
     bool enabled = true,
@@ -140,17 +143,18 @@ class AccountView extends StatelessWidget {
     return InkWell(
       onTap: enabled ? onTap : null,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 24,
-              color: enabled
-                  ? AppColors.primary
-                  : AppColors.primary.withValues(alpha: 0.4),
+            Opacity(
+              opacity: enabled ? 1.0 : 0.4,
+              child: Image.asset(
+                'assets/images/$iconAsset',
+                width: 20.w,
+                height: 20.w,
+              ),
             ),
-            SizedBox(width: 16.w),
+            SizedBox(width: 20.w),
             Expanded(
               child: Text(
                 title,
@@ -204,7 +208,6 @@ void showLoginRequiredDialog(BuildContext context) {
               style: GoogleFonts.poppins(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.w600,
-                
                 color: Colors.black,
               ),
             ),
@@ -216,7 +219,6 @@ void showLoginRequiredDialog(BuildContext context) {
                 fontSize: 13.sp,
                 color: Colors.black54,
                 fontWeight: FontWeight.w600,
-              
               ),
             ),
             SizedBox(height: 24.h),
@@ -261,6 +263,146 @@ void showLoginRequiredDialog(BuildContext context) {
                 },
                 child: Text(
                   'Signup',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+void showPendingVerificationDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (_) => Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20.r),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.hourglass_top_rounded, size: 48.sp, color: Colors.amber),
+            SizedBox(height: 16.h),
+            Text(
+              'Please wait for activate and verify',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 24.h),
+            SizedBox(
+              width: double.infinity,
+              height: 46.h,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30.r),
+                  ),
+                ),
+                onPressed: () => Get.back(),
+                child: Text(
+                  'OK',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+void showCompleteProfileDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (_) => Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20.r),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Complete Profile',
+              style: GoogleFonts.poppins(
+                fontSize: 20.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+              ),
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              'Please complete your profile to continue.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 13.sp,
+                color: Colors.black54,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 24.h),
+            SizedBox(
+              width: double.infinity,
+              height: 46.h,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30.r),
+                  ),
+                ),
+                onPressed: () {
+                  Get.back();
+                  Get.to(() => CompleteProfileScreen());
+                },
+                child: Text(
+                  'Continue',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 12.h),
+            SizedBox(
+              width: double.infinity,
+              height: 46.h,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30.r),
+                  ),
+                ),
+                onPressed: () {
+                  Get.back();
+                },
+                child: Text(
+                  'Cancel',
                   style: GoogleFonts.poppins(
                     fontSize: 16.sp,
                     fontWeight: FontWeight.w500,
