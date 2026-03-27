@@ -168,14 +168,18 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
                         if (vs == null) return const SizedBox.shrink();
                         final label = vs == 'inactive'
                             ? 'Inactive'
-                            : vs == 'verified'
+                            : vs == 'approved'
                                 ? 'Verified'
-                                : 'In Process';
+                                : vs == 'rejected'
+                                    ? 'Rejected'
+                                    : 'In Process';
                         final color = vs == 'inactive'
                             ? Colors.red
-                            : vs == 'verified'
+                            : vs == 'approved'
                                 ? Colors.green
-                                : Colors.amber;
+                                : vs == 'rejected'
+                                    ? Colors.red
+                                    : Colors.amber;
                         return Container(
                           padding: EdgeInsets.symmetric(
                               horizontal: 10.w, vertical: 3.h),

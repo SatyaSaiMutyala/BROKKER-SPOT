@@ -196,7 +196,7 @@ class ProfileView extends StatelessWidget {
 
   Widget _buildProfileHeader() {
     final data = controller.profileData.value;
-    final bool isVerified = data?['verificationStatus'] == 'verified';
+    final bool isVerified = data?['verificationStatus'] == 'approved';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -9,7 +9,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:get/get.dart';
 
 class AccountMenuView extends StatelessWidget {
-  const AccountMenuView({super.key});
+  AccountMenuView({super.key});
+
+  final ProfileController profileCtrl = Get.put(ProfileController());
 
   @override
   Widget build(BuildContext context) {
@@ -25,38 +27,61 @@ class AccountMenuView extends StatelessWidget {
             ),
             Expanded(
               child: Obx(() {
-        final bool isLoggedIn = LocalStorageService.isLoggedIn();
-        final profileCtrl = Get.put(ProfileController());
-        final isPending = isLoggedIn &&
-            profileCtrl.role.value == 2 &&
-            profileCtrl.profileData.value?['verificationStatus'] == 'pending';
-        final bool canAccess = isLoggedIn && !isPending;
-        return SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
-          child: Column(
-            children: [
-              // First card group
-              _buildCardGroup([
-                _menuItem('assets/images/broker_my_profile_icon.png', 'My Information', () {}, enabled: canAccess),
-                _menuItem('assets/images/broker_mydeal_icon.png', 'My Deals', () {}, enabled: canAccess),
-                _menuItem('assets/images/broker_bank_icon.png', 'My Bank Account Details', () {}, enabled: canAccess),
-                _menuItem('assets/images/broker_announcement.png', 'Announcement', () {}, enabled: canAccess),
-                _menuItem('assets/images/broker_wishlist_icon.png', 'My Wishlist', () {}, showDivider: false, enabled: canAccess),
-              ]),
-              SizedBox(height: 16.h),
-              // Second card group
-              _buildCardGroup([
-                _menuItem('assets/images/switch_to_user_icon.png', 'Switch to User side', () {
-                  LocalStorageService.saveLastSide('user');
-                  Get.offAll(() => const DashboardView());
-                }),
-                _menuItem('assets/images/subscription_icon.png', 'My Subscription', () {}, enabled: canAccess),
-                _menuItem('assets/images/broker_settings_icon.png', 'Setting', () => Get.to(() => SettingsView(side: 'broker')), showDivider: false, enabled: isLoggedIn),
-              ]),
-            ],
-          ),
-        );
-      }),
+                final bool isLoggedIn = profileCtrl.profileData.value != null;
+
+                final isPending = isLoggedIn &&
+                    (profileCtrl.role.value == 1 || profileCtrl.role.value == 2) &&
+                    (profileCtrl.profileData.value?['verificationStatus'] ==
+                        'inactive' || profileCtrl.profileData.value?['verificationStatus'] ==
+                        'pending' || profileCtrl.profileData.value?['verificationStatus'] ==
+                        'rejected');
+
+                final bool canAccess = isLoggedIn && !isPending;
+                return SingleChildScrollView(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
+                  child: Column(
+                    children: [
+                      // First card group
+                      _buildCardGroup([
+                        _menuItem('assets/images/broker_my_profile_icon.png',
+                            'My Information', () {},
+                            enabled: canAccess),
+                        _menuItem('assets/images/broker_mydeal_icon.png',
+                            'My Deals', () {},
+                            enabled: canAccess),
+                        _menuItem('assets/images/broker_bank_icon.png',
+                            'My Bank Account Details', () {},
+                            enabled: canAccess),
+                        _menuItem('assets/images/broker_announcement.png',
+                            'Announcement', () {},
+                            enabled: canAccess),
+                        _menuItem('assets/images/broker_wishlist_icon.png',
+                            'My Wishlist', () {},
+                            showDivider: false, enabled: canAccess),
+                      ]),
+                      SizedBox(height: 16.h),
+                      // Second card group
+                      _buildCardGroup([
+                        _menuItem('assets/images/switch_to_user_icon.png',
+                            'Switch to User side', () {
+                          LocalStorageService.saveLastSide('user');
+                          Get.offAll(() => const DashboardView());
+                        }),
+                        _menuItem('assets/images/subscription_icon.png',
+                            'My Subscription', () {},
+                            enabled: canAccess),
+                        _menuItem(
+                            'assets/images/broker_settings_icon.png',
+                            'Setting',
+                            () => Get.to(() => SettingsView(side: 'broker')),
+                            showDivider: false,
+                            enabled: isLoggedIn),
+                      ]),
+                    ],
+                  ),
+                );
+              }),
             ),
           ],
         ),
@@ -112,7 +137,8 @@ class AccountMenuView extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Icon(Icons.chevron_right, size: 22.sp, color: Colors.grey.shade400),
+                  Icon(Icons.chevron_right,
+                      size: 22.sp, color: Colors.grey.shade400),
                 ],
               ),
             ),
@@ -121,7 +147,8 @@ class AccountMenuView extends StatelessWidget {
         if (showDivider)
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.w),
-            child: Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+            child:
+                Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
           ),
       ],
     );

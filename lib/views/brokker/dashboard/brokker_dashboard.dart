@@ -12,11 +12,55 @@ import 'package:brokkerspot/views/brokker/project/broker_projects_view.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-class BrokerDashBoardView extends StatelessWidget {
+class BrokerDashBoardView extends StatefulWidget {
   BrokerDashBoardView({super.key});
 
+  @override
+  State<BrokerDashBoardView> createState() => _BrokerDashBoardViewState();
+}
+
+class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
   final BottomNavController controller = Get.put(BottomNavController());
   final profileController = Get.put(ProfileController());
+  bool _rejectedDialogShown = false;
+
+  Worker? _profileWorker;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showRejectedDialogIfNeeded();
+    });
+    // Listen for profile data changes (fires when API response arrives)
+    _profileWorker = ever(profileController.profileData, (_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showRejectedDialogIfNeeded();
+      });
+    });
+    // Re-fetch profile to trigger the listener (handles case when profile was already loaded before this screen)
+    if (LocalStorageService.isLoggedIn()) {
+      profileController.getProfile();
+    }
+  }
+
+  @override
+  void dispose() {
+    _profileWorker?.dispose();
+    super.dispose();
+  }
+
+  void _showRejectedDialogIfNeeded() {
+    if (_rejectedDialogShown || !mounted) return;
+    final isLoggedIn = LocalStorageService.isLoggedIn();
+    if (isLoggedIn &&
+        profileController.role.value == 2 &&
+        profileController.profileData.value?['verificationStatus'] == 'rejected') {
+      _rejectedDialogShown = true;
+      final reason = profileController.profileData.value?['rejectionReason'] ?? 'Your account has been rejected.';
+      showAccountRejectedDialog(context, reason);
+    }
+  }
 
   final List<Widget> pages = [
     BrokerHomeView(),
@@ -41,10 +85,21 @@ class BrokerDashBoardView extends StatelessWidget {
       //   controller.changeTab(index);
       // },
       onTap: () {
+        final isLoggedIn = LocalStorageService.isLoggedIn();
+        final verificationStatus = profileController.profileData.value?['verificationStatus'];
+
+        // Rejected: block all tabs except Account (index 4)
+        if (index != 4 &&
+            isLoggedIn &&
+            profileController.role.value == 2 &&
+            verificationStatus == 'rejected') {
+          final reason = profileController.profileData.value?['rejectionReason'] ?? 'Your account has been rejected.';
+          showAccountRejectedDialog(context, reason);
+          return;
+        }
+
         // Only restrict loginRequiredTabs (1, 2, 3)
         if (loginRequiredTabs.contains(index)) {
-          final isLoggedIn = LocalStorageService.isLoggedIn();
-
           // Step 1: Not logged in
           if (!isLoggedIn) {
             showLoginRequiredDialog(context);
@@ -58,14 +113,13 @@ class BrokerDashBoardView extends StatelessWidget {
           }
 
           // Step 3: Logged in, role == 2, but verification pending
-          if (profileController.role.value == 2 &&
-              profileController.profileData.value?['verificationStatus'] == 'pending') {
+          if (profileController.role.value == 2 && verificationStatus == 'pending') {
             showPendingVerificationDialog(context);
             return;
           }
         }
 
-        // Normal navigation (Home=0, Account=4, or verified users)
+        // Normal navigation
         controller.changeTab(index);
       },
       behavior: HitTestBehavior.opaque,
@@ -108,7 +162,7 @@ class BrokerDashBoardView extends StatelessWidget {
                   'Dashboard'),
               _navItem(context, 1, 'assets/images/broker_project_icon.png',
                   'Projects'),
-              _navItem(context, 2, 'assets/images/broker_meeting_icon.png',
+              _navItem(context, 2, 'assets/images/meeting_icon.png',
                   'Meeting'),
               _navItem(context, 3, 'assets/images/broker_payment_icon.png',
                   'Payments'),
