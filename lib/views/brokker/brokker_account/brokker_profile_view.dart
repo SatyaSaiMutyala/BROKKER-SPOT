@@ -143,45 +143,45 @@ class BrokerProfileView extends StatelessWidget {
               ),
             ),
             Expanded(child: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        return SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 20.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: 20.h),
-              _buildProfileHeader(),
-              SizedBox(height: 24.h),
-              Divider(height: 1, color: Colors.grey.shade200),
-              SizedBox(height: 20.h),
-              _buildInfoSection(
-                'Areas',
-                controller.dealingAreas.isNotEmpty
-                    ? controller.dealingAreas.join(', ')
-                    : 'Not added yet',
-              ),
-              SizedBox(height: 20.h),
-              _buildInfoSection(
-                'Language',
-                controller.knownLanguages.isNotEmpty
-                    ? controller.knownLanguages.join(', ')
-                    : 'Not added yet',
-              ),
-              SizedBox(height: 20.h),
-              _buildInfoSection(
-                'About me',
-                controller.profileData.value?['aboutMe'] ??
-                    'No description added yet.',
-              ),
-              SizedBox(height: 24.h),
-              _buildBoostSection(),
-              SizedBox(height: 30.h),
-            ],
-          ),
-        );
-      })),
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              return SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 20.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 20.h),
+                    _buildProfileHeader(),
+                    SizedBox(height: 10.h),
+                    Divider(height: 1, color: Colors.grey.shade200),
+                    SizedBox(height: 20.h),
+                    _buildInfoSection(
+                      'Areas',
+                      controller.dealingAreas.isNotEmpty
+                          ? controller.dealingAreas.join(', ')
+                          : 'Not added yet',
+                    ),
+                    SizedBox(height: 20.h),
+                    _buildInfoSection(
+                      'Language',
+                      controller.knownLanguages.isNotEmpty
+                          ? controller.knownLanguages.join(', ')
+                          : 'Not added yet',
+                    ),
+                    SizedBox(height: 20.h),
+                    _buildInfoSection(
+                      'About me',
+                      controller.profileData.value?['aboutMe'] ??
+                          'No description added yet.',
+                    ),
+                    SizedBox(height: 24.h),
+                    _buildBoostSection(),
+                    SizedBox(height: 30.h),
+                  ],
+                ),
+              );
+            })),
           ],
         ),
       ),
@@ -211,42 +211,54 @@ class BrokerProfileView extends StatelessWidget {
               child: SizedBox(
                 width: 110.w,
                 height: 110.w,
-                child: CustomPaint(
-                  foregroundPainter:
-                      _VerifiedArcPainter(isVerified: isVerified),
-                child: Center(
-                  child: Container(
-                    width: 96.w,
-                    height: 96.w,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.grey.shade200,
-                    ),
-                    child: ClipOval(
-                      child: controller.profileImage.value.isNotEmpty
-                          ? Image.network(
-                              controller.profileImage.value,
-                              fit: BoxFit.cover,
-                              width: 96.w,
-                              height: 96.w,
-                              errorBuilder: (_, __, ___) => Image.asset(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 110.w,
+                      height: 110.w,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey.shade200,
+                      ),
+                      child: ClipOval(
+                        child: controller.profileImage.value.isNotEmpty
+                            ? Image.network(
+                                controller.profileImage.value,
+                                fit: BoxFit.cover,
+                                width: 110.w,
+                                height: 110.w,
+                                errorBuilder: (_, __, ___) => Image.asset(
+                                  'assets/images/profile.jpg',
+                                  fit: BoxFit.cover,
+                                  width: 110.w,
+                                  height: 110.w,
+                                ),
+                              )
+                            : Image.asset(
                                 'assets/images/profile.jpg',
                                 fit: BoxFit.cover,
-                                width: 96.w,
-                                height: 96.w,
+                                width: 110.w,
+                                height: 110.w,
                               ),
-                            )
-                          : Image.asset(
-                              'assets/images/profile.jpg',
-                              fit: BoxFit.cover,
-                              width: 96.w,
-                              height: 96.w,
-                            ),
+                      ),
                     ),
-                  ),
+                    if (isVerified)
+                      Positioned(
+                        bottom: 2.h,
+                        right: -26.w,
+                        child: Transform.rotate(
+                          angle: -0.45,
+                          child: Image.asset(
+                            'assets/images/verified_icon.png',
+                            width: 110.w,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
             ),
             SizedBox(height: 6.h),
             // Name

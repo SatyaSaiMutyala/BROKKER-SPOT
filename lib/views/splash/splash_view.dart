@@ -59,7 +59,9 @@ class _SplashViewState extends State<SplashView>
       CurvedAnimation(parent: _moveController, curve: Curves.easeInOut),
     );
 
-    _checkAndNavigate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndNavigate();
+    });
   }
 
   Future<void> _checkAndNavigate() async {
@@ -73,6 +75,7 @@ class _SplashViewState extends State<SplashView>
       _fadeController.value = 1.0;
       _logoScale = AlwaysStoppedAnimation(1.0);
       await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return;
       final lastSide = LocalStorageService.getLastSide();
       if (lastSide == 'broker') {
         Get.offAll(() => BrokerDashBoardView());
@@ -80,41 +83,8 @@ class _SplashViewState extends State<SplashView>
         Get.offAll(() => DashboardView());
       }
     } else {
-      // No token - play full animation then go to welcome
-      await _startAnimation();
-    }
-  }
-
-  Future<void> _startAnimation() async {
-    // Brief pause before logo appears
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    // Phase 1: Fade in logo at center
-    _fadeController.forward();
-    await Future.delayed(const Duration(milliseconds: 2000));
-
-    // Phase 2: Move logo up to top position
-    _moveController.forward();
-    await Future.delayed(const Duration(milliseconds: 1000));
-
-    // Navigate
-    _navigate();
-  }
-
-  void _navigate() {
-    final token = LocalStorageService.getAccessToken();
-    final user = LocalStorageService.getUser();
-    final firebaseUser = FirebaseAuth.instance.currentUser;
-
-    if (token != null && (user != null || firebaseUser != null)) {
-      final lastSide = LocalStorageService.getLastSide();
-      if (lastSide == 'broker') {
-        Get.offAll(() => BrokerDashBoardView());
-      } else {
-        Get.offAll(() => DashboardView());
-      }
-    } else {
-      Get.offAll(() => WelcomeView());
+      // No token - go directly to welcome screen, no splash animation
+      Get.offAll(() => const WelcomeView());
     }
   }
 

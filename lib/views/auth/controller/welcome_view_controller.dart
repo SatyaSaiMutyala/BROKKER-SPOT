@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
-import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/login_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
@@ -136,12 +139,34 @@ class WelcomeViewController extends GetxController {
       }
       print('Got Apple ID token, sending to backend...');
 
-      // Send Apple ID token to backend
-      final appleEmail = appleCredential.email ?? '';
+      // Apple only sends email/name on FIRST login
+      // Extract email from the JWT token payload as fallback
+      final appleEmail = appleCredential.email ?? _extractEmailFromToken(appleIdToken);
       final appleName = [appleCredential.givenName ?? '', appleCredential.familyName ?? '']
           .where((s) => s.isNotEmpty)
           .join(' ');
-      final backendSaved = await _appleLoginWithBackend(appleIdToken, appleEmail, appleName);
+
+      // Check if user shared real email
+      final isRelayEmail = appleEmail.contains('privaterelay.appleid.com') || appleEmail.isEmpty;
+
+      // If relay email — block and show instructions
+      if (isRelayEmail) {
+        await _showAppleShareInfoDialog(isRelayEmail: true, hasNoName: appleName.isEmpty);
+        return;
+      }
+
+      // If name is empty but email is real — extract name from email prefix
+      // e.g. alok31796@icloud.com → "alok"
+      final resolvedName = appleName.isNotEmpty
+          ? appleName
+          : appleEmail.split('@').first.replaceAll(RegExp(r'[0-9]'), '').trim();
+      final finalName = resolvedName.isNotEmpty ? resolvedName : appleEmail.split('@').first;
+
+      print('Apple email: "$appleEmail"');
+      print('Apple name resolved: "$finalName"');
+
+      final backendSaved = await _appleLoginWithBackend(appleIdToken, appleEmail, finalName);
+      print('Backend saved: $backendSaved');
 
       if (!backendSaved) {
         // Fallback: Firebase sign-in so user can still navigate
@@ -154,12 +179,22 @@ class WelcomeViewController extends GetxController {
         final firebaseToken = await userCredential.user?.getIdToken();
         if (firebaseToken != null) {
           await LocalStorageService.saveAccessToken(firebaseToken);
+          print('Firebase fallback token saved');
         }
       }
 
-      // Refresh profile so name/image show on home screen
+      // Set name/email immediately before getProfile
       final profileCtrl = Get.put(ProfileController());
+      profileCtrl.userName.value = finalName;
+      if (appleEmail.isNotEmpty) profileCtrl.userEmail.value = appleEmail;
+
+      // Now fetch full profile from backend
       await profileCtrl.getProfile();
+
+      // If profile API returned empty, keep the resolved values
+      if (profileCtrl.userName.value.isEmpty) profileCtrl.userName.value = finalName;
+      if (profileCtrl.userEmail.value.isEmpty) profileCtrl.userEmail.value = appleEmail;
+      print('Final profile — name: "${profileCtrl.userName.value}", email: "${profileCtrl.userEmail.value}"');
       print('Profile loaded, navigating to dashboard...');
 
       _navigateByRole(profileCtrl.role.value);
@@ -248,6 +283,123 @@ class WelcomeViewController extends GetxController {
       }
     }
     return false;
+  }
+
+  /// Shows a dialog explaining how to share real email and name with Apple Sign-In.
+  Future<void> _showAppleShareInfoDialog({
+    required bool isRelayEmail,
+    required bool hasNoName,
+  }) async {
+    final issues = <String>[];
+    if (isRelayEmail) issues.add('• Your real email is hidden');
+    if (hasNoName) issues.add('• Your name was not shared');
+
+    await Get.dialog(
+      Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Action Required.',
+                style: GoogleFonts.poppins(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                'To use Apple Sign-In, please share your real email and name:\n${issues.join('\n')}',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 13.sp,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 16.h),
+              Text(
+                'How to fix on your iPhone:',
+                style: GoogleFonts.poppins(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                '1. Open iPhone Settings\n'
+                '2. Tap your name at the top\n'
+                '3. Go to Password & Security\n'
+                '4. Tap "Apps Using Apple ID"\n'
+                '5. Find Brokkerspot → Tap it\n'
+                '6. Tap "Stop Using Apple ID"\n'
+                '7. Sign in with Apple again\n'
+                '8. Choose "Share My Email"\n'
+                '9. Enter your real full name',
+                textAlign: TextAlign.left,
+                style: GoogleFonts.poppins(
+                  fontSize: 14.sp,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              SizedBox(height: 24.h),
+              SizedBox(
+                width: double.infinity,
+                height: 46.h,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30.r),
+                    ),
+                  ),
+                  onPressed: () => Get.back(),
+                  child: Text(
+                    'OK, Got it',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+  }
+
+  /// Decodes the Apple identity token (JWT) to extract the email from payload.
+  /// Apple only sends email in the credential on first login — but it's always in the token.
+  String _extractEmailFromToken(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return '';
+      // Base64 decode the payload (middle part)
+      String payload = parts[1];
+      // Add padding if needed
+      switch (payload.length % 4) {
+        case 2: payload += '=='; break;
+        case 3: payload += '='; break;
+      }
+      final decoded = utf8.decode(base64Url.decode(payload));
+      final data = jsonDecode(decoded);
+      return data['email'] ?? '';
+    } catch (e) {
+      print('Failed to extract email from Apple token: $e');
+      return '';
+    }
   }
 
   void _navigateByRole(int role) {

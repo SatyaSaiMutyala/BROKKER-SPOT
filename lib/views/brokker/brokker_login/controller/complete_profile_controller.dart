@@ -144,14 +144,24 @@ class CompleteProfileController extends GetxController {
     required RxString urlTarget,
     required String fileType,
   }) async {
-    final picked = await _picker.pickImage(
-      source: source,
-      imageQuality: 70,
-      maxWidth: 1024,
-      maxHeight: 1024,
-    );
+    XFile? picked;
+    try {
+      picked = await _picker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+    } catch (e) {
+      AppToast.error('Permission denied. Please allow camera/photo access in Settings.');
+      return;
+    }
     if (picked == null) return;
     final file = File(picked.path);
+    if (!file.existsSync()) {
+      AppToast.error('Could not access the selected image.');
+      return;
+    }
     imageTarget.value = file;
     uploadingFlag.value = true;
     try {

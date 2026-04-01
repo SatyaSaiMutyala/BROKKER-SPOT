@@ -215,13 +215,13 @@ class ProfileView extends StatelessWidget {
                     : null,
               ),
               child: SizedBox(
-                width: 110.w,
-                height: 110.w,
-                child: CustomPaint(
-                  foregroundPainter:
-                      _VerifiedArcPainter(isVerified: isVerified),
-                  child: Center(
-                    child: Container(
+                width: 120.w,
+                height: 120.w,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
                       width: 96.w,
                       height: 96.w,
                       decoration: BoxDecoration(
@@ -250,7 +250,19 @@ class ProfileView extends StatelessWidget {
                               ),
                       ),
                     ),
-                  ),
+                    if (isVerified)
+                      Positioned(
+                        bottom: 12.h,
+                        right: -8.w,
+                        child: Transform.rotate(
+                          angle: -0.45,
+                          child: Image.asset(
+                            'assets/images/verified_icon.png',
+                            width: 90.w,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),

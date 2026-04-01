@@ -71,7 +71,7 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
   ];
 
   Widget _navItem(
-      BuildContext context, int index, String assetPath, String label) {
+      BuildContext context, int index, String assetPath, String activeAssetPath, String label) {
     final isSelected = controller.currentIndex.value == index;
     final color = isSelected ? AppColors.primary : Colors.grey;
     // Tabs 1 (Projects), 2 (Meeting), 3 (Payments) require login
@@ -89,7 +89,8 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
         final verificationStatus = profileController.profileData.value?['verificationStatus'];
 
         // Rejected: block all tabs except Account (index 4)
-        if (index != 4 &&
+        // Rejected: block tabs 1, 2, 3 only (allow Home=0 and Account=4)
+        if (index != 0 && index != 4 &&
             isLoggedIn &&
             profileController.role.value == 2 &&
             verificationStatus == 'rejected') {
@@ -119,6 +120,11 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
           }
         }
 
+        // Refresh profile when switching to Home tab
+        if (index == 0 && LocalStorageService.isLoggedIn()) {
+          profileController.getProfile();
+        }
+
         // Normal navigation
         controller.changeTab(index);
       },
@@ -126,7 +132,7 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ImageIcon(AssetImage(assetPath), size: 24, color: color),
+          ImageIcon(AssetImage(isSelected ? activeAssetPath : assetPath), size: 32, color: color),
           const SizedBox(height: 4),
           Text(
             label,
@@ -159,15 +165,15 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _navItem(context, 0, 'assets/images/broker_home_icon.png',
-                  'Dashboard'),
+                  'assets/images/broker_active_home_icon.png', 'Dashboard'),
               _navItem(context, 1, 'assets/images/broker_project_icon.png',
-                  'Projects'),
+                  'assets/images/broker_active_project_icon.png', 'Projects'),
               _navItem(context, 2, 'assets/images/meeting_icon.png',
-                  'Meeting'),
+                  'assets/images/meeting_active_icon.png', 'Meeting'),
               _navItem(context, 3, 'assets/images/broker_payment_icon.png',
-                  'Payments'),
+                  'assets/images/broker_active_payment_icon.png', 'Payments'),
               _navItem(context, 4, 'assets/images/broker_profile_icon.png',
-                  'Account'),
+                  'assets/images/broker_active_profile_icon.png', 'Account'),
             ],
           ),
         ),

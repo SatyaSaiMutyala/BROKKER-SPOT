@@ -8,10 +8,74 @@ import 'package:get/get.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/constants/app_colors.dart';
 
-class WelcomeView extends StatelessWidget {
-  WelcomeView({super.key});
+class WelcomeView extends StatefulWidget {
+  const WelcomeView({super.key});
 
-  final WelcomeViewController controller = Get.put(WelcomeViewController());
+  @override
+  State<WelcomeView> createState() => _WelcomeViewState();
+}
+
+class _WelcomeViewState extends State<WelcomeView>
+    with TickerProviderStateMixin {
+  late final WelcomeViewController controller = Get.put(WelcomeViewController());
+
+  late final AnimationController _logoController;
+  late final AnimationController _contentController;
+
+  late final Animation<Alignment> _logoPosition;
+  late final Animation<double> _logoWidth;
+  late final Animation<double> _contentFade;
+  late final Animation<Offset> _contentSlide;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Phase 1: Logo moves from center to top
+    _logoController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+
+    // Phase 2: Content fades + slides up from below
+    _contentController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    _logoPosition = AlignmentTween(
+      begin: Alignment.center,
+      end: const Alignment(0.0, -0.72),
+    ).animate(CurvedAnimation(parent: _logoController, curve: Curves.easeInOut));
+
+    _logoWidth = Tween<double>(begin: 220.w, end: 170.w).animate(
+      CurvedAnimation(parent: _logoController, curve: Curves.easeInOut),
+    );
+
+    _contentFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _contentController, curve: Curves.easeIn),
+    );
+
+    _contentSlide = Tween<Offset>(
+      begin: const Offset(0.0, 0.15),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _contentController, curve: Curves.easeOut));
+
+    _startAnimation();
+  }
+
+  Future<void> _startAnimation() async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    await _logoController.forward();
+    _contentController.forward();
+  }
+
+  @override
+  void dispose() {
+    _logoController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +87,7 @@ class WelcomeView extends StatelessWidget {
             // Background Image
             Image.asset(AppAssets.background, fit: BoxFit.cover),
 
-            // Gradient Overlay - darker at bottom for contrast
+            // Gradient Overlay
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -41,165 +105,182 @@ class WelcomeView extends StatelessWidget {
               ),
             ),
 
-            // Content
+            // Animated Logo — center → top
+            AnimatedBuilder(
+              animation: _logoController,
+              builder: (context, child) {
+                return Align(
+                  alignment: _logoPosition.value,
+                  child: Image.asset(
+                    AppAssets.appName,
+                    width: _logoWidth.value,
+                  ),
+                );
+              },
+            ),
+
+            // Bottom content — fades + slides in after logo reaches top
             SafeArea(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 28.w),
-                child: Column(
-                  children: [
-                    SizedBox(height: 100.h),
-
-                    // App Logo
-                    Image.asset(AppAssets.appName, width: 170.w),
-
-                    const Spacer(flex: 1),
-                    SizedBox(height: 20.h),
-                    // Login or Create Account
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Login or Create Account',
-                        style: TextStyle(
-                          fontFamily: 'Lato',
-                          fontSize: 15.sp,
-                          color: AppColors.textWhite,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(height: 18.h),
-
-                    // Google Button
-                    _buildSocialButton(
-                      icon: 'assets/images/google_splash_icon.png',
-                      label: 'Continue with Google',
-                      onTap: controller.signInWithGoogle,
-                    ),
-
-                    SizedBox(height: 14.h),
-
-                    // Apple Button
-                    _buildSocialButton(
-                      icon: 'assets/images/apple_splash_icon.png',
-                      label: 'Continue with Apple',
-                      onTap: controller.signInWithApple,
-                    ),
-
-                    SizedBox(height: 20.h),
-
-                    // OR Divider
-                    Row(
+                child: FadeTransition(
+                  opacity: _contentFade,
+                  child: SlideTransition(
+                    position: _contentSlide,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Expanded(
-                          child: Container( 
-                            height: 0.5,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w),
+                        // Login or Create Account
+                        Align(
+                          alignment: Alignment.centerLeft,
                           child: Text(
-                            'OR',
+                            'Login or Create Account',
                             style: TextStyle(
                               fontFamily: 'Lato',
-                              color: Colors.white,
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Container(
-                            height: 0.5,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    SizedBox(height: 10.h),
-
-                    // Continue with Email
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => Get.to(() => LoginView()),
-                        borderRadius: BorderRadius.circular(30.r),
-                        splashColor: Colors.white24,
-                        highlightColor: Colors.white12,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Image.asset(
-                                'assets/images/email_icon.png',
-                                width: 21.sp,
-                                height: 21.sp,
-                              ),
-                              SizedBox(width: 10.w),
-                              Text(
-                                'Continue with Email',
-                                style: TextStyle(
-                                  fontFamily: 'Lato',
-                                  fontSize: 15.sp,
-                                  color: AppColors.textWhite,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    // Need Help + Guest
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        GestureDetector(
-                          onTap: () => Get.to(() => const NeedHelpView()),
-                          child: Text(
-                            'Need Help?',
-                            style: TextStyle(
-                              fontFamily: 'Lato',
-                              fontSize: 14.sp,
+                              fontSize: 15.sp,
                               color: AppColors.textWhite,
                               fontWeight: FontWeight.w400,
                             ),
                           ),
                         ),
-                        GestureDetector(
-                          onTap: () => Get.offAll(() => DashboardView()),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 22.w, vertical: 9.h),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                  color: AppColors.primary, width: 1.2),
-                              borderRadius: BorderRadius.circular(28.r),
+
+                        SizedBox(height: 18.h),
+
+                        // Google Button
+                        _buildSocialButton(
+                          icon: 'assets/images/google_splash_icon.png',
+                          label: 'Continue with Google',
+                          onTap: controller.signInWithGoogle,
+                        ),
+
+                        SizedBox(height: 14.h),
+
+                        // Apple Button
+                        _buildSocialButton(
+                          icon: 'assets/images/apple_splash_icon.png',
+                          label: 'Continue with Apple',
+                          onTap: controller.signInWithApple,
+                        ),
+
+                        SizedBox(height: 20.h),
+
+                        // OR Divider
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                height: 0.5,
+                                color: Colors.white,
+                              ),
                             ),
-                            child: Text(
-                              'Continue As Guest',
-                              style: TextStyle(
-                                fontFamily: 'Lato',
-                                fontSize: 14.sp,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w500,
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.w),
+                              child: Text(
+                                'OR',
+                                style: TextStyle(
+                                  fontFamily: 'Lato',
+                                  color: Colors.white,
+                                  fontSize: 14.sp,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Container(
+                                height: 0.5,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        SizedBox(height: 10.h),
+
+                        // Continue with Email
+                        Center(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => Get.to(() => LoginView()),
+                              borderRadius: BorderRadius.circular(30.r),
+                              splashColor: Colors.white24,
+                              highlightColor: Colors.white12,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 20.w, vertical: 12.h),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset(
+                                      'assets/images/email_icon.png',
+                                      width: 21.sp,
+                                      height: 21.sp,
+                                    ),
+                                    SizedBox(width: 10.w),
+                                    Text(
+                                      'Continue with Email',
+                                      style: TextStyle(
+                                        fontFamily: 'Lato',
+                                        fontSize: 15.sp,
+                                        color: AppColors.textWhite,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
+
+                        SizedBox(height: 150.h),
+
+                        // Need Help + Guest
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: () => Get.to(() => const NeedHelpView()),
+                              child: Text(
+                                'Need Help?',
+                                style: TextStyle(
+                                  fontFamily: 'Lato',
+                                  fontSize: 14.sp,
+                                  color: AppColors.textWhite,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => Get.offAll(() => DashboardView()),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 22.w, vertical: 9.h),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: AppColors.primary, width: 1.2),
+                                  borderRadius: BorderRadius.circular(28.r),
+                                ),
+                                child: Text(
+                                  'Continue As Guest',
+                                  style: TextStyle(
+                                    fontFamily: 'Lato',
+                                    fontSize: 14.sp,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        SizedBox(height: 24.h),
                       ],
                     ),
-
-                    SizedBox(height: 24.h),
-                  ],
+                  ),
                 ),
               ),
             ),

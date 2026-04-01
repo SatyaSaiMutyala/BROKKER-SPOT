@@ -45,7 +45,7 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
             children: [
               SizedBox(height: 10.h),
               _buildHeader(),
-              SizedBox(height: 14.h),
+              SizedBox(height: 10.h),
               Container(
                 height: 4,
                 decoration: BoxDecoration(
@@ -96,35 +96,60 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
               final isLoading = profileCtrl.isLoading.value;
               final image = profileCtrl.profileImage.value;
               if (isLoading) {
-                return ShimmerCircle(radius: 23.w);
+                return ShimmerCircle(radius: 30.w);
               }
               Widget placeholder = Center(
                 child: Icon(
                   Icons.person,
-                  size: 24.w,
+                  size: 26.w,
                   color: Colors.grey,
                 ),
               );
-              return Container(
-                width: 46.w,
-                height: 46.w,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey.shade200,
-                  border: Border.all(color: AppColors.primary, width: 1),
+              final isVerified =
+                  profileCtrl.profileData.value?['verificationStatus'] ==
+                      'approved';
+              return SizedBox(
+                width: 60.w,
+                height: 60.w,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 60.w,
+                      height: 60.w,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey.shade200,
+                        border: Border.all(color: AppColors.primary, width: 1),
+                      ),
+                      child: ClipOval(
+                          child: image.isNotEmpty
+                              ? Image.network(image,
+                                  width: 60.w,
+                                  height: 60.w,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => placeholder)
+                              : placeholder),
+                    ),
+                    if (isVerified)
+                      Positioned(
+                        bottom: 2.h,
+                        right: -16.w,
+                        child: Transform.rotate(
+                          angle: -0.45,
+                          child: Image.asset(
+                            'assets/images/verified_icon.png',
+                            width: 60.w,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                child: ClipOval(
-                    child: image.isNotEmpty
-                        ? Image.network(image,
-                            width: 50.w,
-                            height: 50.w,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => placeholder)
-                        : placeholder),
               );
             }),
           ),
-          SizedBox(width: 10.w),
+          SizedBox(width: 12.w),
           // Name + badge
           Obx(() {
             final isLoading = profileCtrl.isLoading.value;
@@ -132,9 +157,15 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ShimmerBox(width: 40.w, height: 12.h, borderRadius: BorderRadius.circular(4.r)),
+                  ShimmerBox(
+                      width: 40.w,
+                      height: 12.h,
+                      borderRadius: BorderRadius.circular(4.r)),
                   SizedBox(height: 6.h),
-                  ShimmerBox(width: 120.w, height: 20.h, borderRadius: BorderRadius.circular(4.r)),
+                  ShimmerBox(
+                      width: 120.w,
+                      height: 20.h,
+                      borderRadius: BorderRadius.circular(4.r)),
                 ],
               );
             }
@@ -157,29 +188,29 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
                       style: GoogleFonts.poppins(
                         fontSize: 18.sp,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textHint,
+                        color: AppColors.textBlack.withOpacity(0.7),
                       ),
                     ),
                     if (LocalStorageService.isLoggedIn()) ...[
                       SizedBox(width: 8.w),
                       Obx(() {
-                        final vs = profileCtrl
-                            .profileData.value?['verificationStatus'] as String?;
+                        final vs = profileCtrl.profileData
+                            .value?['verificationStatus'] as String?;
                         if (vs == null) return const SizedBox.shrink();
                         final label = vs == 'inactive'
                             ? 'Inactive'
-                            : vs == 'approved'
-                                ? 'Verified'
-                                : vs == 'rejected'
-                                    ? 'Rejected'
-                                    : 'In Process';
+                            : vs == 'pending'
+                                ? 'In Progress'
+                            : vs == 'rejected'
+                                ? 'Rejected'
+                                : '';
                         final color = vs == 'inactive'
                             ? Colors.red
-                            : vs == 'approved'
-                                ? Colors.green
-                                : vs == 'rejected'
-                                    ? Colors.red
-                                    : Colors.amber;
+                            : vs == 'pending'
+                                ? Colors.amber
+                            : vs == 'rejected'
+                                ? Colors.red
+                                : Colors.white;
                         return Container(
                           padding: EdgeInsets.symmetric(
                               horizontal: 10.w, vertical: 3.h),
@@ -547,5 +578,4 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
       ),
     );
   }
-
 }
