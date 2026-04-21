@@ -53,7 +53,7 @@ class ProfileController extends GetxController {
           userEmail.value = data['email'] ?? '';
           userMobile.value = data['mobileNumber'] ?? '';
           userCountryCode.value = data['countryCode'] ?? '';
-          profileImage.value = data['profileImage'] ?? '';
+          profileImage.value = data['userProfileImage'] ?? data['profileImage'] ?? '';
           accountType.value = data['account_type'] ?? 0;
           role.value = data['role'] ?? 0;
           dealingCities.value = List<String>.from(data['dealingCities'] ?? []);

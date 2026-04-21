@@ -9,6 +9,11 @@ class AnnouncementPropertyCard extends StatefulWidget {
   final bool showWishlist;
   final bool showStatusBadge;
   final bool showBrokerAvatar;
+  final bool showActionButtons;
+  final bool showBrokerProfiles;
+  final bool squareRightSide;
+  final bool listingBadgeAtTop;
+  final bool ownerRowAboveImage;
   final int index;
   final VoidCallback? onTap;
   final VoidCallback? onWishlistTap;
@@ -27,6 +32,11 @@ class AnnouncementPropertyCard extends StatefulWidget {
     this.showWishlist = true,
     this.showStatusBadge = false,
     this.showBrokerAvatar = false,
+    this.showActionButtons = true,
+    this.showBrokerProfiles = false,
+    this.squareRightSide = false,
+    this.listingBadgeAtTop = false,
+    this.ownerRowAboveImage = false,
     this.index = 0,
     this.onTap,
     this.onWishlistTap,
@@ -55,10 +65,17 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        margin: widget.squareRightSide
+            ? EdgeInsets.only(left: 16.w, top: 8.h, bottom: 8.h)
+            : EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16.r),
+          borderRadius: widget.squareRightSide
+              ? BorderRadius.only(
+                  topLeft: Radius.circular(16.r),
+                  bottomLeft: Radius.circular(16.r),
+                )
+              : BorderRadius.circular(16.r),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.07),
@@ -71,16 +88,57 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.ownerRowAboveImage) _buildOwnerRow(a),
             _buildImageSection(a),
             _buildInfoSection(a),
-            _buildActionButtons(),
+            if (widget.showActionButtons) _buildActionButtons(),
           ],
         ),
       ),
     );
   }
 
-  // ─── Image carousel with owner overlay ───
+  // ─── Owner row above the image (used when ownerRowAboveImage = true) ───
+  Widget _buildOwnerRow(AnnouncementModel a) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+      child: Row(
+        children: [
+          ClipOval(
+            child: Image.asset(
+              AnnouncementPropertyCard._avatarAssets[
+                  widget.index % AnnouncementPropertyCard._avatarAssets.length],
+              width: 36.w,
+              height: 36.w,
+              fit: BoxFit.cover,
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text(
+              a.ownerName ?? '',
+              style: GoogleFonts.poppins(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          if (a.listingType != null && a.listingType!.isNotEmpty)
+            Text(
+              a.listingType!,
+              style: GoogleFonts.poppins(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w700,
+                color: AppColors.goldAccent,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Image carousel ───
   Widget _buildImageSection(AnnouncementModel a) {
     final hasImages = (a.imageUrls?.length ?? 0) > 0;
     final images = hasImages ? a.imageUrls! : _fallbackImages;
@@ -108,98 +166,102 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
           ),
         ),
 
-        // Dark gradient overlay at top for readability
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 70.h,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.5),
-                  Colors.transparent,
-                ],
+        // Dark gradient overlay + owner overlay (only when NOT ownerRowAboveImage)
+        if (!widget.ownerRowAboveImage) ...[
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 70.h,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.5),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-
-        // Owner avatar + name (top left)
-        Positioned(
-          top: 14.h,
-          left: 14.w,
-          child: Row(
-            children: [
-              Container(
-                width: 55.w,
-                height: 55.h,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
+          Positioned(
+            top: 14.h,
+            left: 14.w,
+            child: Row(
+              children: [
+                Container(
+                  width: 55.w,
+                  height: 55.h,
+                  decoration: const BoxDecoration(shape: BoxShape.circle),
+                  child: ClipOval(
+                    child: Image.asset(
+                      AnnouncementPropertyCard._avatarAssets[widget.index %
+                          AnnouncementPropertyCard._avatarAssets.length],
+                      width: 55.w,
+                      height: 55.h,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
-                child: ClipOval(
-                  child: Image.asset(
-                    AnnouncementPropertyCard._avatarAssets[widget.index %
-                        AnnouncementPropertyCard._avatarAssets.length],
-                    width: 55.w,
-                    height: 55.h,
-                    fit: BoxFit.cover,
+                SizedBox(width: 8.w),
+                Text(
+                  a.ownerName ?? '',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (widget.showWishlist)
+            Positioned(
+              top: 18.h,
+              right: 14.w,
+              child: GestureDetector(
+                onTap: widget.onWishlistTap,
+                child: Image.asset(
+                  'assets/images/like_icon.png',
+                  width: 42.sp,
+                  height: 42.sp,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+
+          // Listing type badge on image (only when NOT ownerRowAboveImage)
+          if (a.listingType != null && a.listingType!.isNotEmpty)
+            Positioned(
+              top: widget.listingBadgeAtTop ? 0 : null,
+              bottom: widget.listingBadgeAtTop ? null : 0.h,
+              right: 0.w,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: AppColors.goldAccent,
+                  borderRadius: BorderRadius.only(
+                    topLeft: widget.listingBadgeAtTop
+                        ? Radius.zero
+                        : Radius.circular(12.r),
+                    bottomLeft: widget.listingBadgeAtTop
+                        ? Radius.circular(12.r)
+                        : Radius.zero,
+                  ),
+                ),
+                child: Text(
+                  a.listingType!,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
                 ),
               ),
-              SizedBox(width: 8.w),
-              Text(
-                a.ownerName ?? '',
-                style: GoogleFonts.poppins(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        Positioned(
-          top: 18.h,
-          right: 14.w,
-          child: GestureDetector(
-            onTap: widget.onWishlistTap,
-            child: Image.asset(
-              'assets/images/like_icon.png',
-              width: 42.sp,
-              height: 42.sp,
-              color: Colors.white,
             ),
-          ),
-        ),
-
-        // Listing type badge (bottom right)
-        if (a.listingType != null && a.listingType!.isNotEmpty)
-          Positioned(
-            bottom: 0.h,
-            right: 0.w,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: AppColors.goldAccent,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(12.r),
-                ),
-              ),
-              child: Text(
-                a.listingType!,
-                style: GoogleFonts.poppins(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
+        ],
 
         // Dot indicators (bottom center)
         Positioned(
@@ -254,6 +316,23 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
                   color: AppColors.goldAccent,
                 ),
               ),
+              Text(
+                ' Yearly',
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                a.timeAgo ?? '',
+                style: GoogleFonts.inter(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.grey,
+                ),
+              ),
             ],
           ),
           SizedBox(height: 6.h),
@@ -272,45 +351,71 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
           // Bedrooms + Sqft
           Row(
             children: [
-              Icon(Icons.bed_outlined, size: 16.sp, color: AppColors.primary),
-              SizedBox(width: 4.w),
-              Text(
-                '${a.bedrooms ?? 0} Bedroom',
-                style: GoogleFonts.poppins(
-                  fontSize: 12.sp,
-                  color: AppColors.textHint,
-                ),
+              Row(
+                children: [
+                  Icon(Icons.bed_outlined,
+                      size: 16.sp, color: AppColors.primary),
+                  SizedBox(width: 4.w),
+                  Text(
+                    '${a.bedrooms ?? 0} Bedroom',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14.sp, color: AppColors.textHint),
+                  ),
+                ],
               ),
-              SizedBox(width: 16.w),
-              Icon(Icons.square_foot, size: 16.sp, color: AppColors.primary),
-              SizedBox(width: 4.w),
-              Text(
-                '${a.sqft ?? 0} / Sqft',
-                style: GoogleFonts.poppins(
-                  fontSize: 12.sp,
-                  color: AppColors.textHint,
-                ),
+              SizedBox(width: 20),
+              Row(
+                children: [
+                  Icon(Icons.square_foot,
+                      size: 16.sp, color: AppColors.primary),
+                  SizedBox(width: 4.w),
+                  Text(
+                    '${a.sqft ?? 0} / Sqft',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14.sp, color: AppColors.textHint),
+                  ),
+                ],
               ),
+              SizedBox(width: 20),
+              if (widget.showBrokerProfiles) _buildBrokerAvatarWithCount(),
+              SizedBox(width: 20),
+              if (widget.showBrokerProfiles)
+                Container(
+                  padding: EdgeInsets.all(5.w),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.chevron_right,
+                      size: 18.sp, color: AppColors.primary),
+                ),
             ],
           ),
-          SizedBox(height: 6.h),
-          // Location + heart
+          SizedBox(height: 8.h),
+          Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
+          SizedBox(height: 8.h),
+          // Location
           GestureDetector(
             onTap: widget.onLocationTap,
             child: Row(
               children: [
+                Icon(Icons.location_on_outlined,
+                    size: 14.sp, color: AppColors.primary),
+                SizedBox(width: 4.w),
                 Expanded(
                   child: Text(
                     a.location ?? '',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
-                      fontSize: 16.sp,
+                      fontSize: 13.sp,
                       color: AppColors.textHint,
                     ),
                   ),
                 ),
-                Icon(Icons.chevron_right, size: 22.sp, color: AppColors.primary),
+                if (widget.ownerRowAboveImage)
+                  Icon(Icons.chevron_right,
+                      size: 18.sp, color: AppColors.primary),
               ],
             ),
           ),
@@ -346,7 +451,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
                   child: Text(
                     'Call',
                     style: GoogleFonts.poppins(
-                      fontSize: 14.sp,
+                      fontSize: 16.sp,
                       fontWeight: FontWeight.w500,
                       color: AppColors.primary,
                     ),
@@ -354,7 +459,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
                 ),
               ),
             ),
-            VerticalDivider(width: 1, thickness: 0.8, color: AppColors.primary),
+            VerticalDivider(
+                width: 1, thickness: 0.8, color: AppColors.primary),
             Expanded(
               child: GestureDetector(
                 onTap: widget.onChatTap,
@@ -364,7 +470,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
                   child: Text(
                     'Chat',
                     style: GoogleFonts.poppins(
-                      fontSize: 14.sp,
+                      fontSize: 16.sp,
                       fontWeight: FontWeight.w500,
                       color: AppColors.primary,
                     ),
@@ -374,6 +480,73 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBrokerAvatarWithCount() {
+    const count = 4;
+    const avatarSize = 44.0;
+    const peekAmount = 10.0;
+    final totalWidth = avatarSize + peekAmount;
+
+    return SizedBox(
+      width: totalWidth.w,
+      height: avatarSize.w,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            right: 0,
+            child: _avatar('assets/images/story2.png', avatarSize),
+          ),
+          Positioned(
+            left: 0,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _avatar('assets/images/story1.png', avatarSize),
+                Positioned(
+                  top: -4.h,
+                  right: -6.w,
+                  child: Container(
+                    width: 22.w,
+                    height: 22.w,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$count',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _avatar(String asset, double size) {
+    return Container(
+      width: size.w,
+      height: size.w,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: ClipOval(
+        child: Image.asset(asset, fit: BoxFit.cover),
       ),
     );
   }

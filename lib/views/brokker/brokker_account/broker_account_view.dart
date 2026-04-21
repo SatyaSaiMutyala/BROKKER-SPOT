@@ -1,5 +1,6 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/views/brokker/brokker_account/broker_my_information_view.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:brokkerspot/views/user/settings/settings_view.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
@@ -45,7 +46,8 @@ class AccountMenuView extends StatelessWidget {
                       // First card group
                       _buildCardGroup([
                         _menuItem('assets/images/broker_my_profile_icon.png',
-                            'My Information', () {},
+                            'My Information',
+                            () => Get.to(() => const BrokerMyInformationView()),
                             enabled: canAccess),
                         _menuItem('assets/images/broker_mydeal_icon.png',
                             'My Deals', () {},

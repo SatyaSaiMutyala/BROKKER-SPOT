@@ -23,11 +23,11 @@ class AnnouncementsView extends StatelessWidget {
               title: 'ANNOUNCEMENTS',
               leading: GestureDetector(
                 onTap: () {},
-                child: Icon(Icons.search, size: 26.sp, color: AppColors.primary),
+                child: Icon(Icons.search, size: 36.sp, color: AppColors.primary),
               ),
               trailing: GestureDetector(
                 onTap: () => Get.to(() => const CreateAnnouncementView()),
-                child: Icon(Icons.add_home_outlined, size: 26.sp, color: AppColors.primary),
+                child: Image.asset('assets/images/home_add_icon.png', width: 50.w, height: 50.w),
               ),
             ),
             Expanded(
@@ -38,15 +38,9 @@ class AnnouncementsView extends StatelessWidget {
                   return AnnouncementPropertyCard(
                     announcement: announcements[index],
                     index: index,
-                    onTap: () {
-                      // Handle card tap
-                    },
-                    onWishlistTap: () {
-                      // Handle wishlist
-                    },
-                    onLocationTap: () {
-                      // Handle location
-                    },
+                    onTap: () {},
+                    onWishlistTap: () {},
+                    onLocationTap: () {},
                   );
                 },
               ),
@@ -62,7 +56,7 @@ class AnnouncementsView extends StatelessWidget {
       AnnouncementModel(
         id: '1',
         ownerName: 'Hemant',
-        listingType: 'For Rent',
+        listingType: 'Rent',
         price: 1000000,
         propertyName: 'Wooden Home',
         bedrooms: 2,
@@ -74,7 +68,7 @@ class AnnouncementsView extends StatelessWidget {
       AnnouncementModel(
         id: '2',
         ownerName: 'Neha',
-        listingType: 'For sell',
+        listingType: 'sell',
         price: 850000,
         propertyName: 'Modern Villa',
         bedrooms: 3,

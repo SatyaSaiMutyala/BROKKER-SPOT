@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:brokkerspot/core/common_widget/network_info.dart';
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/views/auth/view/welcome_view.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart' hide Response;
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
@@ -43,6 +45,17 @@ Map<String, String> buildHeaders() {
 
 const String baseUrl = "https://api.dev.brokkerspot.com/api/v1/";
 
+/// Clears local storage and sends the user back to WelcomeView on 401.
+void _handleUnauthorized() async {
+  await LocalStorageService.clearAll();
+  Get.offAll(() => WelcomeView());
+}
+
+http.Response _checkUnauthorized(http.Response response) {
+  if (response.statusCode == 401) _handleUnauthorized();
+  return response;
+}
+
 Future<http.Response> postRequest(String s,
     {required String endPoint,
     Map<String, dynamic>? body,
@@ -60,7 +73,7 @@ Future<http.Response> postRequest(String s,
                 throw TimeoutException(AppConstNames.networkError)));
 
     debugPrint("response body :${response.body}");
-    return response;
+    return _checkUnauthorized(response);
   } catch (e, s) {
     print(e);
     print(s);
@@ -85,7 +98,7 @@ Future<http.Response> metaDataPostRequest(
             onTimeout: (() => throw AppConstNames.networkError));
 
     debugPrint("response body :${response.body}");
-    return response;
+    return _checkUnauthorized(response);
   } catch (e) {
     print(e);
     debugPrint("-----postRequest------. $e ");
@@ -106,7 +119,7 @@ Future<http.Response> getRequest(
     debugPrint('getRequest params: $params');
     debugPrint('getRequest URL: $endPoint');
     debugPrint('getRequest body ${response.body}');
-    return response;
+    return _checkUnauthorized(response);
   } catch (e) {
     print(e);
     debugPrint("-----getRequest------. $e ");
@@ -148,7 +161,7 @@ Future<http.Response> patchRequest(
             onTimeout: (() => throw AppConstNames.networkError));
 
     debugPrint("response body :${response.body}");
-    return response;
+    return _checkUnauthorized(response);
   } catch (e) {
     print(e);
     debugPrint("-----patchRequest------. $e ");
@@ -171,7 +184,7 @@ Future<http.Response> putRequest(
             onTimeout: (() => throw AppConstNames.networkError));
 
     debugPrint("response body :${response.body}");
-    return response;
+    return _checkUnauthorized(response);
   } catch (e) {
     print(e);
     debugPrint("-----patchRequest------. $e ");
@@ -239,7 +252,7 @@ Future<http.Response> deleteRequest(
                 throw TimeoutException(AppConstNames.networkError)));
 
     debugPrint("response body :${response.body}");
-    return response;
+    return _checkUnauthorized(response);
   } catch (e) {
     print(e);
     debugPrint("-----postRequest------. $e ");

@@ -3,9 +3,10 @@ import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:brokkerspot/views/auth/view/signup_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/brokker_login_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/complete_profile_screen.dart';
-import 'package:brokkerspot/views/brokker/brokker_login/view/create_brokker_account_view.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
+import 'package:brokkerspot/views/user/announcements/my_announcements_tab_view.dart';
 import 'package:brokkerspot/views/user/deals/my_project_deals_view.dart';
+import 'package:brokkerspot/views/user/my_information/my_information_view.dart';
 import 'package:brokkerspot/views/user/settings/settings_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -52,7 +53,7 @@ class AccountView extends StatelessWidget {
                             iconAsset: 'broker_my_profile_icon.png',
                             title: 'My Information',
                             enabled: !isGuest,
-                            onTap: () {},
+                            onTap: () => Get.to(() => const MyInformationView()),
                           ),
                           _accountTile(
                             iconAsset: 'broker_mydeal_icon.png',
@@ -66,7 +67,7 @@ class AccountView extends StatelessWidget {
                             iconAsset: 'broker_announcement.png',
                             title: 'Announcement',
                             enabled: !isGuest,
-                            onTap: () {},
+                            onTap: () => Get.to(() => const MyAnnouncementsTabView()),
                           ),
                           _accountTile(
                             iconAsset: 'broker_wishlist_icon.png',
