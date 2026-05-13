@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:video_player/video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 
@@ -52,11 +54,36 @@ class AnnouncementPropertyCard extends StatefulWidget {
 
 class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
   int _currentImageIndex = 0;
+  VideoPlayerController? _videoCtrl;
+  bool _videoReady = false;
 
   static const List<String> _fallbackImages = [
     'assets/images/rent1.png',
     'assets/images/rent2.png',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final videoUrl = widget.announcement.propertyMedia?.videos;
+    if (videoUrl != null && videoUrl.isNotEmpty) {
+      _videoCtrl = VideoPlayerController.networkUrl(Uri.parse(videoUrl))
+        ..initialize().then((_) {
+          if (mounted) {
+            setState(() => _videoReady = true);
+            _videoCtrl!.setVolume(0); // muted in list
+            _videoCtrl!.setLooping(true);
+            _videoCtrl!.play();
+          }
+        });
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoCtrl?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,13 +132,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
       child: Row(
         children: [
           ClipOval(
-            child: Image.asset(
-              AnnouncementPropertyCard._avatarAssets[
-                  widget.index % AnnouncementPropertyCard._avatarAssets.length],
-              width: 36.w,
-              height: 36.w,
-              fit: BoxFit.cover,
-            ),
+            child: _avatarWidget(a.ownerAvatarUrl, 36.w),
           ),
           SizedBox(width: 8.w),
           Expanded(
@@ -138,31 +159,56 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
     );
   }
 
-  // ─── Image carousel ───
+  // ─── Image + video carousel ───
   Widget _buildImageSection(AnnouncementModel a) {
+    final videoUrl = a.propertyMedia?.videos;
+    final hasVideo = videoUrl != null && videoUrl.isNotEmpty;
     final hasImages = (a.imageUrls?.length ?? 0) > 0;
-    final images = hasImages ? a.imageUrls! : _fallbackImages;
-    final totalDots = images.length;
+    final images = hasImages ? a.imageUrls! : (hasVideo ? <String>[] : _fallbackImages);
+    final totalPages = (hasVideo ? 1 : 0) + images.length;
 
     return Stack(
       children: [
-        // Image carousel
+        // Video + Image carousel
         SizedBox(
           height: 200.h,
           width: double.infinity,
           child: PageView.builder(
-            itemCount: images.length,
-            onPageChanged: (i) => setState(() => _currentImageIndex = i),
-            itemBuilder: (_, i) => hasImages
-                ? Image.network(
-                    images[i],
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
-                  )
-                : Image.asset(
-                    images[i],
-                    fit: BoxFit.cover,
+            itemCount: totalPages,
+            onPageChanged: (i) {
+              setState(() => _currentImageIndex = i);
+              if (hasVideo) {
+                if (i == 0) {
+                  _videoCtrl?.play();
+                } else {
+                  _videoCtrl?.pause();
+                }
+              }
+            },
+            itemBuilder: (_, i) {
+              // First page: actual video player
+              if (hasVideo && i == 0) {
+                if (!_videoReady || _videoCtrl == null) return _shimmerBox();
+                return FittedBox(
+                  fit: BoxFit.cover,
+                  clipBehavior: Clip.antiAlias,
+                  child: SizedBox(
+                    width: _videoCtrl!.value.size.width,
+                    height: _videoCtrl!.value.size.height,
+                    child: VideoPlayer(_videoCtrl!),
                   ),
+                );
+              }
+              // Remaining pages: images
+              final imgIdx = hasVideo ? i - 1 : i;
+              return Image.network(
+                images[imgIdx],
+                fit: BoxFit.cover,
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : _shimmerBox(),
+                errorBuilder: (_, __, ___) => _imagePlaceholder(),
+              );
+            },
           ),
         ),
 
@@ -196,13 +242,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
                   height: 55.h,
                   decoration: const BoxDecoration(shape: BoxShape.circle),
                   child: ClipOval(
-                    child: Image.asset(
-                      AnnouncementPropertyCard._avatarAssets[widget.index %
-                          AnnouncementPropertyCard._avatarAssets.length],
-                      width: 55.w,
-                      height: 55.h,
-                      fit: BoxFit.cover,
-                    ),
+                    child: _avatarWidget(a.ownerAvatarUrl, 55.w),
                   ),
                 ),
                 SizedBox(width: 8.w),
@@ -271,7 +311,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
-              totalDots,
+              totalPages,
               (i) => Container(
                 width: 7.w,
                 height: 7.w,
@@ -558,6 +598,30 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
         child: Icon(Icons.home_outlined, size: 48.sp, color: Colors.grey),
       ),
     );
+  }
+
+  Widget _shimmerBox() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Container(color: Colors.grey.shade300),
+    );
+  }
+
+  Widget _avatarWidget(String? url, double size) {
+    final fallback = AnnouncementPropertyCard
+        ._avatarAssets[widget.index % AnnouncementPropertyCard._avatarAssets.length];
+    if (url != null && url.isNotEmpty) {
+      return Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            Image.asset(fallback, width: size, height: size, fit: BoxFit.cover),
+      );
+    }
+    return Image.asset(fallback, width: size, height: size, fit: BoxFit.cover);
   }
 
   String _formatPrice(double price) {

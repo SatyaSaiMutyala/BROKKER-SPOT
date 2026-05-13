@@ -1,5 +1,8 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/verification_screen.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
+import 'package:brokkerspot/views/user/announcements/my_announcements_tab_view.dart';
 import 'package:brokkerspot/views/user/announcements/property_information_view.dart';
 import 'package:brokkerspot/views/user/announcements/property_location_view.dart';
 import 'package:brokkerspot/views/user/announcements/property_price_brokerage_view.dart';
@@ -10,16 +13,23 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:brokkerspot/widgets/announcements/form_section_tile.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class CreateAnnouncementView extends StatefulWidget {
-  const CreateAnnouncementView({super.key});
+  final AnnouncementModel? announcement;
+
+  const CreateAnnouncementView({super.key, this.announcement});
+
+  bool get isEditing => announcement != null;
 
   @override
   State<CreateAnnouncementView> createState() => _CreateAnnouncementViewState();
 }
 
 class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
+  late final AnnouncementController _controller;
+
   bool _brokerProposalsEnabled = false;
   String? _brokerProposalLimit;
   String? _propertyFor;
@@ -28,6 +38,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
   bool _videoImagesSaved = false;
   bool _priceSaved = false;
   bool _documentsSaved = false;
+  bool _isSubmitting = false;
 
   bool get _allSectionsDone =>
       _propertyFor != null &&
@@ -36,6 +47,38 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       _videoImagesSaved &&
       _priceSaved &&
       _documentsSaved;
+
+  @override
+  void initState() {
+    super.initState();
+    if (Get.isRegistered<AnnouncementController>()) {
+      _controller = Get.find<AnnouncementController>();
+    } else {
+      _controller = Get.put(AnnouncementController());
+    }
+
+    if (widget.isEditing) {
+      _controller.loadFromAnnouncement(widget.announcement!);
+      final a = widget.announcement!;
+      _propertyFor = (a.listingType ?? '').toLowerCase() == 'sell' ? 'Sell' : 'Rent';
+      _brokerProposalLimit =
+          a.proposalsLimit != null ? a.proposalsLimit.toString() : null;
+      _brokerProposalsEnabled = _brokerProposalLimit != null;
+      _locationSaved = true;
+      _informationSaved = true;
+      _videoImagesSaved = true;
+      _priceSaved = true;
+      _documentsSaved = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!widget.isEditing && Get.isRegistered<AnnouncementController>()) {
+      Get.delete<AnnouncementController>();
+    }
+    super.dispose();
+  }
 
   void _showBrokerProposalLimitDialog() {
     showDialog(
@@ -90,6 +133,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
             return InkWell(
               onTap: () {
                 setState(() => _propertyFor = option);
+                _controller.setListingType(option == 'Sell' ? 1 : 2);
                 Navigator.pop(context);
               },
               child: Container(
@@ -116,6 +160,40 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
     );
   }
 
+  Future<void> _submit() async {
+    setState(() => _isSubmitting = true);
+    _controller.setProposalsLimit(
+        _brokerProposalLimit != null ? int.tryParse(_brokerProposalLimit!) : null);
+
+    bool success;
+    if (widget.isEditing) {
+      success = await _controller.editAnnouncement(widget.announcement!.id!);
+    } else {
+      success = await _controller.createAnnouncement();
+    }
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (success) {
+      if (widget.isEditing) {
+        Get.offAll(() => const MyAnnouncementsTabView());
+      } else {
+        Get.to(() => const VerificationScreen(isAnnouncement: true));
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_controller.errorMessage.value ??
+              (widget.isEditing
+                  ? 'Failed to update announcement'
+                  : 'Failed to create announcement')),
+          backgroundColor: Colors.red.shade600,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -123,7 +201,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       body: SafeArea(
         child: Column(
           children: [
-            const CustomHeader(title: 'ANNOUNCEMENT', showBackButton: true),
+            CustomHeader(
+              title: widget.isEditing ? 'EDIT ANNOUNCEMENT' : 'ANNOUNCEMENT',
+              showBackButton: true,
+            ),
             Divider(height: 1.h, color: Colors.grey.shade200),
             Expanded(
               child: SingleChildScrollView(
@@ -155,8 +236,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             : null,
                       ),
                       onTap: () async {
-                        final result = await Navigator.push<bool>(context,
-                            MaterialPageRoute(builder: (_) => const PropertyLocationView()));
+                        final result = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const PropertyLocationView()));
                         if (result == true) setState(() => _locationSaved = true);
                       },
                     ),
@@ -172,8 +255,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             : null,
                       ),
                       onTap: () async {
-                        final result = await Navigator.push<bool>(context,
-                            MaterialPageRoute(builder: (_) => const PropertyInformationView()));
+                        final result = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const PropertyInformationView()));
                         if (result == true) setState(() => _informationSaved = true);
                       },
                     ),
@@ -189,8 +274,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             : null,
                       ),
                       onTap: () async {
-                        final result = await Navigator.push<bool>(context,
-                            MaterialPageRoute(builder: (_) => const PropertyVideoImagesView()));
+                        final result = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const PropertyVideoImagesView()));
                         if (result == true) setState(() => _videoImagesSaved = true);
                       },
                     ),
@@ -206,8 +293,11 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             : null,
                       ),
                       onTap: () async {
-                        final result = await Navigator.push<bool>(context,
-                            MaterialPageRoute(builder: (_) => PropertyPriceBrokerageView(propertyFor: _propertyFor)));
+                        final result = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => PropertyPriceBrokerageView(
+                                    propertyFor: _propertyFor)));
                         if (result == true) setState(() => _priceSaved = true);
                       },
                     ),
@@ -223,8 +313,11 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             : null,
                       ),
                       onTap: () async {
-                        final result = await Navigator.push<bool>(context,
-                            MaterialPageRoute(builder: (_) => UploadDocumentView(propertyFor: _propertyFor)));
+                        final result = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    UploadDocumentView(propertyFor: _propertyFor)));
                         if (result == true) setState(() => _documentsSaved = true);
                       },
                     ),
@@ -253,9 +346,8 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                               });
                             }
                           },
-                          activeThumbColor: Colors.white,
+                          thumbColor: WidgetStatePropertyAll(Colors.white),
                           activeTrackColor: Colors.purple.shade600,
-                          inactiveThumbColor: Colors.white,
                           inactiveTrackColor: Colors.grey.shade400,
                         ),
                       ),
@@ -264,17 +356,20 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                 ),
               ),
             ),
-            // Announce Button
             Padding(
               padding: EdgeInsets.all(20.w),
               child: CustomPrimaryButton(
-                title: 'Announce',
-                onPressed: _allSectionsDone
-                    ? () => Navigator.push(context, MaterialPageRoute(
-                        builder: (_) => const VerificationScreen(isAnnouncement: true)))
-                    : () {},
-                backgroundColor: _allSectionsDone ? AppColors.primary : Colors.grey.shade300,
-                defaultColor: _allSectionsDone ? Colors.white : Colors.black45,
+                title: _isSubmitting
+                    ? (widget.isEditing ? 'Updating...' : 'Creating...')
+                    : (widget.isEditing ? 'Update' : 'Announce'),
+                onPressed:
+                    _allSectionsDone && !_isSubmitting ? _submit : () {},
+                backgroundColor: _allSectionsDone && !_isSubmitting
+                    ? AppColors.primary
+                    : Colors.grey.shade300,
+                defaultColor: _allSectionsDone && !_isSubmitting
+                    ? Colors.white
+                    : Colors.black45,
                 height: 50.h,
                 radius: 10,
               ),

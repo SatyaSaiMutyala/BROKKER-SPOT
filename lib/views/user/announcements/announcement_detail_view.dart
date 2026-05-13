@@ -1,7 +1,11 @@
+import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:video_player/video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
@@ -10,56 +14,103 @@ import 'package:brokkerspot/widgets/common/custom_header.dart';
 
 class AnnouncementDetailView extends StatefulWidget {
   final AnnouncementModel announcement;
+  final bool isOwner;
 
-  const AnnouncementDetailView({super.key, required this.announcement});
+  const AnnouncementDetailView({
+    super.key,
+    required this.announcement,
+    this.isOwner = true,
+  });
 
   @override
   State<AnnouncementDetailView> createState() => _AnnouncementDetailViewState();
 }
 
 class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
-  int _currentImageIndex = 0;
-  bool _brokerSelected = false; // toggle for demo: false = no broker chosen yet
+  int _currentPage = 0;
+  final bool _brokerSelected = false;
+  final _repo = AnnouncementRepository();
+
+  late AnnouncementModel _data;
+  VideoPlayerController? _videoCtrl;
+  bool _videoReady = false;
 
   static const List<String> _fallbackImages = [
     'assets/images/rent1.png',
     'assets/images/rent2.png',
   ];
 
-  static const List<String> _amenities = [
-    'Swimming Pool',
-    'Gym',
-    'Parking',
-    'Security',
-    'Balcony',
-    'Central A/C',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _data = widget.announcement;
+    _initVideo(_data);
+    _fetchDetail();
+  }
 
-  static const List<String> _propertyInfoItems = [
-    'Type: Apartment',
-    'Furnished: Semi-Furnished',
-    'Floor: 5th',
-    'Building: Tower A',
-  ];
+  void _initVideo(AnnouncementModel a) {
+    final videoUrl = a.propertyMedia?.videos;
+    if (videoUrl == null || videoUrl.isEmpty) return;
+    _videoCtrl = VideoPlayerController.networkUrl(Uri.parse(videoUrl))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => _videoReady = true);
+          _videoCtrl!.setLooping(true);
+          _videoCtrl!.play();
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _videoCtrl?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchDetail() async {
+    final id = widget.announcement.id;
+    if (id == null) return;
+    try {
+      final fresh = await _repo.fetchAnnouncementDetail(id);
+      if (mounted) setState(() => _data = fresh);
+    } catch (_) {
+      // keep showing the data passed in
+    }
+  }
+
+  List<String> _buildPropertyInfoItems(AnnouncementModel a) {
+    final items = <String>[];
+    if (a.propertyType != null) items.add('Type: ${a.propertyType}');
+    if (a.bedrooms != null) items.add('Bedrooms: ${a.bedrooms}');
+    if (a.bathrooms != null) items.add('Bathrooms: ${a.bathrooms}');
+    if (a.floor != null) items.add('Floor: ${a.floor}');
+    if (a.totalFloors != null) items.add('Total Floors: ${a.totalFloors}');
+    if (a.propertySize?.sqft != null) {
+      items.add('Size: ${a.propertySize!.sqft.toInt()} sqft');
+    }
+    return items;
+  }
 
   Color _statusColor(String? status) {
     switch (status?.toLowerCase()) {
-      case 'active':
-        return Colors.green.shade500;
-      case 'rejected':
-        return Colors.red.shade500;
-      case 'pending':
-        return Colors.orange.shade500;
-      case 'draft':
-        return Colors.grey.shade600;
-      default:
-        return Colors.grey.shade600;
+      case 'approved':   return Colors.green.shade500;
+      case 'rejected':   return Colors.red.shade500;
+      case 'submitted':  return Colors.orange.shade500;
+      case 'draft':      return Colors.grey.shade600;
+      default:           return Colors.grey.shade600;
     }
   }
 
   String _statusLabel(String? status) {
     if (status?.toLowerCase() == 'draft') return 'In Draft';
     return status ?? '';
+  }
+
+
+  String _formatDate(String isoDate) {
+    final dt = DateTime.tryParse(isoDate);
+    if (dt == null) return isoDate;
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
 
   String _formatPrice(double price) {
@@ -81,11 +132,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     return PopupMenuButton<String>(
       onSelected: (value) {
         if (value == 'edit') {
-          Get.to(() => const CreateAnnouncementView());
+          Get.to(() => CreateAnnouncementView(announcement: widget.announcement));
         } else if (value == 'delete') {
           _showDeleteDialog();
         }
-        // 'not_available' — no action needed yet
       },
       color: Colors.white,
       elevation: 8,
@@ -167,9 +217,19 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                 children: [
                   Expanded(
                     child: GestureDetector(
-                      onTap: () {
+                      onTap: () async {
                         Navigator.pop(context);
-                        Get.back();
+                        final id = widget.announcement.id;
+                        if (id == null) return;
+                        EasyLoading.show(status: 'Deleting...');
+                        try {
+                          await _repo.deleteAnnouncement(id);
+                          EasyLoading.dismiss();
+                          if (mounted) Get.back(result: true);
+                        } catch (e) {
+                          EasyLoading.dismiss();
+                          EasyLoading.showError('Delete failed. Please try again.');
+                        }
                       },
                       child: Container(
                         height: 46.h,
@@ -244,7 +304,9 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               ),
               SizedBox(height: 16.h),
               Text(
-                'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.',
+                _data.rejectionReason?.isNotEmpty == true
+                    ? _data.rejectionReason!
+                    : 'No reason provided.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 13.sp,
@@ -266,7 +328,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                   ),
                   onPressed: () {
                     Navigator.pop(context);
-                    Get.to(() => const CreateAnnouncementView());
+                    Get.to(() => CreateAnnouncementView(
+                        announcement: widget.announcement));
                   },
                   child: Text(
                     'UPLOAD AGAIN',
@@ -287,10 +350,12 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
   @override
   Widget build(BuildContext context) {
-    final a = widget.announcement;
+    final a = _data;
     final status = a.status?.toLowerCase() ?? '';
+    final hasVideo = (a.propertyMedia?.videos?.isNotEmpty ?? false);
     final hasImages = (a.imageUrls?.length ?? 0) > 0;
-    final images = hasImages ? a.imageUrls! : _fallbackImages;
+    final images = hasImages ? a.imageUrls! : (hasVideo ? <String>[] : _fallbackImages);
+    final totalPages = (hasVideo ? 1 : 0) + images.length;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -301,7 +366,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
             CustomHeader(
               title: 'DETAILS',
               showBackButton: true,
-              trailing: _buildThreeDotMenu(),
+              trailing: widget.isOwner ? _buildThreeDotMenu() : null,
             ),
 
             // ── Scrollable body ──
@@ -310,22 +375,48 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Image carousel ──
+                    // ── Video + Image carousel ──
                     Stack(
                       children: [
                         SizedBox(
                           height: 260.h,
                           width: double.infinity,
                           child: PageView.builder(
-                            itemCount: images.length,
-                            onPageChanged: (i) =>
-                                setState(() => _currentImageIndex = i),
-                            itemBuilder: (_, i) => hasImages
-                                ? Image.network(images[i],
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        _imagePlaceholder())
-                                : Image.asset(images[i], fit: BoxFit.cover),
+                            itemCount: totalPages,
+                            onPageChanged: (i) {
+                              setState(() => _currentPage = i);
+                              if (hasVideo) {
+                                if (i == 0) {
+                                  _videoCtrl?.play();
+                                } else {
+                                  _videoCtrl?.pause();
+                                }
+                              }
+                            },
+                            itemBuilder: (_, i) {
+                              if (hasVideo && i == 0) {
+                                if (!_videoReady || _videoCtrl == null) {
+                                  return _shimmerBox();
+                                }
+                                return FittedBox(
+                                  fit: BoxFit.cover,
+                                  clipBehavior: Clip.antiAlias,
+                                  child: SizedBox(
+                                    width: _videoCtrl!.value.size.width,
+                                    height: _videoCtrl!.value.size.height,
+                                    child: VideoPlayer(_videoCtrl!),
+                                  ),
+                                );
+                              }
+                              final imgIdx = hasVideo ? i - 1 : i;
+                              return hasImages
+                                  ? Image.network(images[imgIdx],
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (_, child, progress) =>
+                                          progress == null ? child : _shimmerBox(),
+                                      errorBuilder: (_, __, ___) => _imagePlaceholder())
+                                  : Image.asset(images[imgIdx], fit: BoxFit.cover);
+                            },
                           ),
                         ),
                         // Dark gradient top
@@ -347,7 +438,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                             ),
                           ),
                         ),
-                        // Status badge – top left
+                        // Status badge
                         Positioned(
                           top: 0,
                           right: 0,
@@ -370,7 +461,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                             ),
                           ),
                         ),
-                        // "View All" – top right
+                        // "View All"
                         Positioned(
                           bottom: 10.h,
                           right: 16.w,
@@ -392,7 +483,6 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                             ),
                           ),
                         ),
-
                         // Dot indicators
                         Positioned(
                           bottom: 16.h,
@@ -401,14 +491,14 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: List.generate(
-                              images.length,
+                              totalPages,
                               (i) => Container(
                                 width: 12.w,
                                 height: 12.w,
                                 margin: EdgeInsets.symmetric(horizontal: 3.w),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: i == _currentImageIndex
+                                  color: i == _currentPage
                                       ? AppColors.primary
                                       : Colors.white.withValues(alpha: 0.4),
                                   border: Border.all(color: AppColors.primary),
@@ -430,7 +520,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                'AED ',
+                                '${a.currency ?? 'AED'} ',
                                 style: GoogleFonts.inter(
                                   fontSize: 18.sp,
                                   fontWeight: FontWeight.w500,
@@ -445,22 +535,24 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                                   color: AppColors.goldAccent,
                                 ),
                               ),
-                              Text(
-                                ' Yearly',
-                                style: GoogleFonts.inter(
-                                  fontSize: 18.sp,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
+                              if (a.rentPeriod != null)
+                                Text(
+                                  ' ${a.rentPeriod}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 18.sp,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black,
+                                  ),
                                 ),
-                              ),
                               const Spacer(),
-                              Text(
-                                a.timeAgo ?? '',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13.sp,
-                                  color: Colors.grey,
+                              if (a.createdAt != null)
+                                Text(
+                                  _formatDate(a.createdAt!),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13.sp,
+                                    color: Colors.grey,
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                           SizedBox(height: 8.h),
@@ -504,41 +596,43 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                               color: Colors.grey.shade200),
                           SizedBox(height: 16.h),
 
-                          // ── Available From ──
-                          _sectionTitle('Available From'),
-                          SizedBox(height: 10.h),
-                          Row(
-                            children: [
-                              Container(
-                                width: 6.w,
-                                height: 6.w,
-                                margin: EdgeInsets.only(top: 6.h, right: 10.w),
-                                decoration: BoxDecoration(
-                                  color: AppColors.textBlack,
-                                  shape: BoxShape.circle,
+                          // ── Available From (rent only) ──
+                          if (a.availableDate != null) ...[
+                            _sectionTitle('Available From'),
+                            SizedBox(height: 10.h),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 6.w,
+                                  height: 6.w,
+                                  margin: EdgeInsets.only(top: 6.h, right: 10.w),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.textBlack,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                '25/05/2025',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14.sp,
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w500,
+                                Text(
+                                  _formatDate(a.availableDate!),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14.sp,
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 20.h),
-                          Divider(
-                              height: 1,
-                              thickness: 0.8,
-                              color: Colors.grey.shade200),
-                          SizedBox(height: 16.h),
+                              ],
+                            ),
+                            SizedBox(height: 20.h),
+                            Divider(
+                                height: 1,
+                                thickness: 0.8,
+                                color: Colors.grey.shade200),
+                            SizedBox(height: 16.h),
+                          ],
 
                           // ── Property Info ──
                           _sectionTitle('Property Info'),
                           SizedBox(height: 10.h),
-                          ..._propertyInfoItems.map(
+                          ..._buildPropertyInfoItems(a).map(
                             (item) => Padding(
                               padding: EdgeInsets.only(bottom: 8.h),
                               child: Row(
@@ -573,21 +667,63 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                           SizedBox(height: 16.h),
 
                           // ── Amenities ──
-                          _sectionTitle('Amenities'),
-                          SizedBox(height: 12.h),
-                          Wrap(
-                            spacing: 10.w,
-                            runSpacing: 10.h,
-                            children: _amenities
-                                .map((am) => _amenityChip(am))
-                                .toList(),
-                          ),
-                          SizedBox(height: 20.h),
-                          Divider(
-                              height: 1,
-                              thickness: 0.8,
-                              color: Colors.grey.shade200),
-                          SizedBox(height: 16.h),
+                          if ((a.amenities?.length ?? 0) > 0) ...[
+                            _sectionTitle('Amenities'),
+                            SizedBox(height: 12.h),
+                            _amenityChip('${a.amenities!.length} Amenities'),
+                            SizedBox(height: 20.h),
+                            Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
+                            SizedBox(height: 16.h),
+                          ],
+
+                          // ── Description ──
+                          if ((a.description?.isNotEmpty ?? false)) ...[
+                            _sectionTitle('Description'),
+                            SizedBox(height: 10.h),
+                            Text(
+                              a.description!,
+                              style: GoogleFonts.inter(
+                                fontSize: 14.sp,
+                                color: Colors.black87,
+                                height: 1.6,
+                              ),
+                            ),
+                            SizedBox(height: 20.h),
+                            Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
+                            SizedBox(height: 16.h),
+                          ],
+
+                          // ── Location ──
+                          if ((a.location ?? a.propertyAddress) != null) ...[
+                            _sectionTitle('Location'),
+                            SizedBox(height: 10.h),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.location_on_outlined,
+                                    size: 18.sp, color: AppColors.primary),
+                                SizedBox(width: 8.w),
+                                Expanded(
+                                  child: Text(
+                                    [
+                                      a.propertyAddress,
+                                      a.propertyArea,
+                                      a.propertyCity,
+                                      a.propertyCountry,
+                                    ].whereType<String>().join(', '),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14.sp,
+                                      color: Colors.black87,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 20.h),
+                            Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
+                            SizedBox(height: 16.h),
+                          ],
 
                           SizedBox(height: 24.h),
                         ],
@@ -607,7 +743,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   }
 
   Widget _buildBottomBar(String status) {
-    if (status == 'active') return _buildActiveSection();
+    if (!widget.isOwner) return const SizedBox.shrink();
+    if (status == 'approved') return _buildActiveSection();
     if (status == 'rejected') return _buildRejectedSection();
     if (status == 'draft') return _buildDraftSection();
     return const SizedBox.shrink();
@@ -885,7 +1022,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
             ),
             elevation: 0,
           ),
-          onPressed: () => Get.to(() => const CreateAnnouncementView()),
+          onPressed: () => Get.to(() =>
+              CreateAnnouncementView(announcement: widget.announcement)),
           child: Text(
             'Complete Your Announcement',
             style: GoogleFonts.poppins(
@@ -906,31 +1044,6 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
         fontSize: 14.sp,
         fontWeight: FontWeight.w600,
         color: Colors.black,
-      ),
-    );
-  }
-
-  Widget _infoChip(IconData icon, String label) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8.r),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16.sp, color: AppColors.primary),
-          SizedBox(width: 6.w),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 13.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -959,6 +1072,14 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       child: Center(
         child: Icon(Icons.home_outlined, size: 48.sp, color: Colors.grey),
       ),
+    );
+  }
+
+  Widget _shimmerBox() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Container(color: Colors.grey.shade300),
     );
   }
 }

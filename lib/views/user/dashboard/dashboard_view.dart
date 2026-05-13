@@ -3,11 +3,13 @@ import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcements_view.dart';
 import 'package:brokkerspot/views/user/home/home_view.dart';
 import 'package:brokkerspot/views/user/meeting/meeting_view.dart';
+import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:flutter/material.dart';
 
 class DashboardView extends StatefulWidget {
   final int initialIndex;
-  const DashboardView({super.key, this.initialIndex = 0});
+  final bool showLocationPicker;
+  const DashboardView({super.key, this.initialIndex = 0, this.showLocationPicker = false});
 
   @override
   State<DashboardView> createState() => _DashboardViewState();
@@ -15,6 +17,20 @@ class DashboardView extends StatefulWidget {
 
 class _DashboardViewState extends State<DashboardView> {
   late int _currentIndex = widget.initialIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.showLocationPicker) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const LocationPickerPopup(),
+        );
+      });
+    }
+  }
 
   final List<Widget> _screens = [
     HomeView(),

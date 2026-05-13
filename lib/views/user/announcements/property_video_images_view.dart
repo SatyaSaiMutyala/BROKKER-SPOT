@@ -1,9 +1,13 @@
 import 'dart:io';
+import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -18,15 +22,48 @@ class PropertyVideoImagesView extends StatefulWidget {
 class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
   final ImagePicker _picker = ImagePicker();
   File? _videoFile;
+  String? _existingVideoUrl;
   final List<File?> _imageFiles = List.filled(12, null);
+  final List<String?> _existingImageUrls = List.filled(12, null);
 
-  bool get _isValid => _imageFiles.whereType<File>().length >= 8;
+  bool get _isValid => _filledSlotCount >= 8;
+  bool _isUploading = false;
+
+  int get _filledSlotCount {
+    int count = 0;
+    for (int i = 0; i < 12; i++) {
+      if (_imageFiles[i] != null || _existingImageUrls[i] != null) count++;
+    }
+    return count;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final c = Get.find<AnnouncementController>();
+    _existingVideoUrl = c.videoUrl;
+    for (int i = 0; i < c.imageUrls.length && i < 12; i++) {
+      _existingImageUrls[i] = c.imageUrls[i];
+    }
+  }
+
+  static const int _maxVideoBytes = 50 * 1024 * 1024; // 50 MB
 
   // ─── Video picker ───
   void _pickVideo(ImageSource source) async {
     try {
-      final picked = await _picker.pickVideo(source: source);
-      if (picked != null) setState(() => _videoFile = File(picked.path));
+      final picked = await _picker.pickVideo(
+        source: source,
+        maxDuration: const Duration(minutes: 1),
+      );
+      if (picked == null) return;
+      final file = File(picked.path);
+      final size = await file.length();
+      if (size > _maxVideoBytes) {
+        EasyLoading.showError('Video must be under 50 MB. Please choose a smaller file.');
+        return;
+      }
+      setState(() => _videoFile = file);
     } catch (_) {}
   }
 
@@ -35,6 +72,13 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
       onCamera: () => _pickVideo(ImageSource.camera),
       onGallery: () => _pickVideo(ImageSource.gallery),
     );
+  }
+
+  void _removeVideo() {
+    setState(() {
+      _videoFile = null;
+      _existingVideoUrl = null;
+    });
   }
 
   // ─── Image picker (single box) ───
@@ -66,6 +110,41 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
         } catch (_) {}
       },
     );
+  }
+
+  Future<void> _uploadAndSave() async {
+    setState(() => _isUploading = true);
+    try {
+      EasyLoading.show(status: 'Uploading media...');
+      final imageUrls = <String>[];
+      for (int i = 0; i < 12; i++) {
+        if (_imageFiles[i] != null) {
+          final url = await api.uploadImage(
+              file: _imageFiles[i]!, fileType: 'announcements');
+          if (url != null) imageUrls.add(url);
+        } else if (_existingImageUrls[i] != null) {
+          imageUrls.add(_existingImageUrls[i]!);
+        }
+      }
+      String? videoUrl;
+      if (_videoFile != null) {
+        videoUrl = await api.uploadImage(
+            file: _videoFile!, fileType: 'announcements');
+      } else {
+        videoUrl = _existingVideoUrl;
+      }
+      Get.find<AnnouncementController>().setMedia(
+        imageUrls: imageUrls,
+        videoUrl: videoUrl,
+        thumbnailUrl: imageUrls.isNotEmpty ? imageUrls.first : null,
+      );
+      EasyLoading.dismiss();
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      EasyLoading.dismiss();
+      EasyLoading.showError('Upload failed. Please try again.');
+      setState(() => _isUploading = false);
+    }
   }
 
   void _showSourceSheet({
@@ -118,12 +197,33 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Video
-                    Text('Add Video Max Length 1min',
+                    Text('Add Video (Max 1 min, 50 MB)',
                         style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87)),
                     SizedBox(height: 12.h),
-                    GestureDetector(
-                      onTap: _showVideoPicker,
-                      child: _videoBox(),
+                    Stack(
+                      children: [
+                        GestureDetector(
+                          onTap: _showVideoPicker,
+                          child: _videoBox(),
+                        ),
+                        if (_videoFile != null || _existingVideoUrl != null)
+                          Positioned(
+                            top: 4.h,
+                            right: 4.w,
+                            child: GestureDetector(
+                              onTap: _removeVideo,
+                              child: Container(
+                                width: 20.w,
+                                height: 20.w,
+                                decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle),
+                                child: Icon(Icons.close,
+                                    size: 13.sp, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     SizedBox(height: 24.h),
 
@@ -141,7 +241,7 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
                     ),
                     SizedBox(height: 4.h),
                     Text(
-                      '${_imageFiles.whereType<File>().length}/12 selected',
+                      '$_filledSlotCount/12 selected',
                       style: GoogleFonts.inter(
                           fontSize: 11.sp, color: Colors.grey.shade500),
                     ),
@@ -158,7 +258,7 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
                 title: 'Save',
                 backgroundColor: _isValid ? AppColors.primary : Colors.grey.shade300,
                 defaultColor: _isValid ? Colors.white : Colors.black45,
-                onPressed: _isValid ? () => Navigator.pop(context, true) : () {},
+                onPressed: _isValid && !_isUploading ? _uploadAndSave : () {},
               ),
             ),
           ],
@@ -168,16 +268,17 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
   }
 
   Widget _videoBox() {
+    final hasVideo = _videoFile != null || _existingVideoUrl != null;
     return Container(
       width: 100.w,
       height: 100.w,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6.r),
-        color: _videoFile != null ? Colors.black : Colors.white,
+        color: hasVideo ? Colors.black : Colors.white,
       ),
       child: CustomPaint(
         painter: _DashedBorderPainter(color: Colors.grey.shade300),
-        child: _videoFile != null
+        child: hasVideo
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(6.r),
                 child: Stack(
@@ -190,7 +291,9 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
                       left: 4.w,
                       right: 4.w,
                       child: Text(
-                        _videoFile!.path.split('/').last,
+                        _videoFile != null
+                            ? _videoFile!.path.split('/').last
+                            : 'Video uploaded',
                         style: GoogleFonts.inter(
                             fontSize: 9.sp, color: Colors.white70),
                         maxLines: 1,
@@ -227,36 +330,53 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
 
   Widget _imageBox(int index) {
     final file = _imageFiles[index];
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(4.r),
-      child: file != null
-          ? Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.file(file, fit: BoxFit.cover),
-                Positioned(
-                  top: 4.h,
-                  right: 4.w,
-                  child: GestureDetector(
-                    onTap: () => setState(() => _imageFiles[index] = null),
-                    child: Container(
-                      width: 18.w,
-                      height: 18.w,
-                      decoration: const BoxDecoration(
-                          color: Colors.black54, shape: BoxShape.circle),
-                      child: Icon(Icons.close, size: 12.sp, color: Colors.white),
+    final existingUrl = _existingImageUrls[index];
+
+    if (file != null || existingUrl != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4.r),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            file != null
+                ? Image.file(file, fit: BoxFit.cover)
+                : Image.network(
+                    existingUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.grey.shade200,
+                      child: Icon(Icons.broken_image_outlined,
+                          color: Colors.grey.shade400, size: 28.sp),
                     ),
                   ),
+            Positioned(
+              top: 4.h,
+              right: 4.w,
+              child: GestureDetector(
+                onTap: () => setState(() {
+                  _imageFiles[index] = null;
+                  _existingImageUrls[index] = null;
+                }),
+                child: Container(
+                  width: 18.w,
+                  height: 18.w,
+                  decoration: const BoxDecoration(
+                      color: Colors.black54, shape: BoxShape.circle),
+                  child: Icon(Icons.close, size: 12.sp, color: Colors.white),
                 ),
-              ],
-            )
-          : CustomPaint(
-              painter: _DashedBorderPainter(color: Colors.grey.shade300),
-              child: Center(
-                child: Icon(Icons.image_outlined,
-                    size: 28.sp, color: Colors.grey.shade300),
               ),
             ),
+          ],
+        ),
+      );
+    }
+
+    return CustomPaint(
+      painter: _DashedBorderPainter(color: Colors.grey.shade300),
+      child: Center(
+        child: Icon(Icons.image_outlined,
+            size: 28.sp, color: Colors.grey.shade300),
+      ),
     );
   }
 }

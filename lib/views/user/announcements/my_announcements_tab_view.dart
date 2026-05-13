@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
@@ -19,15 +20,14 @@ class MyAnnouncementsTabView extends StatefulWidget {
 class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late AnnouncementController _controller;
 
-  final _tabs = ['All', 'Active', 'Pending', 'Rejected', 'Draft'];
-
-  final _allAnnouncements = _mockAnnouncements();
+  final _tabs = ['All', 'Draft', 'Submitted', 'Approved', 'Rejected'];
 
   List<AnnouncementModel> get _filtered {
     final tab = _tabs[_tabController.index];
-    if (tab == 'All') return _allAnnouncements;
-    return _allAnnouncements
+    if (tab == 'All') return _controller.announcements;
+    return _controller.announcements
         .where((a) => a.status?.toLowerCase() == tab.toLowerCase())
         .toList();
   }
@@ -37,12 +37,23 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() => setState(() {}));
+    _controller = Get.put(AnnouncementController());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.fetchAnnouncements();
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    Get.delete<AnnouncementController>();
     super.dispose();
+  }
+
+  Future<void> _openDetail(AnnouncementModel a) async {
+    final result = await Get.to(() => AnnouncementDetailView(announcement: a));
+    // Refresh list if detail view deleted or edited the announcement
+    if (result == true) _controller.fetchAnnouncements();
   }
 
   @override
@@ -56,7 +67,10 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
               title: 'ANNOUNCEMENTS',
               showBackButton: true,
               trailing: GestureDetector(
-                onTap: () => Get.to(() => const CreateAnnouncementView()),
+                onTap: () async {
+                  await Get.to(() => const CreateAnnouncementView());
+                  _controller.fetchAnnouncements();
+                },
                 child: Image.asset('assets/images/home_add_icon.png',
                     width: 50.w, height: 50.w),
               ),
@@ -76,7 +90,9 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
                         margin: EdgeInsets.symmetric(horizontal: 3.w),
                         padding: EdgeInsets.symmetric(vertical: 5.h),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary : Colors.transparent,
+                          color: isSelected
+                              ? AppColors.primary
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(20.r),
                           border: isSelected
                               ? null
@@ -88,7 +104,9 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
                           style: GoogleFonts.inter(
                             fontSize: 13.sp,
                             fontWeight: FontWeight.w600,
-                            color: isSelected ? Colors.white : Colors.grey.shade600,
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.grey.shade600,
                           ),
                         ),
                       ),
@@ -100,103 +118,86 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
 
             // ── List ──
             Expanded(
-              child: _filtered.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No announcements',
-                        style: GoogleFonts.inter(
-                            fontSize: 14.sp, color: Colors.grey.shade400),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: EdgeInsets.symmetric(vertical: 8.h),
-                      itemCount: _filtered.length,
-                      itemBuilder: (_, index) {
-                        final a = _filtered[index];
-                        return _CardWithStatusBadge(
-                          announcement: a,
-                          index: index,
-                        );
-                      },
+              child: Obx(() {
+                if (_controller.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (_controller.errorMessage.value != null) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _controller.errorMessage.value!,
+                          style: GoogleFonts.inter(
+                              fontSize: 14.sp, color: Colors.grey.shade500),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 12.h),
+                        TextButton(
+                          onPressed: _controller.fetchAnnouncements,
+                          child: Text('Retry',
+                              style: GoogleFonts.inter(
+                                  fontSize: 14.sp, color: AppColors.primary)),
+                        ),
+                      ],
                     ),
+                  );
+                }
+                final list = _filtered;
+                if (list.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No announcements',
+                      style: GoogleFonts.inter(
+                          fontSize: 14.sp, color: Colors.grey.shade400),
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  padding: EdgeInsets.symmetric(vertical: 8.h),
+                  itemCount: list.length,
+                  itemBuilder: (_, index) {
+                    final a = list[index];
+                    return _CardWithStatusBadge(
+                      announcement: a,
+                      index: index,
+                      onTap: () => _openDetail(a),
+                    );
+                  },
+                );
+              }),
             ),
           ],
         ),
       ),
     );
   }
-
-  static List<AnnouncementModel> _mockAnnouncements() {
-    return [
-      AnnouncementModel(
-        id: '1',
-        ownerName: 'Rachid',
-        listingType: 'Rent',
-        price: 3740000,
-        propertyName: 'Apartment',
-        bedrooms: 2,
-        sqft: 815,
-        location: 'DAMAC Sun City, Dubailand, Dubai',
-        timeAgo: '2 Days ago',
-        isWishlisted: false,
-        status: 'Active',
-      ),
-      AnnouncementModel(
-        id: '2',
-        ownerName: 'Rachid',
-        listingType: 'Sell',
-        price: 1125000,
-        propertyName: 'Villa',
-        bedrooms: 2,
-        sqft: 815,
-        location: 'DAMAC Sun City, Dubailand, Dubai',
-        timeAgo: '5 Days ago',
-        isWishlisted: false,
-        status: 'Rejected',
-      ),
-      AnnouncementModel(
-        id: '3',
-        ownerName: 'Rachid',
-        listingType: 'Rent',
-        price: 2500000,
-        propertyName: 'Studio',
-        bedrooms: 1,
-        sqft: 600,
-        location: 'Downtown Dubai',
-        timeAgo: '1 Day ago',
-        isWishlisted: false,
-        status: 'Pending',
-      ),
-      AnnouncementModel(
-        id: '4',
-        ownerName: 'Rachid',
-        listingType: 'Sell',
-        price: 980000,
-        propertyName: 'Office Space',
-        bedrooms: 0,
-        sqft: 1200,
-        location: 'Business Bay, Dubai',
-        timeAgo: '3 Days ago',
-        isWishlisted: false,
-        status: 'Draft',
-      ),
-    ];
-  }
 }
 
 class _CardWithStatusBadge extends StatelessWidget {
   final AnnouncementModel announcement;
   final int index;
+  final VoidCallback onTap;
 
-  const _CardWithStatusBadge({required this.announcement, required this.index});
+  const _CardWithStatusBadge({
+    required this.announcement,
+    required this.index,
+    required this.onTap,
+  });
 
   Color _statusColor(String? status) {
     switch (status?.toLowerCase()) {
-      case 'active':   return Colors.green.shade500;
-      case 'rejected': return Colors.red.shade500;
-      case 'pending':  return Colors.orange.shade500;
-      case 'draft':    return Colors.grey.shade500;
-      default:         return Colors.grey.shade500;
+      case 'approved':
+        return Colors.green.shade500;
+      case 'rejected':
+        return Colors.red.shade500;
+      case 'submitted':
+        return Colors.orange.shade500;
+      case 'draft':
+        return Colors.grey.shade500;
+      default:
+        return Colors.grey.shade500;
     }
   }
 
@@ -211,15 +212,15 @@ class _CardWithStatusBadge extends StatelessWidget {
           showActionButtons: false,
           showBrokerProfiles: true,
           squareRightSide: false,
-          onTap: () => Get.to(() => AnnouncementDetailView(announcement: announcement)),
+          onTap: onTap,
           onLocationTap: () {},
         ),
-        // Status badge – flush to card's right edge
         Positioned(
           top: 24.h,
           right: 16.w,
           child: Container(
-            padding: EdgeInsets.only(left: 12.w, right: 10.w, top: 5.h, bottom: 5.h),
+            padding:
+                EdgeInsets.only(left: 12.w, right: 10.w, top: 5.h, bottom: 5.h),
             decoration: BoxDecoration(
               color: _statusColor(announcement.status),
               borderRadius: BorderRadius.only(

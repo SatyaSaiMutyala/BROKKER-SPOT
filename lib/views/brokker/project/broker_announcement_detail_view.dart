@@ -3,8 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:video_player/video_player.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 
 class BrokerAnnouncementDetailView extends StatefulWidget {
@@ -22,10 +26,48 @@ class BrokerAnnouncementDetailView extends StatefulWidget {
 
 class _BrokerAnnouncementDetailViewState
     extends State<BrokerAnnouncementDetailView> {
-  static const List<String> _fallbackImages = [
-    'assets/images/rent1.png',
-    'assets/images/rent2.png',
-  ];
+  late AnnouncementModel _data;
+  VideoPlayerController? _videoCtrl;
+  bool _videoReady = false;
+  final PageController _pageCtrl = PageController();
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _data = widget.announcement;
+    _initVideo(_data);
+    _fetchDetail();
+  }
+
+  void _initVideo(AnnouncementModel a) {
+    final videoUrl = a.propertyMedia?.videos;
+    if (videoUrl == null || videoUrl.isEmpty) return;
+    _videoCtrl = VideoPlayerController.networkUrl(Uri.parse(videoUrl))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => _videoReady = true);
+          _videoCtrl!.play();
+          _videoCtrl!.setLooping(true);
+        }
+      });
+  }
+
+  Future<void> _fetchDetail() async {
+    final id = widget.announcement.id;
+    if (id == null) return;
+    try {
+      final fresh = await AnnouncementRepository().fetchAnnouncementDetail(id);
+      if (mounted) setState(() => _data = fresh);
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _videoCtrl?.dispose();
+    _pageCtrl.dispose();
+    super.dispose();
+  }
 
   String _formatPrice(double price) {
     String str = price.toInt().toString();
@@ -58,9 +100,11 @@ class _BrokerAnnouncementDetailViewState
 
   @override
   Widget build(BuildContext context) {
-    final a = widget.announcement;
-    final images =
-        (a.imageUrls?.isNotEmpty ?? false) ? a.imageUrls! : _fallbackImages;
+    final a = _data;
+    final images = (a.imageUrls?.isNotEmpty ?? false) ? a.imageUrls! : <String>[];
+    final hasVideo = a.propertyMedia?.videos != null &&
+        a.propertyMedia!.videos!.isNotEmpty;
+    final totalPages = (hasVideo ? 1 : 0) + images.length;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -80,7 +124,7 @@ class _BrokerAnnouncementDetailViewState
                   padding:
                       EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
                   child: Text(
-                    a.listingType ?? 'For Rent',
+                    a.listingType ?? '',
                     style: GoogleFonts.inter(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w600,
@@ -96,8 +140,9 @@ class _BrokerAnnouncementDetailViewState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Image with View All
-                      _buildImageSection(images),
+                      // ── Video + Image carousel ──
+                      _buildMediaSection(
+                          a, images, hasVideo, totalPages),
 
                       Padding(
                         padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 0),
@@ -108,13 +153,12 @@ class _BrokerAnnouncementDetailViewState
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                // Price on the left
                                 Expanded(
                                   child: RichText(
                                     text: TextSpan(
                                       children: [
                                         TextSpan(
-                                          text: 'AED ',
+                                          text: '${a.currency ?? 'AED'} ',
                                           style: GoogleFonts.poppins(
                                             fontSize: 18.sp,
                                             fontWeight: FontWeight.w300,
@@ -129,19 +173,19 @@ class _BrokerAnnouncementDetailViewState
                                             color: AppColors.primary,
                                           ),
                                         ),
-                                        TextSpan(
-                                          text: ' Yearly',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 18.sp,
-                                            fontWeight: FontWeight.w300,
-                                            color: AppColors.primary,
+                                        if (a.rentPeriod != null)
+                                          TextSpan(
+                                            text: ' ${a.rentPeriod}',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 18.sp,
+                                              fontWeight: FontWeight.w300,
+                                              color: AppColors.primary,
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
                                   ),
                                 ),
-                                // Interested button on the right
                                 GestureDetector(
                                   onTap: _showProposalSheet,
                                   child: Container(
@@ -186,17 +230,24 @@ class _BrokerAnnouncementDetailViewState
                             // Property Info section
                             _sectionTitle('Property Info'),
                             SizedBox(height: 10.h),
-                            _infoRow('Apartment'),
-                            _infoRow('${a.sqft ?? 847} sqft / ${((a.sqft ?? 847) * 0.0929).toStringAsFixed(0)} sqm Property size'),
-                            _infoRow('${a.bedrooms ?? 2} Bedroom'),
-                            _infoRow('1 Bathroom'),
+                            if (a.propertyType != null)
+                              _infoRow(a.propertyType!),
+                            if (a.sqft != null)
+                              _infoRow(
+                                  '${a.sqft} sqft / ${a.propertySize?.sqm.toStringAsFixed(0) ?? ''} sqm Property size'),
+                            if (a.bedrooms != null)
+                              _infoRow('${a.bedrooms} Bedroom'),
+                            if (a.bathrooms != null)
+                              _infoRow('${a.bathrooms} Bathroom'),
+                            if (a.floor != null && a.totalFloors != null)
+                              _infoRow('Floor ${a.floor} of ${a.totalFloors}'),
                             SizedBox(height: 16.h),
 
                             // Description section
                             _sectionTitle('Description'),
                             SizedBox(height: 8.h),
                             Text(
-                              'Lorem ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen.',
+                              a.description ?? '',
                               style: GoogleFonts.inter(
                                 fontSize: 13.sp,
                                 color: AppColors.textHint,
@@ -208,7 +259,7 @@ class _BrokerAnnouncementDetailViewState
                             // Location section
                             _sectionTitle('Location'),
                             SizedBox(height: 8.h),
-                            _buildMapBox(a.location ?? ''),
+                            _buildMapBox(a),
                             SizedBox(height: 32.h),
                           ],
                         ),
@@ -217,7 +268,6 @@ class _BrokerAnnouncementDetailViewState
                   ),
                 ),
               ),
-
             ],
           ),
         ),
@@ -225,17 +275,43 @@ class _BrokerAnnouncementDetailViewState
     );
   }
 
-  Widget _buildImageSection(List<String> images) {
+  Widget _buildMediaSection(AnnouncementModel a, List<String> images,
+      bool hasVideo, int totalPages) {
+    if (totalPages == 0) {
+      return SizedBox(
+        height: 220.h,
+        width: double.infinity,
+        child: Image.asset('assets/images/rent1.png', fit: BoxFit.cover),
+      );
+    }
+
     return Stack(
       children: [
         SizedBox(
           height: 220.h,
           width: double.infinity,
-          child: Image.asset(
-            images.first,
-            fit: BoxFit.cover,
+          child: PageView.builder(
+            controller: _pageCtrl,
+            itemCount: totalPages,
+            onPageChanged: (i) => setState(() => _currentPage = i),
+            itemBuilder: (_, i) {
+              if (hasVideo && i == 0) return _buildVideoPage();
+              final imgIdx = hasVideo ? i - 1 : i;
+              return Image.network(
+                images[imgIdx],
+                fit: BoxFit.cover,
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : _shimmerBox(),
+                errorBuilder: (_, __, ___) => Container(
+                  color: Colors.grey.shade300,
+                  child: Icon(Icons.home_outlined,
+                      size: 48.sp, color: Colors.grey),
+                ),
+              );
+            },
           ),
         ),
+
         // View All pill
         Positioned(
           bottom: 12.h,
@@ -259,7 +335,67 @@ class _BrokerAnnouncementDetailViewState
             ),
           ),
         ),
+
+        // Dot indicators
+        if (totalPages > 1)
+          Positioned(
+            bottom: 10.h,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                totalPages,
+                (i) => Container(
+                  width: 7.w,
+                  height: 7.w,
+                  margin: EdgeInsets.symmetric(horizontal: 2.w),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: i == _currentPage
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.4),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _buildVideoPage() {
+    if (!_videoReady || _videoCtrl == null) {
+      return _shimmerBox();
+    }
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(color: Colors.black),
+        AspectRatio(
+          aspectRatio: _videoCtrl!.value.aspectRatio,
+          child: VideoPlayer(_videoCtrl!),
+        ),
+        // Mute/unmute tap
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _videoCtrl!.value.volume > 0
+                  ? _videoCtrl!.setVolume(0)
+                  : _videoCtrl!.setVolume(1.0);
+            });
+          },
+          child: Container(color: Colors.transparent),
+        ),
+      ],
+    );
+  }
+
+  Widget _shimmerBox() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Container(color: Colors.grey.shade300),
     );
   }
 
@@ -274,17 +410,32 @@ class _BrokerAnnouncementDetailViewState
     );
   }
 
-  Widget _buildMapBox(String location) {
+  Widget _buildMapBox(AnnouncementModel a) {
+    final coords = a.propertyLocation?.coordinates;
+    final hasCoords = coords != null && coords.length >= 2;
+    final location = a.location ?? a.propertyAddress ?? '';
+
+    // GeoJSON order: [longitude, latitude]
+    final lat = hasCoords ? coords[1] : 0.0;
+    final lng = hasCoords ? coords[0] : 0.0;
+    final target = LatLng(lat, lng);
+
     return GestureDetector(
       onTap: () async {
-        final query = Uri.encodeComponent(location);
-        final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+        final Uri uri;
+        if (hasCoords) {
+          uri = Uri.parse(
+              'https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+        } else {
+          uri = Uri.parse(
+              'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(location)}');
+        }
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         }
       },
       child: Container(
-        height: 160.h,
+        height: 180.h,
         width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12.r),
@@ -293,30 +444,43 @@ class _BrokerAnnouncementDetailViewState
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // Map grid background
-            CustomPaint(
-              size: Size(double.infinity, 160.h),
-              painter: _MapGridPainter(),
-            ),
-            // Center pin
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.location_on,
-                      size: 36.sp, color: Colors.red.shade600),
-                  Container(
-                    width: 8.w,
-                    height: 4.h,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4.r),
+            if (hasCoords)
+              AbsorbPointer(
+                child: SizedBox(
+                  height: 180.h,
+                  width: double.infinity,
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: target,
+                      zoom: 15,
                     ),
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId('property'),
+                        position: target,
+                      ),
+                    },
+                    zoomControlsEnabled: false,
+                    myLocationButtonEnabled: false,
+                    compassEnabled: false,
+                    mapToolbarEnabled: false,
+                    rotateGesturesEnabled: false,
+                    scrollGesturesEnabled: false,
+                    zoomGesturesEnabled: false,
+                    tiltGesturesEnabled: false,
                   ),
-                ],
+                ),
+              )
+            else ...[
+              CustomPaint(
+                size: Size(double.infinity, 180.h),
+                painter: _MapGridPainter(),
               ),
-            ),
-            // Address bar at bottom
+              Center(
+                child: Icon(Icons.location_on,
+                    size: 36.sp, color: Colors.red.shade600),
+              ),
+            ],
             Positioned(
               bottom: 0,
               left: 0,
@@ -381,7 +545,7 @@ class _BrokerAnnouncementDetailViewState
   }
 }
 
-// ── Proposal bottom sheet ──
+// ── Proposal dialog ──
 class _ProposalSheet extends StatefulWidget {
   @override
   State<_ProposalSheet> createState() => _ProposalSheetState();
@@ -407,7 +571,6 @@ class _ProposalSheetState extends State<_ProposalSheet> {
   void _submit() {
     if (_controller.text.trim().isEmpty) return;
     setState(() => _submitted = true);
-
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (mounted) Navigator.pop(context);
     });
@@ -425,7 +588,6 @@ class _ProposalSheetState extends State<_ProposalSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title
                 Text(
                   'Write Proposal Message To Buyer',
                   style: GoogleFonts.poppins(
@@ -435,8 +597,6 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                   ),
                 ),
                 SizedBox(height: 14.h),
-
-                // Text area
                 Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey.shade300),
@@ -446,47 +606,29 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                     controller: _controller,
                     maxLines: 6,
                     maxLength: _maxLength,
-                    buildCounter: (_,
-                            {required currentLength,
-                            required isFocused,
-                            maxLength}) =>
-                        null,
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(_maxLength),
-                    ],
-                    style: GoogleFonts.inter(
-                      fontSize: 13.sp,
-                      color: Colors.black87,
-                    ),
+                    buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+                    inputFormatters: [LengthLimitingTextInputFormatter(_maxLength)],
+                    style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87),
                     decoration: InputDecoration(
                       hintText: 'Write Here...',
-                      hintStyle: GoogleFonts.inter(
-                        fontSize: 13.sp,
-                        color: Colors.grey.shade400,
-                      ),
+                      hintStyle:
+                          GoogleFonts.inter(fontSize: 13.sp, color: Colors.grey.shade400),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.all(12.w),
                     ),
                   ),
                 ),
-
-                // Character counter
                 Align(
                   alignment: Alignment.centerRight,
                   child: Padding(
                     padding: EdgeInsets.only(top: 6.h),
                     child: Text(
                       '$charCount/$_maxLength',
-                      style: GoogleFonts.inter(
-                        fontSize: 11.sp,
-                        color: Colors.grey.shade500,
-                      ),
+                      style: GoogleFonts.inter(fontSize: 11.sp, color: Colors.grey.shade500),
                     ),
                   ),
                 ),
                 SizedBox(height: 14.h),
-
-                // Send button
                 SizedBox(
                   width: double.infinity,
                   height: 52.h,
@@ -495,17 +637,15 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
+                          borderRadius: BorderRadius.circular(8.r)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Send Proposal Request',
                       style: GoogleFonts.poppins(
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white),
                     ),
                   ),
                 ),
@@ -523,27 +663,19 @@ class _ProposalSheetState extends State<_ProposalSheet> {
           width: 60.w,
           height: 60.w,
           decoration: const BoxDecoration(
-            color: AppColors.successGreen,
-            shape: BoxShape.circle,
-          ),
+              color: AppColors.successGreen, shape: BoxShape.circle),
           child: Icon(Icons.check, color: Colors.white, size: 32.sp),
         ),
         SizedBox(height: 12.h),
         Text(
           'Proposal Sent!',
           style: GoogleFonts.poppins(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
+              fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black),
         ),
         SizedBox(height: 6.h),
         Text(
           'Your proposal has been sent to the buyer.',
-          style: GoogleFonts.inter(
-            fontSize: 13.sp,
-            color: AppColors.textHint,
-          ),
+          style: GoogleFonts.inter(fontSize: 13.sp, color: AppColors.textHint),
           textAlign: TextAlign.center,
         ),
         SizedBox(height: 20.h),
@@ -555,37 +687,28 @@ class _ProposalSheetState extends State<_ProposalSheet> {
 class _MapGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    // Light background
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
       Paint()..color = const Color(0xFFE8EFF4),
     );
-
     final roadPaint = Paint()
       ..color = Colors.white
       ..strokeWidth = 10;
-
     final minorPaint = Paint()
       ..color = const Color(0xFFD6E0E8)
       ..strokeWidth = 1;
-
-    // Horizontal roads
     for (double y = 30; y < size.height; y += 50) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), roadPaint);
     }
-    // Vertical roads
     for (double x = 40; x < size.width; x += 60) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), roadPaint);
     }
-    // Minor grid lines
     for (double y = 0; y < size.height; y += 25) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), minorPaint);
     }
     for (double x = 0; x < size.width; x += 30) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), minorPaint);
     }
-
-    // A couple of block fills to look like buildings
     final blockPaint = Paint()..color = const Color(0xFFCDD8E0);
     canvas.drawRect(Rect.fromLTWH(10, 40, 50, 30), blockPaint);
     canvas.drawRect(Rect.fromLTWH(80, 10, 40, 40), blockPaint);

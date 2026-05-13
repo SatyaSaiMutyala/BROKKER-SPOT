@@ -55,6 +55,7 @@ class LoginController extends GetxController {
         "Login",
         endPoint: "user/auth/login",
         body: body,
+        skipUnauthorizedCheck: true,
       );
 
       if (response.statusCode == 200) {
@@ -75,7 +76,7 @@ class LoginController extends GetxController {
           if (lastSide == 'broker') {
             Get.offAll(() => BrokerDashBoardView());
           } else {
-            Get.offAll(() => DashboardView());
+            Get.offAll(() => const DashboardView(showLocationPicker: true));
           }
         } else {
           AppToast.error(loginModel.message);

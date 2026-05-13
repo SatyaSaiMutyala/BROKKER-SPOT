@@ -1,8 +1,10 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class PropertyInformationView extends StatefulWidget {
@@ -58,6 +60,20 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   @override
   void initState() {
     super.initState();
+    final c = Get.find<AnnouncementController>();
+    _propertyType = c.propertyType;
+    if (c.propertyName != null) _nameCtrl.text = c.propertyName!;
+    if (c.sqft != null) _sqftCtrl.text = c.sqft!.toStringAsFixed(0);
+    if (c.sqm != null) _spmCtrl.text = c.sqm!.toStringAsFixed(0);
+    _bedroom = _intToCountStr(c.bedrooms);
+    _bathroom = _intToCountStr(c.bathrooms);
+    _floor = _intToFloorStr(c.floor);
+    _totalFloor = _intToFloorStr(c.totalFloors);
+    if (c.description != null) _descCtrl.text = c.description!;
+    if (c.amenities.isNotEmpty) _amenities.addAll(c.amenities);
+    if (c.propertyStatus == 1) _isProperty = 'Ready';
+    if (c.propertyStatus == 2) _isProperty = 'Off Plan';
+    _isCommercial = c.isCommercialProperty == 1;
     _descCtrl.addListener(() => setState(() {}));
     _sqftCtrl.addListener(() => setState(() {}));
     _spmCtrl.addListener(() => setState(() {}));
@@ -74,6 +90,26 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
 
   void _toggle(String key) {
     setState(() => _openDropdown = _openDropdown == key ? '' : key);
+  }
+
+  int _parseFloor(String? val) {
+    if (val == null) return 0;
+    if (val == 'G') return 0;
+    if (val == '5+') return 5;
+    return int.tryParse(val) ?? 0;
+  }
+
+  String? _intToFloorStr(int? val) {
+    if (val == null) return null;
+    if (val == 0) return 'G';
+    if (val >= 5) return '5+';
+    return val.toString();
+  }
+
+  String? _intToCountStr(int? val) {
+    if (val == null || val == 0) return null;
+    if (val >= 5) return '5+';
+    return val.toString();
   }
 
   @override
@@ -102,8 +138,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                             value: _isCommercial,
                             onChanged: (v) => setState(() => _isCommercial = v),
                             activeTrackColor: AppColors.primary,
-                            activeThumbColor: Colors.white,
-                            inactiveThumbColor: Colors.white,
+                            thumbColor: WidgetStatePropertyAll(Colors.white),
                             inactiveTrackColor: Colors.grey.shade400,
                           ),
                         ),
@@ -328,7 +363,27 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                 title: 'Done',
                 backgroundColor: _isValid ? AppColors.primary : Colors.grey.shade300,
                 defaultColor: _isValid ? Colors.white : Colors.black45,
-                onPressed: _isValid ? () => Navigator.pop(context, true) : () {},
+                onPressed: _isValid
+                    ? () {
+                        Get.find<AnnouncementController>().setInformation(
+                          propertyType: _propertyType!,
+                          propertyName: _nameCtrl.text.trim().isEmpty
+                              ? null
+                              : _nameCtrl.text.trim(),
+                          sqft: double.tryParse(_sqftCtrl.text.trim()) ?? 0,
+                          sqm: double.tryParse(_spmCtrl.text.trim()) ?? 0,
+                          bedrooms: int.tryParse(_bedroom!) ?? 0,
+                          bathrooms: int.tryParse(_bathroom!) ?? 0,
+                          floor: _parseFloor(_floor),
+                          totalFloors: _parseFloor(_totalFloor),
+                          description: _descCtrl.text.trim(),
+                          amenities: _amenities.toList(),
+                          propertyStatus: _isProperty == 'Off Plan' ? 2 : 1,
+                          isCommercialProperty: _isCommercial ? 1 : 0,
+                        );
+                        Navigator.pop(context, true);
+                      }
+                    : () {},
               ),
             ),
           ],

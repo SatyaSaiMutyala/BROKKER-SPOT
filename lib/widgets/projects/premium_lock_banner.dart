@@ -13,6 +13,7 @@ class PremiumLockBanner extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        width: double.infinity,
         padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 24.w),
         decoration: BoxDecoration(
           color: Colors.white,

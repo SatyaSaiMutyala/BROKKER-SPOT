@@ -18,4 +18,12 @@ class ApiEndpoints {
   static const String editMobileNumber = 'user/profile/edit-mobilenumber';
   static const String editEmail = 'user/profile/edit-email';
   static const String verifyEmailOtp = 'user/profile/verify-email-otp';
+
+  // Announcements
+  static const String addAnnouncement = 'user/announcements/add';
+  static const String editAnnouncement = 'user/announcements/edit';
+  static const String deleteAnnouncement = 'user/announcements/delete';
+  static const String fetchAnnouncements = 'user/announcements/fetch';
+  static const String fetchAnnouncementDetail = 'user/announcements/fetch';
+  static const String fetchAllAnnouncements = 'user/announcements/fetch-all';
 }

@@ -1,8 +1,10 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class PropertyPriceBrokerageView extends StatefulWidget {
@@ -39,6 +41,14 @@ class _PropertyPriceBrokerageViewState
   @override
   void initState() {
     super.initState();
+    final c = Get.find<AnnouncementController>();
+    if (c.price != null) _priceCtrl.text = c.price!.toStringAsFixed(0);
+    _brokeragePercent = c.brokeragePercent;
+    if (c.rentPeriod != null) {
+      final rp = c.rentPeriod!;
+      _priceType = rp[0].toUpperCase() + rp.substring(1);
+    }
+    _availableDate = c.availableDate;
     _priceCtrl.addListener(() => setState(() {}));
   }
 
@@ -108,7 +118,17 @@ class _PropertyPriceBrokerageViewState
                 title: 'Save',
                 backgroundColor: _isValid ? AppColors.primary : Colors.grey.shade300,
                 defaultColor: _isValid ? Colors.white : Colors.black45,
-                onPressed: _isValid ? () => Navigator.pop(context, true) : () {},
+                onPressed: _isValid
+                    ? () {
+                        Get.find<AnnouncementController>().setPrice(
+                          price: _price,
+                          brokeragePercent: _brokeragePercent,
+                          rentPeriod: _isSell ? null : _priceType,
+                          availableDate: _isSell ? null : _availableDate,
+                        );
+                        Navigator.pop(context, true);
+                      }
+                    : () {},
               ),
             ),
           ],

@@ -1,7 +1,12 @@
+import 'dart:io';
+import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -14,42 +19,99 @@ class UploadDocumentView extends StatefulWidget {
 }
 
 class _UploadDocumentViewState extends State<UploadDocumentView> {
-  // Shared – ID type
   String _selectedIdType = 'Upload UAE ID Card';
   bool _idDropdownOpen = false;
   final _idTypes = ['Upload UAE ID Card', 'Upload Your Passport'];
 
-  // Sell only – Deed type
   String _selectedDeedType = 'Upload Title Deed';
   bool _deedDropdownOpen = false;
   final _deedTypes = ['Upload Title Deed', 'Upload Oqood'];
 
   bool get _isSell => widget.propertyFor == 'Sell';
+  bool _isUploading = false;
+
+  // Sell
+  XFile? _idFrontFile, _idBackFile, _deedFile, _nocFile;
+  // Rent
+  XFile? _rentIdFrontFile, _rentIdBackFile, _rentDeedFile;
+  // Existing URLs from edit mode
+  String? _existingFrontUrl, _existingBackUrl, _existingDeedUrl, _existingNocUrl;
 
   bool get _isValid {
     if (_isSell) {
-      return _idFrontUploaded && _idBackUploaded && _deedUploaded;
+      return (_idFrontFile != null || _existingFrontUrl != null) &&
+          (_idBackFile != null || _existingBackUrl != null) &&
+          (_deedFile != null || _existingDeedUrl != null);
     }
-    return _rentIdFrontUploaded && _rentIdBackUploaded && _rentDeedUploaded;
+    return (_rentIdFrontFile != null || _existingFrontUrl != null) &&
+        (_rentIdBackFile != null || _existingBackUrl != null) &&
+        (_rentDeedFile != null || _existingDeedUrl != null);
   }
-
-  // Upload states
-  bool _idFrontUploaded = false;
-  bool _idBackUploaded = false;
-  bool _deedUploaded = false;
-  bool _nocUploaded = false;
-  bool _rentIdFrontUploaded = false;
-  bool _rentIdBackUploaded = false;
-  bool _rentDeedUploaded = false;
 
   final _picker = ImagePicker();
 
-  Future<bool> _pickFile() async {
+  @override
+  void initState() {
+    super.initState();
+    final c = Get.find<AnnouncementController>();
+    _existingFrontUrl = c.passportFrontUrl;
+    _existingBackUrl = c.passportBackUrl;
+    _existingDeedUrl = c.titleDeedUrl;
+    _existingNocUrl = c.nocUrl;
+  }
+
+  Future<XFile?> _pickFile() async {
     try {
-      final picked = await _picker.pickImage(source: ImageSource.gallery);
-      return picked != null;
+      return await _picker.pickImage(source: ImageSource.gallery);
     } catch (_) {
-      return false;
+      return null;
+    }
+  }
+
+  Future<void> _uploadAndSave() async {
+    setState(() => _isUploading = true);
+    try {
+      EasyLoading.show(status: 'Uploading documents...');
+      String? titleDeedUrl, passportFrontUrl, passportBackUrl, nocUrl;
+
+      if (_isSell) {
+        passportFrontUrl = _idFrontFile != null
+            ? await api.uploadImage(file: File(_idFrontFile!.path), fileType: 'announcements')
+            : _existingFrontUrl;
+        passportBackUrl = _idBackFile != null
+            ? await api.uploadImage(file: File(_idBackFile!.path), fileType: 'announcements')
+            : _existingBackUrl;
+        titleDeedUrl = _deedFile != null
+            ? await api.uploadImage(file: File(_deedFile!.path), fileType: 'announcements')
+            : _existingDeedUrl;
+        nocUrl = _nocFile != null
+            ? await api.uploadImage(file: File(_nocFile!.path), fileType: 'announcements')
+            : _existingNocUrl;
+      } else {
+        passportFrontUrl = _rentIdFrontFile != null
+            ? await api.uploadImage(file: File(_rentIdFrontFile!.path), fileType: 'announcements')
+            : _existingFrontUrl;
+        passportBackUrl = _rentIdBackFile != null
+            ? await api.uploadImage(file: File(_rentIdBackFile!.path), fileType: 'announcements')
+            : _existingBackUrl;
+        titleDeedUrl = _rentDeedFile != null
+            ? await api.uploadImage(file: File(_rentDeedFile!.path), fileType: 'announcements')
+            : _existingDeedUrl;
+      }
+
+      Get.find<AnnouncementController>().setDocuments(
+        titleDeedUrl: titleDeedUrl,
+        passportFrontUrl: passportFrontUrl,
+        passportBackUrl: passportBackUrl,
+        nocUrl: nocUrl,
+      );
+
+      EasyLoading.dismiss();
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      EasyLoading.dismiss();
+      EasyLoading.showError('Upload failed. Please try again.');
+      setState(() => _isUploading = false);
     }
   }
 
@@ -68,7 +130,6 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Important Note
                     Text(
                       'Important Note:',
                       style: GoogleFonts.inter(
@@ -100,15 +161,16 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
                 width: double.infinity,
                 height: 50.h,
                 child: ElevatedButton(
-                  onPressed: _isValid ? () => Navigator.pop(context, true) : null,
+                  onPressed: _isValid && !_isUploading ? _uploadAndSave : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isValid ? AppColors.primary : Colors.grey.shade300,
+                    backgroundColor:
+                        _isValid ? AppColors.primary : Colors.grey.shade300,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30.r)),
                   ),
                   child: Text(
-                    'SAVE',
+                    _isUploading ? 'Uploading...' : 'SAVE',
                     style: GoogleFonts.inter(
                       fontSize: 15.sp,
                       fontWeight: FontWeight.w600,
@@ -127,7 +189,6 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
   // ── Sell layout ──────────────────────────────────────────────
   List<Widget> _sellLayout() {
     return [
-      // ID type dropdown (golden border)
       _goldDropdown(
         selected: _selectedIdType,
         isOpen: _idDropdownOpen,
@@ -152,9 +213,10 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
           Expanded(
             child: _uploadButton(
               label: 'Front Side',
-              isUploaded: _idFrontUploaded,
+              isUploaded: _idFrontFile != null || _existingFrontUrl != null,
               onTap: () async {
-                if (await _pickFile()) setState(() => _idFrontUploaded = true);
+                final f = await _pickFile();
+                if (f != null) setState(() => _idFrontFile = f);
               },
             ),
           ),
@@ -162,9 +224,10 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
           Expanded(
             child: _uploadButton(
               label: 'Back Side',
-              isUploaded: _idBackUploaded,
+              isUploaded: _idBackFile != null || _existingBackUrl != null,
               onTap: () async {
-                if (await _pickFile()) setState(() => _idBackUploaded = true);
+                final f = await _pickFile();
+                if (f != null) setState(() => _idBackFile = f);
               },
             ),
           ),
@@ -174,7 +237,6 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
       Divider(height: 1, color: Colors.grey.shade200),
       SizedBox(height: 24.h),
 
-      // Deed type dropdown (golden border)
       _goldDropdown(
         selected: _selectedDeedType,
         isOpen: _deedDropdownOpen,
@@ -197,16 +259,16 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
       _uploadButton(
         label: 'Upload',
         fullWidth: true,
-        isUploaded: _deedUploaded,
+        isUploaded: _deedFile != null || _existingDeedUrl != null,
         onTap: () async {
-          if (await _pickFile()) setState(() => _deedUploaded = true);
+          final f = await _pickFile();
+          if (f != null) setState(() => _deedFile = f);
         },
       ),
       SizedBox(height: 24.h),
       Divider(height: 1, color: Colors.grey.shade200),
       SizedBox(height: 24.h),
 
-      // NOC Doc — only when UAE ID Card is selected
       if (_selectedIdType == 'Upload UAE ID Card') ...[
         Text(
           'NOC Doc',
@@ -216,9 +278,10 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
         _uploadButton(
           label: 'Upload',
           fullWidth: true,
-          isUploaded: _nocUploaded,
+          isUploaded: _nocFile != null || _existingNocUrl != null,
           onTap: () async {
-            if (await _pickFile()) setState(() => _nocUploaded = true);
+            final f = await _pickFile();
+            if (f != null) setState(() => _nocFile = f);
           },
         ),
       ],
@@ -228,7 +291,6 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
   // ── Rent layout ──────────────────────────────────────────────
   List<Widget> _rentLayout() {
     return [
-      // ID type inline grey dropdown
       _greyDropdown(
         selected: _selectedIdType,
         isOpen: _idDropdownOpen,
@@ -250,9 +312,10 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
           Expanded(
             child: _uploadButton(
               label: 'Front Side',
-              isUploaded: _rentIdFrontUploaded,
+              isUploaded: _rentIdFrontFile != null || _existingFrontUrl != null,
               onTap: () async {
-                if (await _pickFile()) setState(() => _rentIdFrontUploaded = true);
+                final f = await _pickFile();
+                if (f != null) setState(() => _rentIdFrontFile = f);
               },
             ),
           ),
@@ -260,9 +323,10 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
           Expanded(
             child: _uploadButton(
               label: 'Back Side',
-              isUploaded: _rentIdBackUploaded,
+              isUploaded: _rentIdBackFile != null || _existingBackUrl != null,
               onTap: () async {
-                if (await _pickFile()) setState(() => _rentIdBackUploaded = true);
+                final f = await _pickFile();
+                if (f != null) setState(() => _rentIdBackFile = f);
               },
             ),
           ),
@@ -272,7 +336,6 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
       Divider(height: 1, color: Colors.grey.shade200),
       SizedBox(height: 24.h),
 
-      // Title Deed Doc
       RichText(
         text: TextSpan(
           text: 'Upload Title Deed Doc',
@@ -281,8 +344,7 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
               fontWeight: FontWeight.w600,
               color: Colors.black87),
           children: [
-            TextSpan(
-                text: ' *', style: GoogleFonts.inter(color: Colors.red)),
+            TextSpan(text: ' *', style: GoogleFonts.inter(color: Colors.red)),
           ],
         ),
       ),
@@ -290,9 +352,10 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
       _uploadButton(
         label: 'Upload',
         fullWidth: true,
-        isUploaded: _rentDeedUploaded,
+        isUploaded: _rentDeedFile != null || _existingDeedUrl != null,
         onTap: () async {
-          if (await _pickFile()) setState(() => _rentDeedUploaded = true);
+          final f = await _pickFile();
+          if (f != null) setState(() => _rentDeedFile = f);
         },
       ),
     ];
@@ -325,8 +388,8 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
                   child: RichText(
                     text: TextSpan(
                       text: '$selected ',
-                      style: GoogleFonts.inter(
-                          fontSize: 14.sp, color: Colors.black87),
+                      style:
+                          GoogleFonts.inter(fontSize: 14.sp, color: Colors.black87),
                       children: [
                         TextSpan(
                             text: '*',
@@ -336,9 +399,7 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
                   ),
                 ),
                 Icon(
-                  isOpen
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
+                  isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                   color: AppColors.primary,
                   size: 20.sp,
                 ),
@@ -355,8 +416,7 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
                 right: BorderSide(color: AppColors.primary, width: 1.5),
                 bottom: BorderSide(color: AppColors.primary, width: 1.5),
               ),
-              borderRadius:
-                  BorderRadius.vertical(bottom: Radius.circular(8.r)),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(8.r)),
             ),
             child: Column(
               children: options.map((item) {
@@ -377,12 +437,10 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
                           item,
                           style: GoogleFonts.inter(
                             fontSize: 14.sp,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: isSelected
-                                ? AppColors.primary
-                                : Colors.black87,
+                            fontWeight:
+                                isSelected ? FontWeight.w600 : FontWeight.w400,
+                            color:
+                                isSelected ? AppColors.primary : Colors.black87,
                           ),
                         ),
                       ),
@@ -431,9 +489,7 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
                           fontSize: 14.sp, color: Colors.black87)),
                 ),
                 Icon(
-                  isOpen
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
+                  isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                   color: Colors.grey.shade500,
                   size: 20.sp,
                 ),
@@ -460,8 +516,8 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
                   onTap: () => onSelect(item),
                   child: Container(
                     width: double.infinity,
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 14.w, vertical: 13.h),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
                     color: isSelected
                         ? AppColors.primary.withValues(alpha: 0.08)
                         : null,
@@ -471,8 +527,7 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
                         fontSize: 14.sp,
                         fontWeight:
                             isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color:
-                            isSelected ? AppColors.primary : Colors.black87,
+                        color: isSelected ? AppColors.primary : Colors.black87,
                       ),
                     ),
                   ),
@@ -503,7 +558,7 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
               borderRadius: BorderRadius.circular(30.r)),
           padding: EdgeInsets.symmetric(vertical: 14.h, horizontal: 16.w),
         ),
-        onPressed: isUploaded ? null : onTap,
+        onPressed: onTap,
         icon: Icon(
           isUploaded ? Icons.check : Icons.cloud_upload_outlined,
           color: isUploaded ? Colors.green.shade600 : AppColors.primary,

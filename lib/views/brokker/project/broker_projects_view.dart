@@ -7,10 +7,48 @@ import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/projects/premium_lock_banner.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
 import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_view.dart';
+import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:get/get.dart';
 
-class BrokerProjectsView extends StatelessWidget {
+class BrokerProjectsView extends StatefulWidget {
   const BrokerProjectsView({super.key});
+
+  @override
+  State<BrokerProjectsView> createState() => _BrokerProjectsViewState();
+}
+
+class _BrokerProjectsViewState extends State<BrokerProjectsView> {
+  final _repo = AnnouncementRepository();
+  List<AnnouncementModel> _announcements = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAnnouncements();
+  }
+
+  Future<void> _fetchAnnouncements() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await _repo.fetchAllAnnouncements();
+      if (mounted)
+        setState(() {
+          _announcements = result.items;
+          _loading = false;
+        });
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,42 +57,47 @@ class BrokerProjectsView extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            CustomHeader(
-              title: 'Projects',
-              // trailing: Container(
-              //   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-              //   decoration: BoxDecoration(
-              //     borderRadius: BorderRadius.circular(20.r),
-              //     border: Border.all(color: AppColors.goldAccent),
-              //   ),
-              //   child: Row(
-              //     mainAxisSize: MainAxisSize.min,
-              //     children: [
-              //       Image.asset('assets/images/search_icon.png',
-              //           width: 18.sp, height: 18.sp),
-              //       SizedBox(width: 4.w),
-              //       Text(
-              //         'Search..',
-              //         style: GoogleFonts.inter(
-              //           fontSize: 14.sp,
-              //           color: Colors.grey.shade400,
-              //         ),
-              //       ),
-              //     ],
-              //   ),
-              // ),
-            ),
-            Expanded(
-              child: _buildContent(context),
-            ),
+            const CustomHeader(title: 'Projects'),
+            Expanded(child: _buildContent()),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context) {
-    final announcements = _mockAnnouncements();
+  Widget _buildContent() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error!,
+              style: GoogleFonts.inter(
+                  fontSize: 14.sp, color: Colors.grey.shade500),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 12.h),
+            TextButton(
+              onPressed: _fetchAnnouncements,
+              child: Text('Retry',
+                  style: GoogleFonts.inter(
+                      fontSize: 14.sp, color: AppColors.primary)),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_announcements.isEmpty) {
+      return Center(
+        child: Text('No announcements',
+            style: GoogleFonts.inter(
+                fontSize: 14.sp, color: Colors.grey.shade400)),
+      );
+    }
 
     return SingleChildScrollView(
       child: Column(
@@ -62,25 +105,22 @@ class BrokerProjectsView extends StatelessWidget {
         children: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-            child: _buildSectionHeader('Announcement', '15 min ago updated'),
+            child: _buildSectionHeader(
+                'Announcement', '${_announcements.length} announcements'),
           ),
-          ...announcements.asMap().entries.map(
+          ..._announcements.asMap().entries.map(
                 (entry) => AnnouncementPropertyCard(
                   announcement: entry.value,
                   index: entry.key,
                   showWishlist: false,
                   showActionButtons: false,
                   ownerRowAboveImage: true,
-                  onTap: () => Get.to(() => BrokerAnnouncementDetailView(
-                        announcement: entry.value,
-                      )),
+                  onTap: () => Get.to(() =>
+                      BrokerAnnouncementDetailView(announcement: entry.value)),
                 ),
               ),
           SizedBox(height: 8.h),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            child: PremiumLockBanner(onTap: () {}),
-          ),
+          PremiumLockBanner(onTap: () {}),
           SizedBox(height: 24.h),
         ],
       ),
@@ -93,65 +133,28 @@ class BrokerProjectsView extends StatelessWidget {
         Text(
           title,
           style: GoogleFonts.inter(
-            fontSize: 15.sp,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
+              fontSize: 15.sp,
+              fontWeight: FontWeight.w500,
+              color: Colors.black),
         ),
         SizedBox(width: 6.w),
         Container(
           width: 18.w,
           height: 18.w,
-          decoration: BoxDecoration(
-            color: AppColors.goldAccent,
-            shape: BoxShape.circle,
-          ),
+          decoration: const BoxDecoration(
+              color: AppColors.goldAccent, shape: BoxShape.circle),
           alignment: Alignment.center,
-          child: Text(
-            '!',
-            style: GoogleFonts.inter(
-              fontSize: 11.sp,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
-          ),
+          child: Text('!',
+              style: GoogleFonts.inter(
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white)),
         ),
         const Spacer(),
-        Text(
-          subtitle,
-          style: GoogleFonts.inter(
-            fontSize: 11.sp,
-            color: Colors.grey.shade500,
-          ),
-        ),
+        Text(subtitle,
+            style: GoogleFonts.inter(
+                fontSize: 11.sp, color: Colors.grey.shade500)),
       ],
     );
-  }
-
-  List<AnnouncementModel> _mockAnnouncements() {
-    return [
-      AnnouncementModel(
-        id: '1',
-        ownerName: 'He---',
-        listingType: 'For Rent',
-        price: 5000,
-        propertyName: 'Wooden Home',
-        bedrooms: 2,
-        sqft: 847,
-        location: 'Abu Dhabi | United Arab Emirates',
-        timeAgo: '15 min ago',
-      ),
-      AnnouncementModel(
-        id: '2',
-        ownerName: 'Ne--',
-        listingType: 'For sell',
-        price: 8000,
-        propertyName: 'Modern Villa',
-        bedrooms: 3,
-        sqft: 1200,
-        location: 'Dubai | United Arab Emirates',
-        timeAgo: '20 min ago',
-      ),
-    ];
   }
 }

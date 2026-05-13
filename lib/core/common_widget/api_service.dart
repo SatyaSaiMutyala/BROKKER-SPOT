@@ -59,7 +59,8 @@ http.Response _checkUnauthorized(http.Response response) {
 Future<http.Response> postRequest(String s,
     {required String endPoint,
     Map<String, dynamic>? body,
-    Map<String, String>? headers}) async {
+    Map<String, String>? headers,
+    bool skipUnauthorizedCheck = false}) async {
   try {
     String url = baseUrl + endPoint;
     debugPrint('postRequest URL: $url');
@@ -73,7 +74,7 @@ Future<http.Response> postRequest(String s,
                 throw TimeoutException(AppConstNames.networkError)));
 
     debugPrint("response body :${response.body}");
-    return _checkUnauthorized(response);
+    return skipUnauthorizedCheck ? response : _checkUnauthorized(response);
   } catch (e, s) {
     print(e);
     print(s);
@@ -246,7 +247,8 @@ Future<http.Response> deleteRequest(
 
     http.Response response = await http
         .delete(Uri.parse(url),
-            body: jsonEncode(body), headers: headers ?? buildHeader())
+            body: body != null ? jsonEncode(body) : null,
+            headers: headers ?? buildHeader())
         .timeout(const Duration(seconds: NetworkConfig.timeoutDuration),
             onTimeout: (() =>
                 throw TimeoutException(AppConstNames.networkError)));
