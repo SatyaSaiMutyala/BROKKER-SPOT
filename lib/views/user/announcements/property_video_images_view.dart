@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
@@ -28,6 +29,10 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
 
   bool get _isValid => _filledSlotCount >= 8;
   bool _isUploading = false;
+  int _uploadedCount = 0;
+  int _totalToUpload = 0;
+  double get _uploadProgress =>
+      _totalToUpload == 0 ? 0 : _uploadedCount / _totalToUpload;
 
   int get _filledSlotCount {
     int count = 0;
@@ -113,15 +118,21 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
   }
 
   Future<void> _uploadAndSave() async {
-    setState(() => _isUploading = true);
+    final newImageCount = _imageFiles.where((f) => f != null).length;
+    final hasNewVideo = _videoFile != null;
+    setState(() {
+      _isUploading = true;
+      _uploadedCount = 0;
+      _totalToUpload = newImageCount + (hasNewVideo ? 1 : 0);
+    });
     try {
-      EasyLoading.show(status: 'Uploading media...');
       final imageUrls = <String>[];
       for (int i = 0; i < 12; i++) {
         if (_imageFiles[i] != null) {
           final url = await api.uploadImage(
               file: _imageFiles[i]!, fileType: 'announcements');
           if (url != null) imageUrls.add(url);
+          setState(() => _uploadedCount++);
         } else if (_existingImageUrls[i] != null) {
           imageUrls.add(_existingImageUrls[i]!);
         }
@@ -130,6 +141,7 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
       if (_videoFile != null) {
         videoUrl = await api.uploadImage(
             file: _videoFile!, fileType: 'announcements');
+        setState(() => _uploadedCount++);
       } else {
         videoUrl = _existingVideoUrl;
       }
@@ -138,12 +150,19 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
         videoUrl: videoUrl,
         thumbnailUrl: imageUrls.isNotEmpty ? imageUrls.first : null,
       );
-      EasyLoading.dismiss();
+      // Hold at 100% briefly so user sees completion before navigating back
+      await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      EasyLoading.dismiss();
-      EasyLoading.showError('Upload failed. Please try again.');
       setState(() => _isUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Upload failed. Please try again.'),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
     }
   }
 
@@ -252,17 +271,66 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
                 ),
               ),
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
-              child: CustomPrimaryButton(
-                title: 'Save',
-                backgroundColor: _isValid ? AppColors.primary : Colors.grey.shade300,
-                defaultColor: _isValid ? Colors.white : Colors.black45,
-                onPressed: _isValid && !_isUploading ? _uploadAndSave : () {},
+            if (_isUploading)
+              _buildProgressBar()
+            else
+              Padding(
+                padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
+                child: CustomPrimaryButton(
+                  title: 'Save',
+                  backgroundColor: _isValid ? AppColors.primary : Colors.grey.shade300,
+                  defaultColor: _isValid ? Colors.white : Colors.black45,
+                  onPressed: _isValid ? _uploadAndSave : () {},
+                ),
               ),
-            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildProgressBar() {
+    final percent = (_uploadProgress * 100).toInt();
+    final isDone = _uploadedCount >= _totalToUpload && _totalToUpload > 0;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 24.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isDone
+                    ? 'Upload complete!'
+                    : 'Uploading ${_uploadedCount + 1} of $_totalToUpload...',
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+              Text(
+                '$percent%',
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10.h),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(100.r),
+            child: LinearProgressIndicator(
+              value: _uploadProgress,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              minHeight: 10.h,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -340,10 +408,10 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
           children: [
             file != null
                 ? Image.file(file, fit: BoxFit.cover)
-                : Image.network(
-                    existingUrl!,
+                : CachedNetworkImage(
+                    imageUrl: existingUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorWidget: (_, __, ___) => Container(
                       color: Colors.grey.shade200,
                       child: Icon(Icons.broken_image_outlined,
                           color: Colors.grey.shade400, size: 28.sp),

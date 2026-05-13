@@ -197,9 +197,9 @@ class AnnouncementModel {
       case 0:
         return 'Draft';
       case 1:
-        return 'Submitted';
+        return 'Pending';
       case 2:
-        return 'Approved';
+        return 'Active';
       case 3:
         return 'Rejected';
       default:

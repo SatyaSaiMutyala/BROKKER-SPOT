@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AnnouncementController extends GetxController {
   final _repo = AnnouncementRepository();
@@ -161,6 +163,110 @@ class AnnouncementController extends GetxController {
     proposalsLimit = a.proposalsLimit;
   }
 
+  // ── Draft persistence ──────────────────────────────────────────────────────
+  static const _draftKey = 'create_announcement_draft';
+
+  Future<void> saveDraft({
+    String? propertyFor,
+    bool locationSaved = false,
+    bool informationSaved = false,
+    bool videoImagesSaved = false,
+    bool priceSaved = false,
+    bool documentsSaved = false,
+    String? brokerProposalLimit,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final draft = <String, dynamic>{
+      if (listingType != null) 'listingType': listingType,
+      if (country != null) 'country': country,
+      if (city != null) 'city': city,
+      if (area != null) 'area': area,
+      if (address != null) 'address': address,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+      if (propertyType != null) 'propertyType': propertyType,
+      if (propertyName != null) 'propertyName': propertyName,
+      if (description != null) 'description': description,
+      if (sqft != null) 'sqft': sqft,
+      if (sqm != null) 'sqm': sqm,
+      if (bedrooms != null) 'bedrooms': bedrooms,
+      if (bathrooms != null) 'bathrooms': bathrooms,
+      if (floor != null) 'floor': floor,
+      if (totalFloors != null) 'totalFloors': totalFloors,
+      if (propertyStatus != null) 'propertyStatus': propertyStatus,
+      'isCommercialProperty': isCommercialProperty,
+      'amenities': amenities,
+      'imageUrls': imageUrls,
+      if (videoUrl != null) 'videoUrl': videoUrl,
+      if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
+      if (price != null) 'price': price,
+      'currency': currency,
+      'brokeragePercent': brokeragePercent,
+      if (rentPeriod != null) 'rentPeriod': rentPeriod,
+      if (availableDate != null) 'availableDate': availableDate!.toIso8601String(),
+      if (titleDeedUrl != null) 'titleDeedUrl': titleDeedUrl,
+      if (passportFrontUrl != null) 'passportFrontUrl': passportFrontUrl,
+      if (passportBackUrl != null) 'passportBackUrl': passportBackUrl,
+      if (nocUrl != null) 'nocUrl': nocUrl,
+      if (proposalsLimit != null) 'proposalsLimit': proposalsLimit,
+      if (propertyFor != null) 'propertyFor': propertyFor,
+      'locationSaved': locationSaved,
+      'informationSaved': informationSaved,
+      'videoImagesSaved': videoImagesSaved,
+      'priceSaved': priceSaved,
+      'documentsSaved': documentsSaved,
+      if (brokerProposalLimit != null) 'brokerProposalLimit': brokerProposalLimit,
+    };
+    await prefs.setString(_draftKey, jsonEncode(draft));
+  }
+
+  Future<Map<String, dynamic>?> loadDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_draftKey);
+    if (raw == null) return null;
+    final data = jsonDecode(raw) as Map<String, dynamic>;
+    listingType = data['listingType'] as int?;
+    country = data['country'] as String?;
+    city = data['city'] as String?;
+    area = data['area'] as String?;
+    address = data['address'] as String?;
+    latitude = (data['latitude'] as num?)?.toDouble();
+    longitude = (data['longitude'] as num?)?.toDouble();
+    propertyType = data['propertyType'] as String?;
+    propertyName = data['propertyName'] as String?;
+    description = data['description'] as String?;
+    sqft = (data['sqft'] as num?)?.toDouble();
+    sqm = (data['sqm'] as num?)?.toDouble();
+    bedrooms = data['bedrooms'] as int?;
+    bathrooms = data['bathrooms'] as int?;
+    floor = data['floor'] as int?;
+    totalFloors = data['totalFloors'] as int?;
+    propertyStatus = data['propertyStatus'] as int?;
+    isCommercialProperty = (data['isCommercialProperty'] as int?) ?? 0;
+    amenities = (data['amenities'] as List?)?.cast<String>() ?? [];
+    imageUrls = (data['imageUrls'] as List?)?.cast<String>() ?? [];
+    videoUrl = data['videoUrl'] as String?;
+    thumbnailUrl = data['thumbnailUrl'] as String?;
+    price = (data['price'] as num?)?.toDouble();
+    currency = (data['currency'] as String?) ?? 'AED';
+    brokeragePercent = (data['brokeragePercent'] as int?) ?? 2;
+    rentPeriod = data['rentPeriod'] as String?;
+    availableDate = data['availableDate'] != null
+        ? DateTime.tryParse(data['availableDate'] as String)
+        : null;
+    titleDeedUrl = data['titleDeedUrl'] as String?;
+    passportFrontUrl = data['passportFrontUrl'] as String?;
+    passportBackUrl = data['passportBackUrl'] as String?;
+    nocUrl = data['nocUrl'] as String?;
+    proposalsLimit = data['proposalsLimit'] as int?;
+    return data;
+  }
+
+  Future<void> clearDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_draftKey);
+  }
+
   void resetDraft() {
     listingType = null;
     country = city = area = address = null;
@@ -178,6 +284,7 @@ class AnnouncementController extends GetxController {
     proposalsLimit = null;
     latitude = longitude = null;
     isCommercialProperty = 0;
+    clearDraft();
   }
 
   // ── Body builder ───────────────────────────────────────────────────────────

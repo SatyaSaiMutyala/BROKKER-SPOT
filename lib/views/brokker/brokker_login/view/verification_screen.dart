@@ -1,5 +1,6 @@
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/announcements/my_announcements_tab_view.dart';
+import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -20,7 +21,17 @@ class _VerificationScreenState extends State<VerificationScreen> {
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
       if (widget.isAnnouncement) {
-        Get.offAll(() => const MyAnnouncementsTabView());
+        // Clear entire stack, put DashboardView(AccountTab) at bottom
+        // with no transition, then push MyAnnouncementsTabView on top.
+        // Back from MyAnnouncementsTabView will then land on AccountView.
+        Get.offAll(
+          () => const DashboardView(initialIndex: 3),
+          transition: Transition.noTransition,
+          duration: Duration.zero,
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.to(() => const MyAnnouncementsTabView());
+        });
       } else {
         Get.offAll(() => BrokerDashBoardView());
       }

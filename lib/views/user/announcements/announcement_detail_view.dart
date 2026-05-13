@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:video_player/video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
@@ -132,7 +133,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     return PopupMenuButton<String>(
       onSelected: (value) {
         if (value == 'edit') {
-          Get.to(() => CreateAnnouncementView(announcement: widget.announcement));
+          Get.to(() => CreateAnnouncementView(announcement: widget.announcement))
+              ?.then((result) { if (result == true && mounted) Get.back(result: true); });
         } else if (value == 'delete') {
           _showDeleteDialog();
         }
@@ -410,11 +412,11 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                               }
                               final imgIdx = hasVideo ? i - 1 : i;
                               return hasImages
-                                  ? Image.network(images[imgIdx],
+                                  ? CachedNetworkImage(
+                                      imageUrl: images[imgIdx],
                                       fit: BoxFit.cover,
-                                      loadingBuilder: (_, child, progress) =>
-                                          progress == null ? child : _shimmerBox(),
-                                      errorBuilder: (_, __, ___) => _imagePlaceholder())
+                                      placeholder: (_, __) => _shimmerBox(),
+                                      errorWidget: (_, __, ___) => _imagePlaceholder())
                                   : Image.asset(images[imgIdx], fit: BoxFit.cover);
                             },
                           ),
@@ -1023,7 +1025,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
             elevation: 0,
           ),
           onPressed: () => Get.to(() =>
-              CreateAnnouncementView(announcement: widget.announcement)),
+              CreateAnnouncementView(announcement: widget.announcement))
+              ?.then((result) { if (result == true && mounted) Get.back(result: true); }),
           child: Text(
             'Complete Your Announcement',
             style: GoogleFonts.poppins(

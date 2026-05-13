@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:video_player/video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
@@ -201,12 +202,11 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
               }
               // Remaining pages: images
               final imgIdx = hasVideo ? i - 1 : i;
-              return Image.network(
-                images[imgIdx],
+              return CachedNetworkImage(
+                imageUrl: images[imgIdx],
                 fit: BoxFit.cover,
-                loadingBuilder: (_, child, progress) =>
-                    progress == null ? child : _shimmerBox(),
-                errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                placeholder: (_, __) => _shimmerBox(),
+                errorWidget: (_, __, ___) => _imagePlaceholder(),
               );
             },
           ),
@@ -612,12 +612,12 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
     final fallback = AnnouncementPropertyCard
         ._avatarAssets[widget.index % AnnouncementPropertyCard._avatarAssets.length];
     if (url != null && url.isNotEmpty) {
-      return Image.network(
-        url,
+      return CachedNetworkImage(
+        imageUrl: url,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) =>
+        errorWidget: (_, __, ___) =>
             Image.asset(fallback, width: size, height: size, fit: BoxFit.cover),
       );
     }

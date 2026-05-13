@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
@@ -85,6 +86,8 @@ class _BrokerAnnouncementDetailViewState
   }
 
   void _showProposalSheet() {
+    final id = _data.id;
+    if (id == null) return;
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -93,7 +96,7 @@ class _BrokerAnnouncementDetailViewState
           borderRadius: BorderRadius.circular(16.r),
         ),
         insetPadding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 60.h),
-        child: _ProposalSheet(),
+        child: _ProposalSheet(announcementId: id),
       ),
     );
   }
@@ -297,12 +300,11 @@ class _BrokerAnnouncementDetailViewState
             itemBuilder: (_, i) {
               if (hasVideo && i == 0) return _buildVideoPage();
               final imgIdx = hasVideo ? i - 1 : i;
-              return Image.network(
-                images[imgIdx],
+              return CachedNetworkImage(
+                imageUrl: images[imgIdx],
                 fit: BoxFit.cover,
-                loadingBuilder: (_, child, progress) =>
-                    progress == null ? child : _shimmerBox(),
-                errorBuilder: (_, __, ___) => Container(
+                placeholder: (_, __) => _shimmerBox(),
+                errorWidget: (_, __, ___) => Container(
                   color: Colors.grey.shade300,
                   child: Icon(Icons.home_outlined,
                       size: 48.sp, color: Colors.grey),
@@ -547,6 +549,9 @@ class _BrokerAnnouncementDetailViewState
 
 // ── Proposal dialog ──
 class _ProposalSheet extends StatefulWidget {
+  final String announcementId;
+  const _ProposalSheet({required this.announcementId});
+
   @override
   State<_ProposalSheet> createState() => _ProposalSheetState();
 }
@@ -555,6 +560,8 @@ class _ProposalSheetState extends State<_ProposalSheet> {
   final TextEditingController _controller = TextEditingController();
   final int _maxLength = 50;
   bool _submitted = false;
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void initState() {
@@ -568,12 +575,20 @@ class _ProposalSheetState extends State<_ProposalSheet> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_controller.text.trim().isEmpty) return;
-    setState(() => _submitted = true);
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted) Navigator.pop(context);
-    });
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      await AnnouncementRepository().sendProposal(widget.announcementId);
+      if (!mounted) return;
+      setState(() { _submitted = true; _isLoading = false; });
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) Navigator.pop(context);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _isLoading = false; _error = e.toString(); });
+    }
   }
 
   @override
@@ -628,25 +643,44 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                     ),
                   ),
                 ),
+                if (_error != null) ...[
+                  SizedBox(height: 8.h),
+                  Text(
+                    _error!,
+                    style: GoogleFonts.inter(
+                        fontSize: 12.sp, color: Colors.red.shade600),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
                 SizedBox(height: 14.h),
                 SizedBox(
                   width: double.infinity,
                   height: 52.h,
                   child: ElevatedButton(
-                    onPressed: _submit,
+                    onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
+                      disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8.r)),
                       elevation: 0,
                     ),
-                    child: Text(
-                      'Send Proposal Request',
-                      style: GoogleFonts.poppins(
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white),
-                    ),
+                    child: _isLoading
+                        ? SizedBox(
+                            width: 22.w,
+                            height: 22.w,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : Text(
+                            'Send Proposal Request',
+                            style: GoogleFonts.poppins(
+                                fontSize: 15.sp,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white),
+                          ),
                   ),
                 ),
               ],

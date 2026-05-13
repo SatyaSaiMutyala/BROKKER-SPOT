@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
@@ -22,7 +23,7 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
   late TabController _tabController;
   late AnnouncementController _controller;
 
-  final _tabs = ['All', 'Draft', 'Submitted', 'Approved', 'Rejected'];
+  final _tabs = ['All', 'Pending', 'Active', 'Rejected', 'Draft'];
 
   List<AnnouncementModel> get _filtered {
     final tab = _tabs[_tabController.index];
@@ -101,6 +102,8 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
                         alignment: Alignment.center,
                         child: Text(
                           _tabs[i],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.inter(
                             fontSize: 13.sp,
                             fontWeight: FontWeight.w600,
@@ -120,7 +123,7 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
             Expanded(
               child: Obx(() {
                 if (_controller.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator());
+                  return _ShimmerCardList();
                 }
                 if (_controller.errorMessage.value != null) {
                   return Center(
@@ -170,6 +173,85 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ShimmerCardList extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: ListView.builder(
+        padding: EdgeInsets.symmetric(vertical: 8.h),
+        itemCount: 4,
+        itemBuilder: (_, __) => _ShimmerCard(),
+      ),
+    );
+  }
+}
+
+class _ShimmerCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image placeholder
+          Container(
+            height: 200.h,
+            width: double.infinity,
+            color: Colors.grey.shade300,
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 12.h),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Price row
+                Row(
+                  children: [
+                    Container(
+                        width: 120.w, height: 16.h, color: Colors.grey.shade300),
+                    const Spacer(),
+                    Container(
+                        width: 60.w, height: 14.h, color: Colors.grey.shade300),
+                  ],
+                ),
+                SizedBox(height: 10.h),
+                // Property name
+                Container(
+                    width: 180.w, height: 16.h, color: Colors.grey.shade300),
+                SizedBox(height: 10.h),
+                // Bedroom / sqft row
+                Row(
+                  children: [
+                    Container(
+                        width: 90.w, height: 14.h, color: Colors.grey.shade300),
+                    SizedBox(width: 20.w),
+                    Container(
+                        width: 80.w, height: 14.h, color: Colors.grey.shade300),
+                  ],
+                ),
+                SizedBox(height: 10.h),
+                Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
+                SizedBox(height: 10.h),
+                // Location row
+                Container(
+                    width: 150.w, height: 14.h, color: Colors.grey.shade300),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

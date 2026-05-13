@@ -89,6 +89,19 @@ class AnnouncementRepository {
     throw json['message'] ?? 'Failed to fetch announcements';
   }
 
+  Future<void> sendProposal(String announcementId) async {
+    final response = await api.postRequest(
+      '',
+      endPoint: ApiEndpoints.sendProposal,
+      body: {'announcement_id': announcementId},
+      headers: api.buildHeaders(),
+    );
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['success'] != true) {
+      throw json['message'] ?? 'Failed to send proposal';
+    }
+  }
+
   Future<AnnouncementModel> fetchAnnouncementDetail(String id) async {
     final response = await api.getRequest(
       endPoint: '${api.baseUrl}${ApiEndpoints.fetchAnnouncementDetail}/$id',

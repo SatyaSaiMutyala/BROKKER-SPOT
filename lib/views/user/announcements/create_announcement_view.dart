@@ -2,7 +2,6 @@ import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/verification_screen.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
-import 'package:brokkerspot/views/user/announcements/my_announcements_tab_view.dart';
 import 'package:brokkerspot/views/user/announcements/property_information_view.dart';
 import 'package:brokkerspot/views/user/announcements/property_location_view.dart';
 import 'package:brokkerspot/views/user/announcements/property_price_brokerage_view.dart';
@@ -69,6 +68,21 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       _videoImagesSaved = true;
       _priceSaved = true;
       _documentsSaved = true;
+    } else {
+      _controller.loadDraft().then((flags) {
+        if (flags != null && mounted) {
+          setState(() {
+            _propertyFor = flags['propertyFor'] as String?;
+            _locationSaved = flags['locationSaved'] as bool? ?? false;
+            _informationSaved = flags['informationSaved'] as bool? ?? false;
+            _videoImagesSaved = flags['videoImagesSaved'] as bool? ?? false;
+            _priceSaved = flags['priceSaved'] as bool? ?? false;
+            _documentsSaved = flags['documentsSaved'] as bool? ?? false;
+            _brokerProposalLimit = flags['brokerProposalLimit'] as String?;
+            _brokerProposalsEnabled = _brokerProposalLimit != null;
+          });
+        }
+      });
     }
   }
 
@@ -78,6 +92,19 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       Get.delete<AnnouncementController>();
     }
     super.dispose();
+  }
+
+  void _saveDraft() {
+    if (widget.isEditing) return;
+    _controller.saveDraft(
+      propertyFor: _propertyFor,
+      locationSaved: _locationSaved,
+      informationSaved: _informationSaved,
+      videoImagesSaved: _videoImagesSaved,
+      priceSaved: _priceSaved,
+      documentsSaved: _documentsSaved,
+      brokerProposalLimit: _brokerProposalLimit,
+    );
   }
 
   void _showBrokerProposalLimitDialog() {
@@ -95,6 +122,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                   _brokerProposalLimit = option;
                   _brokerProposalsEnabled = true;
                 });
+                _saveDraft();
                 Navigator.pop(context);
               },
               child: Container(
@@ -134,6 +162,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
               onTap: () {
                 setState(() => _propertyFor = option);
                 _controller.setListingType(option == 'Sell' ? 1 : 2);
+                _saveDraft();
                 Navigator.pop(context);
               },
               child: Container(
@@ -177,7 +206,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
 
     if (success) {
       if (widget.isEditing) {
-        Get.offAll(() => const MyAnnouncementsTabView());
+        Get.back(result: true);
       } else {
         Get.to(() => const VerificationScreen(isAnnouncement: true));
       }
@@ -240,7 +269,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const PropertyLocationView()));
-                        if (result == true) setState(() => _locationSaved = true);
+                        if (result == true) { setState(() => _locationSaved = true); _saveDraft(); }
                       },
                     ),
                     FormSectionTile(
@@ -259,7 +288,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const PropertyInformationView()));
-                        if (result == true) setState(() => _informationSaved = true);
+                        if (result == true) { setState(() => _informationSaved = true); _saveDraft(); }
                       },
                     ),
                     FormSectionTile(
@@ -278,7 +307,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const PropertyVideoImagesView()));
-                        if (result == true) setState(() => _videoImagesSaved = true);
+                        if (result == true) { setState(() => _videoImagesSaved = true); _saveDraft(); }
                       },
                     ),
                     FormSectionTile(
@@ -298,7 +327,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             MaterialPageRoute(
                                 builder: (_) => PropertyPriceBrokerageView(
                                     propertyFor: _propertyFor)));
-                        if (result == true) setState(() => _priceSaved = true);
+                        if (result == true) { setState(() => _priceSaved = true); _saveDraft(); }
                       },
                     ),
                     FormSectionTile(
@@ -318,7 +347,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             MaterialPageRoute(
                                 builder: (_) =>
                                     UploadDocumentView(propertyFor: _propertyFor)));
-                        if (result == true) setState(() => _documentsSaved = true);
+                        if (result == true) { setState(() => _documentsSaved = true); _saveDraft(); }
                       },
                     ),
                     FormSectionTile(
@@ -344,6 +373,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                                 _brokerProposalsEnabled = false;
                                 _brokerProposalLimit = null;
                               });
+                              _saveDraft();
                             }
                           },
                           thumbColor: WidgetStatePropertyAll(Colors.white),
