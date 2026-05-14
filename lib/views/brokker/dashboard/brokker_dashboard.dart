@@ -9,11 +9,13 @@ import 'package:brokkerspot/views/brokker/home/brokker_home_view.dart';
 import 'package:brokkerspot/views/brokker/meeting/broker_meeting_view.dart';
 import 'package:brokkerspot/views/brokker/payments/broker_payments_view.dart';
 import 'package:brokkerspot/views/brokker/project/broker_projects_view.dart';
+import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class BrokerDashBoardView extends StatefulWidget {
-  BrokerDashBoardView({super.key});
+  final bool showLocationPicker;
+  BrokerDashBoardView({super.key, this.showLocationPicker = false});
 
   @override
   State<BrokerDashBoardView> createState() => _BrokerDashBoardViewState();
@@ -30,6 +32,13 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.showLocationPicker) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const LocationPickerPopup(),
+        );
+      }
       _showRejectedDialogIfNeeded();
     });
     // Listen for profile data changes (fires when API response arrives)

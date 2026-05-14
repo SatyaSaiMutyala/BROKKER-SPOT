@@ -1,6 +1,6 @@
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,10 +8,10 @@ import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:video_player/video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_proposals_view.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
 
 class AnnouncementDetailView extends StatefulWidget {
   final AnnouncementModel announcement;
@@ -31,6 +31,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   int _currentPage = 0;
   final bool _brokerSelected = false;
   final _repo = AnnouncementRepository();
+  bool _descExpanded = false;
+  bool _isDeleting = false;
 
   late AnnouncementModel _data;
   VideoPlayerController? _videoCtrl;
@@ -74,39 +76,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     try {
       final fresh = await _repo.fetchAnnouncementDetail(id);
       if (mounted) setState(() => _data = fresh);
-    } catch (_) {
-      // keep showing the data passed in
-    }
+    } catch (_) {}
   }
-
-  List<String> _buildPropertyInfoItems(AnnouncementModel a) {
-    final items = <String>[];
-    if (a.propertyType != null) items.add('Type: ${a.propertyType}');
-    if (a.bedrooms != null) items.add('Bedrooms: ${a.bedrooms}');
-    if (a.bathrooms != null) items.add('Bathrooms: ${a.bathrooms}');
-    if (a.floor != null) items.add('Floor: ${a.floor}');
-    if (a.totalFloors != null) items.add('Total Floors: ${a.totalFloors}');
-    if (a.propertySize?.sqft != null) {
-      items.add('Size: ${a.propertySize!.sqft.toInt()} sqft');
-    }
-    return items;
-  }
-
-  Color _statusColor(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'approved':   return Colors.green.shade500;
-      case 'rejected':   return Colors.red.shade500;
-      case 'submitted':  return Colors.orange.shade500;
-      case 'draft':      return Colors.grey.shade600;
-      default:           return Colors.grey.shade600;
-    }
-  }
-
-  String _statusLabel(String? status) {
-    if (status?.toLowerCase() == 'draft') return 'In Draft';
-    return status ?? '';
-  }
-
 
   String _formatDate(String isoDate) {
     final dt = DateTime.tryParse(isoDate);
@@ -115,7 +86,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   }
 
   String _formatPrice(double price) {
-    String str = price.toInt().toString();
+    final str = price.toInt().toString();
     final buffer = StringBuffer();
     int count = 0;
     for (int i = str.length - 1; i >= 0; i--) {
@@ -129,36 +100,47 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     return buffer.toString().split('').reversed.join();
   }
 
+  Color _statusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'active': return const Color(0xFF1B6B3A);
+      case 'rejected': return const Color(0xFFC0392B);
+      case 'pending': return const Color(0xFFB8600A);
+      case 'draft': return Colors.grey.shade600;
+      default: return Colors.grey.shade600;
+    }
+  }
+
+  // ── Three-dot popup menu ───────────────────────────────────────────────────
+
   Widget _buildThreeDotMenu() {
     return PopupMenuButton<String>(
       onSelected: (value) {
         if (value == 'edit') {
           Get.to(() => CreateAnnouncementView(announcement: widget.announcement))
-              ?.then((result) { if (result == true && mounted) Get.back(result: true); });
+              ?.then((result) {
+            if (result == true && mounted) Get.back(result: true);
+          });
         } else if (value == 'delete') {
           _showDeleteDialog();
         }
       },
       color: Colors.white,
       elevation: 8,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.r),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
       offset: const Offset(0, 48),
       itemBuilder: (_) => [
         _popupItem(value: 'edit', label: 'Edit'),
         _popupItem(value: 'not_available', label: 'Not Available'),
-        _popupItem(
-            value: 'delete', label: 'Delete Announcement', color: Colors.red),
+        _popupItem(value: 'delete', label: 'Delete', color: Colors.red),
       ],
       child: Container(
-        width: 40.w,
-        height: 40.w,
+        width: 38.w,
+        height: 38.w,
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: Colors.black.withValues(alpha: 0.35),
           shape: BoxShape.circle,
         ),
-        child: Icon(Icons.more_horiz, size: 22.sp, color: Colors.black87),
+        child: Icon(Icons.more_horiz, size: 20.sp, color: Colors.white),
       ),
     );
   }
@@ -168,179 +150,193 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     required String label,
     Color? color,
   }) {
-    final c = color ?? Colors.black87;
     return PopupMenuItem<String>(
       value: value,
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
       child: Text(
         label,
         style: GoogleFonts.inter(
-          fontSize: 14.sp,
-          fontWeight: FontWeight.w500,
-          color: c,
-        ),
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w500,
+            color: color ?? Colors.black87),
       ),
     );
   }
 
+  // ── Delete dialog ──────────────────────────────────────────────────────────
+
   void _showDeleteDialog() {
     showDialog(
       context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6.r),
-        ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'ALERT',
-                style: GoogleFonts.poppins(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.red,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          backgroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+          child: Padding(
+            padding:
+                EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56.w,
+                  height: 56.w,
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.delete_outline_rounded,
+                      color: Colors.red.shade600, size: 28.sp),
                 ),
-              ),
-              SizedBox(height: 12.h),
-              Text(
-                'Are you sure you want to delete this announcement?',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
+                SizedBox(height: 16.h),
+                Text(
+                  'Delete Announcement',
+                  style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black),
                 ),
-              ),
-              SizedBox(height: 24.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () async {
-                        Navigator.pop(context);
-                        final id = widget.announcement.id;
-                        if (id == null) return;
-                        EasyLoading.show(status: 'Deleting...');
-                        try {
-                          await _repo.deleteAnnouncement(id);
-                          EasyLoading.dismiss();
-                          if (mounted) Get.back(result: true);
-                        } catch (e) {
-                          EasyLoading.dismiss();
-                          EasyLoading.showError('Delete failed. Please try again.');
-                        }
-                      },
-                      child: Container(
-                        height: 46.h,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(6.r),
+                SizedBox(height: 8.h),
+                Text(
+                  'This action cannot be undone. Are you sure?',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                      fontSize: 13.sp, color: Colors.grey.shade600),
+                ),
+                SizedBox(height: 24.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade300),
+                          padding: EdgeInsets.symmetric(vertical: 13.h),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10.r)),
                         ),
-                        child: Text(
-                          'DELETE',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15.sp,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: Text('Cancel',
+                            style: GoogleFonts.inter(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87)),
                       ),
                     ),
-                  ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        height: 46.h,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(6.r),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isDeleting
+                            ? null
+                            : () async {
+                                final id = widget.announcement.id;
+                                if (id == null) return;
+                                setDialogState(() => _isDeleting = true);
+                                try {
+                                  await _repo.deleteAnnouncement(id);
+                                  if (mounted) {
+                                    Get.back(); // dismiss dialog
+                                    Get.back(result: true);
+                                  }
+                                } catch (_) {
+                                  setDialogState(() => _isDeleting = false);
+                                  AppToast.error('Delete failed. Please try again.');
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade600,
+                          disabledBackgroundColor:
+                              Colors.red.shade300,
+                          padding: EdgeInsets.symmetric(vertical: 13.h),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10.r)),
                         ),
-                        child: Text(
-                          'CANCEL',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15.sp,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: _isDeleting
+                            ? SizedBox(
+                                width: 18.w,
+                                height: 18.w,
+                                child: const CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2.5),
+                              )
+                            : Text('Delete',
+                                style: GoogleFonts.inter(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white)),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  // ── Rejection reason dialog ────────────────────────────────────────────────
 
   void _showRejectionReasonDialog() {
     showDialog(
       context: context,
       builder: (_) => Dialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.r),
-        ),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'REASON OF REJECTION',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
-                ),
+              Container(
+                width: 56.w,
+                height: 56.w,
+                decoration: BoxDecoration(
+                    color: Colors.red.shade50, shape: BoxShape.circle),
+                child: Icon(Icons.cancel_outlined,
+                    color: Colors.red.shade600, size: 28.sp),
               ),
-              SizedBox(height: 16.h),
+              SizedBox(height: 14.h),
+              Text('Reason for Rejection',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black)),
+              SizedBox(height: 12.h),
               Text(
                 _data.rejectionReason?.isNotEmpty == true
                     ? _data.rejectionReason!
                     : 'No reason provided.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 13.sp,
-                  color: Colors.black54,
-                  fontWeight: FontWeight.w400,
-                ),
+                style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    color: Colors.black54,
+                    height: 1.5),
               ),
               SizedBox(height: 24.h),
               SizedBox(
                 width: double.infinity,
-                height: 46.h,
+                height: 48.h,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
+                    backgroundColor: AppColors.primary,
                     elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r)),
                   ),
                   onPressed: () {
                     Navigator.pop(context);
                     Get.to(() => CreateAnnouncementView(
                         announcement: widget.announcement));
                   },
-                  child: Text(
-                    'UPLOAD AGAIN',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: Text('Upload Again',
+                      style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white)),
                 ),
               ),
             ],
@@ -349,6 +345,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       ),
     );
   }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -356,410 +354,608 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     final status = a.status?.toLowerCase() ?? '';
     final hasVideo = (a.propertyMedia?.videos?.isNotEmpty ?? false);
     final hasImages = (a.imageUrls?.length ?? 0) > 0;
-    final images = hasImages ? a.imageUrls! : (hasVideo ? <String>[] : _fallbackImages);
+    final images = hasImages
+        ? a.imageUrls!
+        : (hasVideo ? <String>[] : _fallbackImages);
     final totalPages = (hasVideo ? 1 : 0) + images.length;
+    final topPadding = MediaQuery.of(context).padding.top;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
           children: [
-            // ── Header ──
-            CustomHeader(
-              title: 'DETAILS',
-              showBackButton: true,
-              trailing: widget.isOwner ? _buildThreeDotMenu() : null,
-            ),
-
-            // ── Scrollable body ──
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Video + Image carousel ──
-                    Stack(
-                      children: [
-                        SizedBox(
-                          height: 260.h,
-                          width: double.infinity,
-                          child: PageView.builder(
-                            itemCount: totalPages,
-                            onPageChanged: (i) {
-                              setState(() => _currentPage = i);
-                              if (hasVideo) {
-                                if (i == 0) {
-                                  _videoCtrl?.play();
-                                } else {
-                                  _videoCtrl?.pause();
-                                }
-                              }
-                            },
-                            itemBuilder: (_, i) {
-                              if (hasVideo && i == 0) {
-                                if (!_videoReady || _videoCtrl == null) {
-                                  return _shimmerBox();
-                                }
-                                return FittedBox(
-                                  fit: BoxFit.cover,
-                                  clipBehavior: Clip.antiAlias,
-                                  child: SizedBox(
-                                    width: _videoCtrl!.value.size.width,
-                                    height: _videoCtrl!.value.size.height,
-                                    child: VideoPlayer(_videoCtrl!),
-                                  ),
-                                );
-                              }
-                              final imgIdx = hasVideo ? i - 1 : i;
-                              return hasImages
-                                  ? CachedNetworkImage(
-                                      imageUrl: images[imgIdx],
-                                      fit: BoxFit.cover,
-                                      placeholder: (_, __) => _shimmerBox(),
-                                      errorWidget: (_, __, ___) => _imagePlaceholder())
-                                  : Image.asset(images[imgIdx], fit: BoxFit.cover);
-                            },
-                          ),
+            // ── Scrollable content ──
+            SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeroMedia(a, images, hasImages, hasVideo,
+                      totalPages, topPadding),
+                  Transform.translate(
+                    offset: Offset(0, -22.h),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(22.r),
+                          topRight: Radius.circular(22.r),
                         ),
-                        // Dark gradient top
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: 70.h,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.black.withValues(alpha: 0.45),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Status badge
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 16.w, vertical: 6.h),
-                            decoration: BoxDecoration(
-                              color: _statusColor(a.status),
-                              borderRadius: BorderRadius.only(
-                                bottomLeft: Radius.circular(12.r),
-                              ),
-                            ),
-                            child: Text(
-                              _statusLabel(a.status),
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // "View All"
-                        Positioned(
-                          bottom: 10.h,
-                          right: 16.w,
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 12.w, vertical: 4.h),
-                            decoration: BoxDecoration(
-                              color: AppColors.tealLight,
-                              borderRadius: BorderRadius.circular(20.r),
-                              border: Border.all(color: AppColors.primary),
-                            ),
-                            child: Text(
-                              'View All',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Dot indicators
-                        Positioned(
-                          bottom: 16.h,
-                          left: 0,
-                          right: 0,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(
-                              totalPages,
-                              (i) => Container(
-                                width: 12.w,
-                                height: 12.w,
-                                margin: EdgeInsets.symmetric(horizontal: 3.w),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: i == _currentPage
-                                      ? AppColors.primary
-                                      : Colors.white.withValues(alpha: 0.4),
-                                  border: Border.all(color: AppColors.primary),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 0),
+                      ),
+                      padding:
+                          EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ── Price row ──
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                '${a.currency ?? 'AED'} ',
-                                style: GoogleFonts.inter(
-                                  fontSize: 18.sp,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              Text(
-                                _formatPrice(a.price ?? 0),
-                                style: GoogleFonts.inter(
-                                  fontSize: 18.sp,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.goldAccent,
-                                ),
-                              ),
-                              if (a.rentPeriod != null)
-                                Text(
-                                  ' ${a.rentPeriod}',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 18.sp,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              const Spacer(),
-                              if (a.createdAt != null)
-                                Text(
-                                  _formatDate(a.createdAt!),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13.sp,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          SizedBox(height: 8.h),
-                          // Property name
-                          Padding(
-                            padding: const EdgeInsets.only(right: 32.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    a.propertyName ?? '',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 16.sp,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {},
-                                  child: Container(
-                                    padding: EdgeInsets.all(8.w),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.grey.shade300)
-                                    ),
-                                    child: Icon(Icons.share_outlined,
-                                        size: 20.sp, color: AppColors.primary),
-                                  ),
-                                ),
-                              ],
+                          _buildPriceRow(a),
+                          SizedBox(height: 6.h),
+                          Text(
+                            a.propertyName ?? '',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
                             ),
                           ),
-
-                          SizedBox(height: 14.h),
-
-                          Divider(
-                              height: 1,
-                              thickness: 0.8,
-                              color: Colors.grey.shade200),
-                          SizedBox(height: 16.h),
-
-                          // ── Available From (rent only) ──
-                          if (a.availableDate != null) ...[
-                            _sectionTitle('Available From'),
-                            SizedBox(height: 10.h),
+                          SizedBox(height: 4.h),
+                          if (_fullLocation(a).isNotEmpty)
                             Row(
-                              children: [
-                                Container(
-                                  width: 6.w,
-                                  height: 6.w,
-                                  margin: EdgeInsets.only(top: 6.h, right: 10.w),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.textBlack,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                Text(
-                                  _formatDate(a.availableDate!),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14.sp,
-                                    color: Colors.black87,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 20.h),
-                            Divider(
-                                height: 1,
-                                thickness: 0.8,
-                                color: Colors.grey.shade200),
-                            SizedBox(height: 16.h),
-                          ],
-
-                          // ── Property Info ──
-                          _sectionTitle('Property Info'),
-                          SizedBox(height: 10.h),
-                          ..._buildPropertyInfoItems(a).map(
-                            (item) => Padding(
-                              padding: EdgeInsets.only(bottom: 8.h),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    width: 6.w,
-                                    height: 6.w,
-                                    margin:
-                                        EdgeInsets.only(top: 6.h, right: 10.w),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.textBlack,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  Text(
-                                    item,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14.sp,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 20.h),
-                          Divider(
-                              height: 1,
-                              thickness: 0.8,
-                              color: Colors.grey.shade200),
-                          SizedBox(height: 16.h),
-
-                          // ── Amenities ──
-                          if ((a.amenities?.length ?? 0) > 0) ...[
-                            _sectionTitle('Amenities'),
-                            SizedBox(height: 12.h),
-                            _amenityChip('${a.amenities!.length} Amenities'),
-                            SizedBox(height: 20.h),
-                            Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
-                            SizedBox(height: 16.h),
-                          ],
-
-                          // ── Description ──
-                          if ((a.description?.isNotEmpty ?? false)) ...[
-                            _sectionTitle('Description'),
-                            SizedBox(height: 10.h),
-                            Text(
-                              a.description!,
-                              style: GoogleFonts.inter(
-                                fontSize: 14.sp,
-                                color: Colors.black87,
-                                height: 1.6,
-                              ),
-                            ),
-                            SizedBox(height: 20.h),
-                            Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
-                            SizedBox(height: 16.h),
-                          ],
-
-                          // ── Location ──
-                          if ((a.location ?? a.propertyAddress) != null) ...[
-                            _sectionTitle('Location'),
-                            SizedBox(height: 10.h),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Icon(Icons.location_on_outlined,
-                                    size: 18.sp, color: AppColors.primary),
-                                SizedBox(width: 8.w),
+                                    size: 13.sp, color: AppColors.teal),
+                                SizedBox(width: 3.w),
                                 Expanded(
                                   child: Text(
-                                    [
-                                      a.propertyAddress,
-                                      a.propertyArea,
-                                      a.propertyCity,
-                                      a.propertyCountry,
-                                    ].whereType<String>().join(', '),
+                                    _fullLocation(a),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.inter(
-                                      fontSize: 14.sp,
-                                      color: Colors.black87,
-                                      height: 1.5,
-                                    ),
+                                        fontSize: 12.sp,
+                                        color: AppColors.textHint),
                                   ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 20.h),
-                            Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
-                            SizedBox(height: 16.h),
+                          SizedBox(height: 18.h),
+                          _buildStatsRow(a),
+                          SizedBox(height: 20.h),
+                          Divider(
+                              color: Colors.grey.shade100, thickness: 1),
+                          SizedBox(height: 18.h),
+                          if ((a.description ?? '').isNotEmpty) ...[
+                            _sectionTitle('About this property'),
+                            SizedBox(height: 10.h),
+                            _buildDescription(a.description!),
+                            SizedBox(height: 22.h),
                           ],
-
-                          SizedBox(height: 24.h),
+                          _sectionTitle('Property Details'),
+                          SizedBox(height: 12.h),
+                          _buildDetailsGrid(a),
+                          SizedBox(height: 22.h),
+                          if ((a.amenities ?? []).isNotEmpty) ...[
+                            _sectionTitle('Amenities'),
+                            SizedBox(height: 12.h),
+                            _buildAmenities(a.amenities!),
+                            SizedBox(height: 22.h),
+                          ],
+                          SizedBox(height: 100.h),
                         ],
                       ),
                     ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Floating back button ──
+            Positioned(
+              top: topPadding + 10.h,
+              left: 16.w,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  width: 38.w,
+                  height: 38.w,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.arrow_back_ios_new,
+                      size: 16.sp, color: Colors.white),
                 ),
               ),
             ),
 
-            // ── Fixed bottom bar ──
-            _buildBottomBar(status),
+            // ── Floating 3-dot menu (owner only) ──
+            if (widget.isOwner)
+              Positioned(
+                top: topPadding + 10.h,
+                right: 16.w,
+                child: _buildThreeDotMenu(),
+              ),
+
+            // ── Sticky bottom bar ──
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _buildBottomBar(status),
+            ),
           ],
         ),
       ),
     );
   }
 
+  // ── Hero carousel ──────────────────────────────────────────────────────────
+
+  Widget _buildHeroMedia(AnnouncementModel a, List<String> images,
+      bool hasImages, bool hasVideo, int totalPages, double topPadding) {
+    final height = 300.h + topPadding;
+
+    Widget carousel;
+    if (totalPages == 0) {
+      carousel = Image.asset('assets/images/rent1.png',
+          width: double.infinity, height: height, fit: BoxFit.cover);
+    } else {
+      carousel = PageView.builder(
+        itemCount: totalPages,
+        onPageChanged: (i) {
+          setState(() => _currentPage = i);
+          if (hasVideo) {
+            i == 0 ? _videoCtrl?.play() : _videoCtrl?.pause();
+          }
+        },
+        itemBuilder: (_, i) {
+          if (hasVideo && i == 0) {
+            if (!_videoReady || _videoCtrl == null) return _shimmerBox();
+            return FittedBox(
+              fit: BoxFit.cover,
+              clipBehavior: Clip.antiAlias,
+              child: SizedBox(
+                width: _videoCtrl!.value.size.width,
+                height: _videoCtrl!.value.size.height,
+                child: VideoPlayer(_videoCtrl!),
+              ),
+            );
+          }
+          final imgIdx = hasVideo ? i - 1 : i;
+          return hasImages
+              ? CachedNetworkImage(
+                  imageUrl: images[imgIdx],
+                  width: double.infinity,
+                  height: height,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => _shimmerBox(),
+                  errorWidget: (_, __, ___) => Container(
+                    color: Colors.grey.shade300,
+                    child: Icon(Icons.home_outlined,
+                        size: 48.sp, color: Colors.grey),
+                  ),
+                )
+              : Image.asset(images[imgIdx],
+                  width: double.infinity,
+                  height: height,
+                  fit: BoxFit.cover);
+        },
+      );
+    }
+
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          carousel,
+          // Bottom gradient
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 130.h,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.7),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Status badge
+          if (a.status != null)
+            Positioned(
+              top: topPadding + 10.h,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 14.w, vertical: 5.h),
+                  decoration: BoxDecoration(
+                    color: _statusColor(a.status),
+                    borderRadius: BorderRadius.circular(20.r),
+                  ),
+                  child: Text(
+                    a.status ?? '',
+                    style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          // Animated pill indicators
+          if (totalPages > 1)
+            Positioned(
+              bottom: 30.h,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  totalPages.clamp(0, 8),
+                  (i) {
+                    final active = i == _currentPage.clamp(0, 7);
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                      width: active ? 20.w : 6.w,
+                      height: 6.w,
+                      margin: EdgeInsets.symmetric(horizontal: 2.w),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? AppColors.primary
+                            : Colors.white.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(3.r),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          // Page counter
+          if (totalPages > 1)
+            Positioned(
+              top: topPadding + 10.h,
+              right: widget.isOwner ? 62.w : 16.w,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                    horizontal: 10.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(20.r),
+                ),
+                child: Text(
+                  '${_currentPage + 1} / $totalPages',
+                  style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Price row ──────────────────────────────────────────────────────────────
+
+  Widget _buildPriceRow(AnnouncementModel a) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: '${a.currency ?? 'AED'} ',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black45),
+                ),
+                TextSpan(
+                  text: _formatPrice(a.price ?? 0),
+                  style: GoogleFonts.poppins(
+                      fontSize: 22.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryDark),
+                ),
+                if (a.rentPeriod != null)
+                  TextSpan(
+                    text: ' / ${a.rentPeriod}',
+                    style: GoogleFonts.inter(
+                        fontSize: 12.sp, color: Colors.black38),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (a.listingType != null)
+          Container(
+            padding:
+                EdgeInsets.symmetric(horizontal: 14.w, vertical: 5.h),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20.r),
+              border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.35)),
+            ),
+            child: Text(
+              a.listingType!,
+              style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryDark),
+            ),
+          ),
+        if (a.createdAt != null) ...[
+          SizedBox(width: 8.w),
+          Text(
+            _formatDate(a.createdAt!),
+            style: GoogleFonts.inter(
+                fontSize: 11.sp, color: Colors.grey.shade400),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Stats chips ────────────────────────────────────────────────────────────
+
+  Widget _buildStatsRow(AnnouncementModel a) {
+    final chips = <_Chip>[];
+    if (a.bedrooms != null) {
+      chips.add(_Chip(Icons.bed_outlined, '${a.bedrooms} Beds'));
+    }
+    if (a.bathrooms != null) {
+      chips.add(_Chip(Icons.bathtub_outlined, '${a.bathrooms} Baths'));
+    }
+    if (a.sqft != null) {
+      chips.add(_Chip(Icons.straighten_outlined, '${a.sqft} sqft'));
+    }
+    if (a.propertyType != null) {
+      chips.add(_Chip(Icons.home_work_outlined, a.propertyType!));
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Row(
+      children: chips.asMap().entries.map((e) {
+        final isLast = e.key == chips.length - 1;
+        final c = e.value;
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(right: isLast ? 0 : 8.w),
+            padding:
+                EdgeInsets.symmetric(vertical: 10.h, horizontal: 4.w),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F6F0),
+              borderRadius: BorderRadius.circular(10.r),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(c.icon, size: 18.sp, color: AppColors.primaryDark),
+                SizedBox(height: 4.h),
+                Text(
+                  c.label,
+                  style: GoogleFonts.inter(
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // ── Section title ──────────────────────────────────────────────────────────
+
+  Widget _sectionTitle(String title) {
+    return Row(
+      children: [
+        Container(
+          width: 3.w,
+          height: 16.h,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(2.r),
+          ),
+        ),
+        SizedBox(width: 8.w),
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.black),
+        ),
+      ],
+    );
+  }
+
+  // ── Description ────────────────────────────────────────────────────────────
+
+  Widget _buildDescription(String desc) {
+    const threshold = 160;
+    final isLong = desc.length > threshold;
+    final displayText = isLong && !_descExpanded
+        ? '${desc.substring(0, threshold)}...'
+        : desc;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          displayText,
+          style: GoogleFonts.inter(
+              fontSize: 13.sp, color: AppColors.textHint, height: 1.65),
+        ),
+        if (isLong) ...[
+          SizedBox(height: 4.h),
+          GestureDetector(
+            onTap: () => setState(() => _descExpanded = !_descExpanded),
+            child: Text(
+              _descExpanded ? 'Show less' : 'Read more',
+              style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryDark),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Details grid ───────────────────────────────────────────────────────────
+
+  Widget _buildDetailsGrid(AnnouncementModel a) {
+    final items = <_DetailItem>[];
+    if (a.propertyType != null) {
+      items.add(_DetailItem('Type', a.propertyType!));
+    }
+    if (a.floor != null && a.totalFloors != null) {
+      items.add(_DetailItem('Floor', '${a.floor} of ${a.totalFloors}'));
+    }
+    if (a.sqft != null) {
+      items.add(_DetailItem('Area', '${a.sqft} sqft'));
+    }
+    if (a.propertySize != null) {
+      items.add(_DetailItem(
+          'Area (sqm)', '${a.propertySize!.sqm.toStringAsFixed(0)} sqm'));
+    }
+    if (a.availableDate != null) {
+      items.add(_DetailItem('Available', _formatDate(a.availableDate!)));
+    }
+    if (a.brokkeragePercent != null) {
+      items.add(_DetailItem('Brokerage', '${a.brokkeragePercent}%'));
+    }
+    if (a.proposalsLimit != null) {
+      items.add(_DetailItem('Proposal Limit', '${a.proposalsLimit}'));
+    }
+
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final cardWidth =
+        (MediaQuery.of(context).size.width - 48.w) / 2;
+
+    return Wrap(
+      spacing: 8.w,
+      runSpacing: 8.h,
+      children: items
+          .map((item) => Container(
+                width: cardWidth,
+                padding: EdgeInsets.symmetric(
+                    horizontal: 14.w, vertical: 12.h),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: Colors.grey.shade100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.label,
+                        style: GoogleFonts.inter(
+                            fontSize: 10.sp,
+                            color: AppColors.textHint,
+                            fontWeight: FontWeight.w500)),
+                    SizedBox(height: 3.h),
+                    Text(item.value,
+                        style: GoogleFonts.inter(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87)),
+                  ],
+                ),
+              ))
+          .toList(),
+    );
+  }
+
+  // ── Amenities ──────────────────────────────────────────────────────────────
+
+  Widget _buildAmenities(List<String> amenities) {
+    return Wrap(
+      spacing: 8.w,
+      runSpacing: 8.h,
+      children: amenities
+          .map((label) => Container(
+                padding: EdgeInsets.symmetric(
+                    horizontal: 12.w, vertical: 6.h),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20.r),
+                  border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.25)),
+                ),
+                child: Text(label,
+                    style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.primaryDark)),
+              ))
+          .toList(),
+    );
+  }
+
+  // ── Full location string ───────────────────────────────────────────────────
+
+  String _fullLocation(AnnouncementModel a) {
+    return [
+      a.propertyAddress,
+      a.propertyArea,
+      a.propertyCity,
+      a.propertyCountry,
+    ].whereType<String>().where((s) => s.isNotEmpty).join(', ');
+  }
+
+  // ── Bottom bar (status-based) ──────────────────────────────────────────────
+
   Widget _buildBottomBar(String status) {
     if (!widget.isOwner) return const SizedBox.shrink();
-    if (status == 'approved') return _buildActiveSection();
+    if (status == 'active') return _buildActiveSection();
     if (status == 'rejected') return _buildRejectedSection();
     if (status == 'draft') return _buildDraftSection();
     return const SizedBox.shrink();
   }
 
-  // ── Active: fixed bottom bar ──
   Widget _buildActiveSection() {
+    final bottomPad = MediaQuery.of(context).padding.bottom + 12.h;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 14,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
-      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
+      padding:
+          EdgeInsets.fromLTRB(20.w, 14.h, 20.w, bottomPad),
       child: _brokerSelected
           ? _buildBrokerSelectedBar()
           : GestureDetector(
@@ -769,7 +965,6 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     );
   }
 
-  // Broker NOT selected — two text rows on left, avatar+chevron once on right
   Widget _buildNoBrokerBar() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -779,23 +974,15 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Interested Brokers',
-                style: GoogleFonts.poppins(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-              SizedBox(height: 4.h),
-              Text(
-                'Select and Start Chat',
-                style: GoogleFonts.poppins(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textBlack,
-                ),
-              ),
+              Text('Interested Brokers',
+                  style: GoogleFonts.poppins(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryDark)),
+              SizedBox(height: 2.h),
+              Text('Tap to view & select',
+                  style: GoogleFonts.inter(
+                      fontSize: 12.sp, color: AppColors.textHint)),
             ],
           ),
         ),
@@ -804,37 +991,33 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
         Container(
           padding: EdgeInsets.all(5.w),
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
+            color: AppColors.primary.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.chevron_right, size: 18.sp, color: AppColors.primary),
+          child: Icon(Icons.chevron_right,
+              size: 18.sp, color: AppColors.primary),
         ),
       ],
     );
   }
 
-  // Two overlapping broker avatars with count badge
   Widget _brokerAvatarStack() {
-    const double avatarSize = 46.0;
-    const double peekAmount = 10.0;
+    const double sz = 46.0;
+    const double peek = 10.0;
     return SizedBox(
-      width: (avatarSize + peekAmount),
-      height: avatarSize,
+      width: sz + peek,
+      height: sz,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Back avatar – peeking right
           Positioned(
-            right: 0,
-            child: _brokerAvatar('assets/images/story2.png', avatarSize),
-          ),
-          // Front avatar – fully visible left, on top
+              right: 0, child: _brokerAvatar('assets/images/story2.png', sz)),
           Positioned(
             left: 0,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                _brokerAvatar('assets/images/story1.png', avatarSize),
+                _brokerAvatar('assets/images/story1.png', sz),
                 Positioned(
                   top: -3.h,
                   right: -5.w,
@@ -844,17 +1027,15 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
+                      border:
+                          Border.all(color: Colors.white, width: 1.5),
                     ),
                     child: Center(
-                      child: Text(
-                        '4',
-                        style: GoogleFonts.inter(
-                          fontSize: 9.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: Text('4',
+                          style: GoogleFonts.inter(
+                              fontSize: 9.sp,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white)),
                     ),
                   ),
                 ),
@@ -871,212 +1052,175 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 1.5),
-      ),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 1.5)),
       child: ClipOval(
-        child: Image.asset(asset, fit: BoxFit.cover),
-      ),
+          child: Image.asset(asset, fit: BoxFit.cover)),
     );
   }
 
-  // Broker selected — avatar + name + Call/Chat
   Widget _buildBrokerSelectedBar() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            ClipOval(
-              child: Image.asset(
-                'assets/images/story1.png',
-                width: 46.w,
-                height: 46.w,
-                fit: BoxFit.cover,
-              ),
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Start Chat With Your Broker',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  Text(
-                    'Ahmed Al-Rashid',
-                    style: GoogleFonts.inter(
-                      fontSize: 12.sp,
-                      color: AppColors.textHint,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 12.h),
-        Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {},
-                child: Container(
-                  height: 46.h,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.primary),
-                    borderRadius: BorderRadius.circular(10.r),
-                  ),
-                  child: Text(
-                    'Call',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {},
-                child: Container(
-                  height: 46.h,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(10.r),
-                  ),
-                  child: Text(
-                    'Chat',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // ── Rejected: fixed bottom bar ──
-  Widget _buildRejectedSection() {
+    final bottomPad = MediaQuery.of(context).padding.bottom + 12.h;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 14,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
-      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
+      padding: EdgeInsets.fromLTRB(20.w, 14.h, 20.w, bottomPad),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              ClipOval(
+                child: Image.asset('assets/images/story1.png',
+                    width: 44.w, height: 44.w, fit: BoxFit.cover),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Start Chat With Your Broker',
+                        style: GoogleFonts.poppins(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87)),
+                    Text('Ahmed Al-Rashid',
+                        style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: AppColors.textHint)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {},
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppColors.primary),
+                    padding: EdgeInsets.symmetric(vertical: 13.h),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r)),
+                  ),
+                  child: Text('Call',
+                      style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary)),
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(vertical: 13.h),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r)),
+                  ),
+                  child: Text('Chat',
+                      style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRejectedSection() {
+    final bottomPad = MediaQuery.of(context).padding.bottom + 12.h;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 14,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, bottomPad),
       child: SizedBox(
         width: double.infinity,
-        height: 50.h,
+        height: 52.h,
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red.shade600,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10.r),
-            ),
             elevation: 0,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14.r)),
           ),
           onPressed: _showRejectionReasonDialog,
-          child: Text(
-            'View Reason',
-            style: GoogleFonts.poppins(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
+          child: Text('View Rejection Reason',
+              style: GoogleFonts.poppins(
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white)),
         ),
       ),
     );
   }
 
-  // ── Draft: fixed bottom bar ──
   Widget _buildDraftSection() {
+    final bottomPad = MediaQuery.of(context).padding.bottom + 12.h;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 14,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
-      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
+      padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, bottomPad),
       child: SizedBox(
         width: double.infinity,
-        height: 50.h,
+        height: 52.h,
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10.r),
-            ),
             elevation: 0,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14.r)),
           ),
-          onPressed: () => Get.to(() =>
-              CreateAnnouncementView(announcement: widget.announcement))
-              ?.then((result) { if (result == true && mounted) Get.back(result: true); }),
-          child: Text(
-            'Complete Your Announcement',
-            style: GoogleFonts.poppins(
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
+          onPressed: () =>
+              Get.to(() => CreateAnnouncementView(
+                      announcement: widget.announcement))
+                  ?.then((result) {
+                if (result == true && mounted) Get.back(result: true);
+              }),
+          child: Text('Complete Your Announcement',
+              style: GoogleFonts.poppins(
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white)),
         ),
       ),
     );
   }
 
-  Widget _sectionTitle(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.poppins(
-        fontSize: 14.sp,
-        fontWeight: FontWeight.w600,
-        color: Colors.black,
-      ),
-    );
-  }
-
-  Widget _amenityChip(String label) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
-        borderRadius: BorderRadius.circular(20.r),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          fontSize: 13.sp,
-          color: Colors.black87,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
-  Widget _imagePlaceholder() {
-    return Container(
-      color: Colors.grey.shade300,
-      child: Center(
-        child: Icon(Icons.home_outlined, size: 48.sp, color: Colors.grey),
-      ),
-    );
-  }
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   Widget _shimmerBox() {
     return Shimmer.fromColors(
@@ -1085,4 +1229,18 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       child: Container(color: Colors.grey.shade300),
     );
   }
+}
+
+// ── Data helpers ───────────────────────────────────────────────────────────
+
+class _Chip {
+  final IconData icon;
+  final String label;
+  const _Chip(this.icon, this.label);
+}
+
+class _DetailItem {
+  final String label;
+  final String value;
+  const _DetailItem(this.label, this.value);
 }

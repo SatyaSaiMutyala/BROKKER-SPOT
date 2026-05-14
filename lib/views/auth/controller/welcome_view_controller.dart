@@ -404,12 +404,10 @@ class WelcomeViewController extends GetxController {
 
   void _navigateByRole(int role) {
     final lastSide = LocalStorageService.getLastSide();
-    // Navigate to where they last logged out from
-    // For fresh installs (no lastSide), fall back to role
     if (lastSide == 'broker') {
-      Get.offAll(() => BrokerDashBoardView());
+      Get.offAll(() => BrokerDashBoardView(showLocationPicker: true));
     } else {
-      Get.offAll(() => DashboardView());
+      Get.offAll(() => const DashboardView(showLocationPicker: true));
     }
   }
 }

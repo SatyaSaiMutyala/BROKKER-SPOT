@@ -1,6 +1,7 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/settings/change_password_view.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
+import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -141,6 +142,16 @@ class SettingsView extends StatelessWidget {
             iconColor: AppColors.goldAccent,
             title: 'Change Password',
             onTap: () => Get.to(() => ChangePasswordView()),
+          ),
+          _tileDivider(),
+          _settingsTile(
+            icon: Icons.location_on_outlined,
+            iconColor: AppColors.goldAccent,
+            title: 'Location',
+            onTap: () => Get.dialog(
+              const LocationPickerPopup(),
+              barrierDismissible: false,
+            ),
           ),
           _tileDivider(),
           _settingsTile(

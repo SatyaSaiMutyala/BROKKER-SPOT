@@ -94,7 +94,7 @@ class CreateBrokerAccountView extends StatelessWidget {
                 alignment: Alignment.bottomRight,
                 child: TextButton(
                   onPressed: () {
-                    Get.offAll(() => BrokerDashBoardView());
+                    Get.offAll(() => BrokerDashBoardView(showLocationPicker: true));
                   },
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

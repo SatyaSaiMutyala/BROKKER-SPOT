@@ -205,7 +205,9 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
+      body: Stack(
+        children: [
+          SafeArea(
         child: Column(
           children: [
             const CustomHeader(title: 'VIDEO & IMAGES', showBackButton: true),
@@ -271,69 +273,92 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
                 ),
               ),
             ),
-            if (_isUploading)
-              _buildProgressBar()
-            else
-              Padding(
+            Padding(
                 padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
                 child: CustomPrimaryButton(
                   title: 'Save',
                   backgroundColor: _isValid ? AppColors.primary : Colors.grey.shade300,
                   defaultColor: _isValid ? Colors.white : Colors.black45,
-                  onPressed: _isValid ? _uploadAndSave : () {},
+                  onPressed: _isValid && !_isUploading ? _uploadAndSave : () {},
                 ),
               ),
           ],
+        ),
+          ),  // SafeArea
+          if (_isUploading) _buildUploadOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadOverlay() {
+    final percent = (_uploadProgress * 100).toInt();
+    final isDone = _uploadedCount >= _totalToUpload && _totalToUpload > 0;
+    return Positioned.fill(
+      child: AbsorbPointer(
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.5),
+          child: Center(
+            child: Container(
+              width: 200.w,
+              padding: EdgeInsets.symmetric(vertical: 28.h, horizontal: 24.w),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20.r),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 72.w,
+                    height: 72.w,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 72.w,
+                          height: 72.w,
+                          child: CircularProgressIndicator(
+                            value: _uploadProgress,
+                            strokeWidth: 7,
+                            strokeCap: StrokeCap.round,
+                            backgroundColor: Colors.grey.shade200,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.primary),
+                          ),
+                        ),
+                        Text(
+                          '$percent%',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  Text(
+                    isDone
+                        ? 'Upload complete!'
+                        : 'Uploading ${_uploadedCount + 1} of $_totalToUpload...',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProgressBar() {
-    final percent = (_uploadProgress * 100).toInt();
-    final isDone = _uploadedCount >= _totalToUpload && _totalToUpload > 0;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 24.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                isDone
-                    ? 'Upload complete!'
-                    : 'Uploading ${_uploadedCount + 1} of $_totalToUpload...',
-                style: GoogleFonts.inter(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
-                ),
-              ),
-              Text(
-                '$percent%',
-                style: GoogleFonts.inter(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 10.h),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(100.r),
-            child: LinearProgressIndicator(
-              value: _uploadProgress,
-              backgroundColor: Colors.grey.shade200,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              minHeight: 10.h,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _videoBox() {
     final hasVideo = _videoFile != null || _existingVideoUrl != null;

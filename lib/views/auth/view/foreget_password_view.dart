@@ -1,6 +1,7 @@
 import 'package:brokkerspot/views/auth/controller/email_verification_controller.dart';
 import 'package:brokkerspot/views/auth/controller/forget_password_controller.dart';
 import 'package:brokkerspot/views/auth/view/email_verification_view.dart';
+import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -212,13 +213,7 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
                         email: emailController.text.trim(),
                       ));
                 } else {
-                  Get.snackbar(
-                    "Error",
-                    "Failed to send OTP. Please try again.",
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.red,
-                    colorText: Colors.white,
-                  );
+                  AppToast.error("Failed to send OTP. Please try again.");
                 }
               }
             : null,

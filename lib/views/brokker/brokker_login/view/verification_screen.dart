@@ -33,7 +33,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
           Get.to(() => const MyAnnouncementsTabView());
         });
       } else {
-        Get.offAll(() => BrokerDashBoardView());
+        Get.offAll(() => BrokerDashBoardView(showLocationPicker: true));
       }
     });
   }

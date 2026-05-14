@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
@@ -17,36 +18,143 @@ class BrokerProjectsView extends StatefulWidget {
   State<BrokerProjectsView> createState() => _BrokerProjectsViewState();
 }
 
+class _BrokerShimmerList extends StatelessWidget {
+  const _BrokerShimmerList();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade200,
+      highlightColor: Colors.grey.shade100,
+      child: ListView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 4,
+        itemBuilder: (_, __) => const _BrokerShimmerCard(),
+      ),
+    );
+  }
+}
+
+class _BrokerShimmerCard extends StatelessWidget {
+  const _BrokerShimmerCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Owner row
+          Row(
+            children: [
+              Container(
+                width: 32.w,
+                height: 32.w,
+                decoration: const BoxDecoration(
+                    color: Colors.white, shape: BoxShape.circle),
+              ),
+              SizedBox(width: 8.w),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                      width: 100.w, height: 10.h, color: Colors.white),
+                  SizedBox(height: 4.h),
+                  Container(
+                      width: 60.w, height: 8.h, color: Colors.white),
+                ],
+              ),
+              const Spacer(),
+              Container(
+                  width: 60.w,
+                  height: 22.h,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4.r),
+                  )),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          // Image area
+          Container(
+            width: double.infinity,
+            height: 200.h,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+          ),
+          SizedBox(height: 10.h),
+          // Price row
+          Container(width: 120.w, height: 14.h, color: Colors.white),
+          SizedBox(height: 6.h),
+          // Property name
+          Container(width: 200.w, height: 12.h, color: Colors.white),
+          SizedBox(height: 6.h),
+          // Bedroom / sqft row
+          Row(
+            children: [
+              Container(width: 50.w, height: 10.h, color: Colors.white),
+              SizedBox(width: 12.w),
+              Container(width: 50.w, height: 10.h, color: Colors.white),
+            ],
+          ),
+          SizedBox(height: 6.h),
+          Divider(color: Colors.grey.shade200, thickness: 1),
+          SizedBox(height: 4.h),
+          // Location row
+          Container(width: 160.w, height: 10.h, color: Colors.white),
+          SizedBox(height: 8.h),
+        ],
+      ),
+    );
+  }
+}
+
 class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   final _repo = AnnouncementRepository();
+
+  // Static cache — survives navigation, cleared only on pull-to-refresh
+  static List<AnnouncementModel>? _cache;
+
   List<AnnouncementModel> _announcements = [];
-  bool _loading = true;
+  bool _loading = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _fetchAnnouncements();
+    if (_cache != null) {
+      // Show cached data instantly — no API call
+      _announcements = _cache!;
+    } else {
+      _fetchAnnouncements();
+    }
   }
 
-  Future<void> _fetchAnnouncements() async {
+  Future<void> _fetchAnnouncements({bool isRefresh = false}) async {
+    if (isRefresh) _cache = null;
     setState(() {
-      _loading = true;
+      _loading = _announcements.isEmpty;
       _error = null;
     });
     try {
       final result = await _repo.fetchAllAnnouncements();
-      if (mounted)
+      if (mounted) {
+        _cache = result.items;
         setState(() {
           _announcements = result.items;
           _loading = false;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = _announcements.isEmpty ? e.toString() : null;
           _loading = false;
         });
+      }
     }
   }
 
@@ -67,7 +175,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
 
   Widget _buildContent() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return _BrokerShimmerList();
     }
     if (_error != null) {
       return Center(
@@ -92,37 +200,51 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
       );
     }
     if (_announcements.isEmpty) {
-      return Center(
-        child: Text('No announcements',
-            style: GoogleFonts.inter(
-                fontSize: 14.sp, color: Colors.grey.shade400)),
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => _fetchAnnouncements(isRefresh: true),
+        child: ListView(
+          children: [
+            SizedBox(height: 200.h),
+            Center(
+              child: Text('No announcements',
+                  style: GoogleFonts.inter(
+                      fontSize: 14.sp, color: Colors.grey.shade400)),
+            ),
+          ],
+        ),
       );
     }
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-            child: _buildSectionHeader(
-                'Announcement', '${_announcements.length} announcements'),
-          ),
-          ..._announcements.asMap().entries.map(
-                (entry) => AnnouncementPropertyCard(
-                  announcement: entry.value,
-                  index: entry.key,
-                  showWishlist: false,
-                  showActionButtons: false,
-                  ownerRowAboveImage: true,
-                  onTap: () => Get.to(() =>
-                      BrokerAnnouncementDetailView(announcement: entry.value)),
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () => _fetchAnnouncements(isRefresh: true),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              child: _buildSectionHeader(
+                  'Announcement', '${_announcements.length} announcements'),
+            ),
+            ..._announcements.asMap().entries.map(
+                  (entry) => AnnouncementPropertyCard(
+                    announcement: entry.value,
+                    index: entry.key,
+                    showWishlist: false,
+                    showActionButtons: false,
+                    ownerRowAboveImage: true,
+                    onTap: () => Get.to(() =>
+                        BrokerAnnouncementDetailView(announcement: entry.value)),
+                  ),
                 ),
-              ),
-          SizedBox(height: 8.h),
-          PremiumLockBanner(onTap: () {}),
-          SizedBox(height: 24.h),
-        ],
+            SizedBox(height: 8.h),
+            PremiumLockBanner(onTap: () {}),
+            SizedBox(height: 24.h),
+          ],
+        ),
       ),
     );
   }
