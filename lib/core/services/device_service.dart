@@ -8,16 +8,52 @@ import 'package:flutter/foundation.dart';
 class DeviceService {
   static final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
-  static Future<void> registerDevice() async {
+  static Future<String?> _getFcmToken() async {
     try {
-      // Get FCM token
-      final fcmToken = await FirebaseMessaging.instance.getToken();
-      if (fcmToken == null) {
-        debugPrint('FCM token is null, skipping device registration');
-        return;
-      }
+      if (Platform.isIOS) {
+        // Request permission first — required on iOS for APNS token to arrive
+        await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
 
-      // Get device info
+        // Wait up to 10s for APNS token
+        String? apns;
+        for (int i = 0; i < 5; i++) {
+          apns = await FirebaseMessaging.instance.getAPNSToken();
+          if (apns != null) break;
+          await Future.delayed(const Duration(seconds: 2));
+        }
+
+        if (apns == null) {
+          debugPrint('APNS token not available after retries');
+          return null;
+        }
+      }
+      return await FirebaseMessaging.instance.getToken();
+    } catch (e) {
+      debugPrint('Could not get FCM token: $e');
+      return null;
+    }
+  }
+
+  static Future<void> registerDevice() async {
+    final fcmToken = await _getFcmToken();
+    if (fcmToken == null) {
+      debugPrint('Device registration: FCM token null, waiting for onTokenRefresh...');
+      FirebaseMessaging.instance.onTokenRefresh.first.then((token) {
+        debugPrint('Device registration: token refreshed, registering now');
+        _sendRegistration(token);
+      });
+      return;
+    }
+    debugPrint('Device registration: calling API with token $fcmToken');
+    await _sendRegistration(fcmToken);
+  }
+
+  static Future<void> _sendRegistration(String fcmToken) async {
+    try {
       String platform = Platform.isAndroid ? 'android' : 'ios';
       String deviceModel = '';
       String deviceId = '';

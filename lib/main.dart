@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
@@ -15,6 +17,30 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await LocalStorageService.init();
+
+  try {
+    if (Platform.isIOS) {
+      await FirebaseMessaging.instance.requestPermission();
+      // Wait for APNS token to arrive after permission grant
+      String? apns;
+      for (int i = 0; i < 5; i++) {
+        apns = await FirebaseMessaging.instance.getAPNSToken();
+        if (apns != null) break;
+        await Future.delayed(const Duration(seconds: 2));
+      }
+      if (apns == null) {
+        debugPrint('FCM Token: APNS not ready (simulator or denied)');
+      } else {
+        final fcmToken = await FirebaseMessaging.instance.getToken();
+        debugPrint('FCM Token: $fcmToken');
+      }
+    } else {
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      debugPrint('FCM Token: $fcmToken');
+    }
+  } catch (e) {
+    debugPrint('FCM Token unavailable: $e');
+  }
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

@@ -82,7 +82,13 @@ class LoginController extends GetxController {
           AppToast.error(loginModel.message);
         }
       } else {
-        AppToast.error("Login failed");
+        try {
+          final body = jsonDecode(response.body);
+          final msg = body['message'] as String?;
+          AppToast.error(msg ?? "Login failed");
+        } catch (_) {
+          AppToast.error("Login failed");
+        }
       }
     } catch (e, s) {
       print(e);

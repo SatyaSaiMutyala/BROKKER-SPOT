@@ -1,3 +1,4 @@
+import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/announcements/my_announcements_tab_view.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
@@ -33,6 +34,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
           Get.to(() => const MyAnnouncementsTabView());
         });
       } else {
+        DeviceService.registerDevice();
         Get.offAll(() => BrokerDashBoardView(showLocationPicker: true));
       }
     });

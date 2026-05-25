@@ -7,6 +7,7 @@ import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:brokkerspot/models/login_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
@@ -403,6 +404,7 @@ class WelcomeViewController extends GetxController {
   }
 
   void _navigateByRole(int role) {
+    DeviceService.registerDevice();
     final lastSide = LocalStorageService.getLastSide();
     if (lastSide == 'broker') {
       Get.offAll(() => BrokerDashBoardView(showLocationPicker: true));
