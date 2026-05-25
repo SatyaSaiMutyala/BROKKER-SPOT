@@ -38,6 +38,13 @@ class _PropertyPriceBrokerageViewState
   double get _brokerageAmount => _price * _brokeragePercent / 100;
   double get _receiveAmount => _price - _brokerageAmount;
 
+  // For rent: brokerage is always calculated on a single month's rent.
+  // Yearly inputs are divided by 12 first.
+  double get _oneMonthRent =>
+      _priceType == 'Yearly' ? _price / 12 : _price;
+  double get _rentBrokerageAmount =>
+      _oneMonthRent * _brokeragePercent / 100;
+
   @override
   void initState() {
     super.initState();
@@ -163,13 +170,13 @@ class _PropertyPriceBrokerageViewState
         SizedBox(height: 20.h),
 
         _readOnlyAmountField(
-          label: 'You have to pay Brokerage',
+          label: 'You will receive Brokerage',
           amount: _brokerageAmount,
         ),
         SizedBox(height: 16.h),
 
         _readOnlyAmountField(
-          label: 'You will receive Amount',
+          label: 'You have to pay owner',
           amount: _receiveAmount,
         ),
         SizedBox(height: 32.h),
@@ -220,6 +227,23 @@ class _PropertyPriceBrokerageViewState
         _label('Property is Available For Rent', required: true),
         SizedBox(height: 8.h),
         _datePicker(),
+        SizedBox(height: 24.h),
+        Text(
+          'Are You want to share brokerage with broker?',
+          style: GoogleFonts.inter(
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87),
+        ),
+        SizedBox(height: 14.h),
+        _label('Set Brokerage'),
+        SizedBox(height: 8.h),
+        _brokerageStepperRow(),
+        SizedBox(height: 20.h),
+        _readOnlyAmountField(
+          label: 'You will receive one Month Brokerage',
+          amount: _rentBrokerageAmount,
+        ),
         SizedBox(height: 32.h),
       ],
     );

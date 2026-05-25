@@ -4,7 +4,6 @@ import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -29,6 +28,10 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
 
   bool get _isSell => widget.propertyFor == 'Sell';
   bool _isUploading = false;
+  int _uploadedCount = 0;
+  int _totalToUpload = 0;
+  double get _uploadProgress =>
+      _totalToUpload == 0 ? 0 : _uploadedCount / _totalToUpload;
 
   // Sell
   XFile? _idFrontFile, _idBackFile, _deedFile, _nocFile;
@@ -69,34 +72,43 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
   }
 
   Future<void> _uploadAndSave() async {
-    setState(() => _isUploading = true);
+    int total = 0;
+    if (_isSell) {
+      if (_idFrontFile != null) total++;
+      if (_idBackFile != null) total++;
+      if (_deedFile != null) total++;
+      if (_nocFile != null) total++;
+    } else {
+      if (_rentIdFrontFile != null) total++;
+      if (_rentIdBackFile != null) total++;
+      if (_rentDeedFile != null) total++;
+    }
+    setState(() {
+      _isUploading = true;
+      _uploadedCount = 0;
+      _totalToUpload = total;
+    });
     try {
-      EasyLoading.show(status: 'Uploading documents...');
-      String? titleDeedUrl, passportFrontUrl, passportBackUrl, nocUrl;
+      Future<String?> uploadIfNew(XFile? file, String? existingUrl) async {
+        if (file == null) return existingUrl;
+        final url = await api.uploadImage(
+            file: File(file.path), fileType: 'announcements');
+        if (mounted) setState(() => _uploadedCount++);
+        return url;
+      }
 
+      String? titleDeedUrl, passportFrontUrl, passportBackUrl, nocUrl;
       if (_isSell) {
-        passportFrontUrl = _idFrontFile != null
-            ? await api.uploadImage(file: File(_idFrontFile!.path), fileType: 'announcements')
-            : _existingFrontUrl;
-        passportBackUrl = _idBackFile != null
-            ? await api.uploadImage(file: File(_idBackFile!.path), fileType: 'announcements')
-            : _existingBackUrl;
-        titleDeedUrl = _deedFile != null
-            ? await api.uploadImage(file: File(_deedFile!.path), fileType: 'announcements')
-            : _existingDeedUrl;
-        nocUrl = _nocFile != null
-            ? await api.uploadImage(file: File(_nocFile!.path), fileType: 'announcements')
-            : _existingNocUrl;
+        passportFrontUrl = await uploadIfNew(_idFrontFile, _existingFrontUrl);
+        passportBackUrl = await uploadIfNew(_idBackFile, _existingBackUrl);
+        titleDeedUrl = await uploadIfNew(_deedFile, _existingDeedUrl);
+        nocUrl = await uploadIfNew(_nocFile, _existingNocUrl);
       } else {
-        passportFrontUrl = _rentIdFrontFile != null
-            ? await api.uploadImage(file: File(_rentIdFrontFile!.path), fileType: 'announcements')
-            : _existingFrontUrl;
-        passportBackUrl = _rentIdBackFile != null
-            ? await api.uploadImage(file: File(_rentIdBackFile!.path), fileType: 'announcements')
-            : _existingBackUrl;
-        titleDeedUrl = _rentDeedFile != null
-            ? await api.uploadImage(file: File(_rentDeedFile!.path), fileType: 'announcements')
-            : _existingDeedUrl;
+        passportFrontUrl =
+            await uploadIfNew(_rentIdFrontFile, _existingFrontUrl);
+        passportBackUrl =
+            await uploadIfNew(_rentIdBackFile, _existingBackUrl);
+        titleDeedUrl = await uploadIfNew(_rentDeedFile, _existingDeedUrl);
       }
 
       Get.find<AnnouncementController>().setDocuments(
@@ -106,12 +118,19 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
         nocUrl: nocUrl,
       );
 
-      EasyLoading.dismiss();
+      // Hold at 100% briefly so user sees completion before navigating back.
+      await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      EasyLoading.dismiss();
-      EasyLoading.showError('Upload failed. Please try again.');
-      setState(() => _isUploading = false);
+      if (mounted) setState(() => _isUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Upload failed. Please try again.'),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
     }
   }
 
@@ -119,7 +138,9 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
+      body: Stack(
+        children: [
+          SafeArea(
         child: Column(
           children: [
             const CustomHeader(title: 'Upload Document', showBackButton: true),
@@ -181,6 +202,80 @@ class _UploadDocumentViewState extends State<UploadDocumentView> {
               ),
             ),
           ],
+        ),
+          ), // SafeArea
+          if (_isUploading) _buildUploadOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadOverlay() {
+    final percent = (_uploadProgress * 100).toInt();
+    final isDone =
+        _totalToUpload == 0 || _uploadedCount >= _totalToUpload;
+    return Positioned.fill(
+      child: AbsorbPointer(
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.5),
+          child: Center(
+            child: Container(
+              width: 200.w,
+              padding: EdgeInsets.symmetric(vertical: 28.h, horizontal: 24.w),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20.r),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 72.w,
+                    height: 72.w,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 72.w,
+                          height: 72.w,
+                          child: CircularProgressIndicator(
+                            value: _totalToUpload == 0 ? null : _uploadProgress,
+                            strokeWidth: 7,
+                            strokeCap: StrokeCap.round,
+                            backgroundColor: Colors.grey.shade200,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.primary),
+                          ),
+                        ),
+                        Text(
+                          _totalToUpload == 0 ? '...' : '$percent%',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  Text(
+                    _totalToUpload == 0
+                        ? 'Saving...'
+                        : isDone
+                            ? 'Upload complete!'
+                            : 'Uploading ${_uploadedCount + 1} of $_totalToUpload...',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

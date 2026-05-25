@@ -11,6 +11,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class PropertyVideoImagesView extends StatefulWidget {
   const PropertyVideoImagesView({super.key});
@@ -54,8 +55,105 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
 
   static const int _maxVideoBytes = 50 * 1024 * 1024; // 50 MB
 
+  // ─── Permission gate ───
+  /// Requests the permissions needed for the given source/media. Returns true
+  /// only after the user grants them. If the user previously selected "Don't
+  /// ask again" on Android, shows an in-app dialog routing them to Settings.
+  Future<bool> _ensurePermissions({
+    required ImageSource source,
+    required bool needsMicrophone,
+  }) async {
+    final permissions = <Permission>[];
+
+    if (source == ImageSource.camera) {
+      permissions.add(Permission.camera);
+      if (needsMicrophone) permissions.add(Permission.microphone);
+    } else {
+      // Gallery — Android 13+ uses Permission.photos / Permission.videos;
+      // older Android uses storage. permission_handler maps these correctly.
+      if (Platform.isIOS) {
+        permissions.add(Permission.photos);
+      } else {
+        permissions.add(
+            needsMicrophone ? Permission.videos : Permission.photos);
+      }
+    }
+
+    for (final p in permissions) {
+      var status = await p.status;
+      if (status.isGranted || status.isLimited) continue;
+      if (status.isPermanentlyDenied) {
+        if (!mounted) return false;
+        final opened = await _showSettingsDialog(p);
+        if (!opened) return false;
+        status = await p.status;
+        if (!status.isGranted && !status.isLimited) return false;
+        continue;
+      }
+      status = await p.request();
+      if (status.isGranted || status.isLimited) continue;
+      if (status.isPermanentlyDenied) {
+        if (!mounted) return false;
+        final opened = await _showSettingsDialog(p);
+        if (!opened) return false;
+        status = await p.status;
+        if (!status.isGranted && !status.isLimited) return false;
+        continue;
+      }
+      // Still denied (but not permanent) — allow re-prompt on next tap.
+      return false;
+    }
+    return true;
+  }
+
+  Future<bool> _showSettingsDialog(Permission permission) async {
+    final label = permission == Permission.camera
+        ? 'Camera'
+        : permission == Permission.microphone
+            ? 'Microphone'
+            : permission == Permission.videos
+                ? 'Videos'
+                : 'Photos';
+    final granted = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.r)),
+            title: Text('$label permission required',
+                style: GoogleFonts.poppins(
+                    fontSize: 16.sp, fontWeight: FontWeight.w600)),
+            content: Text(
+              'Please enable $label access in Settings to continue.',
+              style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text('Cancel',
+                    style: GoogleFonts.inter(color: Colors.black54)),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await openAppSettings();
+                  if (ctx.mounted) Navigator.pop(ctx, true);
+                },
+                child: Text('Open Settings',
+                    style: GoogleFonts.inter(
+                        color: AppColors.primary, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    return granted;
+  }
+
   // ─── Video picker ───
   void _pickVideo(ImageSource source) async {
+    final ok = await _ensurePermissions(source: source, needsMicrophone: true);
+    if (!ok) return;
     try {
       final picked = await _picker.pickVideo(
         source: source,
@@ -69,7 +167,13 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
         return;
       }
       setState(() => _videoFile = file);
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open video picker: $e')),
+        );
+      }
+    }
   }
 
   void _showVideoPicker() {
@@ -90,15 +194,27 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
   void _pickImage(int index) {
     _showSourceSheet(
       onCamera: () async {
+        final ok = await _ensurePermissions(
+            source: ImageSource.camera, needsMicrophone: false);
+        if (!ok) return;
         try {
           final picked = await _picker.pickImage(
               source: ImageSource.camera, imageQuality: 80);
           if (picked != null) {
             setState(() => _imageFiles[index] = File(picked.path));
           }
-        } catch (_) {}
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not open camera: $e')),
+            );
+          }
+        }
       },
       onGallery: () async {
+        final ok = await _ensurePermissions(
+            source: ImageSource.gallery, needsMicrophone: false);
+        if (!ok) return;
         try {
           final picked = await _picker.pickMultiImage(imageQuality: 80);
           if (picked.isNotEmpty) {
@@ -112,7 +228,13 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
               }
             });
           }
-        } catch (_) {}
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not open gallery: $e')),
+            );
+          }
+        }
       },
     );
   }

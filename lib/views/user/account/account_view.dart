@@ -84,6 +84,7 @@ class AccountView extends StatelessWidget {
                           Obx(() {
                             final profileCtrl = Get.find<ProfileController>();
                             final isBroker = profileCtrl.role.value == 2;
+                            final canSwitchToBroker = isBroker || role == 2;
                             return _accountTile(
                               iconAsset: 'switch_to_user_icon.png',
                               title: isBroker
@@ -92,10 +93,18 @@ class AccountView extends StatelessWidget {
                                       ? 'Switch to Broker'
                                       : 'Become Broker',
                               enabled: true,
-                              onTap: () {
-                                if (isBroker) {
-                                  LocalStorageService.saveLastSide('broker');
-                                  Get.offAll(() => BrokerDashBoardView());
+                              onTap: () async {
+                                if (canSwitchToBroker) {
+                                  Get.dialog(
+                                    const Center(child: CircularProgressIndicator()),
+                                    barrierDismissible: false,
+                                  );
+                                  final ok = await profileCtrl.switchRole(2);
+                                  if (Get.isDialogOpen ?? false) Get.back();
+                                  if (ok) {
+                                    LocalStorageService.saveLastSide('broker');
+                                    Get.offAll(() => BrokerDashBoardView());
+                                  }
                                 } else {
                                   Get.to(() => BrokerOnboardingView());
                                 }

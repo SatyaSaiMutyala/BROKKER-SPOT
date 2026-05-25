@@ -17,8 +17,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 class CreateAnnouncementView extends StatefulWidget {
   final AnnouncementModel? announcement;
+  final bool fromBroker;
 
-  const CreateAnnouncementView({super.key, this.announcement});
+  const CreateAnnouncementView({
+    super.key,
+    this.announcement,
+    this.fromBroker = false,
+  });
 
   bool get isEditing => announcement != null;
 
@@ -208,7 +213,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       if (widget.isEditing) {
         Get.back(result: true);
       } else {
-        Get.to(() => const VerificationScreen(isAnnouncement: true));
+        Get.to(() => VerificationScreen(
+              isAnnouncement: true,
+              fromBroker: widget.fromBroker,
+            ));
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

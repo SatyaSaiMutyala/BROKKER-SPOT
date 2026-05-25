@@ -15,7 +15,12 @@ import 'package:get/get.dart';
 
 class BrokerDashBoardView extends StatefulWidget {
   final bool showLocationPicker;
-  BrokerDashBoardView({super.key, this.showLocationPicker = false});
+  final int initialIndex;
+  BrokerDashBoardView({
+    super.key,
+    this.showLocationPicker = false,
+    this.initialIndex = 0,
+  });
 
   @override
   State<BrokerDashBoardView> createState() => _BrokerDashBoardViewState();
@@ -31,6 +36,7 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
   @override
   void initState() {
     super.initState();
+    controller.currentIndex.value = widget.initialIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.showLocationPicker) {
         showDialog(
@@ -176,7 +182,7 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
               _navItem(context, 0, 'assets/images/broker_home_icon.png',
                   'assets/images/broker_active_home_icon.png', 'Dashboard'),
               _navItem(context, 1, 'assets/images/broker_project_icon.png',
-                  'assets/images/broker_active_project_icon.png', 'Projects'),
+                  'assets/images/broker_active_project_icon.png', 'Announcement'),
               _navItem(context, 2, 'assets/images/meeting_icon.png',
                   'assets/images/meeting_active_icon.png', 'Meeting'),
               _navItem(context, 3, 'assets/images/broker_payment_icon.png',

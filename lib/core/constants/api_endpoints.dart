@@ -8,6 +8,7 @@ class ApiEndpoints {
   static const String appleSignIn = 'user/auth/apple-login';
   static const String registerDevice = 'user/auth/register-device';
   static const String forgotPassword = 'user/auth/forgot-password';
+  static const String switchRole = 'user/auth/switch-role';
 
   // Profile
   static const String fileUpload = 'user/profile/file-upload';

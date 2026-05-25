@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:brokkerspot/core/common_widget/api_service.dart';
+import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class ProfileController extends GetxController {
@@ -72,6 +74,51 @@ class ProfileController extends GetxController {
       print('Stack: $s');
       // Fallback to Firebase Auth user data
       _loadFromFirebaseUser();
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Calls /user/auth/switch-role. Returns true on success.
+  /// Updates local token (if returned), refreshes profile.
+  Future<bool> switchRole(int targetRole) async {
+    try {
+      isLoading.value = true;
+      final response = await postRequest(
+        '',
+        endPoint: ApiEndpoints.switchRole,
+        body: {'target_role': targetRole},
+        headers: buildHeaders(),
+      );
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      if (json['success'] == true) {
+        final data = json['data'];
+        if (data is Map<String, dynamic>) {
+          final newToken = data['token'] ?? data['access_token'] ?? data['accessToken'];
+          if (newToken is String && newToken.isNotEmpty) {
+            await LocalStorageService.saveAccessToken(newToken);
+          }
+        }
+        await getProfile();
+        return true;
+      }
+      Get.snackbar(
+        'Error',
+        json['message']?.toString() ?? 'Failed to switch role',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+      );
+      return false;
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+      );
+      return false;
     } finally {
       isLoading.value = false;
     }

@@ -886,10 +886,17 @@ class _ProposalSheet extends StatefulWidget {
 
 class _ProposalSheetState extends State<_ProposalSheet> {
   final TextEditingController _controller = TextEditingController();
-  final int _maxLength = 50;
+  final int _maxLength = 500;
+  static const int _minWords = 10;
   bool _submitted = false;
   bool _isLoading = false;
   String? _error;
+
+  int _wordCount(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return 0;
+    return trimmed.split(RegExp(r'\s+')).length;
+  }
 
   @override
   void initState() {
@@ -904,13 +911,24 @@ class _ProposalSheetState extends State<_ProposalSheet> {
   }
 
   Future<void> _submit() async {
-    if (_controller.text.trim().isEmpty) return;
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      setState(() => _error = 'Message is required');
+      return;
+    }
+    if (_wordCount(text) < _minWords) {
+      setState(() => _error = 'Message must be at least $_minWords words');
+      return;
+    }
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
-      await AnnouncementRepository().sendProposal(widget.announcementId);
+      await AnnouncementRepository().sendProposal(
+        widget.announcementId,
+        message: _controller.text.trim(),
+      );
       if (!mounted) return;
       setState(() {
         _submitted = true;
@@ -931,6 +949,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
   @override
   Widget build(BuildContext context) {
     final charCount = _controller.text.length;
+    final wordCount = _wordCount(_controller.text);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 20.h),
@@ -974,15 +993,25 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                     ),
                   ),
                 ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 6.h),
-                    child: Text(
-                      '$charCount/$_maxLength',
-                      style: GoogleFonts.inter(
-                          fontSize: 11.sp, color: Colors.grey.shade500),
-                    ),
+                Padding(
+                  padding: EdgeInsets.only(top: 6.h),
+                  child: Row(
+                    children: [
+                      Text(
+                        '$wordCount/$_minWords words min',
+                        style: GoogleFonts.inter(
+                            fontSize: 11.sp,
+                            color: wordCount < _minWords
+                                ? Colors.red.shade400
+                                : AppColors.successGreen),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '$charCount/$_maxLength',
+                        style: GoogleFonts.inter(
+                            fontSize: 11.sp, color: Colors.grey.shade500),
+                      ),
+                    ],
                   ),
                 ),
                 if (_error != null) ...[

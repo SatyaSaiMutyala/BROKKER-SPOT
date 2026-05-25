@@ -9,7 +9,12 @@ import 'package:google_fonts/google_fonts.dart';
 
 class VerificationScreen extends StatefulWidget {
   final bool isAnnouncement;
-  const VerificationScreen({super.key, this.isAnnouncement = false});
+  final bool fromBroker;
+  const VerificationScreen({
+    super.key,
+    this.isAnnouncement = false,
+    this.fromBroker = false,
+  });
 
   @override
   State<VerificationScreen> createState() => _VerificationScreenState();
@@ -22,17 +27,27 @@ class _VerificationScreenState extends State<VerificationScreen> {
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
       if (widget.isAnnouncement) {
-        // Clear entire stack, put DashboardView(AccountTab) at bottom
-        // with no transition, then push MyAnnouncementsTabView on top.
-        // Back from MyAnnouncementsTabView will then land on AccountView.
-        Get.offAll(
-          () => const DashboardView(initialIndex: 3),
-          transition: Transition.noTransition,
-          duration: Duration.zero,
-        );
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          Get.to(() => const MyAnnouncementsTabView());
-        });
+        if (widget.fromBroker) {
+          // Broker side: clear stack and land on broker dashboard's
+          // Announcement tab (index 1).
+          Get.offAll(
+            () => BrokerDashBoardView(initialIndex: 1),
+            transition: Transition.noTransition,
+            duration: Duration.zero,
+          );
+        } else {
+          // User side: clear entire stack, put DashboardView(AccountTab) at
+          // bottom with no transition, then push MyAnnouncementsTabView on top.
+          // Back from MyAnnouncementsTabView will then land on AccountView.
+          Get.offAll(
+            () => const DashboardView(initialIndex: 3),
+            transition: Transition.noTransition,
+            duration: Duration.zero,
+          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Get.to(() => const MyAnnouncementsTabView());
+          });
+        }
       } else {
         DeviceService.registerDevice();
         Get.offAll(() => BrokerDashBoardView(showLocationPicker: true));

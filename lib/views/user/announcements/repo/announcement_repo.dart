@@ -89,11 +89,14 @@ class AnnouncementRepository {
     throw json['message'] ?? 'Failed to fetch announcements';
   }
 
-  Future<void> sendProposal(String announcementId) async {
+  Future<void> sendProposal(String announcementId, {required String message}) async {
     final response = await api.postRequest(
       '',
       endPoint: ApiEndpoints.sendProposal,
-      body: {'announcement_id': announcementId},
+      body: {
+        'announcement_id': announcementId,
+        'message': message,
+      },
       headers: api.buildHeaders(),
     );
     final json = jsonDecode(response.body) as Map<String, dynamic>;

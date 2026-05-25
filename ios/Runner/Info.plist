@@ -43,6 +43,8 @@
 	<string>This app needs your location to help you set the property address on the map.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to take photos for your profile, passport, and ID documents.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access to record audio when capturing property videos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs photo library access to upload your profile photo and documents.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

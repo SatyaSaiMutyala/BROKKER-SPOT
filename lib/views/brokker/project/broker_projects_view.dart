@@ -8,6 +8,7 @@ import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/projects/premium_lock_banner.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
 import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_view.dart';
+import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:get/get.dart';
 
@@ -121,6 +122,8 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   List<AnnouncementModel> _announcements = [];
   bool _loading = false;
   String? _error;
+  int _selectedTab = 0;
+  final _tabs = const ['User Announcement', 'Your Announcement'];
 
   @override
   void initState() {
@@ -165,7 +168,19 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
       body: SafeArea(
         child: Column(
           children: [
-            const CustomHeader(title: 'Projects'),
+            CustomHeader(
+              title: 'Projects',
+              trailing: GestureDetector(
+                onTap: () async {
+                  await Get.to(
+                      () => const CreateAnnouncementView(fromBroker: true));
+                  _fetchAnnouncements(isRefresh: true);
+                },
+                child: Image.asset('assets/images/home_add_icon.png',
+                    width: 50.w, height: 50.w),
+              ),
+            ),
+            _buildTabBar(),
             Expanded(child: _buildContent()),
           ],
         ),
@@ -227,7 +242,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
               child: _buildSectionHeader(
-                  'Announcement', '${_announcements.length} announcements'),
+                  _tabs[_selectedTab], '${_announcements.length} announcements'),
             ),
             ..._announcements.asMap().entries.map(
                   (entry) => AnnouncementPropertyCard(
@@ -245,6 +260,46 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
             SizedBox(height: 24.h),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+      child: Row(
+        children: List.generate(_tabs.length, (i) {
+          final isSelected = _selectedTab == i;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedTab = i),
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 3.w),
+                padding: EdgeInsets.symmetric(vertical: 7.h),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20.r),
+                  border: isSelected
+                      ? null
+                      : Border.all(color: AppColors.primary, width: 1),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _tabs[i],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                    color:
+                        isSelected ? Colors.white : Colors.grey.shade600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

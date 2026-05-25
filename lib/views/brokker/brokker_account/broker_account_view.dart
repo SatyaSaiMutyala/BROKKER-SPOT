@@ -66,9 +66,17 @@ class AccountMenuView extends StatelessWidget {
                       // Second card group
                       _buildCardGroup([
                         _menuItem('assets/images/switch_to_user_icon.png',
-                            'Switch to User side', () {
-                          LocalStorageService.saveLastSide('user');
-                          Get.offAll(() => const DashboardView());
+                            'Switch to User side', () async {
+                          Get.dialog(
+                            const Center(child: CircularProgressIndicator()),
+                            barrierDismissible: false,
+                          );
+                          final ok = await profileCtrl.switchRole(1);
+                          if (Get.isDialogOpen ?? false) Get.back();
+                          if (ok) {
+                            LocalStorageService.saveLastSide('user');
+                            Get.offAll(() => const DashboardView());
+                          }
                         }),
                         _menuItem('assets/images/subscription_icon.png',
                             'My Subscription', () {},
