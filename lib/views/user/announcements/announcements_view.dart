@@ -37,7 +37,8 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
               title: 'ANNOUNCEMENTS',
               leading: GestureDetector(
                 onTap: () {},
-                child: Icon(Icons.search, size: 36.sp, color: AppColors.primary),
+                child:
+                    Icon(Icons.search, size: 36.sp, color: AppColors.primary),
               ),
               trailing: GestureDetector(
                 onTap: () => Get.to(() => const CreateAnnouncementView()),

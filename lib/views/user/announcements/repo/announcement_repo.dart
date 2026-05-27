@@ -45,12 +45,13 @@ class AnnouncementRepository {
   }
 
   Future<({List<AnnouncementModel> items, int totalRecords, int totalPages, int page})>
-      fetchAnnouncements({int page = 1, int perPage = 10, int? status}) async {
+      fetchAnnouncements({int page = 1, int perPage = 10, int? status, int? userRole}) async {
     // status: 0=draft, 1=submitted, 2=approved, 3=rejected. Omit for "all".
     final statusQuery = status != null ? '&status=$status' : '';
+    final roleQuery = userRole != null ? '&user_role=$userRole' : '';
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.fetchAnnouncements}?page=$page&perPage=$perPage$statusQuery',
+          '${api.baseUrl}${ApiEndpoints.fetchAnnouncements}?page=$page&perPage=$perPage$statusQuery$roleQuery',
       headers: api.buildHeaders(),
     );
     final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -70,10 +71,11 @@ class AnnouncementRepository {
   }
 
   Future<({List<AnnouncementModel> items, int totalRecords, int totalPages, int page})>
-      fetchAllAnnouncements({int page = 1, int perPage = 10}) async {
+      fetchAllAnnouncements({int page = 1, int perPage = 10, int? userRole}) async {
+    final roleQuery = userRole != null ? '&user_role=$userRole' : '';
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.fetchAllAnnouncements}?page=$page&perPage=$perPage',
+          '${api.baseUrl}${ApiEndpoints.fetchAllAnnouncements}?page=$page&perPage=$perPage$roleQuery',
       headers: api.buildHeaders(),
     );
     final json = jsonDecode(response.body) as Map<String, dynamic>;

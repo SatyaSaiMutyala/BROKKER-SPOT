@@ -59,11 +59,9 @@ class _BrokerShimmerCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                      width: 100.w, height: 10.h, color: Colors.white),
+                  Container(width: 100.w, height: 10.h, color: Colors.white),
                   SizedBox(height: 4.h),
-                  Container(
-                      width: 60.w, height: 8.h, color: Colors.white),
+                  Container(width: 60.w, height: 8.h, color: Colors.white),
                 ],
               ),
               const Spacer(),
@@ -125,9 +123,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   @override
   void initState() {
     super.initState();
-    // Loads only if not cached yet — shared with the user-side feed, so it
-    // won't re-hit the API when the data is already in memory.
-    _controller.loadAll();
+    _controller.loadBroker();
   }
 
   @override
@@ -142,8 +138,8 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
               trailing: GestureDetector(
                 // New announcements auto-refresh the cached list via the
                 // controller's mutation hook, so just navigate.
-                onTap: () =>
-                    Get.to(() => const CreateAnnouncementView(fromBroker: true)),
+                onTap: () => Get.to(
+                    () => const CreateAnnouncementView(fromBroker: true)),
                 child: Image.asset('assets/images/home_add_icon.png',
                     width: 50.w, height: 50.w),
               ),
@@ -159,25 +155,25 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   Widget _buildContent() {
     return Obx(() {
       // First-load shimmer only when nothing is cached yet.
-      if (_controller.isLoadingAll.value &&
-          _controller.allAnnouncements.isEmpty) {
+      if (_controller.isLoadingBroker.value &&
+          _controller.brokerAnnouncements.isEmpty) {
         return _BrokerShimmerList();
       }
-      if (_controller.allError.value != null &&
-          _controller.allAnnouncements.isEmpty) {
+      if (_controller.brokerError.value != null &&
+          _controller.brokerAnnouncements.isEmpty) {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _controller.allError.value!,
+                _controller.brokerError.value!,
                 style: GoogleFonts.inter(
                     fontSize: 14.sp, color: Colors.grey.shade500),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 12.h),
               TextButton(
-                onPressed: () => _controller.loadAll(force: true),
+                onPressed: () => _controller.loadBroker(force: true),
                 child: Text('Retry',
                     style: GoogleFonts.inter(
                         fontSize: 14.sp, color: AppColors.primary)),
@@ -187,22 +183,22 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         );
       }
 
-      // Split the shared feed by ownership (no extra API call):
+      // Split the broker feed by ownership:
       //  • My Announcement → posts created by the logged-in user
       //  • User Announcement → everyone else's posts
       final myId = _profileCtrl.currentUserId;
       final announcements = _selectedTab == 1
-          ? _controller.allAnnouncements
+          ? _controller.brokerAnnouncements
               .where((a) => myId != null && a.userId == myId)
               .toList()
-          : _controller.allAnnouncements
+          : _controller.brokerAnnouncements
               .where((a) => a.userId != myId)
               .toList();
 
       if (announcements.isEmpty) {
         return RefreshIndicator(
           color: AppColors.primary,
-          onRefresh: () => _controller.loadAll(force: true),
+          onRefresh: () => _controller.loadBroker(force: true),
           child: ListView(
             children: [
               SizedBox(height: 200.h),
@@ -221,7 +217,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
 
       return RefreshIndicator(
         color: AppColors.primary,
-        onRefresh: () => _controller.loadAll(force: true),
+        onRefresh: () => _controller.loadBroker(force: true),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
@@ -229,8 +225,8 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
             children: [
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                child: _buildSectionHeader(
-                    _tabs[_selectedTab], '${announcements.length} announcements'),
+                child: _buildSectionHeader(_tabs[_selectedTab],
+                    '${announcements.length} announcements'),
               ),
               ...announcements.asMap().entries.map(
                     (entry) => AnnouncementPropertyCard(
@@ -281,8 +277,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
                   style: GoogleFonts.inter(
                     fontSize: 13.sp,
                     fontWeight: FontWeight.w600,
-                    color:
-                        isSelected ? Colors.white : Colors.grey.shade600,
+                    color: isSelected ? Colors.white : Colors.grey.shade600,
                   ),
                 ),
               ),

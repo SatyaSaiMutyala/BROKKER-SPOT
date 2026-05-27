@@ -22,11 +22,17 @@ class AnnouncementListController extends GetxController {
           ? Get.find<AnnouncementListController>()
           : Get.put(AnnouncementListController(), permanent: true);
 
-  // Public feed (all announcements) ------------------------------------------
+  // Public feed — user-role=1 (property owners) used by AnnouncementsView ----
   final allAnnouncements = <AnnouncementModel>[].obs;
   final isLoadingAll = false.obs;
   final allError = Rxn<String>();
   bool _allLoaded = false;
+
+  // Broker feed — user-role=2 (brokers) used by BrokerProjectsView -----------
+  final brokerAnnouncements = <AnnouncementModel>[].obs;
+  final isLoadingBroker = false.obs;
+  final brokerError = Rxn<String>();
+  bool _brokerLoaded = false;
 
   // My announcements (server-side status filter, cached per status) -----------
   // status: null=all, 0=draft, 1=submitted, 2=approved, 3=rejected.
@@ -43,19 +49,35 @@ class AnnouncementListController extends GetxController {
   final homeError = Rxn<String>();
   bool _homeLoaded = false;
 
-  /// Loads the public feed. No-op if already loaded unless [force].
+  /// Loads user-role=1 announcements (property owners). No-op unless [force].
   Future<void> loadAll({bool force = false}) async {
     if (_allLoaded && !force) return;
     try {
       isLoadingAll.value = true;
       allError.value = null;
-      final result = await _repo.fetchAllAnnouncements();
+      final result = await _repo.fetchAllAnnouncements(userRole: 1);
       allAnnouncements.assignAll(result.items);
       _allLoaded = true;
     } catch (e) {
       allError.value = e.toString();
     } finally {
       isLoadingAll.value = false;
+    }
+  }
+
+  /// Loads user-role=2 announcements (brokers). No-op unless [force].
+  Future<void> loadBroker({bool force = false}) async {
+    if (_brokerLoaded && !force) return;
+    try {
+      isLoadingBroker.value = true;
+      brokerError.value = null;
+      final result = await _repo.fetchAllAnnouncements(userRole: 2);
+      brokerAnnouncements.assignAll(result.items);
+      _brokerLoaded = true;
+    } catch (e) {
+      brokerError.value = e.toString();
+    } finally {
+      isLoadingBroker.value = false;
     }
   }
 
@@ -75,7 +97,7 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingMine.value = true;
       myError.value = null;
-      final result = await _repo.fetchAnnouncements(status: status);
+      final result = await _repo.fetchAnnouncements(status: status, userRole: 1);
       _mineCache[status] = result.items;
       _mineLoaded = true;
       // Only show it if this is still the selected tab (guards fast switching).
@@ -96,7 +118,7 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingHome.value = true;
       homeError.value = null;
-      final result = await _repo.fetchAllAnnouncements(page: 1, perPage: 5);
+      final result = await _repo.fetchAllAnnouncements(page: 1, perPage: 5, userRole: 1);
       homeAnnouncements.assignAll(result.items);
       _homeLoaded = true;
     } catch (e) {
@@ -109,11 +131,10 @@ class AnnouncementListController extends GetxController {
   /// Call after a create/edit/delete so all list screens reactively refresh.
   /// Only refreshes lists that have already been loaded once.
   Future<void> refreshAfterMutation() async {
-    // A create/edit can change which status bucket items fall into, so drop the
-    // whole per-status cache and reload the currently visible tab.
     _mineCache.clear();
     await Future.wait([
       if (_allLoaded) loadAll(force: true),
+      if (_brokerLoaded) loadBroker(force: true),
       if (_mineLoaded) loadMine(status: _currentMineStatus, force: true),
       if (_homeLoaded) loadHome(force: true),
     ]);
@@ -123,6 +144,7 @@ class AnnouncementListController extends GetxController {
   /// so the UI updates without waiting for a network round-trip.
   void removeLocally(String id) {
     allAnnouncements.removeWhere((a) => a.id == id);
+    brokerAnnouncements.removeWhere((a) => a.id == id);
     myAnnouncements.removeWhere((a) => a.id == id);
     homeAnnouncements.removeWhere((a) => a.id == id);
     for (final list in _mineCache.values) {
