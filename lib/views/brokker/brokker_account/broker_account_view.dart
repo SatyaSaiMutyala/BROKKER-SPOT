@@ -30,12 +30,11 @@ class AccountMenuView extends StatelessWidget {
               child: Obx(() {
                 final bool isLoggedIn = profileCtrl.profileData.value != null;
 
+                final vs =
+                    profileCtrl.profileData.value?['verificationStatus'];
                 final isPending = isLoggedIn &&
-                    (profileCtrl.role.value == 1 || profileCtrl.role.value == 2) &&
-                    (profileCtrl.profileData.value?['verificationStatus'] ==
-                        'inactive' || profileCtrl.profileData.value?['verificationStatus'] ==
-                        'pending' || profileCtrl.profileData.value?['verificationStatus'] ==
-                        'rejected');
+                    profileCtrl.hasBrokerRole &&
+                    (vs == 'inactive' || vs == 'pending' || vs == 'rejected');
 
                 final bool canAccess = isLoggedIn && !isPending;
                 return SingleChildScrollView(

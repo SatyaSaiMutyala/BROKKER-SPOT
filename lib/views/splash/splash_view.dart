@@ -1,3 +1,4 @@
+import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
@@ -5,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/constants/app_assets.dart';
 import '../auth/view/welcome_view.dart';
 
@@ -86,6 +89,100 @@ class _SplashViewState extends State<SplashView>
       // No token - go directly to welcome screen, no splash animation
       Get.offAll(() => const WelcomeView());
     }
+
+    // After the destination screen is on top, re-prompt for notification
+    // permission if it's still denied. This fires every launch until granted.
+    _promptNotificationIfNeeded();
+  }
+
+  Future<void> _promptNotificationIfNeeded() async {
+    // Let the destination screen settle before showing the dialog.
+    await Future.delayed(const Duration(milliseconds: 600));
+    final status = await Permission.notification.status;
+    if (status.isGranted || status.isLimited) return;
+
+    final ctx = Get.context;
+    if (ctx == null) return;
+
+    await showDialog<void>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (dialogCtx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r)),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.notifications_active_outlined,
+                  size: 44.sp, color: AppColors.primary),
+              SizedBox(height: 14.h),
+              Text(
+                'Enable Notifications',
+                style: GoogleFonts.poppins(
+                  fontSize: 17.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              SizedBox(height: 10.h),
+              Text(
+                'Stay updated about new proposals, deals, and announcements. '
+                'Please allow notifications to continue.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  color: Colors.black54,
+                  height: 1.5,
+                ),
+              ),
+              SizedBox(height: 22.h),
+              SizedBox(
+                width: double.infinity,
+                height: 46.h,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30.r)),
+                  ),
+                  onPressed: () async {
+                    final navigator = Navigator.of(dialogCtx);
+                    final current = await Permission.notification.status;
+                    if (current.isPermanentlyDenied) {
+                      await openAppSettings();
+                    } else {
+                      await Permission.notification.request();
+                    }
+                    navigator.pop();
+                  },
+                  child: Text(
+                    'Allow Notifications',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 10.h),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: Text(
+                  'Maybe Later',
+                  style: GoogleFonts.inter(
+                      fontSize: 13.sp, color: Colors.black54),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override

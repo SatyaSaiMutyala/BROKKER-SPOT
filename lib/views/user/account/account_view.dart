@@ -25,8 +25,6 @@ class AccountView extends StatelessWidget {
   Widget build(BuildContext context) {
     Get.put(AccountController());
     final bool isGuest = !LocalStorageService.isLoggedIn();
-    final user = LocalStorageService.getUser()?.data;
-    final int role = user?.role ?? 0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -83,18 +81,17 @@ class AccountView extends StatelessWidget {
                         children: [
                           Obx(() {
                             final profileCtrl = Get.find<ProfileController>();
-                            final isBroker = profileCtrl.role.value == 2;
-                            final canSwitchToBroker = isBroker || role == 2;
+                            // role is a bitmask: broker bit set (2 or 3) means
+                            // the user is already a broker and can switch sides.
+                            final hasBrokerRole = profileCtrl.hasBrokerRole;
                             return _accountTile(
                               iconAsset: 'switch_to_user_icon.png',
-                              title: isBroker
-                                  ? 'Switch to Broker Side'
-                                  : role == 2
-                                      ? 'Switch to Broker'
-                                      : 'Become Broker',
+                              title: hasBrokerRole
+                                  ? 'Switch to Broker'
+                                  : 'Become Broker',
                               enabled: true,
                               onTap: () async {
-                                if (canSwitchToBroker) {
+                                if (hasBrokerRole) {
                                   Get.dialog(
                                     const Center(child: CircularProgressIndicator()),
                                     barrierDismissible: false,

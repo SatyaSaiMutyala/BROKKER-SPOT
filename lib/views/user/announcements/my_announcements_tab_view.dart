@@ -5,7 +5,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
-import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
@@ -21,40 +21,121 @@ class MyAnnouncementsTabView extends StatefulWidget {
 class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late AnnouncementController _controller;
+  final _controller = AnnouncementListController.to;
 
   final _tabs = ['All', 'Pending', 'Active', 'Rejected', 'Draft'];
 
-  List<AnnouncementModel> get _filtered {
-    final tab = _tabs[_tabController.index];
-    if (tab == 'All') return _controller.announcements;
-    return _controller.announcements
-        .where((a) => a.status?.toLowerCase() == tab.toLowerCase())
-        .toList();
+  /// Maps a tab index to the API status param.
+  /// All=null, Pending=1 (submitted), Active=2 (approved), Rejected=3, Draft=0.
+  int? _statusForTab(int i) {
+    switch (i) {
+      case 1:
+        return 1;
+      case 2:
+        return 2;
+      case 3:
+        return 3;
+      case 4:
+        return 0;
+      default:
+        return null; // All
+    }
   }
+
+  int? get _currentStatus => _statusForTab(_tabController.index);
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() => setState(() {}));
-    _controller = Get.put(AnnouncementController());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _controller.fetchAnnouncements();
-    });
+    // Always fetch on open so it's never stale. Shimmer shows only on the very
+    // first load (empty list); later entries show cached data instantly and
+    // refresh in the background. Each status is also cached on first tap.
+    _controller.loadMine(force: true);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    Get.delete<AnnouncementController>();
     super.dispose();
   }
 
+  void _onTabSelected(int i) {
+    _tabController.animateTo(i);
+    // Calls the API for this status (cached per status after first load).
+    _controller.loadMine(status: _statusForTab(i));
+  }
+
   Future<void> _openDetail(AnnouncementModel a) async {
+    // Edit/delete inside the detail view auto-refresh the cached lists via the
+    // mutation hooks; force a reload too in case it changed something else.
     final result = await Get.to(() => AnnouncementDetailView(announcement: a));
-    // Refresh list if detail view deleted or edited the announcement
-    if (result == true) _controller.fetchAnnouncements();
+    if (result == true) _controller.loadMine(status: _currentStatus, force: true);
+  }
+
+  Widget _buildList() {
+    // Error state — scrollable so pull-to-refresh still works.
+    if (_controller.myError.value != null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: 160.h),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _controller.myError.value!,
+                  style: GoogleFonts.inter(
+                      fontSize: 14.sp, color: Colors.grey.shade500),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 12.h),
+                TextButton(
+                  onPressed: () =>
+                      _controller.loadMine(status: _currentStatus, force: true),
+                  child: Text('Retry',
+                      style: GoogleFonts.inter(
+                          fontSize: 14.sp, color: AppColors.primary)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+    // Server already filtered by status — show the list as-is.
+    final list = _controller.myAnnouncements;
+    // Empty state — scrollable so the user can pull to refresh.
+    if (list.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: 200.h),
+          Center(
+            child: Text(
+              'No announcements',
+              style: GoogleFonts.inter(
+                  fontSize: 14.sp, color: Colors.grey.shade400),
+            ),
+          ),
+        ],
+      );
+    }
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.symmetric(vertical: 8.h),
+      itemCount: list.length,
+      itemBuilder: (_, index) {
+        final a = list[index];
+        return _CardWithStatusBadge(
+          announcement: a,
+          index: index,
+          onTap: () => _openDetail(a),
+        );
+      },
+    );
   }
 
   @override
@@ -68,10 +149,7 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
               title: 'ANNOUNCEMENTS',
               showBackButton: true,
               trailing: GestureDetector(
-                onTap: () async {
-                  await Get.to(() => const CreateAnnouncementView());
-                  _controller.fetchAnnouncements();
-                },
+                onTap: () => Get.to(() => const CreateAnnouncementView()),
                 child: Image.asset('assets/images/home_add_icon.png',
                     width: 50.w, height: 50.w),
               ),
@@ -86,7 +164,7 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
                   final isSelected = _tabController.index == i;
                   return Expanded(
                     child: GestureDetector(
-                      onTap: () => _tabController.animateTo(i),
+                      onTap: () => _onTabSelected(i),
                       child: Container(
                         margin: EdgeInsets.symmetric(horizontal: 3.w),
                         padding: EdgeInsets.symmetric(vertical: 5.h),
@@ -122,52 +200,17 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
             // ── List ──
             Expanded(
               child: Obx(() {
-                if (_controller.isLoading.value) {
+                // Shimmer only on first load (nothing cached). During pull-to-
+                // refresh the list stays visible with the refresh indicator.
+                if (_controller.isLoadingMine.value &&
+                    _controller.myAnnouncements.isEmpty) {
                   return _ShimmerCardList();
                 }
-                if (_controller.errorMessage.value != null) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _controller.errorMessage.value!,
-                          style: GoogleFonts.inter(
-                              fontSize: 14.sp, color: Colors.grey.shade500),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 12.h),
-                        TextButton(
-                          onPressed: _controller.fetchAnnouncements,
-                          child: Text('Retry',
-                              style: GoogleFonts.inter(
-                                  fontSize: 14.sp, color: AppColors.primary)),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                final list = _filtered;
-                if (list.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No announcements',
-                      style: GoogleFonts.inter(
-                          fontSize: 14.sp, color: Colors.grey.shade400),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  padding: EdgeInsets.symmetric(vertical: 8.h),
-                  itemCount: list.length,
-                  itemBuilder: (_, index) {
-                    final a = list[index];
-                    return _CardWithStatusBadge(
-                      announcement: a,
-                      index: index,
-                      onTap: () => _openDetail(a),
-                    );
-                  },
+                return RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () =>
+                      _controller.loadMine(status: _currentStatus, force: true),
+                  child: _buildList(),
                 );
               }),
             ),

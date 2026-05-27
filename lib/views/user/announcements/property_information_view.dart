@@ -1,5 +1,6 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
+import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:flutter/material.dart';
@@ -27,7 +28,9 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   final _sqftCtrl = TextEditingController();
   final _spmCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  final Set<String> _amenities = {};
+  // Stores the selected amenity ObjectIds (what the API expects).
+  final Set<String> _selectedAmenityIds = {};
+  final _amenityCtrl = AmenityController.to;
 
   // Which dropdown is open
   String _openDropdown = '';
@@ -37,13 +40,6 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   final _floorCounts = ['G', '1', '2', '3', '4', '5+'];
   final _isPropertyOptions = ['Ready', 'Off Plan'];
   DateTime? _completionDate;
-  final _amenityList = [
-    'Partly furnished', 'Balcony',
-    'Built in Wardrobes', 'Central A/C',
-    'Concierge', 'Covered Parking',
-    'Security', 'Shared Gym',
-    'Shared Pool', 'View of Water',
-  ];
 
   bool get _isValid =>
       _propertyType != null &&
@@ -70,9 +66,12 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     _floor = _intToFloorStr(c.floor);
     _totalFloor = _intToFloorStr(c.totalFloors);
     if (c.description != null) _descCtrl.text = c.description!;
-    if (c.amenities.isNotEmpty) _amenities.addAll(c.amenities);
+    if (c.amenities.isNotEmpty) _selectedAmenityIds.addAll(c.amenities);
+    // Load the amenities reference list (cached after first fetch).
+    _amenityCtrl.loadAmenities();
     if (c.propertyStatus == 1) _isProperty = 'Ready';
     if (c.propertyStatus == 2) _isProperty = 'Off Plan';
+    _completionDate = c.completionDate;
     _isCommercial = c.isCommercialProperty == 1;
     _descCtrl.addListener(() => setState(() {}));
     _sqftCtrl.addListener(() => setState(() {}));
@@ -377,9 +376,10 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                           floor: _parseFloor(_floor),
                           totalFloors: _parseFloor(_totalFloor),
                           description: _descCtrl.text.trim(),
-                          amenities: _amenities.toList(),
+                          amenities: _selectedAmenityIds.toList(),
                           propertyStatus: _isProperty == 'Off Plan' ? 2 : 1,
                           isCommercialProperty: _isCommercial ? 1 : 0,
+                          completionDate: _completionDate,
                         );
                         Navigator.pop(context, true);
                       }
@@ -471,44 +471,78 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   }
 
   Widget _buildAmenities() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 4,
-      mainAxisSpacing: 8.h,
-      crossAxisSpacing: 8.w,
-      children: _amenityList.map((item) {
-        final selected = _amenities.contains(item);
-        return GestureDetector(
-          onTap: () => setState(() {
-            selected ? _amenities.remove(item) : _amenities.add(item);
-          }),
-          child: Row(
-            children: [
-              Container(
-                width: 18.w,
-                height: 18.w,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade400),
-                  borderRadius: BorderRadius.circular(3.r),
-                  color: selected ? AppColors.primary : Colors.white,
-                ),
-                child: selected
-                    ? Icon(Icons.check, size: 12.sp, color: Colors.white)
-                    : null,
-              ),
-              SizedBox(width: 8.w),
-              Expanded(
-                child: Text(item,
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: Colors.black87),
-                    overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
+    return Obx(() {
+      if (_amenityCtrl.isLoading.value && _amenityCtrl.amenities.isEmpty) {
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: 16.h),
+          child: const Center(child: CircularProgressIndicator()),
         );
-      }).toList(),
-    );
+      }
+      if (_amenityCtrl.error.value != null && _amenityCtrl.amenities.isEmpty) {
+        return Row(
+          children: [
+            Expanded(
+              child: Text(
+                "Couldn't load amenities.",
+                style:
+                    GoogleFonts.inter(fontSize: 12.sp, color: Colors.grey.shade500),
+              ),
+            ),
+            TextButton(
+              onPressed: () => _amenityCtrl.loadAmenities(force: true),
+              child: Text('Retry',
+                  style:
+                      GoogleFonts.inter(fontSize: 12.sp, color: AppColors.primary)),
+            ),
+          ],
+        );
+      }
+      if (_amenityCtrl.amenities.isEmpty) {
+        return Text('No amenities available',
+            style: GoogleFonts.inter(fontSize: 12.sp, color: Colors.grey.shade400));
+      }
+      return GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        childAspectRatio: 4,
+        mainAxisSpacing: 8.h,
+        crossAxisSpacing: 8.w,
+        children: _amenityCtrl.amenities.map((item) {
+          final selected = _selectedAmenityIds.contains(item.id);
+          return GestureDetector(
+            onTap: () => setState(() {
+              selected
+                  ? _selectedAmenityIds.remove(item.id)
+                  : _selectedAmenityIds.add(item.id);
+            }),
+            child: Row(
+              children: [
+                Container(
+                  width: 18.w,
+                  height: 18.w,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(3.r),
+                    color: selected ? AppColors.primary : Colors.white,
+                  ),
+                  child: selected
+                      ? Icon(Icons.check, size: 12.sp, color: Colors.white)
+                      : null,
+                ),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Text(item.name,
+                      style: GoogleFonts.inter(
+                          fontSize: 12.sp, color: Colors.black87),
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      );
+    });
   }
 
   Widget _label(String text, {bool required = false}) {

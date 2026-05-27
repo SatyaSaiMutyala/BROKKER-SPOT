@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
+import 'package:brokkerspot/models/amenity_model.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 
 class AnnouncementRepository {
@@ -44,10 +45,12 @@ class AnnouncementRepository {
   }
 
   Future<({List<AnnouncementModel> items, int totalRecords, int totalPages, int page})>
-      fetchAnnouncements({int page = 1, int perPage = 10}) async {
+      fetchAnnouncements({int page = 1, int perPage = 10, int? status}) async {
+    // status: 0=draft, 1=submitted, 2=approved, 3=rejected. Omit for "all".
+    final statusQuery = status != null ? '&status=$status' : '';
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.fetchAnnouncements}?page=$page&perPage=$perPage',
+          '${api.baseUrl}${ApiEndpoints.fetchAnnouncements}?page=$page&perPage=$perPage$statusQuery',
       headers: api.buildHeaders(),
     );
     final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -103,6 +106,22 @@ class AnnouncementRepository {
     if (json['success'] != true) {
       throw json['message'] ?? 'Failed to send proposal';
     }
+  }
+
+  Future<List<AmenityModel>> fetchAmenities() async {
+    final response = await api.getRequest(
+      endPoint:
+          '${api.baseUrl}${ApiEndpoints.fetchAmenities}?page=1&perPage=100',
+      headers: api.buildHeaders(),
+    );
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['success'] == true) {
+      // Note: amenities list is at top-level `data` (not nested data.data).
+      return (json['data'] as List)
+          .map((e) => AmenityModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw json['message'] ?? 'Failed to fetch amenities';
   }
 
   Future<AnnouncementModel> fetchAnnouncementDetail(String id) async {

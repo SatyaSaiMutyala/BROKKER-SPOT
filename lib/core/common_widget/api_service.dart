@@ -5,6 +5,7 @@ import 'package:brokkerspot/core/common_widget/network_info.dart';
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/auth/view/welcome_view.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart' hide Response;
 import 'package:http/http.dart' as http;
@@ -56,29 +57,66 @@ http.Response _checkUnauthorized(http.Response response) {
   return response;
 }
 
+/// Centralized API logger — prints every request URL/body and its response.
+/// Only logs in debug builds (stripped from release).
+void _logApi(
+  String method,
+  String url, {
+  Map<String, String>? headers,
+  Object? requestBody,
+  int? statusCode,
+  String? responseBody,
+  Object? error,
+}) {
+  if (!kDebugMode) return;
+  debugPrint('╔═══ API $method ═══════════════════════════');
+  debugPrint('║ URL      : $url');
+  if (headers != null) {
+    headers.forEach((k, v) => _logChunked('║ HEADER   : $k: ', v));
+  }
+  if (requestBody != null) _logChunked('║ REQUEST  : ', requestBody.toString());
+  if (statusCode != null) debugPrint('║ STATUS   : $statusCode');
+  if (responseBody != null) _logChunked('║ RESPONSE : ', responseBody);
+  if (error != null) _logChunked('║ ERROR    : ', error.toString());
+  debugPrint('╚═══════════════════════════════════════════');
+}
+
+/// Prints [text] in chunks so long payloads aren't truncated by the platform
+/// log (Android logcat / debugPrint cap each line at ~1KB).
+void _logChunked(String prefix, String text) {
+  const chunkSize = 800;
+  if (text.length <= chunkSize) {
+    debugPrint('$prefix$text');
+    return;
+  }
+  debugPrint(prefix);
+  for (int i = 0; i < text.length; i += chunkSize) {
+    final end = (i + chunkSize < text.length) ? i + chunkSize : text.length;
+    debugPrint(text.substring(i, end));
+  }
+}
+
 Future<http.Response> postRequest(String s,
     {required String endPoint,
     Map<String, dynamic>? body,
     Map<String, String>? headers,
     bool skipUnauthorizedCheck = false}) async {
+  String url = baseUrl + endPoint;
+  final usedHeaders = headers ?? buildHeader();
   try {
-    String url = baseUrl + endPoint;
-    debugPrint('postRequest URL: $url');
-    debugPrint('postRequest Request: $body');
-
+    _logApi('POST', url, headers: usedHeaders, requestBody: body);
     http.Response response = await http
         .post(Uri.parse(url),
-            body: jsonEncode(body), headers: headers ?? buildHeader())
+            body: jsonEncode(body), headers: usedHeaders)
         .timeout(const Duration(seconds: NetworkConfig.timeoutDuration),
             onTimeout: (() =>
                 throw TimeoutException(AppConstNames.networkError)));
 
-    debugPrint("response body :${response.body}");
+    _logApi('POST', url,
+        statusCode: response.statusCode, responseBody: response.body);
     return skipUnauthorizedCheck ? response : _checkUnauthorized(response);
-  } catch (e, s) {
-    print(e);
-    print(s);
-    debugPrint("-----postRequest------. $e ");
+  } catch (e) {
+    _logApi('POST', url, error: e);
     rethrow;
   }
 }
@@ -87,22 +125,21 @@ Future<http.Response> metaDataPostRequest(
     {required String endPoint,
     required dynamic body,
     Map<String, String>? headers}) async {
+  String url = endPoint;
+  final usedHeaders = headers ?? buildHeader();
   try {
-    String url = endPoint;
-    debugPrint('postRequest URL: $url');
-    debugPrint('postRequest Request: $body');
-
+    _logApi('POST', url, headers: usedHeaders, requestBody: body);
     http.Response response = await http
         .post(Uri.parse(url),
-            body: jsonEncode(body), headers: headers ?? buildHeader())
+            body: jsonEncode(body), headers: usedHeaders)
         .timeout(const Duration(seconds: NetworkConfig.timeoutDuration),
             onTimeout: (() => throw AppConstNames.networkError));
 
-    debugPrint("response body :${response.body}");
+    _logApi('POST', url,
+        statusCode: response.statusCode, responseBody: response.body);
     return _checkUnauthorized(response);
   } catch (e) {
-    print(e);
-    debugPrint("-----postRequest------. $e ");
+    _logApi('POST', url, error: e);
     rethrow;
   }
 }
@@ -111,38 +148,37 @@ Future<http.Response> getRequest(
     {required String endPoint,
     String? params,
     Map<String, String>? headers}) async {
+  final url = endPoint + (params ?? '');
   try {
+    _logApi('GET', url, headers: headers);
     http.Response response = await http
-        .get(Uri.parse(endPoint + (params ?? '')), headers: headers)
+        .get(Uri.parse(url), headers: headers)
         .timeout(const Duration(seconds: NetworkConfig.timeoutDuration),
             onTimeout: (() => throw AppConstNames.networkError));
 
-    debugPrint('getRequest params: $params');
-    debugPrint('getRequest URL: $endPoint');
-    debugPrint('getRequest body ${response.body}');
+    _logApi('GET', url,
+        statusCode: response.statusCode, responseBody: response.body);
     return _checkUnauthorized(response);
   } catch (e) {
-    print(e);
-    debugPrint("-----getRequest------. $e ");
+    _logApi('GET', url, error: e);
     rethrow;
   }
 }
 
 Future<String> getImage({required String endPoint, String? params}) async {
+  final url = endPoint + (params ?? '');
   try {
+    _logApi('GET', url, headers: buildHeader());
     http.Response response = await http
-        .get(Uri.parse(endPoint + (params ?? '')), headers: buildHeader())
+        .get(Uri.parse(url), headers: buildHeader())
         .timeout(const Duration(seconds: NetworkConfig.timeoutDuration),
             onTimeout: (() => throw AppConstNames.networkError));
 
-    debugPrint('getRequest params: $params');
-    debugPrint('getRequest URL: $endPoint');
-    debugPrint('getRequest body ${response.body}');
+    _logApi('GET', url,
+        statusCode: response.statusCode, responseBody: response.body);
     return jsonDecode(response.body);
   } catch (e) {
-    print(e);
-
-    debugPrint("-----getRequest------. $e ");
+    _logApi('GET', url, error: e);
     rethrow;
   }
 }
@@ -151,21 +187,19 @@ Future<http.Response> patchRequest(
     {required String endPoint,
     required Map<String, dynamic> body,
     Map<String, String>? headers}) async {
+  String url = endPoint;
   try {
-    String url = endPoint;
-    debugPrint('patchRequest URL: $url');
-    debugPrint('patchRequest Request: $body');
-
+    _logApi('PATCH', url, headers: headers, requestBody: body);
     http.Response response = await http
         .patch(Uri.parse(url), body: jsonEncode(body), headers: headers)
         .timeout(const Duration(seconds: NetworkConfig.timeoutDuration),
             onTimeout: (() => throw AppConstNames.networkError));
 
-    debugPrint("response body :${response.body}");
+    _logApi('PATCH', url,
+        statusCode: response.statusCode, responseBody: response.body);
     return _checkUnauthorized(response);
   } catch (e) {
-    print(e);
-    debugPrint("-----patchRequest------. $e ");
+    _logApi('PATCH', url, error: e);
     rethrow;
   }
 }
@@ -174,21 +208,19 @@ Future<http.Response> putRequest(
     {required String endPoint,
     required Map<String, dynamic> body,
     Map<String, String>? headers}) async {
+  String url = endPoint;
   try {
-    String url = endPoint;
-    debugPrint('putRequest URL: $url');
-    debugPrint('putRequest Request: $body');
-
+    _logApi('PUT', url, headers: headers, requestBody: body);
     http.Response response = await http
         .put(Uri.parse(url), body: jsonEncode(body), headers: headers)
         .timeout(const Duration(seconds: NetworkConfig.timeoutDuration),
             onTimeout: (() => throw AppConstNames.networkError));
 
-    debugPrint("response body :${response.body}");
+    _logApi('PUT', url,
+        statusCode: response.statusCode, responseBody: response.body);
     return _checkUnauthorized(response);
   } catch (e) {
-    print(e);
-    debugPrint("-----patchRequest------. $e ");
+    _logApi('PUT', url, error: e);
     rethrow;
   }
 }
@@ -207,13 +239,12 @@ Future<Response> uploadFile({
 
   request.fields.addAll(body);
 
-  debugPrint(postUri.toString());
-  print(request.fields);
+  _logApi('UPLOAD', url, headers: request.headers, requestBody: request.fields);
 
   request.files.add(await http.MultipartFile.fromPath('file', file.path));
   final response = await http.Response.fromStream(await request.send());
-  print(response.statusCode);
-  print(response.body);
+  _logApi('UPLOAD', url,
+      statusCode: response.statusCode, responseBody: response.body);
 
   return response;
 }
@@ -240,24 +271,23 @@ Future<http.Response> deleteRequest(
     {required String endPoint,
     Map<String, dynamic>? body,
     Map<String, String>? headers}) async {
+  String url = endPoint;
+  final usedHeaders = headers ?? buildHeader();
   try {
-    String url = endPoint;
-    debugPrint('deleteRequest URL: $url');
-    debugPrint('deleteRequest Request: $body');
-
+    _logApi('DELETE', url, headers: usedHeaders, requestBody: body);
     http.Response response = await http
         .delete(Uri.parse(url),
             body: body != null ? jsonEncode(body) : null,
-            headers: headers ?? buildHeader())
+            headers: usedHeaders)
         .timeout(const Duration(seconds: NetworkConfig.timeoutDuration),
             onTimeout: (() =>
                 throw TimeoutException(AppConstNames.networkError)));
 
-    debugPrint("response body :${response.body}");
+    _logApi('DELETE', url,
+        statusCode: response.statusCode, responseBody: response.body);
     return _checkUnauthorized(response);
   } catch (e) {
-    print(e);
-    debugPrint("-----postRequest------. $e ");
+    _logApi('DELETE', url, error: e);
     rethrow;
   }
 }

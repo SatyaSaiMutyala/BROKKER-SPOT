@@ -13,7 +13,11 @@ class ProfileController extends GetxController {
   var userCountryCode = ''.obs;
   var profileImage = ''.obs;
   var accountType = 0.obs; // 1 = user, 2 = broker
+  // `role` is a bitmask granted by the backend: 1 = user, 2 = broker, 3 = both.
   var role = 0.obs;
+  // `currentRole` is the side the user is currently acting as (1 = user,
+  // 2 = broker). The switch-role API toggles this.
+  var currentRole = 0.obs;
   var isLoading = false.obs;
   var profileData = Rxn<Map<String, dynamic>>();
 
@@ -23,7 +27,21 @@ class ProfileController extends GetxController {
   var knownLanguages = <String>[].obs;
 
   bool get isGuest => !LocalStorageService.isLoggedIn();
-  bool get isBroker => accountType.value == 2;
+
+  /// The logged-in user's id (from /me). Used to tell "my" announcements apart
+  /// from others in shared feeds.
+  String? get currentUserId => profileData.value?['_id'] as String?;
+
+  /// True if the user has been granted the broker role (bit 2 set → 2 or 3).
+  bool get hasBrokerRole => (role.value & 2) != 0;
+
+  /// True if the user has the plain user role (bit 1 set → 1 or 3).
+  bool get hasUserRole => (role.value & 1) != 0;
+
+  /// True if the user is currently acting on the broker side.
+  bool get isOnBrokerSide => currentRole.value == 2;
+
+  bool get isBroker => hasBrokerRole;
 
   @override
   void onInit() {
@@ -58,6 +76,7 @@ class ProfileController extends GetxController {
           profileImage.value = data['userProfileImage'] ?? data['profileImage'] ?? '';
           accountType.value = data['account_type'] ?? 0;
           role.value = data['role'] ?? 0;
+          currentRole.value = data['currentRole'] ?? data['account_type'] ?? 0;
           dealingCities.value = List<String>.from(data['dealingCities'] ?? []);
           dealingAreas.value = List<String>.from(data['dealingAreas'] ?? []);
           knownLanguages.value =
@@ -81,7 +100,13 @@ class ProfileController extends GetxController {
 
   /// Calls /user/auth/switch-role. Returns true on success.
   /// Updates local token (if returned), refreshes profile.
+  ///
+  /// Guests have no token, so there's nothing to switch on the server — skip
+  /// the API and return true so the UI can still flip sides locally.
   Future<bool> switchRole(int targetRole) async {
+    if (!LocalStorageService.isLoggedIn()) {
+      return true;
+    }
     try {
       isLoading.value = true;
       final response = await postRequest(

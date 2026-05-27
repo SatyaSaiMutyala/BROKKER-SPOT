@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,6 +26,8 @@ class AnnouncementController extends GetxController {
   int? bedrooms, bathrooms, floor, totalFloors, propertyStatus;
   int isCommercialProperty = 0;
   List<String> amenities = [];
+  // Set only when the property is Off Plan (propertyStatus == 2).
+  DateTime? completionDate;
 
   List<String> imageUrls = [];
   String? videoUrl, thumbnailUrl;
@@ -73,6 +76,7 @@ class AnnouncementController extends GetxController {
     required List<String> amenities,
     required int propertyStatus,
     int isCommercialProperty = 0,
+    DateTime? completionDate,
   }) {
     this.propertyType = propertyType;
     this.propertyName = propertyName;
@@ -86,6 +90,8 @@ class AnnouncementController extends GetxController {
     this.amenities = List.of(amenities);
     this.propertyStatus = propertyStatus;
     this.isCommercialProperty = isCommercialProperty;
+    // Only keep a completion date for Off Plan properties.
+    this.completionDate = propertyStatus == 2 ? completionDate : null;
   }
 
   void setMedia({
@@ -141,6 +147,9 @@ class AnnouncementController extends GetxController {
     description = a.description;
     amenities = List.of(a.amenities ?? []);
     propertyStatus = a.propertyStatus;
+    completionDate = a.completionDate != null
+        ? DateTime.tryParse(a.completionDate!)
+        : null;
     isCommercialProperty = (a.isCommercialProperty == true) ? 1 : 0;
     imageUrls = List.of(a.propertyMedia?.images ?? []);
     videoUrl = a.propertyMedia?.videos;
@@ -194,6 +203,8 @@ class AnnouncementController extends GetxController {
       if (floor != null) 'floor': floor,
       if (totalFloors != null) 'totalFloors': totalFloors,
       if (propertyStatus != null) 'propertyStatus': propertyStatus,
+      if (completionDate != null)
+        'completionDate': completionDate!.toIso8601String(),
       'isCommercialProperty': isCommercialProperty,
       'amenities': amenities,
       'imageUrls': imageUrls,
@@ -242,6 +253,9 @@ class AnnouncementController extends GetxController {
     floor = data['floor'] as int?;
     totalFloors = data['totalFloors'] as int?;
     propertyStatus = data['propertyStatus'] as int?;
+    completionDate = data['completionDate'] != null
+        ? DateTime.tryParse(data['completionDate'] as String)
+        : null;
     isCommercialProperty = (data['isCommercialProperty'] as int?) ?? 0;
     amenities = (data['amenities'] as List?)?.cast<String>() ?? [];
     imageUrls = (data['imageUrls'] as List?)?.cast<String>() ?? [];
@@ -280,6 +294,7 @@ class AnnouncementController extends GetxController {
     brokeragePercent = 2;
     rentPeriod = null;
     availableDate = null;
+    completionDate = null;
     titleDeedUrl = passportFrontUrl = passportBackUrl = nocUrl = null;
     proposalsLimit = null;
     latitude = longitude = null;
@@ -306,9 +321,8 @@ class AnnouncementController extends GetxController {
       'floor': floor,
       'total_floors': totalFloors,
       'description': description,
-      // Amenities require ObjectId strings from the amenities API.
-      // Send empty array until amenities fetch is implemented.
-      'amenities': <String>[],
+      // Amenity ObjectId strings selected from the fetch-amenities API.
+      'amenities': amenities,
       'propertyStatus': propertyStatus,
       'is_commercial_property': isCommercialProperty,
       'propertyMedia': {
@@ -323,6 +337,11 @@ class AnnouncementController extends GetxController {
 
     if (propertyName != null && propertyName!.isNotEmpty) {
       body['property_name'] = propertyName;
+    }
+
+    // Off Plan completion date.
+    if (propertyStatus == 2 && completionDate != null) {
+      body['completionDate'] = completionDate!.toUtc().toIso8601String();
     }
 
     if (listingType == 1) {
@@ -357,6 +376,8 @@ class AnnouncementController extends GetxController {
       errorMessage.value = null;
       await _repo.createAnnouncement(_buildBody());
       resetDraft();
+      // New data: refresh cached lists so list screens update automatically.
+      AnnouncementListController.to.refreshAfterMutation();
       return true;
     } catch (e) {
       errorMessage.value = e.toString();
@@ -371,6 +392,7 @@ class AnnouncementController extends GetxController {
       isLoading.value = true;
       errorMessage.value = null;
       await _repo.editAnnouncement(id, _buildBody());
+      AnnouncementListController.to.refreshAfterMutation();
       return true;
     } catch (e) {
       errorMessage.value = e.toString();
@@ -386,6 +408,9 @@ class AnnouncementController extends GetxController {
       errorMessage.value = null;
       await _repo.deleteAnnouncement(id);
       announcements.removeWhere((a) => a.id == id);
+      // Drop from cached lists immediately, then reconcile with the server.
+      AnnouncementListController.to.removeLocally(id);
+      AnnouncementListController.to.refreshAfterMutation();
       return true;
     } catch (e) {
       errorMessage.value = e.toString();

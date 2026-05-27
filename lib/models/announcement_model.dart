@@ -101,6 +101,43 @@ class PropertyDocuments {
       };
 }
 
+/// A broker who sent a proposal — used for the avatar stack on announcement
+/// cards. Parsed defensively since the name/image may sit at the top level or
+/// nested under a broker/user object.
+class ProposalBroker {
+  final String? id; // proposal id
+  final String? brokerId;
+  final String? name;
+  final String? brokerProfileImage;
+  final String? message;
+  final String? createdAt;
+
+  ProposalBroker({
+    this.id,
+    this.brokerId,
+    this.name,
+    this.brokerProfileImage,
+    this.message,
+    this.createdAt,
+  });
+
+  factory ProposalBroker.fromJson(Map<String, dynamic> json) {
+    final nested = (json['broker'] ?? json['user_id'] ?? json['user']);
+    final n = nested is Map<String, dynamic> ? nested : const {};
+    return ProposalBroker(
+      id: json['_id']?.toString(),
+      brokerId: n['_id']?.toString(),
+      name: json['name'] ?? n['name'],
+      brokerProfileImage: json['brokerProfileImage'] ??
+          json['userProfileImage'] ??
+          n['brokerProfileImage'] ??
+          n['userProfileImage'],
+      message: json['message']?.toString(),
+      createdAt: json['created_at']?.toString(),
+    );
+  }
+}
+
 class AnnouncementModel {
   // ── API data fields ──────────────────────────────────────────────────────
   final String? id;
@@ -128,6 +165,7 @@ class AnnouncementModel {
   final int? proposalsLimit;
   final String? rentPeriod;
   final String? availableDate;
+  final String? completionDate;
   final PropertyDocuments? propertyDocuments;
   final String? createdAt;
   final String? updatedAt;
@@ -147,6 +185,12 @@ class AnnouncementModel {
   final bool? isWishlisted;
   final String? status;         // 'Active' | 'Pending' | 'Rejected' | 'Draft'
   final int? proposalCount;
+  // Latest (up to 3) brokers who sent a proposal, for the avatar stack on cards.
+  final List<ProposalBroker>? latestProposals;
+  // From the detail endpoint: whether the viewer owns this listing, and whether
+  // they've already sent a proposal on it.
+  final bool? isOwner;
+  final bool? isProposalSent;
 
   AnnouncementModel({
     this.id,
@@ -174,6 +218,7 @@ class AnnouncementModel {
     this.proposalsLimit,
     this.rentPeriod,
     this.availableDate,
+    this.completionDate,
     this.propertyDocuments,
     this.createdAt,
     this.updatedAt,
@@ -190,6 +235,9 @@ class AnnouncementModel {
     this.isWishlisted,
     this.status,
     this.proposalCount,
+    this.latestProposals,
+    this.isOwner,
+    this.isProposalSent,
   });
 
   static String? _statusLabel(int? code) {
@@ -255,7 +303,12 @@ class AnnouncementModel {
       floor: json['floor'],
       totalFloors: json['total_floors'],
       description: json['description'],
-      amenities: (json['amenities'] as List?)?.cast<String>(),
+      // The list endpoint returns amenities as id strings, while the detail
+      // endpoint returns full objects ({_id, name, ...}). Normalize both to ids.
+      amenities: (json['amenities'] as List?)
+          ?.map((e) => e is Map ? (e['_id']?.toString() ?? '') : e.toString())
+          .where((id) => id.isNotEmpty)
+          .toList(),
       propertyStatus: json['propertyStatus'],
       isCommercialProperty: json['is_commercial_property'] == true ||
           json['is_commercial_property'] == 1,
@@ -266,6 +319,7 @@ class AnnouncementModel {
       proposalsLimit: json['proposals_limit'],
       rentPeriod: json['rentPeriod'],
       availableDate: json['availableDate'],
+      completionDate: json['completionDate'],
       propertyDocuments: json['property_documents'] != null
           ? PropertyDocuments.fromJson(
               json['property_documents'] as Map<String, dynamic>)
@@ -285,6 +339,13 @@ class AnnouncementModel {
       sqft: size?.sqft.toInt(),
       location: locationStr.isEmpty ? null : locationStr,
       status: _statusLabel(statusCode),
+      proposalCount: json['proposals_count'] as int?,
+      latestProposals: (json['latest_proposals'] as List?)
+          ?.whereType<Map<String, dynamic>>()
+          .map(ProposalBroker.fromJson)
+          .toList(),
+      isOwner: json['is_owner'] as bool?,
+      isProposalSent: json['is_proposal_sent'] as bool?,
     );
   }
 

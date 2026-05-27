@@ -100,7 +100,7 @@ class BrokerMyInformationController extends GetxController {
       final response = await uploadFile(
         url: '$baseUrl${ApiEndpoints.fileUpload}',
         file: file,
-        body: {'file_type': 'user-profile-image'},
+        body: {'file_type': 'broker-profile-image'},
       );
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (json['success'] == true) {

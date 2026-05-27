@@ -3,13 +3,13 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
-import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/projects/premium_lock_banner.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
 import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
-import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:get/get.dart';
 
 class BrokerProjectsView extends StatefulWidget {
@@ -114,51 +114,20 @@ class _BrokerShimmerCard extends StatelessWidget {
 }
 
 class _BrokerProjectsViewState extends State<BrokerProjectsView> {
-  final _repo = AnnouncementRepository();
+  final _controller = AnnouncementListController.to;
+  final _profileCtrl = Get.isRegistered<ProfileController>()
+      ? Get.find<ProfileController>()
+      : Get.put(ProfileController());
 
-  // Static cache — survives navigation, cleared only on pull-to-refresh
-  static List<AnnouncementModel>? _cache;
-
-  List<AnnouncementModel> _announcements = [];
-  bool _loading = false;
-  String? _error;
   int _selectedTab = 0;
-  final _tabs = const ['User Announcement', 'Your Announcement'];
+  final _tabs = const ['User Announcement', 'My Announcement'];
 
   @override
   void initState() {
     super.initState();
-    if (_cache != null) {
-      // Show cached data instantly — no API call
-      _announcements = _cache!;
-    } else {
-      _fetchAnnouncements();
-    }
-  }
-
-  Future<void> _fetchAnnouncements({bool isRefresh = false}) async {
-    if (isRefresh) _cache = null;
-    setState(() {
-      _loading = _announcements.isEmpty;
-      _error = null;
-    });
-    try {
-      final result = await _repo.fetchAllAnnouncements();
-      if (mounted) {
-        _cache = result.items;
-        setState(() {
-          _announcements = result.items;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = _announcements.isEmpty ? e.toString() : null;
-          _loading = false;
-        });
-      }
-    }
+    // Loads only if not cached yet — shared with the user-side feed, so it
+    // won't re-hit the API when the data is already in memory.
+    _controller.loadAll();
   }
 
   @override
@@ -171,11 +140,10 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
             CustomHeader(
               title: 'Projects',
               trailing: GestureDetector(
-                onTap: () async {
-                  await Get.to(
-                      () => const CreateAnnouncementView(fromBroker: true));
-                  _fetchAnnouncements(isRefresh: true);
-                },
+                // New announcements auto-refresh the cached list via the
+                // controller's mutation hook, so just navigate.
+                onTap: () =>
+                    Get.to(() => const CreateAnnouncementView(fromBroker: true)),
                 child: Image.asset('assets/images/home_add_icon.png',
                     width: 50.w, height: 50.w),
               ),
@@ -189,79 +157,100 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   }
 
   Widget _buildContent() {
-    if (_loading) {
-      return _BrokerShimmerList();
-    }
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _error!,
-              style: GoogleFonts.inter(
-                  fontSize: 14.sp, color: Colors.grey.shade500),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 12.h),
-            TextButton(
-              onPressed: _fetchAnnouncements,
-              child: Text('Retry',
-                  style: GoogleFonts.inter(
-                      fontSize: 14.sp, color: AppColors.primary)),
-            ),
-          ],
-        ),
-      );
-    }
-    if (_announcements.isEmpty) {
+    return Obx(() {
+      // First-load shimmer only when nothing is cached yet.
+      if (_controller.isLoadingAll.value &&
+          _controller.allAnnouncements.isEmpty) {
+        return _BrokerShimmerList();
+      }
+      if (_controller.allError.value != null &&
+          _controller.allAnnouncements.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _controller.allError.value!,
+                style: GoogleFonts.inter(
+                    fontSize: 14.sp, color: Colors.grey.shade500),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 12.h),
+              TextButton(
+                onPressed: () => _controller.loadAll(force: true),
+                child: Text('Retry',
+                    style: GoogleFonts.inter(
+                        fontSize: 14.sp, color: AppColors.primary)),
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Split the shared feed by ownership (no extra API call):
+      //  • My Announcement → posts created by the logged-in user
+      //  • User Announcement → everyone else's posts
+      final myId = _profileCtrl.currentUserId;
+      final announcements = _selectedTab == 1
+          ? _controller.allAnnouncements
+              .where((a) => myId != null && a.userId == myId)
+              .toList()
+          : _controller.allAnnouncements
+              .where((a) => a.userId != myId)
+              .toList();
+
+      if (announcements.isEmpty) {
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => _controller.loadAll(force: true),
+          child: ListView(
+            children: [
+              SizedBox(height: 200.h),
+              Center(
+                child: Text(
+                    _selectedTab == 1
+                        ? 'You have no announcements yet'
+                        : 'No announcements',
+                    style: GoogleFonts.inter(
+                        fontSize: 14.sp, color: Colors.grey.shade400)),
+              ),
+            ],
+          ),
+        );
+      }
+
       return RefreshIndicator(
         color: AppColors.primary,
-        onRefresh: () => _fetchAnnouncements(isRefresh: true),
-        child: ListView(
-          children: [
-            SizedBox(height: 200.h),
-            Center(
-              child: Text('No announcements',
-                  style: GoogleFonts.inter(
-                      fontSize: 14.sp, color: Colors.grey.shade400)),
-            ),
-          ],
+        onRefresh: () => _controller.loadAll(force: true),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                child: _buildSectionHeader(
+                    _tabs[_selectedTab], '${announcements.length} announcements'),
+              ),
+              ...announcements.asMap().entries.map(
+                    (entry) => AnnouncementPropertyCard(
+                      announcement: entry.value,
+                      index: entry.key,
+                      showWishlist: false,
+                      showActionButtons: false,
+                      ownerRowAboveImage: true,
+                      onTap: () => Get.to(() => BrokerAnnouncementDetailView(
+                          announcement: entry.value)),
+                    ),
+                  ),
+              SizedBox(height: 8.h),
+              PremiumLockBanner(onTap: () {}),
+              SizedBox(height: 24.h),
+            ],
+          ),
         ),
       );
-    }
-
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: () => _fetchAnnouncements(isRefresh: true),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-              child: _buildSectionHeader(
-                  _tabs[_selectedTab], '${_announcements.length} announcements'),
-            ),
-            ..._announcements.asMap().entries.map(
-                  (entry) => AnnouncementPropertyCard(
-                    announcement: entry.value,
-                    index: entry.key,
-                    showWishlist: false,
-                    showActionButtons: false,
-                    ownerRowAboveImage: true,
-                    onTap: () => Get.to(() =>
-                        BrokerAnnouncementDetailView(announcement: entry.value)),
-                  ),
-                ),
-            SizedBox(height: 8.h),
-            PremiumLockBanner(onTap: () {}),
-            SizedBox(height: 24.h),
-          ],
-        ),
-      ),
-    );
+    });
   }
 
   Widget _buildTabBar() {

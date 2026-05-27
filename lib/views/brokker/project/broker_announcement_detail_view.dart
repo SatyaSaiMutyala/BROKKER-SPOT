@@ -7,8 +7,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:get/get.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 
 class BrokerAnnouncementDetailView extends StatefulWidget {
@@ -32,6 +34,11 @@ class _BrokerAnnouncementDetailViewState
   final PageController _pageCtrl = PageController();
   int _currentPage = 0;
   bool _descExpanded = false;
+  bool _proposalSent = false;
+  // True once the detail fetch returns is_owner / is_proposal_sent. We hold the
+  // proposal button hidden until then to avoid it flashing on reopen.
+  bool _detailLoaded = false;
+  final _amenityCtrl = AmenityController.to;
 
   @override
   void initState() {
@@ -39,6 +46,8 @@ class _BrokerAnnouncementDetailViewState
     _data = widget.announcement;
     _initVideo(_data);
     _fetchDetail();
+    // Cached reference list to resolve amenity ids → names.
+    _amenityCtrl.loadAmenities();
   }
 
   void _initVideo(AnnouncementModel a) {
@@ -56,17 +65,34 @@ class _BrokerAnnouncementDetailViewState
 
   Future<void> _fetchDetail() async {
     final id = widget.announcement.id;
-    if (id == null) return;
+    if (id == null) {
+      if (mounted) setState(() => _detailLoaded = true);
+      return;
+    }
     try {
       final fresh = await AnnouncementRepository().fetchAnnouncementDetail(id);
-      if (mounted) setState(() => _data = fresh);
-    } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _data = fresh;
+          _detailLoaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _detailLoaded = true);
+    }
   }
 
   @override
   void dispose() {
     _videoCtrl?.dispose();
     _pageCtrl.dispose();
+    // Restore dark status-bar icons for the screen we return to (this screen
+    // used light icons over the dark hero image).
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+    ));
     super.dispose();
   }
 
@@ -85,10 +111,10 @@ class _BrokerAnnouncementDetailViewState
     return buffer.toString().split('').reversed.join();
   }
 
-  void _showProposalSheet() {
+  void _showProposalSheet() async {
     final id = _data.id;
     if (id == null) return;
-    showDialog(
+    final sent = await showDialog<bool>(
       context: context,
       builder: (_) => Dialog(
         backgroundColor: Colors.white,
@@ -99,6 +125,10 @@ class _BrokerAnnouncementDetailViewState
         child: _ProposalSheet(announcementId: id),
       ),
     );
+    // Proposal sent → hide the button immediately (no need to leave & return).
+    if (sent == true && mounted) {
+      setState(() => _proposalSent = true);
+    }
   }
 
   @override
@@ -189,12 +219,21 @@ class _BrokerAnnouncementDetailViewState
                           SizedBox(height: 12.h),
                           _buildDetailsGrid(a),
                           SizedBox(height: 22.h),
-                          if ((a.amenities ?? []).isNotEmpty) ...[
-                            _sectionTitle('Amenities'),
-                            SizedBox(height: 12.h),
-                            _buildAmenities(a.amenities!),
-                            SizedBox(height: 22.h),
-                          ],
+                          if ((a.amenities ?? []).isNotEmpty)
+                            Obx(() {
+                              final names =
+                                  _amenityCtrl.namesForIds(a.amenities!);
+                              if (names.isEmpty) return const SizedBox.shrink();
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _sectionTitle('Amenities'),
+                                  SizedBox(height: 12.h),
+                                  _buildAmenities(names),
+                                  SizedBox(height: 22.h),
+                                ],
+                              );
+                            }),
                           _sectionTitle('Location'),
                           SizedBox(height: 12.h),
                           _buildMapBox(a),
@@ -227,12 +266,19 @@ class _BrokerAnnouncementDetailViewState
             ),
 
             // ── Sticky bottom button ──
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: _buildBottomBar(),
-            ),
+            // Only shown once the detail has loaded (avoids a flash on reopen),
+            // and hidden if the viewer owns this listing or already sent a
+            // proposal (flagged by the API, or just sent in this session).
+            if (_detailLoaded &&
+                _data.isOwner != true &&
+                _data.isProposalSent != true &&
+                !_proposalSent)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: _buildBottomBar(),
+              ),
           ],
         ),
       ),
@@ -935,7 +981,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
         _isLoading = false;
       });
       Future.delayed(const Duration(milliseconds: 1500), () {
-        if (mounted) Navigator.pop(context);
+        if (mounted) Navigator.pop(context, true);
       });
     } catch (e) {
       if (!mounted) return;

@@ -1,4 +1,6 @@
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/profile/profile_view.dart';
 import 'package:brokkerspot/views/user/home/more_property_view.dart';
 import 'package:flutter/material.dart';
@@ -14,21 +16,39 @@ import 'package:brokkerspot/views/user/home/property_detail_view.dart';
 import 'package:brokkerspot/views/user/home/search_view.dart';
 import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 
-class HomeView extends StatelessWidget {
-  HomeView({super.key});
+class HomeView extends StatefulWidget {
+  const HomeView({super.key});
 
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
   final ProfileController profileController = Get.put(ProfileController());
+  final AnnouncementListController _announcementController =
+      AnnouncementListController.to;
+
+  @override
+  void initState() {
+    super.initState();
+    // Loads only if not cached yet — fetches just 5 records for the home feed.
+    _announcementController.loadHome();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: 12.h),
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => _announcementController.loadHome(force: true),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 12.h),
               // Header
               Padding(
                 padding: EdgeInsets.only(left: 16.h, bottom: 16.h, top: 4.h),
@@ -72,7 +92,8 @@ class HomeView extends StatelessWidget {
               // DAMAC section
               _buildDamacSection(),
               SizedBox(height: 24.h),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -325,8 +346,6 @@ class HomeView extends StatelessWidget {
 
   // ─────────── ANNOUNCEMENTS ───────────
   Widget _buildAnnouncementsSection() {
-    final announcements = _getMockAnnouncements();
-
     return Container(
       color: Colors.white,
       padding: EdgeInsets.symmetric(vertical: 10.h),
@@ -347,11 +366,14 @@ class HomeView extends StatelessWidget {
                 ),
                 SizedBox(width: 6.w),
                 InkWell(
-                  onTap: () => Get.to(() => PropertyDetailView(
-                        announcement: announcements.first,
-                        sectionTitle:
-                            announcements.first.propertyName ?? 'Details',
-                      )),
+                  onTap: () {
+                    final items = _announcementController.homeAnnouncements;
+                    if (items.isEmpty) return;
+                    Get.to(() => AnnouncementDetailView(
+                          announcement: items.first,
+                          isOwner: false,
+                        ));
+                  },
                   borderRadius: BorderRadius.circular(9.r),
                   child: Container(
                     width: 18.w,
@@ -374,8 +396,9 @@ class HomeView extends StatelessWidget {
                 ),
                 const Spacer(),
                 InkWell(
-                  onTap: () => Get.to(
-                      () => MorePropertyView(announcements: announcements)),
+                  onTap: () => Get.to(() => MorePropertyView(
+                      announcements:
+                          _announcementController.homeAnnouncements.toList())),
                   child: Text(
                     'More',
                     style: GoogleFonts.poppins(
@@ -389,19 +412,126 @@ class HomeView extends StatelessWidget {
             ),
           ),
           SizedBox(height: 12.h),
-          SizedBox(
-            height: 325.h,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
-              itemCount: announcements.length,
-              separatorBuilder: (_, __) => SizedBox(width: 14.w),
-              itemBuilder: (_, index) {
-                return HomeAnnouncementCard(
-                  announcement: announcements[index],
-                  index: index,
-                );
-              },
+          Obx(() {
+            final ctrl = _announcementController;
+            // First load — nothing cached yet.
+            if (ctrl.isLoadingHome.value && ctrl.homeAnnouncements.isEmpty) {
+              return _buildAnnouncementsShimmer();
+            }
+            if (ctrl.homeError.value != null && ctrl.homeAnnouncements.isEmpty) {
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 24.h),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "Couldn't load announcements. Please try again.",
+                        style: GoogleFonts.inter(
+                            fontSize: 13.sp, color: Colors.grey.shade500),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 4.h),
+                      TextButton(
+                        onPressed: () => ctrl.loadHome(force: true),
+                        child: Text('Retry',
+                            style: GoogleFonts.inter(
+                                fontSize: 13.sp, color: AppColors.primary)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            if (ctrl.homeAnnouncements.isEmpty) {
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 32.h),
+                child: Center(
+                  child: Text('No announcements yet',
+                      style: GoogleFonts.inter(
+                          fontSize: 13.sp, color: Colors.grey.shade400)),
+                ),
+              );
+            }
+            return SizedBox(
+              height: 325.h,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                itemCount: ctrl.homeAnnouncements.length,
+                separatorBuilder: (_, __) => SizedBox(width: 14.w),
+                itemBuilder: (_, index) {
+                  final a = ctrl.homeAnnouncements[index];
+                  return HomeAnnouncementCard(
+                    announcement: a,
+                    index: index,
+                    onTap: () => Get.to(() => AnnouncementDetailView(
+                          announcement: a,
+                          isOwner: false,
+                        )),
+                  );
+                },
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // ─────────── ANNOUNCEMENTS SHIMMER ───────────
+  Widget _buildAnnouncementsShimmer() {
+    return SizedBox(
+      height: 325.h,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        itemCount: 3,
+        separatorBuilder: (_, __) => SizedBox(width: 14.w),
+        itemBuilder: (_, __) => _announcementShimmerCard(),
+      ),
+    );
+  }
+
+  Widget _announcementShimmerCard() {
+    return Container(
+      width: 330.w,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F8F8),
+        borderRadius: BorderRadius.circular(16.r),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image block
+          ShimmerBox(width: 330.w, height: 193.h),
+          Padding(
+            padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 12.h),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Price line
+                ShimmerBox(
+                    width: 160.w,
+                    height: 18.h,
+                    borderRadius: BorderRadius.circular(4.r)),
+                SizedBox(height: 10.h),
+                // Property name line
+                ShimmerBox(
+                    width: 220.w,
+                    height: 14.h,
+                    borderRadius: BorderRadius.circular(4.r)),
+                SizedBox(height: 10.h),
+                // Location line
+                ShimmerBox(
+                    width: 180.w,
+                    height: 14.h,
+                    borderRadius: BorderRadius.circular(4.r)),
+              ],
             ),
           ),
         ],
@@ -495,35 +625,6 @@ class HomeView extends StatelessWidget {
   }
 
   // ─────────── MOCK DATA ───────────
-  List<AnnouncementModel> _getMockAnnouncements() {
-    return [
-      AnnouncementModel(
-        listingType: 'For Rent',
-        imageUrls: ['assets/images/room.png'],
-        price: 10000,
-        propertyName: 'SAFA TWO de GRISOGONO',
-        location: 'Dubai | United Arab Emirates',
-        timeAgo: '15 min ago',
-      ),
-      AnnouncementModel(
-        listingType: 'For Rent',
-        imageUrls: ['assets/images/room.png'],
-        price: 15000,
-        propertyName: 'MARINA BAY TOWERS',
-        location: 'Dubai | United Arab Emirates',
-        timeAgo: '30 min ago',
-      ),
-      AnnouncementModel(
-        listingType: 'For sell',
-        imageUrls: ['assets/images/room.png'],
-        price: 850000,
-        propertyName: 'BURJ VISTA HEIGHTS',
-        location: 'Abu Dhabi | UAE',
-        timeAgo: '1 hr ago',
-      ),
-    ];
-  }
-
   List<AnnouncementModel> _getMockDamacAnnouncements() {
     return [
       AnnouncementModel(

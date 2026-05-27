@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -70,13 +71,10 @@ class HomeAnnouncementCard extends StatelessWidget {
           // Property image - full height
           Positioned.fill(
             bottom: 22.h,
-            child: (a.imageUrls != null && a.imageUrls!.isNotEmpty)
-                ? Image.asset(
-                    a.imageUrls!.first,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
-                  )
-                : _imagePlaceholder(),
+            child: _buildImage(
+                (a.imageUrls != null && a.imageUrls!.isNotEmpty)
+                    ? a.imageUrls!.first
+                    : null),
           ),
           // "For Rent" badge - top left
           if (a.listingType != null)
@@ -225,6 +223,26 @@ class HomeAnnouncementCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Renders a network URL (API data) or an asset path (mock data), with a
+  /// graceful placeholder on error/empty.
+  Widget _buildImage(String? url) {
+    if (url == null || url.isEmpty) return _imagePlaceholder();
+    final isNetwork = url.startsWith('http');
+    if (isNetwork) {
+      return CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Container(color: Colors.grey.shade200),
+        errorWidget: (_, __, ___) => _imagePlaceholder(),
+      );
+    }
+    return Image.asset(
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _imagePlaceholder(),
     );
   }
 

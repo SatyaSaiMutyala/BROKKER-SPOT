@@ -69,7 +69,7 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     if (_rejectedDialogShown || !mounted) return;
     final isLoggedIn = LocalStorageService.isLoggedIn();
     if (isLoggedIn &&
-        profileController.role.value == 2 &&
+        profileController.hasBrokerRole &&
         profileController.profileData.value?['verificationStatus'] == 'rejected') {
       _rejectedDialogShown = true;
       final reason = profileController.profileData.value?['rejectionReason'] ?? 'Your account has been rejected.';
@@ -107,7 +107,7 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
         // Rejected: block tabs 1, 2, 3 only (allow Home=0 and Account=4)
         if (index != 0 && index != 4 &&
             isLoggedIn &&
-            profileController.role.value == 2 &&
+            profileController.hasBrokerRole &&
             verificationStatus == 'rejected') {
           final reason = profileController.profileData.value?['rejectionReason'] ?? 'Your account has been rejected.';
           showAccountRejectedDialog(context, reason);
@@ -122,14 +122,14 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
             return;
           }
 
-          // Step 2: Logged in but role == 1
-          if (profileController.role.value == 1) {
+          // Step 2: Logged in but not a broker yet → must complete profile
+          if (!profileController.hasBrokerRole) {
             showCompleteProfileDialog(context);
             return;
           }
 
-          // Step 3: Logged in, role == 2, but verification pending
-          if (profileController.role.value == 2 && verificationStatus == 'pending') {
+          // Step 3: Broker, but verification still pending
+          if (profileController.hasBrokerRole && verificationStatus == 'pending') {
             showPendingVerificationDialog(context);
             return;
           }

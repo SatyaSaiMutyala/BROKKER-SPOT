@@ -28,4 +28,7 @@ class ApiEndpoints {
   static const String fetchAnnouncementDetail = 'user/announcements/fetch';
   static const String fetchAllAnnouncements = 'user/announcements/fetch-all';
   static const String sendProposal = 'user/announcements/sent-proposal';
+
+  // Common
+  static const String fetchAmenities = 'user/common/fetch-amenities';
 }

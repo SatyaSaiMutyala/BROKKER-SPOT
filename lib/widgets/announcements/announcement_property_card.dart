@@ -53,10 +53,16 @@ class AnnouncementPropertyCard extends StatefulWidget {
       _AnnouncementPropertyCardState();
 }
 
-class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
+class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
+    with AutomaticKeepAliveClientMixin {
   int _currentImageIndex = 0;
   VideoPlayerController? _videoCtrl;
   bool _videoReady = false;
+
+  // Keep this card (and its decoded images / current page) alive when it
+  // scrolls out of view, so coming back doesn't re-decode or reset the carousel.
+  @override
+  bool get wantKeepAlive => true;
 
   static const List<String> _fallbackImages = [
     'assets/images/rent1.png',
@@ -88,6 +94,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final a = widget.announcement;
 
     return GestureDetector(
@@ -202,9 +209,19 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
               }
               // Remaining pages: images
               final imgIdx = hasVideo ? i - 1 : i;
+              // Decode at on-screen pixel size — far less memory + much faster
+              // decode, so scrolling stays smooth and cached images paint instantly.
+              final dpr = MediaQuery.of(context).devicePixelRatio;
+              final cacheWidth =
+                  (MediaQuery.of(context).size.width * dpr).round();
               return CachedNetworkImage(
                 imageUrl: images[imgIdx],
                 fit: BoxFit.cover,
+                width: double.infinity,
+                height: 200.h,
+                memCacheWidth: cacheWidth,
+                fadeInDuration: Duration.zero,
+                fadeOutDuration: Duration.zero,
                 placeholder: (_, __) => _shimmerBox(),
                 errorWidget: (_, __, ___) => _imagePlaceholder(),
               );
@@ -525,10 +542,16 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
   }
 
   Widget _buildBrokerAvatarWithCount() {
-    const count = 4;
+    final proposals = widget.announcement.latestProposals ?? [];
+    final count = widget.announcement.proposalCount ?? proposals.length;
+    // Nothing to show until at least one broker has sent a proposal.
+    if (count == 0 && proposals.isEmpty) return const SizedBox.shrink();
+
     const avatarSize = 44.0;
     const peekAmount = 10.0;
-    final totalWidth = avatarSize + peekAmount;
+    // Show up to 3 broker avatars, peeking behind one another.
+    final shown = proposals.take(3).toList();
+    final totalWidth = avatarSize + (shown.length - 1).clamp(0, 2) * 18 + peekAmount;
 
     return SizedBox(
       width: totalWidth.w,
@@ -536,40 +559,34 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // Stack avatars right-to-left so the first one sits on top.
+          for (int i = shown.length - 1; i >= 0; i--)
+            Positioned(
+              left: i * 18.w,
+              child: _avatar(shown[i].brokerProfileImage, avatarSize),
+            ),
+          // Count badge on the top-most (first) avatar.
           Positioned(
-            right: 0,
-            child: _avatar('assets/images/story2.png', avatarSize),
-          ),
-          Positioned(
-            left: 0,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                _avatar('assets/images/story1.png', avatarSize),
-                Positioned(
-                  top: -4.h,
-                  right: -6.w,
-                  child: Container(
-                    width: 22.w,
-                    height: 22.w,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '$count',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+            top: -4.h,
+            left: 38.w,
+            child: Container(
+              width: 22.w,
+              height: 22.w,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: Center(
+                child: Text(
+                  '$count',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -577,16 +594,27 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard> {
     );
   }
 
-  Widget _avatar(String asset, double size) {
+  Widget _avatar(String? imageUrl, double size) {
+    final hasUrl = imageUrl != null && imageUrl.isNotEmpty;
     return Container(
       width: size.w,
       height: size.w,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 2),
+        color: Colors.grey.shade200,
       ),
       child: ClipOval(
-        child: Image.asset(asset, fit: BoxFit.cover),
+        child: hasUrl
+            ? CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(color: Colors.grey.shade200),
+                errorWidget: (_, __, ___) => Image.asset(
+                    'assets/images/story1.png',
+                    fit: BoxFit.cover),
+              )
+            : Image.asset('assets/images/story1.png', fit: BoxFit.cover),
       ),
     );
   }

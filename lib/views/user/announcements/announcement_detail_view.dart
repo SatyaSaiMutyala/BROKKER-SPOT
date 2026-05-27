@@ -1,3 +1,5 @@
+import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
+import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,6 +39,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   late AnnouncementModel _data;
   VideoPlayerController? _videoCtrl;
   bool _videoReady = false;
+  final _amenityCtrl = AmenityController.to;
 
   static const List<String> _fallbackImages = [
     'assets/images/rent1.png',
@@ -49,6 +52,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     _data = widget.announcement;
     _initVideo(_data);
     _fetchDetail();
+    // Cached reference list to resolve amenity ids → names.
+    _amenityCtrl.loadAmenities();
   }
 
   void _initVideo(AnnouncementModel a) {
@@ -67,6 +72,13 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   @override
   void dispose() {
     _videoCtrl?.dispose();
+    // Restore dark status-bar icons for the screen we return to (this screen
+    // used light icons over the dark hero image).
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+    ));
     super.dispose();
   }
 
@@ -234,6 +246,9 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                                 setDialogState(() => _isDeleting = true);
                                 try {
                                   await _repo.deleteAnnouncement(id);
+                                  // Drop it from the shared cache so every list
+                                  // screen updates reactively, no refetch needed.
+                                  AnnouncementListController.to.removeLocally(id);
                                   if (mounted) {
                                     Get.back(); // dismiss dialog
                                     Get.back(result: true);
@@ -379,7 +394,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                   Transform.translate(
                     offset: Offset(0, -22.h),
                     child: Container(
-                      width: double.infinity,
+                       width: double.infinity,
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.only(
@@ -437,12 +452,21 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                           SizedBox(height: 12.h),
                           _buildDetailsGrid(a),
                           SizedBox(height: 22.h),
-                          if ((a.amenities ?? []).isNotEmpty) ...[
-                            _sectionTitle('Amenities'),
-                            SizedBox(height: 12.h),
-                            _buildAmenities(a.amenities!),
-                            SizedBox(height: 22.h),
-                          ],
+                          if ((a.amenities ?? []).isNotEmpty)
+                            Obx(() {
+                              final names =
+                                  _amenityCtrl.namesForIds(a.amenities!);
+                              if (names.isEmpty) return const SizedBox.shrink();
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _sectionTitle('Amenities'),
+                                  SizedBox(height: 12.h),
+                                  _buildAmenities(names),
+                                  SizedBox(height: 22.h),
+                                ],
+                              );
+                            }),
                           SizedBox(height: 100.h),
                         ],
                       ),
@@ -959,7 +983,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       child: _brokerSelected
           ? _buildBrokerSelectedBar()
           : GestureDetector(
-              onTap: () => Get.to(() => const AnnouncementProposalsView()),
+              onTap: () => Get.to(() => AnnouncementProposalsView(
+                    proposals: _data.latestProposals ?? const [],
+                    proposalsLimit: _data.proposalsLimit,
+                  )),
               child: _buildNoBrokerBar(),
             ),
     );
@@ -1003,43 +1030,41 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
   Widget _brokerAvatarStack() {
     const double sz = 46.0;
-    const double peek = 10.0;
+    final proposals = _data.latestProposals ?? [];
+    final count = _data.proposalCount ?? proposals.length;
+    if (count == 0 && proposals.isEmpty) return const SizedBox.shrink();
+
+    final shown = proposals.take(3).toList();
+    final totalWidth = sz + (shown.length - 1).clamp(0, 2) * 18 + 10;
     return SizedBox(
-      width: sz + peek,
+      width: totalWidth.w,
       height: sz,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          for (int i = shown.length - 1; i >= 0; i--)
+            Positioned(
+              left: i * 18.w,
+              child: _brokerAvatar(shown[i].brokerProfileImage, sz),
+            ),
           Positioned(
-              right: 0, child: _brokerAvatar('assets/images/story2.png', sz)),
-          Positioned(
-            left: 0,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                _brokerAvatar('assets/images/story1.png', sz),
-                Positioned(
-                  top: -3.h,
-                  right: -5.w,
-                  child: Container(
-                    width: 18.w,
-                    height: 18.w,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: Colors.white, width: 1.5),
-                    ),
-                    child: Center(
-                      child: Text('4',
-                          style: GoogleFonts.inter(
-                              fontSize: 9.sp,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white)),
-                    ),
-                  ),
-                ),
-              ],
+            top: -3.h,
+            left: 40.w,
+            child: Container(
+              width: 18.w,
+              height: 18.w,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Center(
+                child: Text('$count',
+                    style: GoogleFonts.inter(
+                        fontSize: 9.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
+              ),
             ),
           ),
         ],
@@ -1047,15 +1072,27 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     );
   }
 
-  Widget _brokerAvatar(String asset, double size) {
+  Widget _brokerAvatar(String? imageUrl, double size) {
+    final hasUrl = imageUrl != null && imageUrl.isNotEmpty;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 1.5)),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 1.5),
+        color: Colors.grey.shade200,
+      ),
       child: ClipOval(
-          child: Image.asset(asset, fit: BoxFit.cover)),
+        child: hasUrl
+            ? CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(color: Colors.grey.shade200),
+                errorWidget: (_, __, ___) =>
+                    Image.asset('assets/images/story1.png', fit: BoxFit.cover),
+              )
+            : Image.asset('assets/images/story1.png', fit: BoxFit.cover),
+      ),
     );
   }
 

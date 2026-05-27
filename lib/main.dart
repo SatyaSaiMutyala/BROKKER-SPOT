@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'core/constants/app_colors.dart';
 import 'views/splash/splash_view.dart';
 
@@ -35,6 +36,12 @@ void main() async {
         debugPrint('FCM Token: $fcmToken');
       }
     } else {
+      // Android 13+ requires runtime POST_NOTIFICATIONS permission.
+      // No-op on older Android (auto-granted).
+      final status = await Permission.notification.status;
+      if (!status.isGranted) {
+        await Permission.notification.request();
+      }
       final fcmToken = await FirebaseMessaging.instance.getToken();
       debugPrint('FCM Token: $fcmToken');
     }
