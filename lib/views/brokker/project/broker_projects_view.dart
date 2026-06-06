@@ -61,11 +61,9 @@ class _BrokerShimmerCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                      width: 100.w, height: 10.h, color: Colors.white),
+                  Container(width: 100.w, height: 10.h, color: Colors.white),
                   SizedBox(height: 4.h),
-                  Container(
-                      width: 60.w, height: 8.h, color: Colors.white),
+                  Container(width: 60.w, height: 8.h, color: Colors.white),
                 ],
               ),
               const Spacer(),
@@ -170,8 +168,8 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
               trailing: GestureDetector(
                 // New announcements auto-refresh the cached list via the
                 // controller's mutation hook, so just navigate.
-                onTap: () =>
-                    Get.to(() => const CreateAnnouncementView(fromBroker: true)),
+                onTap: () => Get.to(
+                    () => const CreateAnnouncementView(fromBroker: true)),
                 child: Image.asset('assets/images/home_add_icon.png',
                     width: 50.w, height: 50.w),
               ),
@@ -355,8 +353,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
                   style: GoogleFonts.inter(
                     fontSize: 13.sp,
                     fontWeight: FontWeight.w600,
-                    color:
-                        isSelected ? Colors.white : Colors.grey.shade600,
+                    color: isSelected ? Colors.white : Colors.grey.shade600,
                   ),
                 ),
               ),

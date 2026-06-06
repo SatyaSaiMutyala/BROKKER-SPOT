@@ -23,7 +23,7 @@ class AnnouncementListController extends GetxController {
           ? Get.find<AnnouncementListController>()
           : Get.put(AnnouncementListController(), permanent: true);
 
-  // Public feed (all announcements) ------------------------------------------
+  // Public feed — user-role=1 (property owners) used by AnnouncementsView ----
   final allAnnouncements = <AnnouncementModel>[].obs;
   final isLoadingAll = false.obs;
   /// True while page>1 is being appended — drives the bottom skeleton.
@@ -34,6 +34,12 @@ class AnnouncementListController extends GetxController {
   int _allTotalPages = 1;
   static const int _allPerPage = 10;
   bool get hasMoreAll => _allPage < _allTotalPages;
+
+  // Broker feed — user-role=2 (brokers) used by BrokerProjectsView -----------
+  final brokerAnnouncements = <AnnouncementModel>[].obs;
+  final isLoadingBroker = false.obs;
+  final brokerError = Rxn<String>();
+  bool _brokerLoaded = false;
 
   // My announcements (server-side status filter, cached per status) -----------
   // status: null=all, 0=draft, 1=submitted, 2=approved, 3=rejected.
@@ -60,9 +66,9 @@ class AnnouncementListController extends GetxController {
   final brokerMineError = Rxn<String>();
   bool _brokerMineLoaded = false;
 
-  /// Loads the public feed. Shows the local-DB cache instantly, then refreshes
-  /// from the network. No network call if already loaded this session unless
-  /// [force].
+  /// Loads the public feed (user-role=1, property owners). Shows the local-DB
+  /// cache instantly, then refreshes from the network. No network call if
+  /// already loaded this session unless [force].
   Future<void> loadAll({bool force = false}) async {
     // Instant render from local DB (offline-first) when we have nothing yet.
     if (allAnnouncements.isEmpty) {
@@ -76,8 +82,8 @@ class AnnouncementListController extends GetxController {
       isLoadingAll.value = true;
       allError.value = null;
       // Reset pagination cursor — this is a fresh fetch, not append.
-      final result =
-          await _repo.fetchAllAnnouncements(page: 1, perPage: _allPerPage);
+      final result = await _repo.fetchAllAnnouncements(
+          page: 1, perPage: _allPerPage, userRole: 1);
       allAnnouncements.assignAll(result.items);
       _allPage = result.page;
       _allTotalPages = result.totalPages;
@@ -101,7 +107,7 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingMoreAll.value = true;
       final result = await _repo.fetchAllAnnouncements(
-          page: next, perPage: _allPerPage);
+          page: next, perPage: _allPerPage, userRole: 1);
       allAnnouncements.addAll(result.items);
       _allPage = result.page;
       _allTotalPages = result.totalPages;
@@ -109,6 +115,22 @@ class AnnouncementListController extends GetxController {
       // Silent — keep showing the pages we already have.
     } finally {
       isLoadingMoreAll.value = false;
+    }
+  }
+
+  /// Loads user-role=2 announcements (brokers). No-op unless [force].
+  Future<void> loadBroker({bool force = false}) async {
+    if (_brokerLoaded && !force) return;
+    try {
+      isLoadingBroker.value = true;
+      brokerError.value = null;
+      final result = await _repo.fetchAllAnnouncements(userRole: 2);
+      brokerAnnouncements.assignAll(result.items);
+      _brokerLoaded = true;
+    } catch (e) {
+      brokerError.value = e.toString();
+    } finally {
+      isLoadingBroker.value = false;
     }
   }
 
@@ -140,7 +162,7 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingMine.value = true;
       myError.value = null;
-      final result = await _repo.fetchAnnouncements(status: status);
+      final result = await _repo.fetchAnnouncements(status: status, userRole: 1);
       _mineCache[status] = result.items;
       _mineLoaded = true;
       AnnouncementCache.saveList(AnnouncementCache.keyMine(status), result.raw);
@@ -170,7 +192,7 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingHome.value = true;
       homeError.value = null;
-      final result = await _repo.fetchAllAnnouncements(page: 1, perPage: 5);
+      final result = await _repo.fetchAllAnnouncements(page: 1, perPage: 5, userRole: 1);
       homeAnnouncements.assignAll(result.items);
       AnnouncementCache.saveList(AnnouncementCache.keyHome, result.raw);
       _homeLoaded = true;
@@ -210,11 +232,10 @@ class AnnouncementListController extends GetxController {
   /// Call after a create/edit/delete so all list screens reactively refresh.
   /// Only refreshes lists that have already been loaded once.
   Future<void> refreshAfterMutation() async {
-    // A create/edit can change which status bucket items fall into, so drop the
-    // whole per-status cache and reload the currently visible tab.
     _mineCache.clear();
     await Future.wait([
       if (_allLoaded) loadAll(force: true),
+      if (_brokerLoaded) loadBroker(force: true),
       if (_mineLoaded) loadMine(status: _currentMineStatus, force: true),
       if (_homeLoaded) loadHome(force: true),
       if (_brokerMineLoaded) loadBrokerMine(force: true),
@@ -225,6 +246,7 @@ class AnnouncementListController extends GetxController {
   /// so the UI updates without waiting for a network round-trip.
   void removeLocally(String id) {
     allAnnouncements.removeWhere((a) => a.id == id);
+    brokerAnnouncements.removeWhere((a) => a.id == id);
     myAnnouncements.removeWhere((a) => a.id == id);
     homeAnnouncements.removeWhere((a) => a.id == id);
     brokerMineAnnouncements.removeWhere((a) => a.id == id);
@@ -238,11 +260,13 @@ class AnnouncementListController extends GetxController {
   /// fetch completes.
   void clearAll() {
     allAnnouncements.clear();
+    brokerAnnouncements.clear();
     myAnnouncements.clear();
     homeAnnouncements.clear();
     brokerMineAnnouncements.clear();
     _mineCache.clear();
     _allLoaded = false;
+    _brokerLoaded = false;
     _mineLoaded = false;
     _homeLoaded = false;
     _brokerMineLoaded = false;
@@ -251,6 +275,7 @@ class AnnouncementListController extends GetxController {
     _allTotalPages = 1;
     isLoadingMoreAll.value = false;
     allError.value = null;
+    brokerError.value = null;
     myError.value = null;
     homeError.value = null;
     brokerMineError.value = null;
