@@ -81,7 +81,7 @@ class WelcomeViewController extends GetxController {
         profileCtrl.profileImage.value = googleUser.photoUrl ?? '';
       }
 
-      _navigateByRole(profileCtrl.role.value);
+      _navigateByRole(profileCtrl.currentRole.value);
     } on FirebaseAuthException catch (e) {
       print('Google Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
       AppToast.error(e.message ?? "Google Sign-In Failed");
@@ -198,7 +198,7 @@ class WelcomeViewController extends GetxController {
       print('Final profile — name: "${profileCtrl.userName.value}", email: "${profileCtrl.userEmail.value}"');
       print('Profile loaded, navigating to dashboard...');
 
-      _navigateByRole(profileCtrl.role.value);
+      _navigateByRole(profileCtrl.currentRole.value);
     } on FirebaseAuthException catch (e) {
       print('Apple Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
       AppToast.error(e.message ?? "Apple Sign-In Failed");
@@ -403,10 +403,16 @@ class WelcomeViewController extends GetxController {
     }
   }
 
-  void _navigateByRole(int role) {
+  /// Fresh social-login routing: the backend's [currentRole] decides which
+  /// dashboard to open (1 = user, 2 = broker). Falls back to last-side only
+  /// if currentRole isn't usable yet. Also persists last-side so the splash
+  /// path stays consistent on the next app open.
+  void _navigateByRole(int currentRole) async {
     DeviceService.registerDevice();
-    final lastSide = LocalStorageService.getLastSide();
-    if (lastSide == 'broker') {
+    final goBroker = currentRole == 2 ||
+        (currentRole != 1 && LocalStorageService.getLastSide() == 'broker');
+    await LocalStorageService.saveLastSide(goBroker ? 'broker' : 'user');
+    if (goBroker) {
       Get.offAll(() => BrokerDashBoardView(showLocationPicker: true));
     } else {
       Get.offAll(() => const DashboardView(showLocationPicker: true));

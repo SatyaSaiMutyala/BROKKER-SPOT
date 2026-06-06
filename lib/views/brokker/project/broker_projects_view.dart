@@ -4,7 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
+import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/widgets/projects/premium_lock_banner.dart';
+import 'package:brokkerspot/widgets/announcements/announcement_card_skeleton.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
 import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
@@ -118,6 +120,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   final _profileCtrl = Get.isRegistered<ProfileController>()
       ? Get.find<ProfileController>()
       : Get.put(ProfileController());
+  final _scrollController = ScrollController();
 
   int _selectedTab = 0;
   final _tabs = const ['User Announcement', 'My Announcement'];
@@ -125,9 +128,34 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   @override
   void initState() {
     super.initState();
-    // Loads only if not cached yet — shared with the user-side feed, so it
-    // won't re-hit the API when the data is already in memory.
+    // Both tabs are cache-first; each is a no-op if already loaded.
     _controller.loadAll();
+    _controller.loadBrokerMine();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    // Pagination only applies to the public-feed tab today (My Announcement
+    // is not paginated server-side here).
+    if (_selectedTab != 0) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 300 && _controller.hasMoreAll) {
+      _controller.loadMoreAll();
+    }
+  }
+
+  void _onTabChanged(int i) {
+    setState(() => _selectedTab = i);
+    // Lazy-load "My Announcement" the first time it's opened.
+    if (i == 1) _controller.loadBrokerMine();
   }
 
   @override
@@ -158,26 +186,46 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
 
   Widget _buildContent() {
     return Obx(() {
+      final isMine = _selectedTab == 1;
+
+      // Each tab reads from its own slot. "User Announcement" keeps the
+      // existing public feed; "My Announcement" hits /user/announcements/fetch
+      // (backend filters by role → broker's own posts).
+      final isLoading = isMine
+          ? _controller.isLoadingBrokerMine.value
+          : _controller.isLoadingAll.value;
+      final error = isMine
+          ? _controller.brokerMineError.value
+          : _controller.allError.value;
+      final myId = _profileCtrl.currentUserId;
+      final announcements = isMine
+          ? _controller.brokerMineAnnouncements.toList()
+          : _controller.allAnnouncements
+              .where((a) => a.userId != myId)
+              .toList();
+
+      Future<void> refresh() => isMine
+          ? _controller.loadBrokerMine(force: true)
+          : _controller.loadAll(force: true);
+
       // First-load shimmer only when nothing is cached yet.
-      if (_controller.isLoadingAll.value &&
-          _controller.allAnnouncements.isEmpty) {
+      if (isLoading && announcements.isEmpty) {
         return _BrokerShimmerList();
       }
-      if (_controller.allError.value != null &&
-          _controller.allAnnouncements.isEmpty) {
+      if (error != null && announcements.isEmpty) {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _controller.allError.value!,
+                error,
                 style: GoogleFonts.inter(
                     fontSize: 14.sp, color: Colors.grey.shade500),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 12.h),
               TextButton(
-                onPressed: () => _controller.loadAll(force: true),
+                onPressed: refresh,
                 child: Text('Retry',
                     style: GoogleFonts.inter(
                         fontSize: 14.sp, color: AppColors.primary)),
@@ -187,28 +235,16 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         );
       }
 
-      // Split the shared feed by ownership (no extra API call):
-      //  • My Announcement → posts created by the logged-in user
-      //  • User Announcement → everyone else's posts
-      final myId = _profileCtrl.currentUserId;
-      final announcements = _selectedTab == 1
-          ? _controller.allAnnouncements
-              .where((a) => myId != null && a.userId == myId)
-              .toList()
-          : _controller.allAnnouncements
-              .where((a) => a.userId != myId)
-              .toList();
-
       if (announcements.isEmpty) {
         return RefreshIndicator(
           color: AppColors.primary,
-          onRefresh: () => _controller.loadAll(force: true),
+          onRefresh: refresh,
           child: ListView(
             children: [
               SizedBox(height: 200.h),
               Center(
                 child: Text(
-                    _selectedTab == 1
+                    isMine
                         ? 'You have no announcements yet'
                         : 'No announcements',
                     style: GoogleFonts.inter(
@@ -219,34 +255,72 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         );
       }
 
+      // Only the User Announcement tab paginates; on My Announcement we
+      // hide the loading-more skeleton since there's no next page to fetch.
+      final showLoadingMore = !isMine && _controller.isLoadingMoreAll.value;
+      // Lazy list: header at 0, then cards, then optional skeleton, then
+      // banner. SingleChildScrollView built ALL cards up-front which was the
+      // main cause of scroll jank on this heavy card.
+      final headerIdx = 0;
+      final cardStart = 1;
+      final cardEnd = cardStart + announcements.length; // exclusive
+      final skeletonIdx = showLoadingMore ? cardEnd : -1;
+      final bannerIdx = cardEnd + (showLoadingMore ? 1 : 0);
+      final itemCount = bannerIdx + 1;
+
       return RefreshIndicator(
         color: AppColors.primary,
-        onRefresh: () => _controller.loadAll(force: true),
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                child: _buildSectionHeader(
-                    _tabs[_selectedTab], '${announcements.length} announcements'),
-              ),
-              ...announcements.asMap().entries.map(
-                    (entry) => AnnouncementPropertyCard(
-                      announcement: entry.value,
-                      index: entry.key,
-                      showWishlist: false,
-                      showActionButtons: false,
-                      ownerRowAboveImage: true,
-                      onTap: () => Get.to(() => BrokerAnnouncementDetailView(
-                          announcement: entry.value)),
-                    ),
+        onRefresh: refresh,
+        child: NotificationListener<ScrollNotification>(
+          // The video-player gate stays shut during scroll and opens
+          // INSTANTLY on ScrollEndNotification — the visible card starts
+          // loading the moment the scroll ends, no debounce wait.
+          onNotification: (n) {
+            CachedVideoPlayer.notifyScroll(n);
+            return false;
+          },
+          child: ListView.builder(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            // 400 dp = roughly one extra card in cache. Larger values
+            // (we had 1200) kept multiple heavy cards mounted off-screen
+            // which caused OOM on low-RAM devices.
+            // ignore: deprecated_member_use
+            cacheExtent: 400,
+            itemCount: itemCount,
+            itemBuilder: (_, i) {
+              if (i == headerIdx) {
+                return Padding(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  child: _buildSectionHeader(_tabs[_selectedTab],
+                      '${announcements.length} announcements'),
+                );
+              }
+              if (i >= cardStart && i < cardEnd) {
+                final idx = i - cardStart;
+                final a = announcements[idx];
+                return RepaintBoundary(
+                  child: AnnouncementPropertyCard(
+                    announcement: a,
+                    index: idx,
+                    showWishlist: false,
+                    showActionButtons: false,
+                    ownerRowAboveImage: true,
+                    onTap: () => Get.to(
+                        () => BrokerAnnouncementDetailView(announcement: a)),
                   ),
-              SizedBox(height: 8.h),
-              PremiumLockBanner(onTap: () {}),
-              SizedBox(height: 24.h),
-            ],
+                );
+              }
+              if (i == skeletonIdx) {
+                return const AnnouncementCardSkeleton();
+              }
+              // Footer (banner + trailing spacer).
+              return Padding(
+                padding: EdgeInsets.only(top: 8.h, bottom: 24.h),
+                child: PremiumLockBanner(onTap: () {}),
+              );
+            },
           ),
         ),
       );
@@ -262,7 +336,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
           final isSelected = _selectedTab == i;
           return Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _selectedTab = i),
+              onTap: () => _onTabChanged(i),
               child: Container(
                 margin: EdgeInsets.symmetric(horizontal: 3.w),
                 padding: EdgeInsets.symmetric(vertical: 7.h),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:get/get.dart';
@@ -302,6 +303,17 @@ class AnnouncementController extends GetxController {
     clearDraft();
   }
 
+  /// `status` for the create-announcement payload:
+  ///   1 = posting from user side, 2 = posting from broker side.
+  /// Sourced from [ProfileController.currentRole] (set by /auth/me and kept
+  /// in sync by the switch-role flow). Defaults to 1 if the profile isn't
+  /// loaded yet for any reason.
+  int _activeRoleStatus() {
+    if (!Get.isRegistered<ProfileController>()) return 1;
+    final v = Get.find<ProfileController>().currentRole.value;
+    return v == 2 ? 2 : 1;
+  }
+
   // ── Body builder ───────────────────────────────────────────────────────────
   Map<String, dynamic> _buildBody() {
     final body = <String, dynamic>{
@@ -332,7 +344,10 @@ class AnnouncementController extends GetxController {
       },
       'price': price,
       'currency': currency,
-      'status': 1,
+      // 1 = posting from user side, 2 = posting from broker side.
+      // Read from the active profile (set by the backend's currentRole and
+      // updated locally on switch-role) so the right side is recorded.
+      'status': _activeRoleStatus(),
     };
 
     if (propertyName != null && propertyName!.isNotEmpty) {

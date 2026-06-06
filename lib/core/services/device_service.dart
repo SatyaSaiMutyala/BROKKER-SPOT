@@ -52,20 +52,35 @@ class DeviceService {
     await _sendRegistration(fcmToken);
   }
 
+  /// Stable per-install device identifier — Android `androidInfo.id`, iOS
+  /// `identifierForVendor`. Use this anywhere the backend wants `device_id`
+  /// (register-device, logout, etc.) so all calls reference the same row.
+  /// Returns an empty string if the platform info can't be read.
+  static Future<String> getDeviceId() async {
+    try {
+      if (Platform.isAndroid) {
+        return (await _deviceInfo.androidInfo).id;
+      } else if (Platform.isIOS) {
+        return (await _deviceInfo.iosInfo).identifierForVendor ?? '';
+      }
+    } catch (e) {
+      debugPrint('Could not read device id: $e');
+    }
+    return '';
+  }
+
   static Future<void> _sendRegistration(String fcmToken) async {
     try {
       String platform = Platform.isAndroid ? 'android' : 'ios';
       String deviceModel = '';
-      String deviceId = '';
+      String deviceId = await getDeviceId();
 
       if (Platform.isAndroid) {
         final androidInfo = await _deviceInfo.androidInfo;
         deviceModel = '${androidInfo.brand} ${androidInfo.model}';
-        deviceId = androidInfo.id;
       } else if (Platform.isIOS) {
         final iosInfo = await _deviceInfo.iosInfo;
         deviceModel = iosInfo.utsname.machine;
-        deviceId = iosInfo.identifierForVendor ?? '';
       }
 
       final response = await postRequest(

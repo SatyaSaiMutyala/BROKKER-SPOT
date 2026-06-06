@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_account/broker_my_information_view.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
@@ -74,6 +75,10 @@ class AccountMenuView extends StatelessWidget {
                           if (Get.isDialogOpen ?? false) Get.back();
                           if (ok) {
                             LocalStorageService.saveLastSide('user');
+                            // Wipe broker-side cached data so the user side
+                            // opens with fresh role-correct responses, not
+                            // stale broker-side payloads.
+                            await clearRoleScopedCache();
                             Get.offAll(() => const DashboardView());
                           }
                         }),

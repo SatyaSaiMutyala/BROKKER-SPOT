@@ -8,7 +8,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:video_player/video_player.dart';
+import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
@@ -37,8 +37,6 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   bool _isDeleting = false;
 
   late AnnouncementModel _data;
-  VideoPlayerController? _videoCtrl;
-  bool _videoReady = false;
   final _amenityCtrl = AmenityController.to;
 
   static const List<String> _fallbackImages = [
@@ -50,28 +48,13 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   void initState() {
     super.initState();
     _data = widget.announcement;
-    _initVideo(_data);
     _fetchDetail();
     // Cached reference list to resolve amenity ids → names.
     _amenityCtrl.loadAmenities();
   }
 
-  void _initVideo(AnnouncementModel a) {
-    final videoUrl = a.propertyMedia?.videos;
-    if (videoUrl == null || videoUrl.isEmpty) return;
-    _videoCtrl = VideoPlayerController.networkUrl(Uri.parse(videoUrl))
-      ..initialize().then((_) {
-        if (mounted) {
-          setState(() => _videoReady = true);
-          _videoCtrl!.setLooping(true);
-          _videoCtrl!.play();
-        }
-      });
-  }
-
   @override
   void dispose() {
-    _videoCtrl?.dispose();
     // Restore dark status-bar icons for the screen we return to (this screen
     // used light icons over the dark hero image).
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -529,23 +512,14 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     } else {
       carousel = PageView.builder(
         itemCount: totalPages,
-        onPageChanged: (i) {
-          setState(() => _currentPage = i);
-          if (hasVideo) {
-            i == 0 ? _videoCtrl?.play() : _videoCtrl?.pause();
-          }
-        },
+        onPageChanged: (i) => setState(() => _currentPage = i),
         itemBuilder: (_, i) {
           if (hasVideo && i == 0) {
-            if (!_videoReady || _videoCtrl == null) return _shimmerBox();
-            return FittedBox(
-              fit: BoxFit.cover,
-              clipBehavior: Clip.antiAlias,
-              child: SizedBox(
-                width: _videoCtrl!.value.size.width,
-                height: _videoCtrl!.value.size.height,
-                child: VideoPlayer(_videoCtrl!),
-              ),
+            return CachedVideoPlayer(
+              url: a.propertyMedia!.videos!,
+              active: _currentPage == 0,
+              muted: true,
+              placeholder: _shimmerBox(),
             );
           }
           final imgIdx = hasVideo ? i - 1 : i;
@@ -986,6 +960,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               onTap: () => Get.to(() => AnnouncementProposalsView(
                     proposals: _data.latestProposals ?? const [],
                     proposalsLimit: _data.proposalsLimit,
+                    announcementId: _data.id,
                   )),
               child: _buildNoBrokerBar(),
             ),

@@ -3,6 +3,7 @@ import 'package:brokkerspot/views/user/announcements/controller/announcement_con
 import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
+import 'package:brokkerspot/widgets/common/overlay_dropdown_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -31,9 +32,6 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   // Stores the selected amenity ObjectIds (what the API expects).
   final Set<String> _selectedAmenityIds = {};
   final _amenityCtrl = AmenityController.to;
-
-  // Which dropdown is open
-  String _openDropdown = '';
 
   final _propertyTypes = ['Apartment', 'Villa', 'Townhouse', 'Penthouse', 'Studio'];
   final _bedroomBathroomCounts = ['1', '2', '3', '4', '5+'];
@@ -85,10 +83,6 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     _spmCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
-  }
-
-  void _toggle(String key) {
-    setState(() => _openDropdown = _openDropdown == key ? '' : key);
   }
 
   int _parseFloor(String? val) {
@@ -148,15 +142,11 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                     // Property Type
                     _label('Property Type', required: true),
                     SizedBox(height: 8.h),
-                    _inlineDropdown(
-                      key: 'type',
+                    OverlayDropdownField(
                       hint: 'Select Now',
                       value: _propertyType,
                       items: _propertyTypes,
-                      onSelect: (v) => setState(() {
-                        _propertyType = v;
-                        _openDropdown = '';
-                      }),
+                      onSelect: (v) => setState(() => _propertyType = v),
                     ),
                     SizedBox(height: 16.h),
 
@@ -188,15 +178,12 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                             children: [
                               _label('Bedroom', required: true),
                               SizedBox(height: 8.h),
-                              _inlineDropdown(
-                                key: 'bedroom',
+                              OverlayDropdownField(
                                 hint: '0',
                                 value: _bedroom,
                                 items: _bedroomBathroomCounts,
-                                onSelect: (v) => setState(() {
-                                  _bedroom = v;
-                                  _openDropdown = '';
-                                }),
+                                onSelect: (v) =>
+                                    setState(() => _bedroom = v),
                               ),
                             ],
                           ),
@@ -208,15 +195,12 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                             children: [
                               _label('Bathroom', required: true),
                               SizedBox(height: 8.h),
-                              _inlineDropdown(
-                                key: 'bathroom',
+                              OverlayDropdownField(
                                 hint: '0',
                                 value: _bathroom,
                                 items: _bedroomBathroomCounts,
-                                onSelect: (v) => setState(() {
-                                  _bathroom = v;
-                                  _openDropdown = '';
-                                }),
+                                onSelect: (v) =>
+                                    setState(() => _bathroom = v),
                               ),
                             ],
                           ),
@@ -235,15 +219,12 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                             children: [
                               _label('Floor', required: true),
                               SizedBox(height: 8.h),
-                              _inlineDropdown(
-                                key: 'floor',
+                              OverlayDropdownField(
                                 hint: 'Select Floor',
                                 value: _floor,
                                 items: _floorCounts,
-                                onSelect: (v) => setState(() {
-                                  _floor = v;
-                                  _openDropdown = '';
-                                }),
+                                onSelect: (v) =>
+                                    setState(() => _floor = v),
                               ),
                             ],
                           ),
@@ -255,15 +236,12 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                             children: [
                               _label('Total Floor', required: true),
                               SizedBox(height: 8.h),
-                              _inlineDropdown(
-                                key: 'totalFloor',
+                              OverlayDropdownField(
                                 hint: 'Select Floor',
                                 value: _totalFloor,
                                 items: _floorCounts,
-                                onSelect: (v) => setState(() {
-                                  _totalFloor = v;
-                                  _openDropdown = '';
-                                }),
+                                onSelect: (v) =>
+                                    setState(() => _totalFloor = v),
                               ),
                             ],
                           ),
@@ -281,14 +259,12 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                     // Is Property
                     _label('Is Property', required: true),
                     SizedBox(height: 8.h),
-                    _inlineDropdown(
-                      key: 'isProperty',
+                    OverlayDropdownField(
                       hint: 'Select Now',
                       value: _isProperty,
                       items: _isPropertyOptions,
                       onSelect: (v) => setState(() {
                         _isProperty = v;
-                        _openDropdown = '';
                         if (v != 'Off Plan') _completionDate = null;
                       }),
                     ),
@@ -389,84 +365,6 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _inlineDropdown({
-    required String key,
-    required String hint,
-    required String? value,
-    required List<String> items,
-    required ValueChanged<String> onSelect,
-  }) {
-    final isOpen = _openDropdown == key;
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => _toggle(key),
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: isOpen
-                  ? BorderRadius.vertical(top: Radius.circular(6.r))
-                  : BorderRadius.circular(6.r),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    value ?? hint,
-                    style: GoogleFonts.inter(
-                      fontSize: 13.sp,
-                      color: value != null ? Colors.black87 : Colors.grey.shade400,
-                    ),
-                  ),
-                ),
-                Icon(
-                  isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                  color: Colors.grey.shade500,
-                  size: 18.sp,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (isOpen)
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                left: BorderSide(color: Colors.grey.shade300),
-                right: BorderSide(color: Colors.grey.shade300),
-                bottom: BorderSide(color: Colors.grey.shade300),
-              ),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(6.r)),
-            ),
-            child: Column(
-              children: items.map((item) {
-                final isSelected = value == item;
-                return InkWell(
-                  onTap: () => onSelect(item),
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 11.h),
-                    color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : null,
-                    child: Text(
-                      item,
-                      style: GoogleFonts.inter(
-                        fontSize: 13.sp,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: isSelected ? AppColors.primary : Colors.black87,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-      ],
     );
   }
 

@@ -9,15 +9,34 @@ import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:visibility_detector/visibility_detector.dart';
+import 'package:brokkerspot/core/services/announcement_cache.dart';
+import 'package:brokkerspot/core/services/socket_service.dart';
 import 'core/constants/app_colors.dart';
 import 'views/splash/splash_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Fire visibility callbacks immediately on layout instead of the package
+  // default 500ms throttle — otherwise the first announcement's autoplay
+  // can miss its activation window if the user starts scrolling within the
+  // first half-second of opening the screen.
+  VisibilityDetectorController.instance.updateInterval = Duration.zero;
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await LocalStorageService.init();
+
+  // Local DB for instant, offline-first announcement data.
+  await Hive.initFlutter();
+  await AnnouncementCache.init();
+
+  // Open the realtime socket up-front when the user is logged in, so chat is
+  // ready instantly and the connection state is observable app-wide.
+  if (LocalStorageService.isLoggedIn()) {
+    SocketService.to.connect();
+  }
 
   try {
     if (Platform.isIOS) {

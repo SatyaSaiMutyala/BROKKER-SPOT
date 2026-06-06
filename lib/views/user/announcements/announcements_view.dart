@@ -3,8 +3,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
+import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
+import 'package:brokkerspot/widgets/announcements/announcement_card_skeleton.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -18,12 +22,34 @@ class AnnouncementsView extends StatefulWidget {
 
 class _AnnouncementsViewState extends State<AnnouncementsView> {
   final _controller = AnnouncementListController.to;
+  final _profileCtrl = Get.isRegistered<ProfileController>()
+      ? Get.find<ProfileController>()
+      : Get.put(ProfileController());
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     // Loads only if not cached yet — re-entering this tab won't re-hit the API.
     _controller.loadAll();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    // Pre-fetch the next page when we're within 300dp of the end so the new
+    // cards are usually ready by the time the user reaches the bottom.
+    if (pos.pixels >= pos.maxScrollExtent - 300 && _controller.hasMoreAll) {
+      _controller.loadMoreAll();
+    }
   }
 
   @override
@@ -112,25 +138,57 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
         ],
       );
     }
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.symmetric(vertical: 8.h),
-      itemCount: _controller.allAnnouncements.length,
-      itemBuilder: (_, index) {
-        final a = _controller.allAnnouncements[index];
-        return AnnouncementPropertyCard(
-          announcement: a,
-          index: index,
-          onTap: () async {
-            await Get.to(() => AnnouncementDetailView(
-                  announcement: a,
-                  isOwner: false,
-                ));
-          },
-          onWishlistTap: () {},
-          onLocationTap: () {},
-        );
+    final loadingMore = _controller.isLoadingMoreAll.value;
+    final length = _controller.allAnnouncements.length;
+    return NotificationListener<ScrollNotification>(
+      // The video-player gate stays shut during scroll and opens INSTANTLY on
+      // ScrollEndNotification — no debounce wait, the card starts loading
+      // the moment your finger lifts.
+      onNotification: (n) {
+        CachedVideoPlayer.notifyScroll(n);
+        return false;
       },
+      child: ListView.builder(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.symmetric(vertical: 8.h),
+        // 400 dp = roughly one extra card in cache. Was 1200dp which kept
+        // ~3 heavy cards (with their PageViews, image carousels, and
+        // potentially video controllers) mounted off-screen and was a major
+        // OOM contributor on low-RAM devices.
+        // ignore: deprecated_member_use
+        cacheExtent: 400,
+        // +1 row when the next page is fetching → renders the skeleton.
+        itemCount: length + (loadingMore ? 1 : 0),
+      itemBuilder: (_, index) {
+        if (index >= length) {
+          return const AnnouncementCardSkeleton();
+        }
+        final a = _controller.allAnnouncements[index];
+        // RepaintBoundary stops one card's video / image fades from forcing
+        // sibling cards to repaint on every frame during scroll.
+        return RepaintBoundary(
+          child: AnnouncementPropertyCard(
+            announcement: a,
+            index: index,
+            onTap: () async {
+              await Get.to(() => AnnouncementDetailView(
+                    announcement: a,
+                    isOwner: false,
+                  ));
+            },
+            onWishlistTap: () {},
+            onLocationTap: () {},
+            onChatTap: () => AnnouncementChatView.open(
+              announcementId: a.id ?? '',
+              brokerName: a.ownerName ?? 'Owner',
+              brokerAvatar: a.ownerAvatarUrl,
+              peerUserId: a.userId,
+            ),
+          ),
+        );
+        },
+      ),
     );
   }
 }

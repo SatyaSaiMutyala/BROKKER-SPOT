@@ -72,8 +72,15 @@ class LoginController extends GetxController {
           AppToast.success(loginModel.message);
 
           DeviceService.registerDevice();
-          final lastSide = LocalStorageService.getLastSide();
-          if (lastSide == 'broker') {
+          // Fresh-login routing: pick the dashboard the backend says is
+          // currently active for this account. Falls back to last-side only
+          // if the API didn't return a usable currentRole.
+          final currentRole = user.currentRole;
+          final goBroker = currentRole == 2 ||
+              (currentRole == 0 && LocalStorageService.getLastSide() == 'broker');
+          // Persist for the splash path (already-logged-in app re-opens).
+          await LocalStorageService.saveLastSide(goBroker ? 'broker' : 'user');
+          if (goBroker) {
             Get.offAll(() => BrokerDashBoardView());
           } else {
             Get.offAll(() => const DashboardView(showLocationPicker: true));

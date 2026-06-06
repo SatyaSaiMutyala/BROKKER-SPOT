@@ -28,6 +28,15 @@ class ApiEndpoints {
   static const String fetchAnnouncementDetail = 'user/announcements/fetch';
   static const String fetchAllAnnouncements = 'user/announcements/fetch-all';
   static const String sendProposal = 'user/announcements/sent-proposal';
+  // Meeting (announcements grouped by the conversations on them).
+  // Filters: ?own=true | ?listing_type=1 | ?listing_type=2 | (none = all).
+  static const String fetchMeetings = 'user/announcements/fetch-meetings';
+
+  // Notifications
+  static const String fetchNotifications = 'user/notifications/fetch';
+  static const String fetchNotificationDetail = 'user/notifications/fetch';
+  static const String markAllNotificationsRead = 'user/notifications/mark-all-read';
+  static const String deleteNotification = 'user/notifications/delete';
 
   // Common
   static const String fetchAmenities = 'user/common/fetch-amenities';

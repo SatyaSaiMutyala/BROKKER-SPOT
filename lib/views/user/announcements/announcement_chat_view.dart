@@ -1,19 +1,58 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/services/presence_service.dart';
+import 'package:brokkerspot/models/chat_message.dart';
+import 'package:brokkerspot/views/user/announcements/chat/chat_controller.dart';
 
 class AnnouncementChatView extends StatefulWidget {
+  final String announcementId;
   final String brokerName;
   final String brokerAvatar;
 
+  /// The other user's id — used to show their online/offline status.
+  final String? peerUserId;
+
   const AnnouncementChatView({
     super.key,
+    required this.announcementId,
     required this.brokerName,
     required this.brokerAvatar,
+    this.peerUserId,
   });
+
+  /// Reusable entry point — call this from anywhere chat is opened.
+  static Future<void> open({
+    required String announcementId,
+    required String brokerName,
+    String? brokerAvatar,
+    String? peerUserId,
+  }) async {
+    // Empty (not just null) avatar strings would crash Image.asset(''), so
+    // normalize to the fallback asset here.
+    final avatar = (brokerAvatar != null && brokerAvatar.trim().isNotEmpty)
+        ? brokerAvatar
+        : 'assets/images/story1.png';
+    // Wrap the navigation: on some devices (seen on Samsung) a synchronous
+    // throw during route push (theme/MediaQuery edge cases) would otherwise
+    // tear the app down. Show a toast instead.
+    try {
+      // No `!` — Get.to can return null; that must never crash the tap.
+      await Get.to(() => AnnouncementChatView(
+            announcementId: announcementId,
+            brokerName: brokerName.isNotEmpty ? brokerName : 'Chat',
+            brokerAvatar: avatar,
+            peerUserId: peerUserId,
+          ));
+    } catch (e) {
+      Get.snackbar('Chat', "Couldn't open chat. Please try again.",
+          snackPosition: SnackPosition.BOTTOM);
+    }
+  }
 
   @override
   State<AnnouncementChatView> createState() => _AnnouncementChatViewState();
@@ -21,11 +60,87 @@ class AnnouncementChatView extends StatefulWidget {
 
 class _AnnouncementChatViewState extends State<AnnouncementChatView> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  late final ChatController _chat;
+  late final String _tag;
+  // Saved so we can dispose them — leaked Workers fire on disposed State on
+  // some devices (Samsung in particular) and crash with "setState on disposed".
+  Worker? _msgsWorker;
+  Worker? _errorWorker;
+
+  @override
+  void initState() {
+    super.initState();
+    final recipientId = widget.peerUserId ?? '';
+    // One controller per conversation (announcement + peer), so chats don't clash.
+    _tag = '${widget.announcementId}:$recipientId';
+    _chat = Get.put(
+      ChatController(
+        announcementId: widget.announcementId,
+        recipientId: recipientId,
+        peerName: widget.brokerName,
+        peerAvatar: widget.brokerAvatar,
+      ),
+      tag: _tag,
+    );
+    // Watch the other user's online/offline presence.
+    if (recipientId.isNotEmpty) {
+      PresenceService.to.watch(recipientId);
+    }
+    // Auto-scroll to the newest message whenever the list grows.
+    _msgsWorker = ever(_chat.messages, (_) {
+      if (!mounted) return;
+      _scrollToBottom();
+    });
+    // Surface send/history errors.
+    _errorWorker = ever(_chat.error, (msg) {
+      if (msg.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.red.shade600),
+        );
+      }
+    });
+    // Load older messages when scrolled to the top.
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    // Guard against the listener firing before/after the controller is attached
+    // to a scrollable — accessing .position without this throws on some devices.
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels <= 40 && _chat.hasMore) {
+      _chat.loadMore();
+    }
+  }
 
   @override
   void dispose() {
+    _msgsWorker?.dispose();
+    _errorWorker?.dispose();
+    _scrollController.removeListener(_onScroll);
     _controller.dispose();
+    _scrollController.dispose();
+    Get.delete<ChatController>(tag: _tag);
     super.dispose();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _send() {
+    final text = _controller.text;
+    if (text.trim().isEmpty) return;
+    _chat.sendMessage(text);
+    _controller.clear();
   }
 
   @override
@@ -40,237 +155,221 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
         statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        // teal scaffold bg = status bar area is teal
         backgroundColor: AppColors.teal,
         body: Column(
           children: [
-            // Top safe area — stays teal (scaffold bg)
             SizedBox(height: topPadding),
-
-            // ── Teal header ──
-            Container(
-              color: AppColors.teal,
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Icon(Icons.arrow_back_ios_new,
-                        size: 20.sp, color: Colors.white),
-                  ),
-                  SizedBox(width: 20.w),
-                  ClipOval(
-                    child: Image.asset(
-                      widget.brokerAvatar,
-                      width: 40.w,
-                      height: 40.w,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  SizedBox(width: 10.w),
-                  Expanded(
-                    child: Text(
-                      widget.brokerName,
-                      style: GoogleFonts.poppins(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.videocam_outlined,
-                      color: Colors.white, size: 22.sp),
-                  SizedBox(width: 16.w),
-                  Icon(Icons.call_outlined, color: Colors.white, size: 22.sp),
-                  SizedBox(width: 16.w),
-                  Icon(Icons.more_vert, color: Colors.white, size: 22.sp),
-                ],
-              ),
-            ),
-
-            // ── Messages — white background ──
+            _buildHeader(),
             Expanded(
               child: Container(
                 color: Colors.grey.shade50,
-                child: ListView(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                  children: [
-                    // Date separator
-                    Center(
-                      child: Container(
-                        margin: EdgeInsets.only(bottom: 16.h),
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 16.w, vertical: 4.h),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12.r),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
+                child: Obx(() {
+                  final msgs = _chat.messages;
+                  if (_chat.isLoadingHistory.value && msgs.isEmpty) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (msgs.isEmpty && _chat.error.value.isNotEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 28.w),
                         child: Text(
-                          'Today',
+                          _chat.error.value,
+                          textAlign: TextAlign.center,
                           style: GoogleFonts.inter(
-                            fontSize: 12.sp,
-                            color: Colors.black,
-                          ),
+                              fontSize: 13.sp, color: Colors.grey.shade600),
                         ),
                       ),
-                    ),
-
-                    // Received text bubble
-                    _receivedBubble(
-                      'Hi ${widget.brokerName}, It\'s Rachid um is simply dummy'
-                      ' text of the printing and typesetting industryIpsum is'
-                      ' simply dummy text of the printing and typesetting'
-                      ' industry. LoremIpsum has been of the printing.',
-                      '11:02 pm',
-                    ),
-                    SizedBox(height: 12.h),
-
-                    // Received image + link bubble
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        constraints: BoxConstraints(maxWidth: 260.w),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(16.r),
-                            topRight: Radius.circular(16.r),
-                            bottomRight: Radius.circular(16.r),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Image.asset(
-                              'assets/images/rent1.png',
-                              width: double.infinity,
-                              height: 150.h,
-                              fit: BoxFit.cover,
-                            ),
-                            Padding(
-                              padding: EdgeInsets.fromLTRB(10.w, 8.h, 10.w, 4.h),
-                              child: GestureDetector(
-                                onTap: () async {
-                                  final uri = Uri.parse('http://ajknjkn/#005rachid');
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                  }
-                                },
-                                child: Text(
-                                  '//http:ajknjkn/#005rachid',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.sp,
-                                    color: AppColors.teal,
-                                    decoration: TextDecoration.underline,
-                                    decorationColor: AppColors.teal,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.only(right: 10.w, bottom: 8.h, left: 10.w),
-                              child: Align(
-                                alignment: Alignment.centerRight,
-                                child: Text(
-                                  '11:02 pm',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10.sp,
-                                    color: Colors.grey.shade400,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                    );
+                  }
+                  if (msgs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No messages yet. Say hello 👋',
+                        style: GoogleFonts.inter(
+                            fontSize: 13.sp, color: Colors.grey.shade500),
                       ),
-                    ),
-                    SizedBox(height: 12.h),
-
-                    // Sent bubble
-                    _sentBubble('Hi...', '11:02'),
-                    SizedBox(height: 24.h),
-                  ],
-                ),
+                    );
+                  }
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    itemCount: msgs.length,
+                    itemBuilder: (_, i) {
+                      final m = msgs[i];
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 12.h),
+                        child: m.isMine
+                            ? _sentBubble(m.text, _time(m))
+                            : _receivedBubble(m.text, _time(m)),
+                      );
+                    },
+                  );
+                }),
               ),
             ),
-
-            // ── Input bar — white background ──
-            Material(
-              color: Colors.white,
-              elevation: 0,
-              child: Container(
-              color: Colors.white,
-              padding: EdgeInsets.fromLTRB(
-                  12.w, 10.h, 12.w, 10.h + bottomPadding),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      style: GoogleFonts.inter(fontSize: 14.sp),
-                      decoration: InputDecoration(
-                        hintText: 'Say Somthing...',
-                        hintStyle: GoogleFonts.inter(
-                          fontSize: 14.sp,
-                          color: AppColors.textHint,
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16.w, vertical: 12.h),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30.r),
-                          borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30.r),
-                          borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30.r),
-                          borderSide: BorderSide(color: Colors.grey.shade400, width: 1),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 10.w),
-                  GestureDetector(
-                    onTap: () {},
-                    child: Container(
-                      width: 46.w,
-                      height: 46.w,
-                      decoration: const BoxDecoration(
-                        color: AppColors.teal,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.send_rounded,
-                          color: Colors.white, size: 30.sp),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ), // closes Material
+            _buildInputBar(bottomPadding),
           ],
         ),
       ),
     );
+  }
+
+  // ── Header ──
+  Widget _buildHeader() {
+    return Container(
+      color: AppColors.teal,
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Icon(Icons.arrow_back_ios_new, size: 20.sp, color: Colors.white),
+          ),
+          SizedBox(width: 20.w),
+          ClipOval(child: _headerAvatar()),
+          SizedBox(width: 10.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.brokerName,
+                  style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white),
+                ),
+                Obx(() {
+                  final peerId = widget.peerUserId ?? '';
+                  final String label;
+                  if (_chat.peerTyping.value) {
+                    label = 'typing…';
+                  } else if (peerId.isNotEmpty) {
+                    // Real presence of the other user.
+                    label = PresenceService.to.isOnline(peerId)
+                        ? 'Online'
+                        : 'Offline';
+                  } else {
+                    // No peer id — fall back to our own socket state.
+                    label =
+                        _chat.isConnected.value ? 'Connected' : 'Connecting…';
+                  }
+                  return Text(
+                    label,
+                    style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        color: Colors.white.withValues(alpha: 0.8)),
+                  );
+                }),
+              ],
+            ),
+          ),
+          Icon(Icons.videocam_outlined, color: Colors.white, size: 22.sp),
+          SizedBox(width: 16.w),
+          Icon(Icons.call_outlined, color: Colors.white, size: 22.sp),
+          SizedBox(width: 16.w),
+          Icon(Icons.more_vert, color: Colors.white, size: 22.sp),
+        ],
+      ),
+    );
+  }
+
+  Widget _fallbackAvatar() => Image.asset('assets/images/story1.png',
+      width: 40.w, height: 40.w, fit: BoxFit.cover);
+
+  Widget _headerAvatar() {
+    final a = widget.brokerAvatar;
+    if (a.trim().isEmpty) return _fallbackAvatar();
+    if (a.startsWith('http')) {
+      return CachedNetworkImage(
+        imageUrl: a,
+        width: 40.w,
+        height: 40.w,
+        fit: BoxFit.cover,
+        errorWidget: (_, __, ___) => _fallbackAvatar(),
+      );
+    }
+    // Local asset — guard with errorBuilder so a bad path can't crash the build.
+    return Image.asset(
+      a,
+      width: 40.w,
+      height: 40.w,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _fallbackAvatar(),
+    );
+  }
+
+  // ── Input bar ──
+  Widget _buildInputBar(double bottomPadding) {
+    return Material(
+      color: Colors.white,
+      child: Container(
+        color: Colors.white,
+        padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 10.h + bottomPadding),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                style: GoogleFonts.inter(fontSize: 14.sp),
+                textInputAction: TextInputAction.send,
+                // Capitalize the first letter of each sentence (matches
+                // WhatsApp-style behavior).
+                textCapitalization: TextCapitalization.sentences,
+                onChanged: (_) => _chat.notifyTyping(),
+                onSubmitted: (_) => _send(),
+                decoration: InputDecoration(
+                  hintText: 'Say Somthing...',
+                  hintStyle: GoogleFonts.inter(
+                      fontSize: 14.sp, color: AppColors.textHint),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.r),
+                    borderSide:
+                        BorderSide(color: Colors.grey.shade300, width: 1),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.r),
+                    borderSide:
+                        BorderSide(color: Colors.grey.shade300, width: 1),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.r),
+                    borderSide:
+                        BorderSide(color: Colors.grey.shade400, width: 1),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 10.w),
+            GestureDetector(
+              onTap: _send,
+              child: Container(
+                width: 46.w,
+                height: 46.w,
+                decoration: const BoxDecoration(
+                    color: AppColors.teal, shape: BoxShape.circle),
+                child: Icon(Icons.send_rounded, color: Colors.white, size: 30.sp),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _time(ChatMessage m) {
+    final dt = m.createdAt;
+    if (dt == null) return '';
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final mm = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'pm' : 'am';
+    return '$h:$mm $ampm';
   }
 
   Widget _receivedBubble(String message, String time) {
@@ -300,10 +399,12 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
             Text(message,
                 style:
                     GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87)),
-            SizedBox(height: 4.h),
-            Text(time,
-                style: GoogleFonts.inter(
-                    fontSize: 10.sp, color: Colors.grey.shade400)),
+            if (time.isNotEmpty) ...[
+              SizedBox(height: 4.h),
+              Text(time,
+                  style: GoogleFonts.inter(
+                      fontSize: 10.sp, color: Colors.grey.shade400)),
+            ],
           ],
         ),
       ),
@@ -328,19 +429,18 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                message,
-                style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87),
-              ),
-              SizedBox(height: 4.h),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  time,
+              Text(message,
                   style: GoogleFonts.inter(
-                      fontSize: 10.sp, color: Colors.grey.shade500),
+                      fontSize: 13.sp, color: Colors.black87)),
+              if (time.isNotEmpty) ...[
+                SizedBox(height: 4.h),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(time,
+                      style: GoogleFonts.inter(
+                          fontSize: 10.sp, color: Colors.grey.shade500)),
                 ),
-              ),
+              ],
             ],
           ),
         ),

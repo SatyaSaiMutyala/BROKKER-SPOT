@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
+import 'package:brokkerspot/core/services/device_service.dart';
+import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/views/auth/view/welcome_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
@@ -18,12 +20,16 @@ class AccountController extends GetxController {
 
       // If user logged in via email (has backend user data), call backend logout
       if (user != null) {
+        // device_id ties this logout to the right device row on the server
+        // (same id we sent on register-device).
+        final deviceId = await DeviceService.getDeviceId();
         final response = await postRequest(
           "Logout",
           endPoint: "user/auth/logout",
           headers: buildHeaders(),
           body: {
             "role": user.data?.role ?? "user",
+            "device_id": deviceId,
           },
         );
 
@@ -41,6 +47,8 @@ class AccountController extends GetxController {
 
       // Clear all local storage (preserves last_side)
       await LocalStorageService.clearAll();
+      // Wipe in-memory + Hive caches + socket so the next account starts clean.
+      await clearUserSession();
 
       Get.offAll(() => WelcomeView());
     } catch (e, s) {
@@ -49,6 +57,7 @@ class AccountController extends GetxController {
       await LocalStorageService.saveLastSide(side);
       await FirebaseAuth.instance.signOut();
       await LocalStorageService.clearAll();
+      await clearUserSession();
       Get.offAll(() => WelcomeView());
     } finally {
       isLoading.value = false;

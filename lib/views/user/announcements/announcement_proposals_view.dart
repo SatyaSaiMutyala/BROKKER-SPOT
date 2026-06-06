@@ -10,11 +10,13 @@ import 'package:brokkerspot/widgets/common/custom_header.dart';
 class AnnouncementProposalsView extends StatefulWidget {
   final List<ProposalBroker> proposals;
   final int? proposalsLimit;
+  final String? announcementId;
 
   const AnnouncementProposalsView({
     super.key,
     this.proposals = const [],
     this.proposalsLimit,
+    this.announcementId,
   });
 
   @override
@@ -107,15 +109,11 @@ class _AnnouncementProposalsViewState
                 child: GestureDetector(
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AnnouncementChatView(
-                        brokerName: broker.name ?? 'Broker',
-                        brokerAvatar: broker.brokerProfileImage ??
-                            'assets/images/story1.png',
-                      ),
-                    ),
+                  AnnouncementChatView.open(
+                    announcementId: widget.announcementId ?? '',
+                    brokerName: broker.name ?? 'Broker',
+                    brokerAvatar: broker.brokerProfileImage,
+                    peerUserId: broker.brokerId,
                   );
                 },
                 child: Container(

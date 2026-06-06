@@ -4,6 +4,7 @@ import 'package:brokkerspot/views/user/announcements/announcements_view.dart';
 import 'package:brokkerspot/views/user/home/home_view.dart';
 import 'package:brokkerspot/views/user/meeting/meeting_view.dart';
 import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
+import 'package:brokkerspot/widgets/common/notification_permission_dialog.dart';
 import 'package:flutter/material.dart';
 
 class DashboardView extends StatefulWidget {
@@ -21,15 +22,20 @@ class _DashboardViewState extends State<DashboardView> {
   @override
   void initState() {
     super.initState();
-    if (widget.showLocationPicker) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (widget.showLocationPicker) {
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (_) => const LocationPickerPopup(),
         );
-      });
-    }
+        return;
+      }
+      // Wait for the home's initial load (images/videos) to settle so the
+      // popup animation runs on a free main thread and stays smooth.
+      await Future.delayed(const Duration(milliseconds: 1800));
+      if (mounted) NotificationPermissionDialog.showIfNeeded(context);
+    });
   }
 
   final List<Widget> _screens = [

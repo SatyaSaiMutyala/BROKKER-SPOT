@@ -3,7 +3,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:video_player/video_player.dart';
+import 'package:visibility_detector/visibility_detector.dart';
+import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 
@@ -56,8 +57,11 @@ class AnnouncementPropertyCard extends StatefulWidget {
 class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     with AutomaticKeepAliveClientMixin {
   int _currentImageIndex = 0;
-  VideoPlayerController? _videoCtrl;
-  bool _videoReady = false;
+  // True only while >60% of this card is visible — the CachedVideoPlayer's
+  // global single-active lock takes care of "only one decoder at a time"
+  // and the cleanup-delay between release and re-init keeps the previous
+  // player's buffers from overlapping on the heap.
+  bool _videoVisible = false;
 
   // Keep this card (and its decoded images / current page) alive when it
   // scrolls out of view, so coming back doesn't re-decode or reset the carousel.
@@ -69,27 +73,39 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     'assets/images/rent2.png',
   ];
 
+  bool _precachedInitial = false;
+
   @override
-  void initState() {
-    super.initState();
-    final videoUrl = widget.announcement.propertyMedia?.videos;
-    if (videoUrl != null && videoUrl.isNotEmpty) {
-      _videoCtrl = VideoPlayerController.networkUrl(Uri.parse(videoUrl))
-        ..initialize().then((_) {
-          if (mounted) {
-            setState(() => _videoReady = true);
-            _videoCtrl!.setVolume(0); // muted in list
-            _videoCtrl!.setLooping(true);
-            _videoCtrl!.play();
-          }
-        });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_precachedInitial) return;
+    _precachedInitial = true;
+    // Warm the first image (and the video thumbnail) so the carousel paints
+    // instantly and the first swipe has no loading flash.
+    final a = widget.announcement;
+    final thumb = a.propertyMedia?.thumbnail;
+    if (thumb != null && thumb.startsWith('http')) {
+      precacheImage(CachedNetworkImageProvider(thumb), context);
+    }
+    for (final url in (a.imageUrls ?? const []).take(2)) {
+      if (url.startsWith('http')) {
+        precacheImage(CachedNetworkImageProvider(url), context);
+      }
     }
   }
 
-  @override
-  void dispose() {
-    _videoCtrl?.dispose();
-    super.dispose();
+  /// Preload the images adjacent to [pageIndex] so swiping is instant and a
+  /// page that's already been seen never reloads.
+  void _precacheAround(int pageIndex, bool hasVideo, List<String> images) {
+    for (final p in [pageIndex - 1, pageIndex + 1]) {
+      final imgIdx = hasVideo ? p - 1 : p;
+      if (imgIdx >= 0 && imgIdx < images.length) {
+        final url = images[imgIdx];
+        if (url.startsWith('http')) {
+          precacheImage(CachedNetworkImageProvider(url), context);
+        }
+      }
+    }
   }
 
   @override
@@ -185,46 +201,48 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
             itemCount: totalPages,
             onPageChanged: (i) {
               setState(() => _currentImageIndex = i);
-              if (hasVideo) {
-                if (i == 0) {
-                  _videoCtrl?.play();
-                } else {
-                  _videoCtrl?.pause();
-                }
-              }
+              _precacheAround(i, hasVideo, images);
             },
             itemBuilder: (_, i) {
-              // First page: actual video player
-              if (hasVideo && i == 0) {
-                if (!_videoReady || _videoCtrl == null) return _shimmerBox();
-                return FittedBox(
-                  fit: BoxFit.cover,
-                  clipBehavior: Clip.antiAlias,
-                  child: SizedBox(
-                    width: _videoCtrl!.value.size.width,
-                    height: _videoCtrl!.value.size.height,
-                    child: VideoPlayer(_videoCtrl!),
-                  ),
-                );
-              }
-              // Remaining pages: images
-              final imgIdx = hasVideo ? i - 1 : i;
-              // Decode at on-screen pixel size — far less memory + much faster
-              // decode, so scrolling stays smooth and cached images paint instantly.
               final dpr = MediaQuery.of(context).devicePixelRatio;
               final cacheWidth =
                   (MediaQuery.of(context).size.width * dpr).round();
-              return CachedNetworkImage(
-                imageUrl: images[imgIdx],
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: 200.h,
-                memCacheWidth: cacheWidth,
-                fadeInDuration: Duration.zero,
-                fadeOutDuration: Duration.zero,
-                placeholder: (_, __) => _shimmerBox(),
-                errorWidget: (_, __, ___) => _imagePlaceholder(),
-              );
+              // First page when there's a video: autoplay it (looped, muted)
+              // ONLY for the visible card. Multiple safeguards keep memory
+              // sane on low-RAM devices:
+              //  • VisibilityDetector → active=true only when >60% visible
+              //  • CachedVideoPlayer's global single-active lock → at most
+              //    one decoder allocated at any time
+              //  • Cleanup delay between release and re-init → previous
+              //    player's native buffers fully GC'd before next allocation
+              //  • Scroll gate → no init mid-fling
+              if (hasVideo && i == 0) {
+                final thumb = a.propertyMedia?.thumbnail;
+                final fallback = images.isNotEmpty ? images.first : null;
+                return VisibilityDetector(
+                  key: ValueKey('vid_${a.id}_${widget.index}'),
+                  onVisibilityChanged: (info) {
+                    // 60% threshold — the original, working value.
+                    // CachedVideoPlayer disposes its decoder the moment
+                    // active flips false, so at most ONE decoder is alive
+                    // at any time and we never OOM.
+                    final visible = info.visibleFraction > 0.6;
+                    if (visible != _videoVisible && mounted) {
+                      setState(() => _videoVisible = visible);
+                    }
+                  },
+                  child: CachedVideoPlayer(
+                    url: videoUrl,
+                    active: _videoVisible && _currentImageIndex == 0,
+                    muted: true,
+                    loop: true,
+                    tapToTogglePlay: true,
+                    placeholder: _videoThumb(thumb ?? fallback, cacheWidth),
+                  ),
+                );
+              }
+              final imgIdx = hasVideo ? i - 1 : i;
+              return _networkImage(images[imgIdx], cacheWidth);
             },
           ),
         ),
@@ -617,6 +635,28 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
             : Image.asset('assets/images/story1.png', fit: BoxFit.cover),
       ),
     );
+  }
+
+  Widget _networkImage(String url, int cacheWidth) {
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: 200.h,
+      memCacheWidth: cacheWidth,
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
+      placeholder: (_, __) => _shimmerBox(),
+      errorWidget: (_, __, ___) => _imagePlaceholder(),
+    );
+  }
+
+  /// Shown while the video loads = just the cached thumbnail (no badge).
+  Widget _videoThumb(String? thumbUrl, int cacheWidth) {
+    if (thumbUrl != null && thumbUrl.isNotEmpty) {
+      return _networkImage(thumbUrl, cacheWidth);
+    }
+    return _imagePlaceholder();
   }
 
   Widget _imagePlaceholder() {

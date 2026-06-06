@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:brokkerspot/views/auth/view/signup_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/brokker_login_view.dart';
@@ -100,6 +101,10 @@ class AccountView extends StatelessWidget {
                                   if (Get.isDialogOpen ?? false) Get.back();
                                   if (ok) {
                                     LocalStorageService.saveLastSide('broker');
+                                    // Wipe user-side cached data so the broker
+                                    // side opens with fresh role-correct
+                                    // responses, not stale user-side payloads.
+                                    await clearRoleScopedCache();
                                     Get.offAll(() => BrokerDashBoardView());
                                   }
                                 } else {

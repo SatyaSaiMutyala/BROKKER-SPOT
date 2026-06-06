@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:brokkerspot/core/common_widget/network_info.dart';
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/views/auth/view/welcome_view.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -49,6 +50,7 @@ const String baseUrl = "https://api.dev.brokkerspot.com/api/v1/";
 /// Clears local storage and sends the user back to WelcomeView on 401.
 void _handleUnauthorized() async {
   await LocalStorageService.clearAll();
+  await clearUserSession();
   Get.offAll(() => WelcomeView());
 }
 
@@ -59,6 +61,9 @@ http.Response _checkUnauthorized(http.Response response) {
 
 /// Centralized API logger — prints every request URL/body and its response.
 /// Only logs in debug builds (stripped from release).
+///
+/// Use the `🛰️ API` prefix to filter in logcat (`adb logcat | grep 🛰️`) or
+/// in the Run console.
 void _logApi(
   String method,
   String url, {
@@ -69,12 +74,20 @@ void _logApi(
   Object? error,
 }) {
   if (!kDebugMode) return;
-  debugPrint('╔═══ API $method ═══════════════════════════');
+  debugPrint('╔═══ 🛰️ API $method ═══════════════════════════');
   debugPrint('║ URL      : $url');
   if (headers != null) {
     headers.forEach((k, v) => _logChunked('║ HEADER   : $k: ', v));
   }
-  if (requestBody != null) _logChunked('║ REQUEST  : ', requestBody.toString());
+  if (requestBody != null) {
+    // Maps/Lists get JSON-encoded so the log shows EXACTLY what's sent on the
+    // wire (Dart's Map.toString uses `{key: value}` — not valid JSON and a
+    // pain to copy-paste into Postman).
+    final body = (requestBody is Map || requestBody is List)
+        ? jsonEncode(requestBody)
+        : requestBody.toString();
+    _logChunked('║ REQUEST  : ', body);
+  }
   if (statusCode != null) debugPrint('║ STATUS   : $statusCode');
   if (responseBody != null) _logChunked('║ RESPONSE : ', responseBody);
   if (error != null) _logChunked('║ ERROR    : ', error.toString());

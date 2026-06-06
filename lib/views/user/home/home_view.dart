@@ -1,4 +1,6 @@
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
+import 'package:brokkerspot/views/notifications/notifications_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/profile/profile_view.dart';
@@ -27,12 +29,16 @@ class _HomeViewState extends State<HomeView> {
   final ProfileController profileController = Get.put(ProfileController());
   final AnnouncementListController _announcementController =
       AnnouncementListController.to;
+  final NotificationListController _notificationController =
+      NotificationListController.to;
 
   @override
   void initState() {
     super.initState();
     // Loads only if not cached yet — fetches just 5 records for the home feed.
     _announcementController.loadHome();
+    // Cache-first; powers the bell badge.
+    _notificationController.load();
   }
 
   @override
@@ -240,41 +246,49 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Widget _buildNotificationBell() {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        SizedBox(
-          width: 40.w,
-          height: 40.w,
-          child: Icon(
-            Icons.notifications_none_rounded,
-            size: 28.sp,
-            color: AppColors.goldAccent,
-          ),
-        ),
-        Positioned(
-          right: 0,
-          top: -2,
-          child: Container(
-            width: 18.w,
-            height: 18.w,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.red,
-            ),
-            child: Center(
-              child: Text(
-                '5',
-                style: GoogleFonts.inter(
-                  fontSize: 9.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Get.to(() => const NotificationsView()),
+      child: Obx(() {
+        final count = _notificationController.unseenCount.value;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            SizedBox(
+              width: 40.w,
+              height: 40.w,
+              child: Icon(
+                Icons.notifications_none_rounded,
+                size: 28.sp,
+                color: AppColors.goldAccent,
               ),
             ),
-          ),
-        ),
-      ],
+            if (count > 0)
+              Positioned(
+                right: 0,
+                top: -2,
+                child: Container(
+                  width: 18.w,
+                  height: 18.w,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.red,
+                  ),
+                  child: Center(
+                    child: Text(
+                      count > 9 ? '9+' : '$count',
+                      style: GoogleFonts.inter(
+                        fontSize: 9.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      }),
     );
   }
 

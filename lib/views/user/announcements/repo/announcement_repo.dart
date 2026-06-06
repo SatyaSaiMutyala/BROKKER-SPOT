@@ -44,7 +44,7 @@ class AnnouncementRepository {
     }
   }
 
-  Future<({List<AnnouncementModel> items, int totalRecords, int totalPages, int page})>
+  Future<({List<AnnouncementModel> items, List<Map<String, dynamic>> raw, int totalRecords, int totalPages, int page})>
       fetchAnnouncements({int page = 1, int perPage = 10, int? status}) async {
     // status: 0=draft, 1=submitted, 2=approved, 3=rejected. Omit for "all".
     final statusQuery = status != null ? '&status=$status' : '';
@@ -56,11 +56,11 @@ class AnnouncementRepository {
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     if (json['success'] == true) {
       final data = json['data'] as Map<String, dynamic>;
-      final items = (data['data'] as List)
-          .map((e) => AnnouncementModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final raw = (data['data'] as List).cast<Map<String, dynamic>>();
+      final items = raw.map(AnnouncementModel.fromJson).toList();
       return (
         items: items,
+        raw: raw,
         totalRecords: data['totalRecords'] as int,
         totalPages: data['totalPages'] as int,
         page: data['page'] as int,
@@ -69,7 +69,7 @@ class AnnouncementRepository {
     throw json['message'] ?? 'Failed to fetch announcements';
   }
 
-  Future<({List<AnnouncementModel> items, int totalRecords, int totalPages, int page})>
+  Future<({List<AnnouncementModel> items, List<Map<String, dynamic>> raw, int totalRecords, int totalPages, int page})>
       fetchAllAnnouncements({int page = 1, int perPage = 10}) async {
     final response = await api.getRequest(
       endPoint:
@@ -79,11 +79,11 @@ class AnnouncementRepository {
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     if (json['success'] == true) {
       final data = json['data'] as Map<String, dynamic>;
-      final items = (data['data'] as List)
-          .map((e) => AnnouncementModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final raw = (data['data'] as List).cast<Map<String, dynamic>>();
+      final items = raw.map(AnnouncementModel.fromJson).toList();
       return (
         items: items,
+        raw: raw,
         totalRecords: data['totalRecords'] as int,
         totalPages: data['totalPages'] as int,
         page: data['page'] as int,

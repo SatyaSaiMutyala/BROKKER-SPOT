@@ -2,6 +2,8 @@ import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/dashboard/bottom_nav_controller.dart';
+import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
+import 'package:brokkerspot/views/notifications/notifications_view.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -19,6 +21,7 @@ class BrokerHomeView extends StatefulWidget {
 class _BrokerHomeViewState extends State<BrokerHomeView> {
   int _bannerPage = 0;
   final PageController _bannerController = PageController();
+  final _notificationController = NotificationListController.to;
 
   final List<Map<String, String>> _stories = [
     {'name': 'Brokkerspot', 'image': 'assets/images/realestate_logo.png'},
@@ -27,6 +30,13 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
     {'name': 'Joya', 'image': 'assets/images/story3.png'},
     {'name': 'Aman', 'image': 'assets/images/story4.png'},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Cache-first; powers the bell badge.
+    _notificationController.load();
+  }
 
   @override
   void dispose() {
@@ -235,35 +245,43 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
             );
           }),
           const Spacer(),
-          // Notification bell with badge
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Icon(Icons.notifications_none_rounded,
-                  size: 28.sp, color: AppColors.primary),
-              Positioned(
-                top: -2,
-                right: -2,
-                child: Container(
-                  width: 16.w,
-                  height: 16.w,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.primary,
-                  ),
-                  child: Center(
-                    child: Text(
-                      '1',
-                      style: GoogleFonts.poppins(
-                        fontSize: 9.sp,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+          // Notification bell with reactive badge
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Get.to(() => const NotificationsView()),
+            child: Obx(() {
+              final count = _notificationController.unseenCount.value;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(Icons.notifications_none_rounded,
+                      size: 28.sp, color: AppColors.primary),
+                  if (count > 0)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        width: 16.w,
+                        height: 16.w,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.primary,
+                        ),
+                        child: Center(
+                          child: Text(
+                            count > 9 ? '9+' : '$count',
+                            style: GoogleFonts.poppins(
+                              fontSize: 9.sp,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-            ],
+                ],
+              );
+            }),
           ),
         ],
       ),

@@ -42,6 +42,9 @@ class UserData {
   final String mobileNumber;
   final String countryCode;
   final int role;
+  /// Active side per backend (1 = user, 2 = broker). Decides which dashboard
+  /// to show right after a fresh login.
+  final int currentRole;
   final int accountType;
   final List<dynamic> dealingCities;
   final List<dynamic> dealingAreas;
@@ -62,6 +65,7 @@ class UserData {
     required this.mobileNumber,
     required this.countryCode,
     required this.role,
+    required this.currentRole,
     required this.accountType,
     required this.dealingCities,
     required this.dealingAreas,
@@ -83,6 +87,7 @@ class UserData {
         mobileNumber: json["mobileNumber"] ?? "",
         countryCode: json["countryCode"] ?? "",
         role: json["role"] ?? 0,
+        currentRole: json["currentRole"] ?? json["role"] ?? 0,
         accountType: json["account_type"] ?? 0,
         dealingCities: List<dynamic>.from(json["dealingCities"] ?? []),
         dealingAreas: List<dynamic>.from(json["dealingAreas"] ?? []),
@@ -104,6 +109,7 @@ class UserData {
         "mobileNumber": mobileNumber,
         "countryCode": countryCode,
         "role": role,
+        "currentRole": currentRole,
         "account_type": accountType,
         "dealingCities": dealingCities,
         "dealingAreas": dealingAreas,

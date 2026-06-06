@@ -1,18 +1,102 @@
+import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/models/meeting_item_model.dart';
+import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
+import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
+import 'package:brokkerspot/views/user/meeting/controller/meeting_controller.dart';
+import 'package:brokkerspot/views/user/meeting/repo/meeting_repo.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
+import 'package:brokkerspot/widgets/common/support_fab.dart';
+import 'package:brokkerspot/widgets/meeting/broker_meeting_card.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:brokkerspot/core/constants/app_colors.dart';
-import 'package:brokkerspot/models/meeting_model.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
-import 'package:brokkerspot/widgets/meetings/meeting_tile.dart';
-import 'package:brokkerspot/widgets/common/support_fab.dart';
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
 
-class BrokerMeetingView extends StatelessWidget {
+/// Broker-side Meeting screen.
+///
+/// Reuses [MeetingController] (same `fetch-meetings` endpoint — the backend
+/// returns broker-relevant data when currentRole=2) and the same
+/// [MeetingCard] widget. Two screens only on broker side: this list and a
+/// direct chat — no middle "conversations" screen.
+class BrokerMeetingView extends StatefulWidget {
   const BrokerMeetingView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final meetings = _mockMeetings();
+  State<BrokerMeetingView> createState() => _BrokerMeetingViewState();
+}
 
+class _BrokerMeetingViewState extends State<BrokerMeetingView> {
+  final _ctrl = MeetingController.to;
+
+  // Same filter set + labels as the user-side meeting screen.
+  final List<({String label, MeetingFilter filter})> _filters = const [
+    (label: 'ALL', filter: MeetingFilter.all),
+    (label: 'BUY', filter: MeetingFilter.buy),
+    (label: 'RENT', filter: MeetingFilter.rent),
+    (label: 'OWN', filter: MeetingFilter.own),
+  ];
+
+  Worker? _precacheWorker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.loadBroker();
+    _precacheWorker =
+        ever(_ctrl.brokerMeetings, (_) => _precacheAvatars());
+  }
+
+  @override
+  void dispose() {
+    _precacheWorker?.dispose();
+    super.dispose();
+  }
+
+  void _precacheAvatars() {
+    if (!mounted) return;
+    final urls = <String>{};
+    for (final m in _ctrl.brokerMeetings) {
+      final thumb = m.announcement.propertyMedia?.thumbnail;
+      if (thumb != null && thumb.isNotEmpty) urls.add(thumb);
+      for (final p in m.chatProfiles) {
+        final u = p.profileImageUrl;
+        if (u != null && u.isNotEmpty) urls.add(u);
+      }
+    }
+    for (final u in urls) {
+      precacheImage(CachedNetworkImageProvider(u), context).catchError((_) {});
+    }
+  }
+
+  /// Broker side jumps straight into the 1:1 chat with the single chat
+  /// profile on this announcement. If the announcement has more than one
+  /// profile (rare for brokers, but possible), fall back to the conversations
+  /// screen so the user can pick.
+  Future<void> _onTap(MeetingItem m) async {
+    if (m.chatProfiles.length == 1) {
+      final peer = m.chatProfiles.first;
+      final peerId = peer.id ?? '';
+      if (peerId.isEmpty) return;
+      await AnnouncementChatView.open(
+        announcementId: m.announcementId,
+        brokerName: peer.name ?? 'User',
+        brokerAvatar: peer.profileImageUrl,
+        peerUserId: peerId,
+      );
+    } else {
+      await Get.to(() => AnnouncementConversationsView(meeting: m));
+    }
+    if (!mounted) return;
+    // Tiny delay so the server has time to persist the just-sent message
+    // before we re-fetch — same trick as the user side.
+    await Future.delayed(const Duration(milliseconds: 350));
+    if (mounted) _ctrl.loadBroker(force: true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -23,28 +107,19 @@ class BrokerMeetingView extends StatelessWidget {
                 CustomHeader(
                   title: 'MEETING',
                   trailing: GestureDetector(
-                    onTap: () {
-                      // Handle filter
-                    },
-                    child: Icon(
-                      Icons.tune,
-                      size: 22.sp,
-                      color: AppColors.goldAccent,
-                    ),
+                    onTap: () => _ctrl.loadBroker(force: true),
+                    child: Icon(Icons.refresh,
+                        size: 22.sp, color: AppColors.goldAccent),
                   ),
                 ),
-                Expanded(child: _buildMeetingList(meetings)),
+                _buildFilterChips(),
+                Expanded(child: _buildList()),
               ],
             ),
-            // Support FAB
             Positioned(
               right: 20.w,
               bottom: 20.h,
-              child: SupportFab(
-                onTap: () {
-                  // Handle support tap
-                },
-              ),
+              child: SupportFab(onTap: () {}),
             ),
           ],
         ),
@@ -52,91 +127,176 @@ class BrokerMeetingView extends StatelessWidget {
     );
   }
 
-  Widget _buildMeetingList(List<MeetingModel> meetings) {
-    return ListView.builder(
-      padding: EdgeInsets.symmetric(vertical: 4.h),
-      itemCount: meetings.length * 2 - 1,
-      itemBuilder: (_, index) {
-        // Odd indices are dividers
-        if (index.isOdd) {
-          return Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            child: Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
-          );
-        }
-        final meeting = meetings[index ~/ 2];
-        return MeetingTile(
-          meeting: meeting,
-          formattedAmount: _formatAmount(meeting.dealAmount ?? 0),
-          onTap: () {
-            // Handle meeting tap
-          },
+  // ─── Filter chips (ALL / BUY / RENT / OWN) ───
+  // Identical UI to the user-side meeting screen; taps switch the broker
+  // slot's filter and re-fetch (cache-first per filter).
+  Widget _buildFilterChips() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+      child: Obx(() {
+        final current = _ctrl.brokerFilter.value;
+        return Row(
+          children: _filters.map((f) {
+            final isSelected = current == f.filter;
+            return Padding(
+              padding: EdgeInsets.only(right: 8.w),
+              child: GestureDetector(
+                onTap: () => _ctrl.loadBroker(f: f.filter),
+                child: Container(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 24.w, vertical: 6.h),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : Colors.white,
+                    borderRadius: BorderRadius.circular(20.r),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.primary
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Text(
+                    f.label,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12.sp,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.normal,
+                      color: isSelected ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         );
-      },
+      }),
     );
   }
 
-  String _formatAmount(double amount) {
-    String str = amount.toInt().toString();
-    final buffer = StringBuffer();
-    int count = 0;
-    for (int i = str.length - 1; i >= 0; i--) {
-      buffer.write(str[i]);
-      count++;
-      if (count == 3 && i > 0) {
-        buffer.write(',');
-        count = 0;
+  Widget _buildList() {
+    return Obx(() {
+      if (_ctrl.isLoadingBroker.value && _ctrl.brokerMeetings.isEmpty) {
+        return const _BrokerMeetingShimmer();
       }
-    }
-    return buffer.toString().split('').reversed.join();
+      if (_ctrl.brokerError.value != null && _ctrl.brokerMeetings.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                child: Text(
+                  _ctrl.brokerError.value!,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                      fontSize: 14.sp, color: Colors.grey.shade500),
+                ),
+              ),
+              SizedBox(height: 12.h),
+              TextButton(
+                onPressed: () => _ctrl.loadBroker(force: true),
+                child: Text('Retry',
+                    style: GoogleFonts.inter(
+                        fontSize: 14.sp, color: AppColors.primary)),
+              ),
+            ],
+          ),
+        );
+      }
+      if (_ctrl.brokerMeetings.isEmpty) {
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => _ctrl.loadBroker(force: true),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              SizedBox(height: 200.h),
+              Center(
+                child: Text('No meetings yet',
+                    style: GoogleFonts.inter(
+                        fontSize: 14.sp, color: Colors.grey.shade400)),
+              ),
+            ],
+          ),
+        );
+      }
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => _ctrl.loadBroker(force: true),
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(vertical: 8.h),
+          itemCount: _ctrl.brokerMeetings.length,
+          separatorBuilder: (_, __) => Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w),
+            child:
+                Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+          ),
+          itemBuilder: (_, i) {
+            final m = _ctrl.brokerMeetings[i];
+            return BrokerMeetingCard(
+              meeting: m,
+              onTap: () => _onTap(m),
+            );
+          },
+        ),
+      );
+    });
   }
+}
 
-  List<MeetingModel> _mockMeetings() {
-    return [
-      MeetingModel(
-        id: '1',
-        clientName: 'Aman',
-        projectName: 'AVANTI',
-        avatarUrl: 'assets/images/story4.png',
-        secondAvatarUrl: 'assets/images/story1.png',
-        dealAmount: 5000,
-        fromAmount: '99 0000',
-        timeAgo: '2 min ago',
-        messageCount: 1,
+class _BrokerMeetingShimmer extends StatelessWidget {
+  const _BrokerMeetingShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: ListView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.symmetric(vertical: 8.h),
+        itemCount: 5,
+        itemBuilder: (_, __) => Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          child: Row(
+            children: [
+              Container(
+                width: 60.w,
+                height: 60.w,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                        width: 120.w, height: 12.h, color: Colors.white),
+                    SizedBox(height: 6.h),
+                    Container(
+                        width: 80.w, height: 10.h, color: Colors.white),
+                    SizedBox(height: 6.h),
+                    Container(
+                        width: 140.w, height: 10.h, color: Colors.white),
+                  ],
+                ),
+              ),
+              SizedBox(width: 8.w),
+              Container(
+                width: 46.w,
+                height: 46.w,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      MeetingModel(
-        id: '2',
-        clientName: 'Neha',
-        projectName: 'AVANTI',
-        avatarUrl: 'assets/images/story2.png',
-        secondAvatarUrl: 'assets/images/story3.png',
-        dealAmount: 8000,
-        fromAmount: '99 0000',
-        timeAgo: '2 min ago',
-        messageCount: 1,
-      ),
-      MeetingModel(
-        id: '3',
-        clientName: 'Ankita',
-        projectName: 'SAFA / TWO',
-        avatarUrl: 'assets/images/story3.png',
-        secondAvatarUrl: 'assets/images/story2.png',
-        dealAmount: 15000,
-        fromAmount: '99 0000',
-        timeAgo: '2 min ago',
-        messageCount: 1,
-      ),
-      MeetingModel(
-        id: '4',
-        clientName: 'Anamika',
-        projectName: 'Zada',
-        avatarUrl: 'assets/images/story1.png',
-        secondAvatarUrl: 'assets/images/story4.png',
-        dealAmount: 12000,
-        fromAmount: '99 0000',
-        timeAgo: '2 min ago',
-        messageCount: 1,
-      ),
-    ];
+    );
   }
 }

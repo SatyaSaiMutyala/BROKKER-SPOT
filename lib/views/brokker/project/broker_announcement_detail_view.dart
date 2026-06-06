@@ -4,10 +4,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:video_player/video_player.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get/get.dart';
+import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
@@ -29,8 +29,6 @@ class BrokerAnnouncementDetailView extends StatefulWidget {
 class _BrokerAnnouncementDetailViewState
     extends State<BrokerAnnouncementDetailView> {
   late AnnouncementModel _data;
-  VideoPlayerController? _videoCtrl;
-  bool _videoReady = false;
   final PageController _pageCtrl = PageController();
   int _currentPage = 0;
   bool _descExpanded = false;
@@ -44,23 +42,9 @@ class _BrokerAnnouncementDetailViewState
   void initState() {
     super.initState();
     _data = widget.announcement;
-    _initVideo(_data);
     _fetchDetail();
     // Cached reference list to resolve amenity ids → names.
     _amenityCtrl.loadAmenities();
-  }
-
-  void _initVideo(AnnouncementModel a) {
-    final videoUrl = a.propertyMedia?.videos;
-    if (videoUrl == null || videoUrl.isEmpty) return;
-    _videoCtrl = VideoPlayerController.networkUrl(Uri.parse(videoUrl))
-      ..initialize().then((_) {
-        if (mounted) {
-          setState(() => _videoReady = true);
-          _videoCtrl!.play();
-          _videoCtrl!.setLooping(true);
-        }
-      });
   }
 
   Future<void> _fetchDetail() async {
@@ -84,7 +68,6 @@ class _BrokerAnnouncementDetailViewState
 
   @override
   void dispose() {
-    _videoCtrl?.dispose();
     _pageCtrl.dispose();
     // Restore dark status-bar icons for the screen we return to (this screen
     // used light icons over the dark hero image).
@@ -399,24 +382,18 @@ class _BrokerAnnouncementDetailViewState
   }
 
   Widget _buildVideoPage() {
-    if (!_videoReady || _videoCtrl == null) return _shimmerBox();
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Container(color: Colors.black),
-        AspectRatio(
-          aspectRatio: _videoCtrl!.value.aspectRatio,
-          child: VideoPlayer(_videoCtrl!),
-        ),
-        GestureDetector(
-          onTap: () => setState(() {
-            _videoCtrl!.value.volume > 0
-                ? _videoCtrl!.setVolume(0)
-                : _videoCtrl!.setVolume(1.0);
-          }),
-          child: Container(color: Colors.transparent),
-        ),
-      ],
+    final url = _data.propertyMedia?.videos ?? '';
+    if (url.isEmpty) return _shimmerBox();
+    return Container(
+      color: Colors.black,
+      child: CachedVideoPlayer(
+        url: url,
+        active: _currentPage == 0,
+        fit: BoxFit.contain,
+        muted: false,
+        tapToToggleMute: true,
+        placeholder: _shimmerBox(),
+      ),
     );
   }
 
