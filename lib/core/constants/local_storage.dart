@@ -68,4 +68,31 @@ class LocalStorageService {
   static bool isLoggedIn() {
     return getAccessToken() != null;
   }
+
+  /// Decodes the stored JWT access token and returns the user ID from the
+  /// payload. This is more reliable than getUser()?.data?.id after an account
+  /// switch because it reads the live token, not potentially-stale saved data.
+  ///
+  /// The server encodes the user id as "id" in the token payload.
+  static String? getUserIdFromToken() {
+    final token = getAccessToken() ?? '';
+    if (token.isEmpty) return null;
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      var payload = parts[1];
+      switch (payload.length % 4) {
+        case 2: payload += '=='; break;
+        case 3: payload += '='; break;
+        default: break;
+      }
+      final decoded = utf8.decode(base64Url.decode(payload));
+      final data = jsonDecode(decoded) as Map<String, dynamic>;
+      return data['id']?.toString() ??
+          data['_id']?.toString() ??
+          data['sub']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
 }

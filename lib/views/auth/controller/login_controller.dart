@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
+import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/login_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -68,6 +69,10 @@ class LoginController extends GetxController {
           await LocalStorageService.saveAccessToken(user.accessToken);
           await LocalStorageService.saveRefreshToken(user.refreshToken);
           await LocalStorageService.saveUser(loginModel);
+
+          // Restart socket with the fresh token so chat uses the correct identity.
+          SocketService.to.shutdown();
+          SocketService.to.connect();
 
           AppToast.success(loginModel.message);
 

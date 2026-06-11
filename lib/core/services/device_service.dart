@@ -11,23 +11,11 @@ class DeviceService {
   static Future<String?> _getFcmToken() async {
     try {
       if (Platform.isIOS) {
-        // Request permission first — required on iOS for APNS token to arrive
-        await FirebaseMessaging.instance.requestPermission(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
-
-        // Wait up to 10s for APNS token
-        String? apns;
-        for (int i = 0; i < 5; i++) {
-          apns = await FirebaseMessaging.instance.getAPNSToken();
-          if (apns != null) break;
-          await Future.delayed(const Duration(seconds: 2));
-        }
-
+        // Permission is requested on the home screen — just check if APNS
+        // token is already available (returns null if permission not yet granted).
+        final apns = await FirebaseMessaging.instance.getAPNSToken();
         if (apns == null) {
-          debugPrint('APNS token not available after retries');
+          debugPrint('APNS token not available (permission not granted yet)');
           return null;
         }
       }
@@ -96,7 +84,11 @@ class DeviceService {
       );
 
       final responseJson = jsonDecode(response.body);
-      debugPrint('Device registration: ${responseJson['message']}');
+      if (responseJson['success'] == true) {
+        debugPrint('✅ Device registered successfully');
+      } else {
+        debugPrint('❌ Device registration failed: ${responseJson['message']}');
+      }
     } catch (e) {
       debugPrint('Device registration failed: $e');
     }

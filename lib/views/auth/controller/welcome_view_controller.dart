@@ -8,6 +8,7 @@ import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
+import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/login_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
@@ -81,7 +82,7 @@ class WelcomeViewController extends GetxController {
         profileCtrl.profileImage.value = googleUser.photoUrl ?? '';
       }
 
-      _navigateByRole(profileCtrl.currentRole.value);
+      _navigateByRole(profileCtrl.currentRole.value, backendSaved: backendSaved);
     } on FirebaseAuthException catch (e) {
       print('Google Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
       AppToast.error(e.message ?? "Google Sign-In Failed");
@@ -198,7 +199,7 @@ class WelcomeViewController extends GetxController {
       print('Final profile — name: "${profileCtrl.userName.value}", email: "${profileCtrl.userEmail.value}"');
       print('Profile loaded, navigating to dashboard...');
 
-      _navigateByRole(profileCtrl.currentRole.value);
+      _navigateByRole(profileCtrl.currentRole.value, backendSaved: backendSaved);
     } on FirebaseAuthException catch (e) {
       print('Apple Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
       AppToast.error(e.message ?? "Apple Sign-In Failed");
@@ -407,8 +408,17 @@ class WelcomeViewController extends GetxController {
   /// dashboard to open (1 = user, 2 = broker). Falls back to last-side only
   /// if currentRole isn't usable yet. Also persists last-side so the splash
   /// path stays consistent on the next app open.
-  void _navigateByRole(int currentRole) async {
-    DeviceService.registerDevice();
+  ///
+  /// [backendSaved] — true when we have a real backend JWT. FCM registration
+  /// and socket reconnect are skipped in the Firebase-fallback case because
+  /// the stored token is a Firebase ID token the backend won't accept.
+  void _navigateByRole(int currentRole, {required bool backendSaved}) async {
+    if (backendSaved) {
+      // Restart socket with the fresh backend token (same fix as email login).
+      SocketService.to.shutdown();
+      SocketService.to.connect();
+      DeviceService.registerDevice();
+    }
     final goBroker = currentRole == 2 ||
         (currentRole != 1 && LocalStorageService.getLastSide() == 'broker');
     await LocalStorageService.saveLastSide(goBroker ? 'broker' : 'user');

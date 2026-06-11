@@ -48,14 +48,29 @@ Map<String, String> buildHeaders() {
 const String baseUrl = "https://api.dev.brokkerspot.com/api/v1/";
 
 /// Clears local storage and sends the user back to WelcomeView on 401.
-void _handleUnauthorized() async {
+///
+/// [requestToken] — the Authorization value that was sent with the failing
+/// request. If it no longer matches the stored token the user has already
+/// switched accounts; the stale 401 must not wipe the new session.
+void _handleUnauthorized(String requestToken) async {
+  final currentToken = LocalStorageService.getAccessToken() ?? '';
+
+  // Stale 401 guard: if the request was made with a token that is no longer
+  // the active one (user logged out + back in since the request was sent),
+  // silently discard. Without this, in-flight API calls from the old session
+  // clear the freshly-saved credentials of the new account.
+  if (requestToken.isNotEmpty && requestToken != currentToken) return;
+
+  // Already logged out — nothing left to clear.
+  if (currentToken.isEmpty) return;
+
   await LocalStorageService.clearAll();
   await clearUserSession();
   Get.offAll(() => WelcomeView());
 }
 
-http.Response _checkUnauthorized(http.Response response) {
-  if (response.statusCode == 401) _handleUnauthorized();
+http.Response _checkUnauthorized(http.Response response, String requestToken) {
+  if (response.statusCode == 401) _handleUnauthorized(requestToken);
   return response;
 }
 
@@ -127,7 +142,8 @@ Future<http.Response> postRequest(String s,
 
     _logApi('POST', url,
         statusCode: response.statusCode, responseBody: response.body);
-    return skipUnauthorizedCheck ? response : _checkUnauthorized(response);
+    final requestToken = usedHeaders['Authorization'] ?? '';
+    return skipUnauthorizedCheck ? response : _checkUnauthorized(response, requestToken);
   } catch (e) {
     _logApi('POST', url, error: e);
     rethrow;
@@ -150,7 +166,7 @@ Future<http.Response> metaDataPostRequest(
 
     _logApi('POST', url,
         statusCode: response.statusCode, responseBody: response.body);
-    return _checkUnauthorized(response);
+    return _checkUnauthorized(response, usedHeaders['Authorization'] ?? '');
   } catch (e) {
     _logApi('POST', url, error: e);
     rethrow;
@@ -171,7 +187,7 @@ Future<http.Response> getRequest(
 
     _logApi('GET', url,
         statusCode: response.statusCode, responseBody: response.body);
-    return _checkUnauthorized(response);
+    return _checkUnauthorized(response, headers?['Authorization'] ?? '');
   } catch (e) {
     _logApi('GET', url, error: e);
     rethrow;
@@ -210,7 +226,7 @@ Future<http.Response> patchRequest(
 
     _logApi('PATCH', url,
         statusCode: response.statusCode, responseBody: response.body);
-    return _checkUnauthorized(response);
+    return _checkUnauthorized(response, headers?['Authorization'] ?? '');
   } catch (e) {
     _logApi('PATCH', url, error: e);
     rethrow;
@@ -231,7 +247,7 @@ Future<http.Response> putRequest(
 
     _logApi('PUT', url,
         statusCode: response.statusCode, responseBody: response.body);
-    return _checkUnauthorized(response);
+    return _checkUnauthorized(response, headers?['Authorization'] ?? '');
   } catch (e) {
     _logApi('PUT', url, error: e);
     rethrow;
@@ -298,7 +314,7 @@ Future<http.Response> deleteRequest(
 
     _logApi('DELETE', url,
         statusCode: response.statusCode, responseBody: response.body);
-    return _checkUnauthorized(response);
+    return _checkUnauthorized(response, usedHeaders['Authorization'] ?? '');
   } catch (e) {
     _logApi('DELETE', url, error: e);
     rethrow;

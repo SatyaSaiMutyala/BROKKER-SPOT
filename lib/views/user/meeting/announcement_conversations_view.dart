@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/conversation_model.dart';
 import 'package:brokkerspot/models/meeting_item_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
@@ -35,6 +36,13 @@ class _AnnouncementConversationsViewState
   void initState() {
     super.initState();
     _tag = widget.meeting.announcementId;
+    // Force-delete any stale controller with this tag. After logout/login the
+    // old controller's socket listeners point to the disposed socket. GetX may
+    // return the stale instance via Get.put() instead of creating a fresh one,
+    // causing conversations to never load (onInit() doesn't re-run).
+    if (Get.isRegistered<AnnouncementConversationsController>(tag: _tag)) {
+      Get.delete<AnnouncementConversationsController>(tag: _tag, force: true);
+    }
     _ctrl = Get.put(
       AnnouncementConversationsController(
         announcementId: widget.meeting.announcementId,
@@ -168,6 +176,15 @@ class _AnnouncementConversationsViewState
     final peer = c.user;
     final peerId = peer.id ?? '';
     if (peerId.isEmpty) return;
+    // Safety guard: skip if we somehow ended up with our own ID as the peer.
+    // Use the JWT token as the source of truth — more reliable than user_data
+    // which may be stale after an account switch.
+    final myId = LocalStorageService.getUserIdFromToken() ??
+        LocalStorageService.getUser()?.data?.id ?? '';
+    if (myId.isNotEmpty && peerId == myId) {
+      debugPrint('⚠️ [Chat] Skipping self-chat: peer=$peerId == me=$myId');
+      return;
+    }
     // Clear the unread badge immediately for snappy UX — the server will
     // confirm via chat:history when the chat screen loads.
     _ctrl.markRead(peerId);

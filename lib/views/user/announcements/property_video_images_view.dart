@@ -69,11 +69,11 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
       permissions.add(Permission.camera);
       if (needsMicrophone) permissions.add(Permission.microphone);
     } else {
-      // Gallery — Android 13+ uses Permission.photos / Permission.videos;
-      // older Android uses storage. permission_handler maps these correctly.
-      if (Platform.isIOS) {
-        permissions.add(Permission.photos);
-      } else {
+      // Gallery — on iOS 14+, image_picker uses PHPickerViewController which
+      // grants scoped access without requiring explicit Photos permission.
+      // Checking Permission.photos on iOS causes false "permanently denied"
+      // popups because the OS manages access internally. Skip it on iOS.
+      if (!Platform.isIOS) {
         permissions.add(
             needsMicrophone ? Permission.videos : Permission.photos);
       }
@@ -81,27 +81,27 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
 
     for (final p in permissions) {
       var status = await p.status;
+
       if (status.isGranted || status.isLimited) continue;
-      if (status.isPermanentlyDenied) {
-        if (!mounted) return false;
-        final opened = await _showSettingsDialog(p);
-        if (!opened) return false;
-        status = await p.status;
-        if (!status.isGranted && !status.isLimited) return false;
-        continue;
-      }
+
+      // Restricted (parental/MDM controls) — can't request or change in settings.
+      if (status.isRestricted) return false;
+
+      // Always attempt the system request first.
+      // On iOS, permission_handler can wrongly report notDetermined as
+      // permanentlyDenied before a request is ever made, which suppresses the
+      // OS dialog. Calling p.request() on a notDetermined permission shows the
+      // system prompt; on a truly denied permission it returns immediately.
       status = await p.request();
+
       if (status.isGranted || status.isLimited) continue;
-      if (status.isPermanentlyDenied) {
-        if (!mounted) return false;
-        final opened = await _showSettingsDialog(p);
-        if (!opened) return false;
-        status = await p.status;
-        if (!status.isGranted && !status.isLimited) return false;
-        continue;
-      }
-      // Still denied (but not permanent) — allow re-prompt on next tap.
-      return false;
+
+      // Truly denied — route user to Settings.
+      if (!mounted) return false;
+      final opened = await _showSettingsDialog(p);
+      if (!opened) return false;
+      status = await p.status;
+      if (!status.isGranted && !status.isLimited) return false;
     }
     return true;
   }

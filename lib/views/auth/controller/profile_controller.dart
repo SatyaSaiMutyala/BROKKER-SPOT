@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/session_cleanup.dart';
+import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -122,8 +124,14 @@ class ProfileController extends GetxController {
           final newToken = data['token'] ?? data['access_token'] ?? data['accessToken'];
           if (newToken is String && newToken.isNotEmpty) {
             await LocalStorageService.saveAccessToken(newToken);
+            // Reconnect socket with the fresh token for this role.
+            SocketService.to.shutdown();
+            SocketService.to.connect();
           }
         }
+        // Wipe announcements / meetings / notifications cached for the old
+        // role so the new side always starts with fresh data.
+        await clearRoleScopedCache();
         await getProfile();
         return true;
       }

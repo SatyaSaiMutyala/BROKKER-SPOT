@@ -4,7 +4,8 @@ import 'package:brokkerspot/views/user/announcements/announcements_view.dart';
 import 'package:brokkerspot/views/user/home/home_view.dart';
 import 'package:brokkerspot/views/user/meeting/meeting_view.dart';
 import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
-import 'package:brokkerspot/widgets/common/notification_permission_dialog.dart';
+import 'package:brokkerspot/core/services/device_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 class DashboardView extends StatefulWidget {
@@ -34,7 +35,14 @@ class _DashboardViewState extends State<DashboardView> {
       // Wait for the home's initial load (images/videos) to settle so the
       // popup animation runs on a free main thread and stays smooth.
       await Future.delayed(const Duration(milliseconds: 1800));
-      if (mounted) NotificationPermissionDialog.showIfNeeded(context);
+      if (!mounted) return;
+      final result = await FirebaseMessaging.instance.requestPermission(
+        alert: true, badge: true, sound: true,
+      );
+      if (result.authorizationStatus == AuthorizationStatus.authorized ||
+          result.authorizationStatus == AuthorizationStatus.provisional) {
+        DeviceService.registerDevice();
+      }
     });
   }
 

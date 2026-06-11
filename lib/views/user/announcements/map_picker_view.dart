@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 
-const _apiKey = 'AIzaSyDOkbbIWDhkDgqcIRCgtTx6j2ecLZxYyyE';
+const _apiKey = 'AIzaSyCSQdMM4dbaj1ECCbftDVZCIcca8usqQVs';
 
 class LocationPickerResult {
   final double latitude;
@@ -145,8 +145,7 @@ class _MapPickerViewState extends State<MapPickerView> {
         if (results.isNotEmpty) {
           final first = results.first as Map<String, dynamic>;
           final formattedAddress = first['formatted_address'] as String? ?? '';
-          final components =
-              (first['address_components'] as List?) ?? [];
+          final components = (first['address_components'] as List?) ?? [];
 
           String country = '', city = '', area = '';
           for (final comp in components) {
@@ -212,8 +211,7 @@ class _MapPickerViewState extends State<MapPickerView> {
           children: [
             // ── Map ──────────────────────────────────────────────────────────
             GoogleMap(
-              initialCameraPosition:
-                  CameraPosition(target: _center, zoom: 14),
+              initialCameraPosition: CameraPosition(target: _center, zoom: 14),
               onMapCreated: (c) => _mapController = c,
               onCameraMove: _onCameraMove,
               onCameraIdle: _onCameraIdle,
@@ -227,8 +225,7 @@ class _MapPickerViewState extends State<MapPickerView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.location_pin,
-                      color: Colors.red, size: 48.sp),
+                  Icon(Icons.location_pin, color: Colors.red, size: 48.sp),
                   SizedBox(height: 24.h),
                 ],
               ),
@@ -270,8 +267,7 @@ class _MapPickerViewState extends State<MapPickerView> {
                             decoration: InputDecoration(
                               hintText: 'Search location...',
                               hintStyle: GoogleFonts.inter(
-                                  fontSize: 14.sp,
-                                  color: Colors.grey.shade400),
+                                  fontSize: 14.sp, color: Colors.grey.shade400),
                               border: InputBorder.none,
                               contentPadding:
                                   EdgeInsets.symmetric(vertical: 14.h),
@@ -298,8 +294,7 @@ class _MapPickerViewState extends State<MapPickerView> {
                               });
                             },
                             child: Padding(
-                              padding:
-                                  EdgeInsets.symmetric(horizontal: 12.w),
+                              padding: EdgeInsets.symmetric(horizontal: 12.w),
                               child: Icon(Icons.close,
                                   size: 20.sp, color: Colors.grey),
                             ),
@@ -338,14 +333,12 @@ class _MapPickerViewState extends State<MapPickerView> {
                               child: Row(
                                 children: [
                                   Icon(Icons.place_outlined,
-                                      size: 18.sp,
-                                      color: Colors.grey.shade500),
+                                      size: 18.sp, color: Colors.grey.shade500),
                                   SizedBox(width: 10.w),
                                   Expanded(
                                     child: Text(
                                       s.description,
-                                      style: GoogleFonts.inter(
-                                          fontSize: 13.sp),
+                                      style: GoogleFonts.inter(fontSize: 13.sp),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -386,8 +379,7 @@ class _MapPickerViewState extends State<MapPickerView> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.location_on,
-                            color: Colors.red, size: 18.sp),
+                        Icon(Icons.location_on, color: Colors.red, size: 18.sp),
                         SizedBox(width: 6.w),
                         Text(
                           'Selected Location',
@@ -402,8 +394,8 @@ class _MapPickerViewState extends State<MapPickerView> {
                           SizedBox(
                             width: 16.w,
                             height: 16.w,
-                            child: const CircularProgressIndicator(
-                                strokeWidth: 2),
+                            child:
+                                const CircularProgressIndicator(strokeWidth: 2),
                           ),
                       ],
                     ),
@@ -438,10 +430,9 @@ class _MapPickerViewState extends State<MapPickerView> {
                       width: double.infinity,
                       height: 48.h,
                       child: ElevatedButton(
-                        onPressed:
-                            _address.isNotEmpty && !_isGeocoding
-                                ? _confirm
-                                : null,
+                        onPressed: _address.isNotEmpty && !_isGeocoding
+                            ? _confirm
+                            : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1A1A2E),
                           disabledBackgroundColor: Colors.grey.shade300,

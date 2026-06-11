@@ -187,9 +187,12 @@ class AnnouncementConversationsController extends GetxController {
     final socketUser = c.user;
     ChatProfileSummary? match;
     if (socketUser.id != null && socketUser.id!.isNotEmpty) {
+      // Exact ID match only — never substitute a different user's profile.
       match = knownProfiles.firstWhereOrNull((p) => p.id == socketUser.id);
+    } else {
+      // No id from socket — safe to fill in from the only known profile.
+      match = knownProfiles.length == 1 ? knownProfiles.first : null;
     }
-    match ??= knownProfiles.length == 1 ? knownProfiles.first : null;
     if (match == null) return c;
     final mergedUser = ChatProfileSummary(
       id: socketUser.id ?? match.id,

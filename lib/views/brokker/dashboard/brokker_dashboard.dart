@@ -10,7 +10,8 @@ import 'package:brokkerspot/views/brokker/meeting/broker_meeting_view.dart';
 import 'package:brokkerspot/views/brokker/payments/broker_payments_view.dart';
 import 'package:brokkerspot/views/brokker/project/broker_projects_view.dart';
 import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
-import 'package:brokkerspot/widgets/common/notification_permission_dialog.dart';
+import 'package:brokkerspot/core/services/device_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -46,10 +47,17 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
           builder: (_) => const LocationPickerPopup(),
         );
       } else {
-        // Wait for the dashboard's initial load to settle so the popup
-        // animation runs on a free main thread and stays smooth.
+        // Wait for the dashboard's initial load to settle.
         await Future.delayed(const Duration(milliseconds: 1800));
-        if (mounted) NotificationPermissionDialog.showIfNeeded(context);
+        if (mounted) {
+          final result = await FirebaseMessaging.instance.requestPermission(
+            alert: true, badge: true, sound: true,
+          );
+          if (result.authorizationStatus == AuthorizationStatus.authorized ||
+              result.authorizationStatus == AuthorizationStatus.provisional) {
+            DeviceService.registerDevice();
+          }
+        }
       }
       _showRejectedDialogIfNeeded();
     });

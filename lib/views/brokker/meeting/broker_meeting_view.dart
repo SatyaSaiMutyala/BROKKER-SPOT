@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/meeting_item_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
@@ -44,8 +45,7 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
   void initState() {
     super.initState();
     _ctrl.loadBroker();
-    _precacheWorker =
-        ever(_ctrl.brokerMeetings, (_) => _precacheAvatars());
+    _precacheWorker = ever(_ctrl.brokerMeetings, (_) => _precacheAvatars());
   }
 
   @override
@@ -70,13 +70,38 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
     }
   }
 
-  /// Broker side jumps straight into the 1:1 chat with the single chat
-  /// profile on this announcement. If the announcement has more than one
-  /// profile (rare for brokers, but possible), fall back to the conversations
-  /// screen so the user can pick.
+  /// Broker side jumps straight into 1:1 chat when there is exactly one peer.
+  ///
+  /// The meetings API returns chat_profiles that include the broker's own
+  /// profile for user announcements (since the server lists the broker
+  /// participants from the announcement owner's perspective). We filter out
+  /// self using the JWT-derived user id, then fall back to announcement.userId
+  /// (the announcement owner/user) if no external peers remain.
   Future<void> _onTap(MeetingItem m) async {
-    if (m.chatProfiles.length == 1) {
-      final peer = m.chatProfiles.first;
+    // Use the JWT payload as the authoritative source for the logged-in user's
+    // id — more reliable than user_data which can be stale after account switch.
+    final myId = LocalStorageService.getUserIdFromToken() ??
+        LocalStorageService.getUser()?.data?.id ?? '';
+
+    // Filter out own profile from the list (for user announcements the server
+    // puts the broker's own profile in chat_profiles, not the peer's).
+    final peers = myId.isNotEmpty
+        ? m.chatProfiles.where((p) => p.id != myId).toList()
+        : List<ChatProfileSummary>.from(m.chatProfiles);
+
+    if (peers.isEmpty) {
+      // Only our own profile was in chat_profiles — this is a user announcement
+      // where we (the broker) initiated contact. The peer = the announcement owner.
+      final ownerId = m.announcement.userId ?? '';
+      if (ownerId.isEmpty || ownerId == myId) return;
+      await AnnouncementChatView.open(
+        announcementId: m.announcementId,
+        brokerName: m.announcement.ownerName ?? 'User',
+        brokerAvatar: m.announcement.ownerAvatarUrl,
+        peerUserId: ownerId,
+      );
+    } else if (peers.length == 1) {
+      final peer = peers.first;
       final peerId = peer.id ?? '';
       if (peerId.isEmpty) return;
       await AnnouncementChatView.open(
@@ -149,9 +174,8 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
                     color: isSelected ? AppColors.primary : Colors.white,
                     borderRadius: BorderRadius.circular(20.r),
                     border: Border.all(
-                      color: isSelected
-                          ? AppColors.primary
-                          : Colors.grey.shade300,
+                      color:
+                          isSelected ? AppColors.primary : Colors.grey.shade300,
                     ),
                   ),
                   child: Text(
@@ -273,14 +297,11 @@ class _BrokerMeetingShimmer extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                        width: 120.w, height: 12.h, color: Colors.white),
+                    Container(width: 120.w, height: 12.h, color: Colors.white),
                     SizedBox(height: 6.h),
-                    Container(
-                        width: 80.w, height: 10.h, color: Colors.white),
+                    Container(width: 80.w, height: 10.h, color: Colors.white),
                     SizedBox(height: 6.h),
-                    Container(
-                        width: 140.w, height: 10.h, color: Colors.white),
+                    Container(width: 140.w, height: 10.h, color: Colors.white),
                   ],
                 ),
               ),

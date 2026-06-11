@@ -1,14 +1,12 @@
-import 'dart:io';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/notification_service.dart';
 import 'package:brokkerspot/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:brokkerspot/core/services/announcement_cache.dart';
@@ -38,35 +36,8 @@ void main() async {
     SocketService.to.connect();
   }
 
-  try {
-    if (Platform.isIOS) {
-      await FirebaseMessaging.instance.requestPermission();
-      // Wait for APNS token to arrive after permission grant
-      String? apns;
-      for (int i = 0; i < 5; i++) {
-        apns = await FirebaseMessaging.instance.getAPNSToken();
-        if (apns != null) break;
-        await Future.delayed(const Duration(seconds: 2));
-      }
-      if (apns == null) {
-        debugPrint('FCM Token: APNS not ready (simulator or denied)');
-      } else {
-        final fcmToken = await FirebaseMessaging.instance.getToken();
-        debugPrint('FCM Token: $fcmToken');
-      }
-    } else {
-      // Android 13+ requires runtime POST_NOTIFICATIONS permission.
-      // No-op on older Android (auto-granted).
-      final status = await Permission.notification.status;
-      if (!status.isGranted) {
-        await Permission.notification.request();
-      }
-      final fcmToken = await FirebaseMessaging.instance.getToken();
-      debugPrint('FCM Token: $fcmToken');
-    }
-  } catch (e) {
-    debugPrint('FCM Token unavailable: $e');
-  }
+  // Show a local notification banner when a push arrives while the app is open.
+  await NotificationService.init();
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

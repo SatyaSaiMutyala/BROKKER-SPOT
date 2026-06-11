@@ -74,6 +74,14 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     final recipientId = widget.peerUserId ?? '';
     // One controller per conversation (announcement + peer), so chats don't clash.
     _tag = '${widget.announcementId}:$recipientId';
+    // Force-delete any stale controller with this tag. After a logout/login the
+    // old controller's socket listeners point to the disposed socket — if GetX
+    // returns it via Get.put() instead of creating a fresh one, onInit() never
+    // re-runs so no listeners are registered on the new connection and every
+    // history request times out silently.
+    if (Get.isRegistered<ChatController>(tag: _tag)) {
+      Get.delete<ChatController>(tag: _tag, force: true);
+    }
     _chat = Get.put(
       ChatController(
         announcementId: widget.announcementId,

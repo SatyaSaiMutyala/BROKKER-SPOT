@@ -21,6 +21,11 @@ class SocketService extends GetxService {
 
   io.Socket? _socket;
 
+  /// The token that was used to build the current socket. Used to detect
+  /// account switches: if the stored token changes, the socket must be rebuilt
+  /// even if _socket is somehow still non-null.
+  String? _socketToken;
+
   /// Reactive connection state — bind to it in the UI to show online/offline.
   final RxBool isConnected = false.obs;
 
@@ -32,12 +37,34 @@ class SocketService extends GetxService {
 
   /// Opens the connection. Idempotent — safe to call from many screens.
   void connect() {
-    if (_socket != null) {
-      if (!_socket!.connected) _socket!.connect();
+    final currentToken = LocalStorageService.getAccessToken() ?? '';
+
+    // Never connect with an empty token: connecting without auth can cause the
+    // server to associate this socket with a previous user's session (if it
+    // reuses device-level sessions), leaking one account's chat data into
+    // another. Any call that reaches here before login completes is a no-op;
+    // the login flow calls connect() again after saving the token.
+    if (currentToken.isEmpty) {
+      _log('connect() skipped — no stored token (not logged in)');
       return;
     }
 
-    final token = LocalStorageService.getAccessToken() ?? '';
+    if (_socket != null) {
+      // If the token changed since the socket was built (e.g. after a
+      // logout/login), tear the old socket down and rebuild with the new
+      // credentials. This catches the case where shutdown()'s dispose() threw
+      // and left _socket non-null pointing at the previous user's socket.
+      if (_socketToken != currentToken) {
+        _log('token mismatch — rebuilding socket for new account');
+        _forceShutdown();
+        // Fall through to create a fresh socket below.
+      } else {
+        if (!_socket!.connected) _socket!.connect();
+        return;
+      }
+    }
+
+    _socketToken = currentToken;
     _socket = io.io(
       _baseUrl,
       io.OptionBuilder()
@@ -46,8 +73,8 @@ class SocketService extends GetxService {
           .disableAutoConnect()
           // Auth is sent both ways so it works whether the server reads it from
           // the handshake `auth` payload or an Authorization header.
-          .setAuth({'token': token})
-          .setExtraHeaders({'Authorization': token})
+          .setAuth({'token': currentToken})
+          .setExtraHeaders({'Authorization': currentToken})
           .enableReconnection()
           .build(),
     );
@@ -111,9 +138,25 @@ class SocketService extends GetxService {
 
   /// Tears the socket down completely (e.g. on logout).
   void shutdown() {
-    _socket?.dispose();
+    _forceShutdown();
+    // Discard any queued emits from the old session so they are never sent on
+    // the next account's connection (wrong recipient IDs, stale auth context).
+    _pending.clear();
+  }
+
+  /// Nulls the socket pointer BEFORE calling dispose so that if dispose()
+  /// throws, _socket is already null and connect() won't try to reuse the
+  /// stale socket (which would reconnect with the old account's credentials).
+  void _forceShutdown() {
+    final old = _socket;
     _socket = null;
+    _socketToken = null;
     isConnected.value = false;
+    try {
+      old?.dispose();
+    } catch (e) {
+      _log('dispose error (ignored): $e');
+    }
   }
 
   void _log(String msg) {
