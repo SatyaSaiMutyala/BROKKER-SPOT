@@ -188,7 +188,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     final videoUrl = a.propertyMedia?.videos;
     final hasVideo = videoUrl != null && videoUrl.isNotEmpty;
     final hasImages = (a.imageUrls?.length ?? 0) > 0;
-    final images = hasImages ? a.imageUrls! : (hasVideo ? <String>[] : _fallbackImages);
+    final images =
+        hasImages ? a.imageUrls! : (hasVideo ? <String>[] : _fallbackImages);
     final totalPages = (hasVideo ? 1 : 0) + images.length;
 
     return Stack(
@@ -534,10 +535,10 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                 ),
               ),
             ),
-            VerticalDivider(
-                width: 1, thickness: 0.8, color: AppColors.primary),
+            VerticalDivider(width: 1, thickness: 0.8, color: AppColors.primary),
             Expanded(
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: widget.onChatTap,
                 child: Container(
                   height: 44.h,
@@ -569,7 +570,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     const peekAmount = 10.0;
     // Show up to 3 broker avatars, peeking behind one another.
     final shown = proposals.take(3).toList();
-    final totalWidth = avatarSize + (shown.length - 1).clamp(0, 2) * 18 + peekAmount;
+    final totalWidth =
+        avatarSize + (shown.length - 1).clamp(0, 2) * 18 + peekAmount;
 
     return SizedBox(
       width: totalWidth.w,
@@ -628,9 +630,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                 imageUrl: imageUrl,
                 fit: BoxFit.cover,
                 placeholder: (_, __) => Container(color: Colors.grey.shade200),
-                errorWidget: (_, __, ___) => Image.asset(
-                    'assets/images/story1.png',
-                    fit: BoxFit.cover),
+                errorWidget: (_, __, ___) =>
+                    Image.asset('assets/images/story1.png', fit: BoxFit.cover),
               )
             : Image.asset('assets/images/story1.png', fit: BoxFit.cover),
       ),
@@ -677,8 +678,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
   }
 
   Widget _avatarWidget(String? url, double size) {
-    final fallback = AnnouncementPropertyCard
-        ._avatarAssets[widget.index % AnnouncementPropertyCard._avatarAssets.length];
+    final fallback = AnnouncementPropertyCard._avatarAssets[
+        widget.index % AnnouncementPropertyCard._avatarAssets.length];
     if (url != null && url.isNotEmpty) {
       return CachedNetworkImage(
         imageUrl: url,

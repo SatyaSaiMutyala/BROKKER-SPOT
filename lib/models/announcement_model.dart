@@ -192,6 +192,11 @@ class AnnouncementModel {
   final bool? isOwner;
   final bool? isProposalSent;
 
+  /// Which side created this announcement: 1 = user side, 2 = broker side.
+  /// Used to compute chat user_role (sent in socket events so the server knows
+  /// which directional lookup to perform for chat:history).
+  final int? userRole;
+
   AnnouncementModel({
     this.id,
     this.userId,
@@ -238,6 +243,7 @@ class AnnouncementModel {
     this.latestProposals,
     this.isOwner,
     this.isProposalSent,
+    this.userRole,
   });
 
   static String? _statusLabel(int? code) {
@@ -346,6 +352,7 @@ class AnnouncementModel {
           .toList(),
       isOwner: json['is_owner'] as bool?,
       isProposalSent: json['is_proposal_sent'] as bool?,
+      userRole: (json['user_role'] as num?)?.toInt(),
     );
   }
 

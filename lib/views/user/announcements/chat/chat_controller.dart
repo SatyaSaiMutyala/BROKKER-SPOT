@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/chat_message.dart';
@@ -15,12 +16,17 @@ class ChatController extends GetxController {
   final String recipientId; // the other user's id
   final String peerName;
   final String peerAvatar;
+  /// The socket user's role in this chat context (1=user side, 2=broker side).
+  /// Sent in chat:history / chat:send so the server's directional lookup works
+  /// correctly when the announcement owner is the one requesting history.
+  final int? userRole;
 
   ChatController({
     required this.announcementId,
     required this.recipientId,
     required this.peerName,
     required this.peerAvatar,
+    this.userRole,
   });
 
   final _socket = SocketService.to;
@@ -39,6 +45,17 @@ class ChatController extends GetxController {
   bool get hasMore => _hasMore;
   bool _loadingMore = false;
 
+  // Retry sequence for chat:history when the server rejects the request.
+  // Different server states need different user_role values; we try all in order:
+  //   0 = user_role:1  (initiator always contacts in user mode)
+  //   1 = user_role:2  (owner replied in broker mode — the server may key on this)
+  //   2 = no user_role (server default fallback)
+  int _historyAttempt = 0;
+
+  // Proposal state — null means no proposal exists yet for this conversation.
+  final RxnInt proposalStatus = RxnInt();
+  final RxnString agreementUrl = RxnString();
+
   Timer? _typingTimer;
   Timer? _historyTimeout;
 
@@ -54,9 +71,16 @@ class ChatController extends GetxController {
       ..on(ChatEvents.history, _onHistory)
       ..on(ChatEvents.historyError, _onHistoryError)
       ..on(ChatEvents.typing, _onTyping)
+      ..on(ChatEvents.proposalStatus, _onProposalStatus)
+      ..on(ChatEvents.proposalStatusError, _onProposalIgnore)
+      ..on(ChatEvents.proposalStatusUpdate, _onProposalStatus)
+      ..on(ChatEvents.proposalStatusUpdateError, _onProposalIgnore)
+      ..on(ChatEvents.proposalBrokerAccept, _onProposalStatus)
+      ..on(ChatEvents.proposalBrokerAcceptError, _onProposalIgnore)
       // Generic server-side error (e.g. "Invalid or expired token.").
       ..on('error', _onSocketError);
     _requestHistory(page: 1);
+    _loadProposal();
   }
 
   void _onSocketError(dynamic data) {
@@ -70,12 +94,23 @@ class ChatController extends GetxController {
   // ── History ──
   void _requestHistory({required int page}) {
     if (page == 1) isLoadingHistory.value = true;
-    _socket.emit(ChatEvents.history, {
+    // The server's directional lookup for chat:history is sensitive to user_role.
+    // We don't know which value the server needs (depends on which role was used
+    // when the conversation was initiated and how the server indexed it). We try
+    // three variants in sequence on error: user_role=1, user_role=2, no user_role.
+    final int? roleToSend = switch (_historyAttempt) {
+      0 => 1,
+      1 => 2,
+      _ => null,  // attempt 2+ = no user_role
+    };
+    final payload = <String, dynamic>{
       'recipient_id': recipientId,
       'announcement_id': announcementId,
       'page': page,
       'perPage': _perPage,
-    });
+      if (roleToSend != null) 'user_role': roleToSend,
+    };
+    _socket.emit(ChatEvents.history, payload);
     // Safety net: if the server never replies (e.g. socket gets booted by an
     // auth error), don't spin the loader forever.
     _historyTimeout?.cancel();
@@ -128,9 +163,16 @@ class ChatController extends GetxController {
   }
 
   void _onHistoryError(dynamic data) {
+    _historyTimeout?.cancel();
+    // Retry with the next user_role variant before giving up.
+    // Attempts: 0=user_role:1, 1=user_role:2, 2=no user_role, 3+=give up.
+    if (_historyAttempt < 2 && messages.isEmpty) {
+      _historyAttempt++;
+      _requestHistory(page: 1);
+      return;
+    }
     isLoadingHistory.value = false;
     _loadingMore = false;
-    _historyTimeout?.cancel();
     error.value = _msg(data) ?? 'Failed to load chat history';
   }
 
@@ -216,6 +258,54 @@ class ChatController extends GetxController {
     peerTyping.value = map['is_typing'] == true;
   }
 
+  // ── Proposal ──
+  void _loadProposal() {
+    _socket.emit(ChatEvents.proposalStatus, {
+      'announcement_id': announcementId,
+      'recipient_id': recipientId,
+    });
+  }
+
+  void _onProposalStatus(dynamic data) {
+    if (data == null) {
+      proposalStatus.value = null;
+      agreementUrl.value = null;
+      return;
+    }
+    if (data is! Map) return;
+    final map = Map<String, dynamic>.from(data);
+    final aId = map['announcement_id']?.toString();
+    if (aId != null && aId != announcementId) return;
+    proposalStatus.value = (map['status'] as num?)?.toInt();
+    agreementUrl.value = map['agreement_url']?.toString();
+  }
+
+  void _onProposalIgnore(dynamic data) {
+    debugPrint('Proposal socket event: ${_msg(data)}');
+  }
+
+  void approveProposal() {
+    _socket.emit(ChatEvents.proposalStatusUpdate, {
+      'announcement_id': announcementId,
+      'recipient_id': recipientId,
+      'status': 1,
+    });
+  }
+
+  void rejectProposal() {
+    _socket.emit(ChatEvents.proposalStatusUpdate, {
+      'announcement_id': announcementId,
+      'recipient_id': recipientId,
+      'status': 2,
+    });
+  }
+
+  void brokerAcceptProposal() {
+    _socket.emit(ChatEvents.proposalBrokerAccept, {
+      'announcement_id': announcementId,
+    });
+  }
+
   // ── Helpers ──
   void _sortByTime() {
     messages.sort((a, b) {
@@ -241,6 +331,12 @@ class ChatController extends GetxController {
       ..off(ChatEvents.history, _onHistory)
       ..off(ChatEvents.historyError, _onHistoryError)
       ..off(ChatEvents.typing, _onTyping)
+      ..off(ChatEvents.proposalStatus, _onProposalStatus)
+      ..off(ChatEvents.proposalStatusError, _onProposalIgnore)
+      ..off(ChatEvents.proposalStatusUpdate, _onProposalStatus)
+      ..off(ChatEvents.proposalStatusUpdateError, _onProposalIgnore)
+      ..off(ChatEvents.proposalBrokerAccept, _onProposalStatus)
+      ..off(ChatEvents.proposalBrokerAcceptError, _onProposalIgnore)
       ..off('error', _onSocketError);
     super.onClose();
   }

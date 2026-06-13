@@ -185,6 +185,11 @@ class _AnnouncementConversationsViewState
       debugPrint('⚠️ [Chat] Skipping self-chat: peer=$peerId == me=$myId');
       return;
     }
+    // Compute chat-context user_role so the server's directional history lookup
+    // works when the announcement owner opens chat (see ChatController.userRole).
+    final isOwner = myId.isNotEmpty && widget.meeting.announcement.userId == myId;
+    final annRole = widget.meeting.announcement.userRole ?? 2;
+    final chatUserRole = isOwner ? annRole : (3 - annRole);
     // Clear the unread badge immediately for snappy UX — the server will
     // confirm via chat:history when the chat screen loads.
     _ctrl.markRead(peerId);
@@ -193,6 +198,7 @@ class _AnnouncementConversationsViewState
       brokerName: peer.name ?? 'User',
       brokerAvatar: peer.profileImageUrl,
       peerUserId: peerId,
+      userRole: chatUserRole,
     );
     if (!mounted) return;
     // Tiny delay so the server has time to persist the just-sent message

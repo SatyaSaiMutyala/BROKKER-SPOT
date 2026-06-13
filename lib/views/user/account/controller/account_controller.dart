@@ -4,6 +4,7 @@ import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/views/auth/view/welcome_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
@@ -46,9 +47,12 @@ class AccountController extends GetxController {
       await FirebaseAuth.instance.signOut();
 
       // Clear all local storage (preserves last_side)
+      debugPrint('🔑 [Logout] Before clearAll — JWT user=${LocalStorageService.getUserIdFromToken() ?? "null"}  token=${LocalStorageService.getAccessToken()?.substring(0, 20) ?? "null"}...');
       await LocalStorageService.clearAll();
+      debugPrint('🔑 [Logout] After clearAll — token=${LocalStorageService.getAccessToken() == null ? "CLEARED ✓" : "STILL SET ⚠️"}');
       // Wipe in-memory + Hive caches + socket so the next account starts clean.
       await clearUserSession();
+      debugPrint('🔑 [Logout] clearUserSession() done — socket destroyed');
 
       Get.offAll(() => WelcomeView());
     } catch (e, s) {
@@ -56,7 +60,9 @@ class AccountController extends GetxController {
       print(s);
       await LocalStorageService.saveLastSide(side);
       await FirebaseAuth.instance.signOut();
+      debugPrint('🔑 [Logout/catch] Before clearAll — token=${LocalStorageService.getAccessToken()?.substring(0, 20) ?? "null"}...');
       await LocalStorageService.clearAll();
+      debugPrint('🔑 [Logout/catch] After clearAll — token=${LocalStorageService.getAccessToken() == null ? "CLEARED ✓" : "STILL SET ⚠️"}');
       await clearUserSession();
       Get.offAll(() => WelcomeView());
     } finally {

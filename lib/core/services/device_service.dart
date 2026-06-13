@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:brokkerspot/core/common_widget/api_service.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -11,13 +12,19 @@ class DeviceService {
   static Future<String?> _getFcmToken() async {
     try {
       if (Platform.isIOS) {
-        // Permission is requested on the home screen — just check if APNS
-        // token is already available (returns null if permission not yet granted).
-        final apns = await FirebaseMessaging.instance.getAPNSToken();
+        // After permission is granted, Apple takes 1-3 seconds to assign the
+        // APNS token. Retry for up to ~5 seconds before giving up so we don't
+        // miss registration on a first TestFlight install.
+        String? apns;
+        for (int i = 0; i < 5 && apns == null; i++) {
+          apns = await FirebaseMessaging.instance.getAPNSToken();
+          if (apns == null) await Future.delayed(const Duration(seconds: 1));
+        }
         if (apns == null) {
-          debugPrint('APNS token not available (permission not granted yet)');
+          debugPrint('APNS token not available after retries (permission not granted?)');
           return null;
         }
+        debugPrint('APNS token available: ${apns.substring(0, 8)}...');
       }
       return await FirebaseMessaging.instance.getToken();
     } catch (e) {
@@ -30,13 +37,20 @@ class DeviceService {
     final fcmToken = await _getFcmToken();
     if (fcmToken == null) {
       debugPrint('Device registration: FCM token null, waiting for onTokenRefresh...');
+      // Fallback: listen for the next token change (fires when APNS becomes
+      // available for the first time). Guard with isLoggedIn() so the API
+      // call doesn't go out with no auth token if the user isn't signed in yet.
       FirebaseMessaging.instance.onTokenRefresh.first.then((token) {
-        debugPrint('Device registration: token refreshed, registering now');
-        _sendRegistration(token);
+        if (LocalStorageService.isLoggedIn()) {
+          debugPrint('Device registration: token refreshed, registering now');
+          _sendRegistration(token);
+        } else {
+          debugPrint('Device registration: token refreshed but not logged in, skipping');
+        }
       });
       return;
     }
-    debugPrint('Device registration: calling API with token $fcmToken');
+    debugPrint('Device registration: calling API with token ${fcmToken.substring(0, 12)}...');
     await _sendRegistration(fcmToken);
   }
 

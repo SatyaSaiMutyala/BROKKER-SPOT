@@ -70,9 +70,13 @@ class LoginController extends GetxController {
           await LocalStorageService.saveRefreshToken(user.refreshToken);
           await LocalStorageService.saveUser(loginModel);
 
+          debugPrint('🔑 [Login] token saved — JWT user=${LocalStorageService.getUserIdFromToken()} name=${user.name}');
+          debugPrint('🔑 [Login] calling socket shutdown...');
           // Restart socket with the fresh token so chat uses the correct identity.
           SocketService.to.shutdown();
+          debugPrint('🔑 [Login] calling socket connect() — stored_user=${LocalStorageService.getUserIdFromToken()}');
           SocketService.to.connect();
+          debugPrint('🔑 [Login] socket connect() returned');
 
           AppToast.success(loginModel.message);
 

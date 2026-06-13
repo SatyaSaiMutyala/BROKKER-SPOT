@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/models/chat_message.dart';
@@ -17,12 +18,19 @@ class AnnouncementChatView extends StatefulWidget {
   /// The other user's id — used to show their online/offline status.
   final String? peerUserId;
 
+  /// Chat-context role for the socket user: 1=user/owner side, 2=broker side.
+  /// Passed to ChatController and included in socket events so the server's
+  /// directional history lookup works when the announcement owner is the one
+  /// opening chat (e.g. user replies to a broker who initiated).
+  final int? userRole;
+
   const AnnouncementChatView({
     super.key,
     required this.announcementId,
     required this.brokerName,
     required this.brokerAvatar,
     this.peerUserId,
+    this.userRole,
   });
 
   /// Reusable entry point — call this from anywhere chat is opened.
@@ -31,6 +39,7 @@ class AnnouncementChatView extends StatefulWidget {
     required String brokerName,
     String? brokerAvatar,
     String? peerUserId,
+    int? userRole,
   }) async {
     // Empty (not just null) avatar strings would crash Image.asset(''), so
     // normalize to the fallback asset here.
@@ -47,6 +56,7 @@ class AnnouncementChatView extends StatefulWidget {
             brokerName: brokerName.isNotEmpty ? brokerName : 'Chat',
             brokerAvatar: avatar,
             peerUserId: peerUserId,
+            userRole: userRole,
           ));
     } catch (e) {
       Get.snackbar('Chat', "Couldn't open chat. Please try again.",
@@ -88,6 +98,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
         recipientId: recipientId,
         peerName: widget.brokerName,
         peerAvatar: widget.brokerAvatar,
+        userRole: widget.userRole,
       ),
       tag: _tag,
     );
@@ -168,6 +179,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           children: [
             SizedBox(height: topPadding),
             _buildHeader(),
+            Obx(() => _buildProposalBanner()),
             Expanded(
               child: Container(
                 color: Colors.grey.shade50,
@@ -223,6 +235,275 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     );
   }
 
+  // ── Proposal banner ──
+  Widget _buildProposalBanner() {
+    final status = _chat.proposalStatus.value;
+    if (status == null) return const SizedBox.shrink();
+
+    final isOwner = (widget.userRole ?? 1) == 1;
+
+    String text;
+    Widget? button;
+
+    if (isOwner) {
+      switch (status) {
+        case 0:
+          text = 'Authorize a broker to advertise your property.';
+          button = _bannerButton(
+            icon: Icons.article_outlined,
+            label: 'View Contract',
+            onTap: _showTermsDialog,
+            filled: false,
+          );
+        case 1:
+          text = 'Signed by you. Awaiting broker signature.';
+          button = _bannerButton(
+            icon: Icons.check_circle_outline,
+            label: 'Awaiting',
+            onTap: null,
+            color: AppColors.primary,
+            filled: true,
+          );
+        case 2:
+          text = 'You declined this proposal.';
+          button = null;
+        case 3:
+          text = 'Contract signed. The broker can now advertise your property.';
+          button = _bannerButton(
+            icon: Icons.article_outlined,
+            label: 'Information',
+            onTap: _openAgreement,
+            color: Colors.green.shade700,
+            filled: true,
+          );
+        default:
+          return const SizedBox.shrink();
+      }
+    } else {
+      switch (status) {
+        case 0:
+          text = 'Awaiting owner approval of your proposal.';
+          button = null;
+        case 1:
+          text = 'Owner approved your proposal. Sign to confirm.';
+          button = _bannerButton(
+            icon: Icons.draw_outlined,
+            label: 'Sign & Accept',
+            onTap: _chat.brokerAcceptProposal,
+            color: Colors.green.shade700,
+            filled: true,
+          );
+        case 2:
+          text = 'Owner declined this proposal.';
+          button = null;
+        case 3:
+          text = 'Contract signed. You can now advertise this property.';
+          button = _bannerButton(
+            icon: Icons.article_outlined,
+            label: 'Information',
+            onTap: _openAgreement,
+            color: Colors.green.shade700,
+            filled: true,
+          );
+        default:
+          return const SizedBox.shrink();
+      }
+    }
+
+    return Container(
+      width: double.infinity,
+      color: AppColors.backgroundDark,
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.inter(fontSize: 12.sp, color: Colors.white),
+            ),
+          ),
+          if (button != null) ...[SizedBox(width: 12.w), button],
+        ],
+      ),
+    );
+  }
+
+  Widget _bannerButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    Color color = Colors.white,
+    bool filled = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: filled ? color : Colors.transparent,
+          border: Border.all(color: filled ? color : Colors.white70),
+          borderRadius: BorderRadius.circular(6.r),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13.sp, color: Colors.white),
+            SizedBox(width: 4.w),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11.sp,
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTermsDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.88,
+          decoration: const BoxDecoration(
+            color: AppColors.backgroundDark,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: EdgeInsets.only(top: 10.h),
+                width: 40.w,
+                height: 4.h,
+                decoration: BoxDecoration(
+                  color: Colors.white30,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 20.h),
+                child: Image.asset('assets/images/appLogo.png',
+                    height: 44.h,
+                    errorBuilder: (_, __, ___) => Text('brokker',
+                        style: GoogleFonts.poppins(
+                            fontSize: 22.sp,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold))),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20.w),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'BrokerSpot Terms & conditions.',
+                    style: GoogleFonts.poppins(
+                      fontSize: 17.sp,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 12.h),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: 20.w),
+                  child: Text(
+                    'By authorizing a broker to advertise your property on BrokerSpot, '
+                    'you agree that the broker may list and promote your property to '
+                    'potential buyers and tenants through the platform. You confirm that '
+                    'you are the authorized owner or representative of the property and '
+                    'that all information provided is accurate.\n\n'
+                    'The broker is authorized to negotiate on your behalf within the '
+                    'parameters you have agreed upon. BrokerSpot acts solely as an '
+                    'intermediary platform and is not a party to any agreement between '
+                    'you and the broker.\n\n'
+                    'This authorization remains valid until you withdraw it or the '
+                    'listing period expires. You may revoke this authorization at any '
+                    'time by contacting BrokerSpot support or through the app settings.\n\n'
+                    'BrokerSpot reserves the right to remove listings that violate '
+                    'platform policies. Both parties are responsible for compliance '
+                    'with applicable real estate laws and regulations.',
+                    style: GoogleFonts.inter(
+                        fontSize: 13.sp, color: Colors.white70, height: 1.6),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 8.h),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _chat.approveProposal();
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    height: 50.h,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.white70),
+                      borderRadius: BorderRadius.circular(30.r),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'I Accept',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16.sp,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 24.h),
+                child: RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    style: GoogleFonts.inter(
+                        fontSize: 11.sp, color: Colors.white54),
+                    children: [
+                      const TextSpan(
+                          text:
+                              'By clicking on I Accept button, you agree to brokkerspot '),
+                      TextSpan(
+                        text: 'Terms & conditions',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openAgreement() async {
+    final url = _chat.agreementUrl.value;
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Agreement document not available yet.')));
+      return;
+    }
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   // ── Header ──
   Widget _buildHeader() {
     return Container(
@@ -232,7 +513,8 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
         children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: Icon(Icons.arrow_back_ios_new, size: 20.sp, color: Colors.white),
+            child: Icon(Icons.arrow_back_ios_new,
+                size: 20.sp, color: Colors.white),
           ),
           SizedBox(width: 20.w),
           ClipOval(child: _headerAvatar()),
@@ -362,7 +644,8 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                 height: 46.w,
                 decoration: const BoxDecoration(
                     color: AppColors.teal, shape: BoxShape.circle),
-                child: Icon(Icons.send_rounded, color: Colors.white, size: 30.sp),
+                child:
+                    Icon(Icons.send_rounded, color: Colors.white, size: 30.sp),
               ),
             ),
           ],

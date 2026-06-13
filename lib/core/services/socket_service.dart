@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -38,6 +39,7 @@ class SocketService extends GetxService {
   /// Opens the connection. Idempotent — safe to call from many screens.
   void connect() {
     final currentToken = LocalStorageService.getAccessToken() ?? '';
+    _log('connect() ▶ stored_user=${_uid(currentToken)}  socket_built_for=${_uid(_socketToken)}');
 
     // Never connect with an empty token: connecting without auth can cause the
     // server to associate this socket with a previous user's session (if it
@@ -55,10 +57,11 @@ class SocketService extends GetxService {
       // credentials. This catches the case where shutdown()'s dispose() threw
       // and left _socket non-null pointing at the previous user's socket.
       if (_socketToken != currentToken) {
-        _log('token mismatch — rebuilding socket for new account');
+        _log('⚠️ token mismatch — rebuilding: socket_user=${_uid(_socketToken)} → new_user=${_uid(currentToken)}');
         _forceShutdown();
         // Fall through to create a fresh socket below.
       } else {
+        _log('connect() reusing existing socket for user=${_uid(currentToken)}');
         if (!_socket!.connected) _socket!.connect();
         return;
       }
@@ -101,8 +104,13 @@ class SocketService extends GetxService {
   /// queued and flushed once the connection is established — so events fired
   /// during the handshake aren't lost.
   void emit(String event, dynamic data) {
+    final storedUser = _uid(LocalStorageService.getAccessToken());
+    final socketUser = _uid(_socketToken);
+    if (storedUser != socketUser) {
+      _log('⚠️⚠️ ACCOUNT MISMATCH at emit "$event" — HTTP_user=$storedUser but socket_user=$socketUser — chat will fail!');
+    }
     if (isReady) {
-      _log('emit "$event" -> $data');
+      _log('emit "$event" [socket_user=$socketUser] -> $data');
       _socket!.emit(event, data);
     } else {
       _log('queued "$event" (socket not ready) -> $data');
@@ -148,6 +156,7 @@ class SocketService extends GetxService {
   /// throws, _socket is already null and connect() won't try to reuse the
   /// stale socket (which would reconnect with the old account's credentials).
   void _forceShutdown() {
+    _log('_forceShutdown() — destroying socket for user=${_uid(_socketToken)}  (was connected=${_socket?.connected})');
     final old = _socket;
     _socket = null;
     _socketToken = null;
@@ -156,6 +165,28 @@ class SocketService extends GetxService {
       old?.dispose();
     } catch (e) {
       _log('dispose error (ignored): $e');
+    }
+    _log('_forceShutdown() complete — _socket=null _socketToken=null');
+  }
+
+  /// Decodes a JWT token and returns the first 8 chars of the user ID,
+  /// or "null" if the token is empty/invalid. Used for diagnostic logs only.
+  String _uid(String? token) {
+    if (token == null || token.isEmpty) return 'null';
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return 'bad-jwt';
+      var payload = parts[1];
+      switch (payload.length % 4) {
+        case 2: payload += '=='; break;
+        case 3: payload += '='; break;
+        default: break;
+      }
+      final data = jsonDecode(utf8.decode(base64Url.decode(payload))) as Map<String, dynamic>;
+      final id = data['id']?.toString() ?? data['_id']?.toString() ?? data['sub']?.toString() ?? '?';
+      return id.length > 8 ? '${id.substring(0, 8)}…' : id;
+    } catch (_) {
+      return 'decode-err';
     }
   }
 

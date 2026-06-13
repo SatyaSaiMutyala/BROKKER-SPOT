@@ -42,4 +42,20 @@ class ChatEvents {
   /// BE → FE error for the above. Payload: { message }
   static const String announcementConversationsError =
       'chat:announcement:conversations:error';
+
+  // ── Proposal ──
+  /// FE → BE + BE → FE response (same name). Request: { announcement_id, recipient_id }
+  /// Response: { _id, announcement_id, status, agreement_url } or null if no proposal.
+  static const String proposalStatus = 'announcement:proposal:status';
+  static const String proposalStatusError = 'announcement:proposal:status:error';
+
+  /// Owner approve/reject. FE → BE: { announcement_id, recipient_id, status (1=approve, 2=reject) }
+  /// BE → FE success + real-time broadcast: { _id, announcement_id, status, agreement_url }
+  static const String proposalStatusUpdate = 'announcement:proposal:status:update';
+  static const String proposalStatusUpdateError = 'announcement:proposal:status:update:error';
+
+  /// Broker accept. FE → BE: { announcement_id }  (status must be 1)
+  /// BE → FE success + real-time broadcast: { _id, announcement_id, user_id, status, agreement_url }
+  static const String proposalBrokerAccept = 'announcement:proposal:broker:accept';
+  static const String proposalBrokerAcceptError = 'announcement:proposal:broker:accept:error';
 }
