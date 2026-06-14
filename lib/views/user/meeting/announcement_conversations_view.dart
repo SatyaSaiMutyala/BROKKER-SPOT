@@ -175,23 +175,33 @@ class _AnnouncementConversationsViewState
   Future<void> _openChat(ConversationItem c) async {
     final peer = c.user;
     final peerId = peer.id ?? '';
-    if (peerId.isEmpty) return;
-    // Safety guard: skip if we somehow ended up with our own ID as the peer.
-    // Use the JWT token as the source of truth — more reliable than user_data
-    // which may be stale after an account switch.
     final myId = LocalStorageService.getUserIdFromToken() ??
         LocalStorageService.getUser()?.data?.id ?? '';
-    if (myId.isNotEmpty && peerId == myId) {
-      debugPrint('⚠️ [Chat] Skipping self-chat: peer=$peerId == me=$myId');
+
+    debugPrint('💬 [Conversations] _openChat ann=${widget.meeting.announcementId}');
+    debugPrint('💬 [Conversations]   myId=$myId  peerId=$peerId  peerName=${peer.name}');
+    debugPrint('💬 [Conversations]   ann.userId=${widget.meeting.announcement.userId}');
+
+    if (peerId.isEmpty) {
+      debugPrint('💬 [Conversations]   ✗ peerId empty, aborting');
       return;
     }
-    // Compute chat-context user_role so the server's directional history lookup
-    // works when the announcement owner opens chat (see ChatController.userRole).
+    if (myId.isNotEmpty && peerId == myId) {
+      debugPrint('💬 [Conversations]   ✗ self-chat detected: peer==me=$myId');
+      // This means chat:announcement:conversations returned our own profile —
+      // we are NOT the announcement owner. The owner path should have been
+      // taken instead; this is a routing bug upstream.
+      return;
+    }
+    // Use the user_role stored on the last_message if the server gave us one
+    // — that's the exact value chat:history needs for a first-attempt hit.
+    // Fall back to computing from the announcement role.
     final isOwner = myId.isNotEmpty && widget.meeting.announcement.userId == myId;
     final annRole = widget.meeting.announcement.userRole ?? 2;
-    final chatUserRole = isOwner ? annRole : (3 - annRole);
-    // Clear the unread badge immediately for snappy UX — the server will
-    // confirm via chat:history when the chat screen loads.
+    final computedRole = isOwner ? annRole : (3 - annRole);
+    final chatUserRole = c.lastMessageUserRole ?? computedRole;
+    debugPrint('💬 [Conversations]   chatUserRole=$chatUserRole (lmRole=${c.lastMessageUserRole} computed=$computedRole)');
+    // Clear the unread badge immediately for snappy UX.
     _ctrl.markRead(peerId);
     await AnnouncementChatView.open(
       announcementId: widget.meeting.announcementId,

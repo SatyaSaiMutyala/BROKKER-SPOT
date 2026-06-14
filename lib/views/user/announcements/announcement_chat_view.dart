@@ -192,11 +192,25 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                     return Center(
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 28.w),
-                        child: Text(
-                          _chat.error.value,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
-                              fontSize: 13.sp, color: Colors.grey.shade600),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              "Couldn't load message history.\nYou can still send a new message below.",
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                  fontSize: 13.sp, color: Colors.grey.shade600),
+                            ),
+                            SizedBox(height: 12.h),
+                            TextButton.icon(
+                              onPressed: _chat.reloadHistory,
+                              icon: const Icon(Icons.refresh, size: 16),
+                              label: Text('Retry',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 13.sp,
+                                      color: AppColors.primary)),
+                            ),
+                          ],
                         ),
                       ),
                     );

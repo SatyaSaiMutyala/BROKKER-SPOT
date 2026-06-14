@@ -45,12 +45,25 @@ class ChatController extends GetxController {
   bool get hasMore => _hasMore;
   bool _loadingMore = false;
 
-  // Retry sequence for chat:history when the server rejects the request.
-  // Different server states need different user_role values; we try all in order:
-  //   0 = user_role:1  (initiator always contacts in user mode)
-  //   1 = user_role:2  (owner replied in broker mode — the server may key on this)
-  //   2 = no user_role (server default fallback)
   int _historyAttempt = 0;
+  // Set to true when all chat:history attempts fail. Cleared when a sent
+  // message is confirmed — at that point the server has a record for us as
+  // sender, so a fresh history load should succeed.
+  bool _historyFailed = false;
+
+  // Static slot: the last send-error message from ANY ChatController instance.
+  // Written on _onMessageError, read+cleared by _openChat after the route
+  // closes (the controller is already gone by then, so a static is needed).
+  static String? _lastSendError;
+
+  /// Returns the last send error and clears the slot. Call once after the
+  /// chat route closes to check whether a fatal error occurred (e.g.
+  /// "Cannot send a message to yourself").
+  static String? consumeLastSendError() {
+    final e = _lastSendError;
+    _lastSendError = null;
+    return e;
+  }
 
   // Proposal state — null means no proposal exists yet for this conversation.
   final RxnInt proposalStatus = RxnInt();
@@ -64,6 +77,8 @@ class ChatController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _lastSendError = null; // clear any stale error from the previous chat
+    debugPrint('🔌 [Chat] init ann=$announcementId recipient=$recipientId userRole=$userRole');
     _socket.connect();
     _socket
       ..on(ChatEvents.message, _onMessage)
@@ -94,14 +109,13 @@ class ChatController extends GetxController {
   // ── History ──
   void _requestHistory({required int page}) {
     if (page == 1) isLoadingHistory.value = true;
-    // The server's directional lookup for chat:history is sensitive to user_role.
-    // We don't know which value the server needs (depends on which role was used
-    // when the conversation was initiated and how the server indexed it). We try
-    // three variants in sequence on error: user_role=1, user_role=2, no user_role.
+    // Start with the computed chat-context role (most likely to be correct),
+    // then try the opposite, then omit user_role entirely as a last resort.
+    final int otherRole = (userRole == 1) ? 2 : 1;
     final int? roleToSend = switch (_historyAttempt) {
-      0 => 1,
-      1 => 2,
-      _ => null,  // attempt 2+ = no user_role
+      0 => userRole,         // best guess: the role derived from the announcement
+      1 => otherRole,        // opposite role
+      _ => null,             // no user_role (server default fallback)
     };
     final payload = <String, dynamic>{
       'recipient_id': recipientId,
@@ -110,9 +124,8 @@ class ChatController extends GetxController {
       'perPage': _perPage,
       if (roleToSend != null) 'user_role': roleToSend,
     };
+    debugPrint('🔄 [Chat] chat:history attempt=$_historyAttempt user_role=$roleToSend recipient=$recipientId ann=$announcementId');
     _socket.emit(ChatEvents.history, payload);
-    // Safety net: if the server never replies (e.g. socket gets booted by an
-    // auth error), don't spin the loader forever.
     _historyTimeout?.cancel();
     _historyTimeout = Timer(const Duration(seconds: 8), () {
       if (isLoadingHistory.value || _loadingMore) {
@@ -126,6 +139,13 @@ class ChatController extends GetxController {
     });
   }
 
+  /// Reset and retry history from scratch — call from UI retry button.
+  void reloadHistory() {
+    _historyAttempt = 0;
+    error.value = '';
+    _requestHistory(page: 1);
+  }
+
   /// Loads the next older page (call when the user scrolls to the top).
   void loadMore() {
     if (!_hasMore || _loadingMore) return;
@@ -136,25 +156,30 @@ class ChatController extends GetxController {
   void _onHistory(dynamic data) {
     if (data is! Map) return;
     final map = Map<String, dynamic>.from(data);
-    // Only handle history for this conversation.
     final aId = (map['announcement_id'])?.toString();
     if (aId != null && aId != announcementId) return;
 
     _page = (map['page'] as num?)?.toInt() ?? _page;
     _hasMore = map['has_more'] == true;
+    _historyFailed = false;
 
     final rawList = (map['messages'] as List?) ?? const [];
-    final older = rawList
+    final fromServer = rawList
         .whereType<Map<String, dynamic>>()
-        .map((e) => ChatMessage.fromJson(e, currentUserId: _currentUserId))
+        .map((e) => ChatMessage.fromJson(e,
+            currentUserId: _currentUserId, peerUserId: recipientId))
         .toList();
 
-    // Server returns newest-first or oldest-first? We sort by createdAt asc so
-    // the newest is at the bottom regardless.
     if (_page <= 1) {
-      messages.assignAll(older);
+      // Merge: keep any locally-confirmed messages that aren't in the server
+      // response yet (e.g. a message sent moments before this history loaded).
+      final serverIds = fromServer.map((m) => m.id).whereType<String>().toSet();
+      final localOnly = messages
+          .where((m) => m.id != null && !serverIds.contains(m.id))
+          .toList();
+      messages.assignAll([...fromServer, ...localOnly]);
     } else {
-      messages.insertAll(0, older); // older pages go on top
+      messages.insertAll(0, fromServer);
     }
     _sortByTime();
     isLoadingHistory.value = false;
@@ -164,16 +189,27 @@ class ChatController extends GetxController {
 
   void _onHistoryError(dynamic data) {
     _historyTimeout?.cancel();
-    // Retry with the next user_role variant before giving up.
-    // Attempts: 0=user_role:1, 1=user_role:2, 2=no user_role, 3+=give up.
+    debugPrint('❌ [Chat] chat:history:error attempt=$_historyAttempt data=$data');
     if (_historyAttempt < 2 && messages.isEmpty) {
       _historyAttempt++;
       _requestHistory(page: 1);
       return;
     }
+    debugPrint('❌ [Chat] all 3 chat:history attempts failed — recipient=$recipientId ann=$announcementId');
     isLoadingHistory.value = false;
     _loadingMore = false;
-    error.value = _msg(data) ?? 'Failed to load chat history';
+    _historyFailed = true;
+    final serverMsg = _msg(data) ?? '';
+    // "Invalid recipient_id." means the server has no record where the current
+    // user was the sender in this conversation — treat it as an empty chat
+    // (the other side may have messages but the server doesn't support
+    // recipient-side lookup). Showing a hard error here is misleading; the
+    // user can still send a message to start / continue the conversation.
+    if (serverMsg.toLowerCase().contains('invalid recipient')) {
+      error.value = '';   // show "No messages yet. Say hello" UI instead
+    } else {
+      error.value = serverMsg.isNotEmpty ? serverMsg : 'Failed to load chat history';
+    }
   }
 
   // ── Receiving ──
@@ -182,6 +218,7 @@ class ChatController extends GetxController {
     final msg = ChatMessage.fromJson(
       Map<String, dynamic>.from(data),
       currentUserId: _currentUserId,
+      peerUserId: recipientId,
     );
     if (msg.announcementId != null && msg.announcementId != announcementId) {
       return;
@@ -195,6 +232,15 @@ class ChatController extends GetxController {
       if (idx != -1) {
         messages[idx] = msg;
         messages.refresh();
+        // History failed earlier (we were only a message recipient, not sender).
+        // Now that the server confirmed our outgoing message, it has a record
+        // for us as sender — history should succeed on this fresh attempt.
+        if (_historyFailed) {
+          _historyFailed = false;
+          error.value = '';
+          _historyAttempt = 0;
+          _requestHistory(page: 1);
+        }
         return;
       }
     }
@@ -203,7 +249,23 @@ class ChatController extends GetxController {
   }
 
   void _onMessageError(dynamic data) {
-    error.value = _msg(data) ?? 'Failed to send message';
+    final msg = _msg(data) ?? 'Failed to send message';
+    _lastSendError = msg;
+    messages.removeWhere((m) => m.id == null && m.isMine);
+
+    // "yourself" is a known server-side socket session bug: after logout→login
+    // on the same device, the server sometimes authenticates the new socket with
+    // the previous user's identity. Force-rebuild the socket so the next send
+    // attempt uses a fresh server session, then prompt the user to retry.
+    if (msg.toLowerCase().contains('yourself')) {
+      debugPrint('⚠️ [Chat] "yourself" error — forcing socket rebuild for fresh session');
+      _socket.shutdown();
+      _socket.connect();
+      error.value = 'Connection refreshed — please send again.';
+      return;
+    }
+
+    error.value = msg;
   }
 
   // ── Sending ──

@@ -7,29 +7,36 @@ class ConversationItem {
   final String? lastMessage;
   final DateTime? lastMessageAt;
   final int unseenCount;
+  /// The user_role stored on the last message — tells chat:history which
+  /// direction to search on the first attempt instead of needing a retry.
+  final int? lastMessageUserRole;
 
   const ConversationItem({
     required this.user,
     this.lastMessage,
     this.lastMessageAt,
     this.unseenCount = 0,
+    this.lastMessageUserRole,
   });
 
   factory ConversationItem.fromJson(Map<String, dynamic> json) {
     final last = json['last_message'];
     String? text;
     DateTime? at;
+    int? lmUserRole;
     if (last is Map<String, dynamic>) {
       text = (last['message'] ?? last['text'])?.toString();
       final ts = last['created_at'] ?? last['createdAt'] ?? last['timestamp'];
       if (ts != null) at = DateTime.tryParse(ts.toString());
+      lmUserRole = (last['user_role'] as num?)?.toInt();
     } else if (last is String) {
       text = last;
     }
 
     // Server may send the peer's profile under 'user' (older shape) or
-    // 'profile' (broker-side conversations). Both represent the PEER directly.
-    // The top-level 'user_id' is also the peer's id (matches profile._id).
+    // 'profile' (newer shape). Both are supposed to represent the PEER.
+    // NOTE: The server has a known bug where it sometimes puts the logged-in
+    // user's own profile here — the controller fixes that after parsing.
     Map<String, dynamic> userJson;
     if (json['user'] is Map<String, dynamic>) {
       userJson = json['user'] as Map<String, dynamic>;
@@ -52,6 +59,7 @@ class ConversationItem {
       lastMessage: text,
       lastMessageAt: at,
       unseenCount: (unseen as num?)?.toInt() ?? 0,
+      lastMessageUserRole: lmUserRole,
     );
   }
 }

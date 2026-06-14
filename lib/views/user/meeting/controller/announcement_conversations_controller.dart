@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/conversation_model.dart';
@@ -60,6 +61,13 @@ class AnnouncementConversationsController extends GetxController {
     super.onClose();
   }
 
+  /// Permanently removes a conversation row from the list. Call this when the
+  /// server refuses to allow the chat (e.g. "Cannot send a message to
+  /// yourself") so the broken row doesn't stay visible.
+  void removePeer(String peerId) {
+    conversations.removeWhere((c) => c.user.id == peerId);
+  }
+
   /// Clears the unseen counter for the conversation with [peerUserId] — call
   /// this right before opening the chat screen so the badge disappears
   /// immediately (the server will mark the messages viewed when chat:history
@@ -89,14 +97,20 @@ class AnnouncementConversationsController extends GetxController {
     final myId = LocalStorageService.getUser()?.data?.id;
     final senderId = map['user_id']?.toString();
     final recipientId = map['recipient_id']?.toString();
-    if (myId == null || senderId == null || recipientId == null) return;
+    if (myId == null || recipientId == null) return;
 
-    // Identify the peer for this row: the participant who isn't me.
-    final peerId = senderId == myId ? recipientId : senderId;
+    // Use recipient_id to determine direction — more reliable than user_id
+    // because the server sometimes stores the wrong user_id but always stores
+    // recipient_id correctly. If recipient is me → message is FROM the peer.
+    final fromPeer = recipientId == myId;
+    // The peer is: sender (if I received) or recipient (if I sent).
+    final peerId = fromPeer ? senderId : recipientId;
+    if (peerId == null || peerId.isEmpty || peerId == myId) return;
     final text = map['message']?.toString();
     final at = DateTime.tryParse(map['created_at']?.toString() ?? '') ??
         DateTime.now();
-    final fromPeer = senderId != myId;
+
+    final userRole = (map['user_role'] as num?)?.toInt();
 
     final idx = conversations.indexWhere((c) => c.user.id == peerId);
     if (idx == -1) {
@@ -107,6 +121,7 @@ class AnnouncementConversationsController extends GetxController {
         lastMessage: text,
         lastMessageAt: at,
         unseenCount: fromPeer ? 1 : 0,
+        lastMessageUserRole: userRole,
       ));
       final list = [fresh, ...conversations];
       _sortByLatest(list);
@@ -119,6 +134,9 @@ class AnnouncementConversationsController extends GetxController {
       lastMessage: text ?? existing.lastMessage,
       lastMessageAt: at,
       unseenCount: fromPeer ? existing.unseenCount + 1 : existing.unseenCount,
+      // Preserve (and update) lastMessageUserRole so _openChat doesn't fall
+      // back to the computed role when the user taps before reload() finishes.
+      lastMessageUserRole: userRole ?? existing.lastMessageUserRole,
     );
     // Reassign with the updated entry first so the row jumps to the top
     // immediately — then a defensive sort guarantees correct order even if
@@ -157,22 +175,72 @@ class AnnouncementConversationsController extends GetxController {
   void _onResponse(dynamic data) {
     if (data is! Map) return;
     final map = Map<String, dynamic>.from(data);
-    // Only handle the payload for THIS announcement (server may multiplex).
     final aId = map['announcement_id']?.toString();
     if (aId != null && aId != announcementId) return;
 
+    final myId = LocalStorageService.getUserIdFromToken() ??
+        LocalStorageService.getUser()?.data?.id;
+
     // Accept several common list keys defensively.
-    final raw = (map['conversations'] as List?) ??
+    final rawList = (map['conversations'] as List?) ??
         (map['data'] as List?) ??
         (map['chat_profiles'] as List?) ??
         const [];
-    final parsed = raw
-        .whereType<Map<String, dynamic>>()
+    final rawMaps = rawList.whereType<Map<String, dynamic>>().toList();
+
+    final parsed = rawMaps
         .map(ConversationItem.fromJson)
-        .map(_enrich) // <- fill in user.id/name/avatar from knownProfiles
+        .map(_enrich)
         .toList();
+
+    // Backend bug: chat:announcement:conversations sometimes puts the
+    // logged-in user's own profile in conversation[].profile instead of the
+    // peer's profile. Recover the real peer from last_message.
+    if (myId != null) {
+      for (int i = 0; i < parsed.length && i < rawMaps.length; i++) {
+        if (parsed[i].user.id != myId) continue;
+        final lm = rawMaps[i]['last_message'] as Map?;
+        if (lm == null) continue;
+        final lmSenderId = lm['user_id']?.toString();
+        final lmRecipientId = lm['recipient_id']?.toString();
+        // The real peer is whichever participant is NOT the logged-in user.
+        final peerId = (lmSenderId != myId) ? lmSenderId : lmRecipientId;
+        if (peerId == null || peerId.isEmpty || peerId == myId) continue;
+        final knownProfile =
+            knownProfiles.firstWhereOrNull((p) => p.id == peerId);
+        final peerProfile = knownProfile ?? ChatProfileSummary(id: peerId);
+        debugPrint(
+            '⚡ [Conversations] fixed self-profile bug: real peer=$peerId name=${peerProfile.name}');
+        parsed[i] = ConversationItem(
+          user: peerProfile,
+          lastMessage: parsed[i].lastMessage,
+          lastMessageAt: parsed[i].lastMessageAt,
+          unseenCount: parsed[i].unseenCount,
+          lastMessageUserRole: parsed[i].lastMessageUserRole,
+        );
+      }
+    }
+
+    // Merge: add any knownProfiles the server didn't return (e.g. participants
+    // who haven't sent a message yet). Without this, after the user sends a
+    // message and _onResponse fires with only 1 conversation, the other rows
+    // that were shown via knownProfiles get wiped.
+    if (knownProfiles.isNotEmpty) {
+      final existingIds =
+          parsed.map((c) => c.user.id).whereType<String>().toSet();
+      for (final p in knownProfiles) {
+        if (p.id == null || p.id!.isEmpty) continue;
+        if (p.id == myId) continue;
+        if (existingIds.contains(p.id)) continue;
+        parsed.add(ConversationItem(user: p));
+        debugPrint(
+            '⚡ [Conversations] kept knownProfile not in server response: ${p.name}(${p.id})');
+      }
+    }
+
     _sortByLatest(parsed);
     conversations.assignAll(parsed);
+
     isLoading.value = false;
     _timeout?.cancel();
   }

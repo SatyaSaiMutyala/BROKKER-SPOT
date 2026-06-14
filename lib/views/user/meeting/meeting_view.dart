@@ -1,6 +1,8 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/meeting_item_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:brokkerspot/views/user/meeting/chat_view.dart';
@@ -63,13 +65,46 @@ class _MeetingViewState extends State<MeetingView> {
     super.dispose();
   }
 
-  /// Push the conversations screen, then refresh on return — so any new
-  /// message bumps the row to the top + updates the unseen badge.
   Future<void> _openConversations(MeetingItem m) async {
-    await Get.to(() => AnnouncementConversationsView(meeting: m));
+    // Use JWT as the authoritative source for the logged-in user's id.
+    final myId = LocalStorageService.getUserIdFromToken() ??
+        LocalStorageService.getUser()?.data?.id ?? '';
+    final isOwner = myId.isNotEmpty && m.announcement.userId == myId;
+
+    debugPrint('📋 [Meeting] tap ann=${m.announcementId}');
+    debugPrint('📋 [Meeting]   myId=$myId  ann.userId=${m.announcement.userId}  isOwner=$isOwner');
+    debugPrint('📋 [Meeting]   chatProfiles=[${m.chatProfiles.map((p) => "${p.name}(${p.id})").join(", ")}]');
+
+    if (isOwner) {
+      // My announcement — show everyone who chatted with me.
+      debugPrint('📋 [Meeting]   → owner path: opening AnnouncementConversationsView');
+      await Get.to(() => AnnouncementConversationsView(meeting: m));
+    } else {
+      // I initiated a chat about someone else's announcement.
+      // chat:announcement:conversations returns MY own profile as the peer in
+      // this case (server perspective is the owner's), so skip it entirely and
+      // go straight to chat with the announcement owner.
+      final peers = myId.isNotEmpty
+          ? m.chatProfiles.where((p) => p.id != myId).toList()
+          : List<ChatProfileSummary>.from(m.chatProfiles);
+      final peer = peers.isNotEmpty ? peers.first : null;
+      final ownerId = peer?.id ?? m.announcement.userId ?? '';
+      if (ownerId.isEmpty || ownerId == myId) {
+        debugPrint('📋 [Meeting]   → non-owner path: no valid peer found, aborting');
+        return;
+      }
+      final annRole = m.announcement.userRole ?? 1;
+      final chatUserRole = 3 - annRole;
+      debugPrint('📋 [Meeting]   → non-owner path: peer=${peer?.name}($ownerId) chatUserRole=$chatUserRole');
+      await AnnouncementChatView.open(
+        announcementId: m.announcementId,
+        brokerName: peer?.name ?? m.announcement.ownerName ?? 'User',
+        brokerAvatar: peer?.profileImageUrl ?? m.announcement.ownerAvatarUrl,
+        peerUserId: ownerId,
+        userRole: chatUserRole,
+      );
+    }
     if (!mounted) return;
-    // Tiny delay so the server has time to commit the latest message before
-    // we re-fetch (same reasoning as the conversations screen).
     await Future.delayed(const Duration(milliseconds: 350));
     if (mounted) _ctrl.load(force: true);
   }

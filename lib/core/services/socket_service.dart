@@ -62,12 +62,14 @@ class SocketService extends GetxService {
         // Fall through to create a fresh socket below.
       } else {
         _log('connect() reusing existing socket for user=${_uid(currentToken)}');
+        _logTokenPayload(currentToken); // log payload on reuse too for diagnosis
         if (!_socket!.connected) _socket!.connect();
         return;
       }
     }
 
     _socketToken = currentToken;
+    _logTokenPayload(currentToken); // print full JWT payload for backend diagnosis
     _socket = io.io(
       _baseUrl,
       io.OptionBuilder()
@@ -76,16 +78,28 @@ class SocketService extends GetxService {
           .disableAutoConnect()
           // Auth is sent both ways so it works whether the server reads it from
           // the handshake `auth` payload or an Authorization header.
+          // Bearer prefix is required by most JWT middleware; without it the
+          // server may skip JWT validation and fall back to a stale session.
           .setAuth({'token': currentToken})
-          .setExtraHeaders({'Authorization': currentToken})
+          .setExtraHeaders({'Authorization': 'Bearer $currentToken'})
           .enableReconnection()
           .build(),
     );
 
     _socket!
       ..onConnect((_) {
+        // Guard: if the stored token changed while we were connecting (e.g.
+        // the user switched accounts mid-handshake), tear down and rebuild
+        // immediately so we never emit on the wrong user's session.
+        final liveToken = LocalStorageService.getAccessToken() ?? '';
+        if (liveToken.isNotEmpty && liveToken != _socketToken) {
+          _log('⚠️ token changed during connect — rebuilding for new user');
+          _forceShutdown();
+          connect();
+          return;
+        }
         isConnected.value = true;
-        _log('connected (${_socket!.id})');
+        _log('connected (${_socket!.id})  socket_user=${_uid(_socketToken)}');
         _flushPending();
       })
       ..onDisconnect((_) {
@@ -155,6 +169,11 @@ class SocketService extends GetxService {
   /// Nulls the socket pointer BEFORE calling dispose so that if dispose()
   /// throws, _socket is already null and connect() won't try to reuse the
   /// stale socket (which would reconnect with the old account's credentials).
+  ///
+  /// Calls disconnect() first to send a proper close packet to the server —
+  /// without this the server keeps the old session alive briefly after the
+  /// client moves on, which can cause "yourself" errors when a new user's
+  /// socket connects to the same server-side rooms before the old one clears.
   void _forceShutdown() {
     _log('_forceShutdown() — destroying socket for user=${_uid(_socketToken)}  (was connected=${_socket?.connected})');
     final old = _socket;
@@ -162,11 +181,44 @@ class SocketService extends GetxService {
     _socketToken = null;
     isConnected.value = false;
     try {
-      old?.dispose();
+      old?.disconnect(); // tell server we're leaving cleanly
+      old?.dispose();    // then free client-side resources
     } catch (e) {
       _log('dispose error (ignored): $e');
     }
     _log('_forceShutdown() complete — _socket=null _socketToken=null');
+  }
+
+  /// Prints every field in the JWT payload so the backend team can see exactly
+  /// which user-identifier field the token carries. The signature is never
+  /// logged (only the header + payload sections, which are base64-encoded but
+  /// not encrypted — no credentials are exposed).
+  void _logTokenPayload(String? token) {
+    if (!kDebugMode) return;
+    if (token == null || token.isEmpty) {
+      _log('token payload: (empty)');
+      return;
+    }
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) {
+        _log('token payload: not a JWT (parts=${parts.length})');
+        return;
+      }
+      var payload = parts[1];
+      switch (payload.length % 4) {
+        case 2: payload += '=='; break;
+        case 3: payload += '='; break;
+        default: break;
+      }
+      final data = jsonDecode(utf8.decode(base64Url.decode(payload))) as Map<String, dynamic>;
+      // Log every field so the backend team can see which one they actually use.
+      final storedUserId = LocalStorageService.getUser()?.data?.id ?? 'n/a';
+      _log('🪪 token payload: $data');
+      _log('🪪 stored user_data.id=$storedUserId  (compare with token fields above)');
+    } catch (e) {
+      _log('token payload: decode error: $e');
+    }
   }
 
   /// Decodes a JWT token and returns the first 8 chars of the user ID,

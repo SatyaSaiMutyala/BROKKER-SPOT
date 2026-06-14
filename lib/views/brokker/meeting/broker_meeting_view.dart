@@ -1,5 +1,7 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/meeting_item_model.dart';
+import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
 import 'package:brokkerspot/views/user/meeting/controller/meeting_controller.dart';
 import 'package:brokkerspot/views/user/meeting/repo/meeting_repo.dart';
@@ -69,7 +71,42 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
   }
 
   Future<void> _onTap(MeetingItem m) async {
-    await Get.to(() => AnnouncementConversationsView(meeting: m));
+    final myId = LocalStorageService.getUserIdFromToken() ??
+        LocalStorageService.getUser()?.data?.id ?? '';
+    final isOwner = myId.isNotEmpty && m.announcement.userId == myId;
+
+    debugPrint('📋 [BrokerMeeting] tap ann=${m.announcementId}');
+    debugPrint('📋 [BrokerMeeting]   myId=$myId  ann.userId=${m.announcement.userId}  isOwner=$isOwner');
+    debugPrint('📋 [BrokerMeeting]   chatProfiles=[${m.chatProfiles.map((p) => "${p.name}(${p.id})").join(", ")}]');
+
+    if (isOwner) {
+      // My announcement — show everyone who chatted with me.
+      debugPrint('📋 [BrokerMeeting]   → owner path: opening AnnouncementConversationsView');
+      await Get.to(() => AnnouncementConversationsView(meeting: m));
+    } else {
+      // I initiated a chat about someone else's announcement — go directly to
+      // chat with the owner. chat:announcement:conversations returns MY own
+      // profile in this case, so skip that screen entirely.
+      final peers = myId.isNotEmpty
+          ? m.chatProfiles.where((p) => p.id != myId).toList()
+          : List<ChatProfileSummary>.from(m.chatProfiles);
+      final peer = peers.isNotEmpty ? peers.first : null;
+      final ownerId = peer?.id ?? m.announcement.userId ?? '';
+      if (ownerId.isEmpty || ownerId == myId) {
+        debugPrint('📋 [BrokerMeeting]   → non-owner path: no valid peer found, aborting');
+        return;
+      }
+      final annRole = m.announcement.userRole ?? 1;
+      final chatUserRole = 3 - annRole;
+      debugPrint('📋 [BrokerMeeting]   → non-owner path: peer=${peer?.name}($ownerId) chatUserRole=$chatUserRole');
+      await AnnouncementChatView.open(
+        announcementId: m.announcementId,
+        brokerName: peer?.name ?? m.announcement.ownerName ?? 'User',
+        brokerAvatar: peer?.profileImageUrl ?? m.announcement.ownerAvatarUrl,
+        peerUserId: ownerId,
+        userRole: chatUserRole,
+      );
+    }
     if (!mounted) return;
     await Future.delayed(const Duration(milliseconds: 350));
     if (mounted) _ctrl.loadBroker(force: true);
