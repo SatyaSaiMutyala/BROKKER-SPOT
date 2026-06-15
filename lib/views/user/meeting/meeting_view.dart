@@ -55,8 +55,13 @@ class _MeetingViewState extends State<MeetingView> {
   @override
   void initState() {
     super.initState();
-    _ctrl.load();
     _precacheWorker = ever(_ctrl.meetings, (_) => _precacheAvatars());
+    // Defer until after the first frame — load()'s sync list.clear() would
+    // otherwise mark a listening Obx dirty while the IndexedStack is still
+    // building this tab post-login (setState-during-build crash).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ctrl.load();
+    });
   }
 
   @override

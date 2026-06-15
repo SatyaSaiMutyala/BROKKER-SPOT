@@ -32,7 +32,7 @@ class BrokerMyInformationController extends GetxController {
   String get email => _profileCtrl.userEmail.value;
   String get phone => _profileCtrl.userMobile.value;
   String get countryCode => _profileCtrl.userCountryCode.value;
-  String get profileImage => _profileCtrl.profileImage.value;
+  String get profileImage => _profileCtrl.brokerProfileImage.value;
   bool get isEmailVerified =>
       _profileCtrl.profileData.value?['isEmailVerified'] ?? false;
   String get bnrNumber =>
@@ -131,7 +131,10 @@ class BrokerMyInformationController extends GetxController {
   Future<void> _updateBasicInfo({required String name, String? imageUrl}) async {
     try {
       final body = <String, dynamic>{'name': name};
-      if (imageUrl != null) body['userProfileImage'] = imageUrl;
+      // Broker avatar is stored in its own backend field so it doesn't
+      // overwrite the user-side avatar (file-upload uses file_type
+      // 'broker-profile-image'; edit-info mirrors that with brokerProfileImage).
+      if (imageUrl != null) body['brokerProfileImage'] = imageUrl;
 
       final response = await putRequest(
         endPoint: '$baseUrl${ApiEndpoints.editInfo}',
@@ -141,7 +144,7 @@ class BrokerMyInformationController extends GetxController {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (json['success'] == true) {
         _profileCtrl.userName.value = name;
-        if (imageUrl != null) _profileCtrl.profileImage.value = imageUrl;
+        if (imageUrl != null) _profileCtrl.brokerProfileImage.value = imageUrl;
         AppToast.success('Updated successfully');
       } else {
         AppToast.error(json['message'] ?? 'Update failed');

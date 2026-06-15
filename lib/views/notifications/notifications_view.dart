@@ -28,8 +28,11 @@ class _NotificationsViewState extends State<NotificationsView> {
   @override
   void initState() {
     super.initState();
-    // Cache-first: no-op when already loaded this session.
-    _ctrl.load();
+    // Defer so load()'s sync Rx mutations can't fire while an ancestor is
+    // still mid-build. Cache-first: still a no-op when already loaded.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ctrl.load();
+    });
   }
 
   Future<void> _onTap(NotificationModel n) async {

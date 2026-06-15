@@ -70,7 +70,7 @@ class _LocationPickerPopupState extends State<LocationPickerPopup> {
         style: GoogleFonts.inter(color: Colors.white70, fontSize: 13.sp),
       ),
       backgroundColor: AppColors.primaryDark,
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
       borderRadius: 14,
       margin: EdgeInsets.all(16.w),
       icon: const Icon(Icons.check_circle_rounded, color: Colors.white),

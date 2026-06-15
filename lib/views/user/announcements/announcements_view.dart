@@ -30,9 +30,14 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
   @override
   void initState() {
     super.initState();
-    // Loads only if not cached yet — re-entering this tab won't re-hit the API.
-    _controller.loadAll();
     _scrollController.addListener(_onScroll);
+    // Defer until after the first frame so loadAll()'s synchronous cache
+    // read (which mutates allAnnouncements before its first await) can't
+    // trigger an Obx rebuild while the framework is still building widgets
+    // up the tree — the post-login transition was hitting that exact race.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _controller.loadAll();
+    });
   }
 
   @override

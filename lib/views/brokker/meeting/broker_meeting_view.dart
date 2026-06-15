@@ -44,8 +44,12 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
   @override
   void initState() {
     super.initState();
-    _ctrl.loadBroker();
     _precacheWorker = ever(_ctrl.brokerMeetings, (_) => _precacheAvatars());
+    // Defer so loadBroker()'s sync Rx mutations don't run while an ancestor
+    // is still mid-build (same post-login race as the user-side tabs).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ctrl.loadBroker();
+    });
   }
 
   @override

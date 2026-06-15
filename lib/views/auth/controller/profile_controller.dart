@@ -14,6 +14,9 @@ class ProfileController extends GetxController {
   var userMobile = ''.obs;
   var userCountryCode = ''.obs;
   var profileImage = ''.obs;
+  // Broker side keeps a separate avatar so toggling sides shows the
+  // correct one (backend exposes brokerProfileImage independently).
+  var brokerProfileImage = ''.obs;
   var accountType = 0.obs; // 1 = user, 2 = broker
   // `role` is a bitmask granted by the backend: 1 = user, 2 = broker, 3 = both.
   var role = 0.obs;
@@ -76,6 +79,7 @@ class ProfileController extends GetxController {
           userMobile.value = data['mobileNumber'] ?? '';
           userCountryCode.value = data['countryCode'] ?? '';
           profileImage.value = data['userProfileImage'] ?? data['profileImage'] ?? '';
+          brokerProfileImage.value = data['brokerProfileImage'] ?? '';
           accountType.value = data['account_type'] ?? 0;
           role.value = data['role'] ?? 0;
           currentRole.value = data['currentRole'] ?? data['account_type'] ?? 0;

@@ -201,10 +201,10 @@ class BrokerProfileView extends StatelessWidget {
             // Profile image with verified arc + star
             GestureDetector(
               onTap: () => FullScreenImageView.show(
-                imageUrl: controller.profileImage.value.isNotEmpty
-                    ? controller.profileImage.value
+                imageUrl: controller.brokerProfileImage.value.isNotEmpty
+                    ? controller.brokerProfileImage.value
                     : null,
-                assetPath: controller.profileImage.value.isEmpty
+                assetPath: controller.brokerProfileImage.value.isEmpty
                     ? 'assets/images/profile.jpg'
                     : null,
               ),
@@ -223,9 +223,9 @@ class BrokerProfileView extends StatelessWidget {
                         color: Colors.grey.shade200,
                       ),
                       child: ClipOval(
-                        child: controller.profileImage.value.isNotEmpty
+                        child: controller.brokerProfileImage.value.isNotEmpty
                             ? Image.network(
-                                controller.profileImage.value,
+                                controller.brokerProfileImage.value,
                                 fit: BoxFit.cover,
                                 width: 110.w,
                                 height: 110.w,

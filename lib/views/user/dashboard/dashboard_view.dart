@@ -72,7 +72,10 @@ class _DashboardViewState extends State<DashboardView> {
         selectedItemColor: const Color(0xFFD9C27C),
         unselectedItemColor: Colors.black54,
         onTap: (index) {
-          if (index == 2 && !LocalStorageService.isLoggedIn()) {
+          // Announcements (1) and Meeting (2) both require auth — guests
+          // get the login prompt instead of an empty / errored screen.
+          if ((index == 1 || index == 2) &&
+              !LocalStorageService.isLoggedIn()) {
             showLoginRequiredDialog(context);
             return;
           }

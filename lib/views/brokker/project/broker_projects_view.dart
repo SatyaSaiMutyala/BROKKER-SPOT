@@ -126,10 +126,15 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   @override
   void initState() {
     super.initState();
-    // Both tabs are cache-first; each is a no-op if already loaded.
-    _controller.loadAll();
-    _controller.loadBrokerMine();
     _scrollController.addListener(_onScroll);
+    // Defer so the sync cache-read inside loadAll/loadBrokerMine can't
+    // mutate Rx state while an ancestor is still mid-build (setState-
+    // during-build crash on post-login tab insert).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller.loadAll();
+      _controller.loadBrokerMine();
+    });
   }
 
   @override

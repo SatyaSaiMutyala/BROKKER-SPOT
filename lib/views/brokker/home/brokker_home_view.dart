@@ -104,7 +104,9 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
             },
             child: Obx(() {
               final isLoading = profileCtrl.isLoading.value;
-              final image = profileCtrl.profileImage.value;
+              // Broker dashboard shows the broker-side avatar (separate
+              // field from the user-side userProfileImage).
+              final image = profileCtrl.brokerProfileImage.value;
               if (isLoading) {
                 return ShimmerCircle(radius: 30.w);
               }

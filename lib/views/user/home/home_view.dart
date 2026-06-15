@@ -10,6 +10,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:get/get.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/widgets/home/story_circle.dart';
 import 'package:brokkerspot/widgets/home/new_launch_banner.dart';
@@ -92,9 +93,13 @@ class _HomeViewState extends State<HomeView> {
               SizedBox(height: 14.h),
               Divider(height: 1, color: Colors.grey.shade200),
               SizedBox(height: 6.h),
-              // Announcements section
-              _buildAnnouncementsSection(),
-              SizedBox(height: 20.h),
+              // Announcements section — hidden for guests (no token); the
+              // /fetch-all API needs auth, so showing the "couldn't load"
+              // error to a guest is just noise.
+              if (LocalStorageService.isLoggedIn()) ...[
+                _buildAnnouncementsSection(),
+                SizedBox(height: 20.h),
+              ],
               // DAMAC section
               _buildDamacSection(),
               SizedBox(height: 24.h),
