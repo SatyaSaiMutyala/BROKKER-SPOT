@@ -1,32 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:video_player/video_player.dart';
 
-/// Plays a network video cached to disk, with a memory-safe lifecycle.
-///
-/// CRITICAL: the underlying [VideoPlayerController] (an ExoPlayer + hardware
-/// decoder + image surface) is created ONLY while [active] is true and is
-/// fully disposed the moment [active] becomes false. So in a feed only the
-/// visible card holds a decoder — keeping many videos "alive" at once causes
-/// OutOfMemory crashes.
-///
-/// First play downloads the file once via [DefaultCacheManager]; later plays
-/// read the cached file (no re-download). Loops by default (replays on end).
 class CachedVideoPlayer extends StatefulWidget {
   final String url;
-
-  /// Whether this video should be live (visible & should play). When false
-  /// the controller is released entirely and the [placeholder] is shown.
   final bool active;
   final bool loop;
   final bool muted;
   final BoxFit fit;
   final Widget? placeholder;
-
-  /// Tap to mute/unmute (detail screen).
   final bool tapToToggleMute;
-
-  /// Tap to pause/resume. Shows a play icon only while paused.
   final bool tapToTogglePlay;
 
   const CachedVideoPlayer({
@@ -41,53 +23,81 @@ class CachedVideoPlayer extends StatefulWidget {
     this.tapToTogglePlay = false,
   });
 
-  /// No-op kept for compatibility — old views call
-  /// `NotificationListener<ScrollNotification>` → `notifyScroll(n)`. The
-  /// gating logic was removed; this is just a passthrough so those views
-  /// don't need to be edited.
   static void notifyScroll(Object _) {}
 
   @override
-  State<CachedVideoPlayer> createState() => _CachedVideoPlayerState();
+  CachedVideoPlayerState createState() => CachedVideoPlayerState();
 }
 
-class _CachedVideoPlayerState extends State<CachedVideoPlayer> {
+/// Public so callers can hold a [GlobalKey<CachedVideoPlayerState>] and call
+/// [forceStop] to synchronously silence the video before a route transition.
+class CachedVideoPlayerState extends State<CachedVideoPlayer> {
+  // Static counter so every instance gets a unique ID that appears in every
+  // log line — makes it trivial to tell which state owns which log entry.
+  static int _nextId = 0;
+  final int _id = _nextId++;
+
   VideoPlayerController? _ctrl;
   bool _ready = false;
   late bool _muted = widget.muted;
   bool _userPaused = false;
+  int _generation = 0;
+
+  String get _tag => widget.url.split('/').last;
+  String get _pfx => '🎬 [Video#$_id gen=$_generation]';
 
   @override
   void initState() {
     super.initState();
+    debugPrint('$_pfx initState active=${widget.active} muted=${widget.muted} url=$_tag');
     if (widget.active) _create();
   }
 
   Future<void> _create() async {
     if (_ctrl != null) return;
+    final gen = _generation;
+    debugPrint('🎬 [Video#$_id gen=$_generation] _create() starting url=$_tag');
     try {
-      final file = await DefaultCacheManager().getSingleFile(widget.url);
-      if (!mounted || !widget.active) return;
-      final ctrl = VideoPlayerController.file(file);
+      final ctrl = VideoPlayerController.networkUrl(Uri.parse(widget.url));
       await ctrl.initialize();
-      if (!mounted || !widget.active) {
+      // Cancel if: unmounted, generation moved on, widget deactivated, OR another
+      // concurrent _create() already won the race and set _ctrl first.
+      if (!mounted || _generation != gen || !widget.active || _ctrl != null) {
+        debugPrint('🎬 [Video#$_id] _create() CANCELLED gen_now=$_generation captured=$gen mounted=$mounted active=${widget.active} ctrl_taken=${_ctrl != null} url=$_tag');
+        ctrl.setVolume(0);
         ctrl.dispose();
         return;
       }
-      ctrl
-        ..setLooping(widget.loop)
-        ..setVolume(_muted ? 0 : 1);
-      if (!_userPaused) ctrl.play();
-      setState(() {
-        _ctrl = ctrl;
-        _ready = true;
-      });
-    } catch (_) {
-      // Leave placeholder on failure.
+      // Assign _ctrl BEFORE play() so dispose() can always find and clean it up.
+      _ctrl = ctrl;
+      _ctrl!.setLooping(widget.loop);
+      _ctrl!.setVolume(_muted ? 0 : 1);
+      if (!_userPaused) _ctrl!.play();
+      debugPrint('🎬 [Video#$_id gen=$_generation] PLAYING muted=$_muted url=$_tag');
+      if (mounted) setState(() => _ready = true);
+    } catch (e, s) {
+      debugPrint('❌ [Video#$_id] error url=$_tag: $e\n$s');
     }
   }
 
+  /// Immediately silences and releases the controller. Safe to call from a
+  /// parent's [State.dispose] (no [setState] is issued). Also increments the
+  /// generation so any in-flight [_create] will discard its result.
+  void forceStop() {
+    _generation++;
+    debugPrint('🎬 [Video#$_id gen=$_generation] forceStop() ctrl=${_ctrl != null ? "SET" : "NULL"} url=$_tag');
+    _ctrl?.setVolume(0);
+    _ctrl?.pause();
+    _ctrl?.dispose();
+    _ctrl = null;
+    _ready = false;
+  }
+
   void _releaseController() {
+    _generation++;
+    debugPrint('🎬 [Video#$_id gen=$_generation] _releaseController() ctrl=${_ctrl != null ? "SET" : "NULL"} url=$_tag');
+    _ctrl?.setVolume(0);
+    _ctrl?.pause();
     _ctrl?.dispose();
     _ctrl = null;
     if (mounted) {
@@ -106,8 +116,9 @@ class _CachedVideoPlayerState extends State<CachedVideoPlayer> {
   }
 
   @override
-  void didUpdateWidget(CachedVideoPlayer old) {
-    super.didUpdateWidget(old);
+  void didUpdateWidget(CachedVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    debugPrint('🎬 [Video#$_id gen=$_generation] didUpdateWidget active=${widget.active} was=${oldWidget.active} ctrl=${_ctrl != null ? "SET" : "NULL"} url=$_tag');
     if (widget.active && _ctrl == null) {
       _create();
     } else if (!widget.active && _ctrl != null) {
@@ -119,7 +130,12 @@ class _CachedVideoPlayerState extends State<CachedVideoPlayer> {
 
   @override
   void dispose() {
+    _generation++;
+    debugPrint('🎬 [Video#$_id gen=$_generation] dispose() ctrl=${_ctrl != null ? "SET" : "NULL"} url=$_tag');
+    _ctrl?.setVolume(0);
+    _ctrl?.pause();
     _ctrl?.dispose();
+    _ctrl = null;
     super.dispose();
   }
 

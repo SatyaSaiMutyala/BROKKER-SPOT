@@ -10,6 +10,7 @@ import 'package:get/get.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 
@@ -36,6 +37,12 @@ class _BrokerAnnouncementDetailViewState
   // True once the detail fetch returns is_owner / is_proposal_sent. We hold the
   // proposal button hidden until then to avoid it flashing on reopen.
   bool _detailLoaded = false;
+  // Flipped to false the moment back is pressed so the video stops immediately
+  // (before the pop animation and dispose() run).
+  bool _videoActive = true;
+  // Direct handle to the video state so forceStop() can be called synchronously
+  // without waiting for a setState rebuild.
+  final _videoKey = GlobalKey<CachedVideoPlayerState>();
   final _amenityCtrl = AmenityController.to;
 
   @override
@@ -66,11 +73,24 @@ class _BrokerAnnouncementDetailViewState
     }
   }
 
+  // Stop video immediately and then pop the route.
+  // Using postFrameCallback so the setState rebuild (which sets active:false on
+  // CachedVideoPlayer → triggers _releaseController → setVolume(0)+pause)
+  // completes BEFORE Navigator.pop starts the exit animation.
+  void _stopVideoAndPop() {
+    debugPrint('📄 [DetailView] _stopVideoAndPop called');
+    _videoKey.currentState?.forceStop(); // synchronous, no rebuild needed
+    setState(() => _videoActive = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
   @override
   void dispose() {
+    debugPrint('📄 [DetailView] dispose() called');
+    _videoKey.currentState?.forceStop(); // belt-and-suspenders for programmatic closes
     _pageCtrl.dispose();
-    // Restore dark status-bar icons for the screen we return to (this screen
-    // used light icons over the dark hero image).
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
@@ -117,13 +137,24 @@ class _BrokerAnnouncementDetailViewState
   @override
   Widget build(BuildContext context) {
     final a = _data;
-    final images = (a.imageUrls?.isNotEmpty ?? false) ? a.imageUrls! : <String>[];
+    final images =
+        (a.imageUrls?.isNotEmpty ?? false) ? a.imageUrls! : <String>[];
     final hasVideo =
         a.propertyMedia?.videos != null && a.propertyMedia!.videos!.isNotEmpty;
     final totalPages = (hasVideo ? 1 : 0) + images.length;
     final topPadding = MediaQuery.of(context).padding.top;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    return PopScope(
+      canPop: true, // allow any back gesture / programmatic pop
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          // Fires at the START of any pop (swipe-back, back button, Get.back()).
+          // Stop audio immediately so it doesn't bleed into the back animation.
+          debugPrint('📄 [DetailView] PopScope.onPopInvoked — stopping video');
+          _videoKey.currentState?.forceStop();
+        }
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
@@ -164,7 +195,8 @@ class _BrokerAnnouncementDetailViewState
                             ),
                           ),
                           SizedBox(height: 4.h),
-                          if ((a.location ?? a.propertyAddress ?? '').isNotEmpty)
+                          if ((a.location ?? a.propertyAddress ?? '')
+                              .isNotEmpty)
                             Row(
                               children: [
                                 Icon(Icons.location_on_outlined,
@@ -234,7 +266,7 @@ class _BrokerAnnouncementDetailViewState
               top: topPadding + 10.h,
               left: 16.w,
               child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
+                onTap: _stopVideoAndPop,
                 child: Container(
                   width: 38.w,
                   height: 38.w,
@@ -249,13 +281,9 @@ class _BrokerAnnouncementDetailViewState
             ),
 
             // ── Sticky bottom button ──
-            // Only shown once the detail has loaded (avoids a flash on reopen),
-            // and hidden if the viewer owns this listing or already sent a
-            // proposal (flagged by the API, or just sent in this session).
-            if (_detailLoaded &&
-                _data.isOwner != true &&
-                _data.isProposalSent != true &&
-                !_proposalSent)
+            // Always shown for non-owners. Shows a shimmer while the detail
+            // fetch is in flight, then transitions to the correct state.
+            if (_data.isOwner != true)
               Positioned(
                 bottom: 0,
                 left: 0,
@@ -265,7 +293,8 @@ class _BrokerAnnouncementDetailViewState
           ],
         ),
       ),
-    );
+    ), // AnnotatedRegion
+    ); // PopScope
   }
 
   // ── Hero carousel ──────────────────────────────────────────────────────────
@@ -290,7 +319,7 @@ class _BrokerAnnouncementDetailViewState
             imageUrl: images[imgIdx],
             width: double.infinity,
             height: height,
-            fit: BoxFit.cover,
+            fit: BoxFit.fill,
             placeholder: (_, __) => _shimmerBox(),
             errorWidget: (_, __, ___) => Container(
               color: Colors.grey.shade300,
@@ -387,9 +416,10 @@ class _BrokerAnnouncementDetailViewState
     return Container(
       color: Colors.black,
       child: CachedVideoPlayer(
+        key: _videoKey,
         url: url,
-        active: _currentPage == 0,
-        fit: BoxFit.contain,
+        active: _videoActive && _currentPage == 0,
+        fit: BoxFit.cover,
         muted: false,
         tapToToggleMute: true,
         placeholder: _shimmerBox(),
@@ -447,8 +477,8 @@ class _BrokerAnnouncementDetailViewState
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20.r),
-              border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.35)),
+              border:
+                  Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
             ),
             child: Text(
               a.listingType!,
@@ -540,8 +570,7 @@ class _BrokerAnnouncementDetailViewState
                     errorWidget: (_, __, ___) => Icon(Icons.person,
                         size: 20.sp, color: Colors.grey.shade400),
                   )
-                : Icon(Icons.person,
-                    size: 20.sp, color: Colors.grey.shade400),
+                : Icon(Icons.person, size: 20.sp, color: Colors.grey.shade400),
           ),
         ),
         SizedBox(width: 10.w),
@@ -656,7 +685,8 @@ class _BrokerAnnouncementDetailViewState
       items.add(_DetailItem('Area', '${a.sqft} sqft'));
     }
     if (a.propertySize != null) {
-      items.add(_DetailItem('Area (sqm)', '${a.propertySize!.sqm.toStringAsFixed(0)} sqm'));
+      items.add(_DetailItem(
+          'Area (sqm)', '${a.propertySize!.sqm.toStringAsFixed(0)} sqm'));
     }
     if (a.availableDate != null) {
       items.add(_DetailItem('Available', a.availableDate!.split('T').first));
@@ -774,6 +804,10 @@ class _BrokerAnnouncementDetailViewState
                   height: 180.h,
                   width: double.infinity,
                   child: GoogleMap(
+                    // Unique key per announcement prevents the iOS platform
+                    // view from being recreated with a stale ID when this
+                    // screen is popped and then pushed again.
+                    key: ValueKey('map_${a.id}'),
                     initialCameraPosition:
                         CameraPosition(target: target, zoom: 15),
                     markers: {
@@ -805,8 +839,7 @@ class _BrokerAnnouncementDetailViewState
               left: 0,
               right: 0,
               child: Container(
-                padding:
-                    EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                 color: Colors.white.withValues(alpha: 0.92),
                 child: Row(
                   children: [
@@ -824,8 +857,7 @@ class _BrokerAnnouncementDetailViewState
                             fontWeight: FontWeight.w500),
                       ),
                     ),
-                    Icon(Icons.open_in_new,
-                        size: 13.sp, color: AppColors.teal),
+                    Icon(Icons.open_in_new, size: 13.sp, color: AppColors.teal),
                   ],
                 ),
               ),
@@ -838,10 +870,141 @@ class _BrokerAnnouncementDetailViewState
 
   // ── Bottom bar ─────────────────────────────────────────────────────────────
 
+  void _openChat() {
+    final id = _data.id;
+    final peerId = _data.userId;
+    if (id == null || peerId == null) return;
+    // Announcement user_role is the owner's role (1 = buyer).
+    // The broker viewing is the other party → role 2.
+    final annRole = _data.userRole ?? 1;
+    final brokerRole = 3 - annRole;
+    // The detail endpoint returns user_id as a plain string (no name/avatar).
+    // Fall back to widget.announcement which came from the list endpoint where
+    // user_id is a populated object containing name and profile image.
+    final peerName = _data.ownerName?.isNotEmpty == true
+        ? _data.ownerName!
+        : widget.announcement.ownerName ?? 'User';
+    final peerAvatar = _data.ownerAvatarUrl?.isNotEmpty == true
+        ? _data.ownerAvatarUrl
+        : widget.announcement.ownerAvatarUrl;
+    AnnouncementChatView.open(
+      announcementId: id,
+      brokerName: peerName,
+      brokerAvatar: peerAvatar,
+      peerUserId: peerId,
+      userRole: brokerRole,
+    );
+  }
+
   Widget _buildBottomBar() {
+    // While the detail fetch is in flight, show a shimmer so the bar is
+    // visible immediately with no flash of wrong content.
+    if (!_detailLoaded) {
+      return Container(
+        padding: EdgeInsets.fromLTRB(
+            20.w, 12.h, 20.w, MediaQuery.of(context).padding.bottom + 12.h),
+        color: Colors.white,
+        child: Shimmer.fromColors(
+          baseColor: Colors.grey.shade200,
+          highlightColor: Colors.grey.shade100,
+          child: Container(
+            height: 52.h,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(14.r),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final alreadySent = _proposalSent || _data.isProposalSent == true;
+    final chatReady = _data.isChatAvailable == true;
+
+    final Widget button;
+
+    if (chatReady) {
+      // Proposal accepted — broker can now chat with the buyer.
+      button = ElevatedButton(
+        onPressed: _openChat,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 18.sp, color: Colors.white),
+            SizedBox(width: 8.w),
+            Text(
+              'Chat Now',
+              style: GoogleFonts.poppins(
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white),
+            ),
+          ],
+        ),
+      );
+    } else if (alreadySent) {
+      // Proposal already sent — show a disabled grey state.
+      button = ElevatedButton(
+        onPressed: null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.grey.shade300,
+          disabledBackgroundColor: Colors.grey.shade300,
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline,
+                size: 18.sp, color: Colors.grey.shade600),
+            SizedBox(width: 8.w),
+            Text(
+              'Proposal Sent',
+              style: GoogleFonts.poppins(
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // No proposal yet — let the broker send one.
+      button = ElevatedButton(
+        onPressed: _showProposalSheet,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.handshake_outlined, size: 18.sp, color: Colors.white),
+            SizedBox(width: 8.w),
+            Text(
+              'Send Proposal',
+              style: GoogleFonts.poppins(
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w,
-          MediaQuery.of(context).padding.bottom + 12.h),
+      padding: EdgeInsets.fromLTRB(
+          20.w, 12.h, 20.w, MediaQuery.of(context).padding.bottom + 12.h),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -855,29 +1018,7 @@ class _BrokerAnnouncementDetailViewState
       child: SizedBox(
         width: double.infinity,
         height: 52.h,
-        child: ElevatedButton(
-          onPressed: _showProposalSheet,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14.r)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.handshake_outlined, size: 18.sp, color: Colors.white),
-              SizedBox(width: 8.w),
-              Text(
-                'Send Proposal',
-                style: GoogleFonts.poppins(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white),
-              ),
-            ],
-          ),
-        ),
+        child: button,
       ),
     );
   }
@@ -910,16 +1051,10 @@ class _ProposalSheet extends StatefulWidget {
 class _ProposalSheetState extends State<_ProposalSheet> {
   final TextEditingController _controller = TextEditingController();
   final int _maxLength = 500;
-  static const int _minWords = 10;
+  static const int _minChars = 10;
   bool _submitted = false;
   bool _isLoading = false;
   String? _error;
-
-  int _wordCount(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) return 0;
-    return trimmed.split(RegExp(r'\s+')).length;
-  }
 
   @override
   void initState() {
@@ -939,8 +1074,8 @@ class _ProposalSheetState extends State<_ProposalSheet> {
       setState(() => _error = 'Message is required');
       return;
     }
-    if (_wordCount(text) < _minWords) {
-      setState(() => _error = 'Message must be at least $_minWords words');
+    if (text.length < _minChars) {
+      setState(() => _error = 'Message must be at least $_minChars characters');
       return;
     }
     setState(() {
@@ -971,8 +1106,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final charCount = _controller.text.length;
-    final wordCount = _wordCount(_controller.text);
+    final charCount = _controller.text.trim().length;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 20.h),
@@ -1000,7 +1134,10 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                     controller: _controller,
                     maxLines: 6,
                     maxLength: _maxLength,
-                    buildCounter: (_, {required currentLength, required isFocused, maxLength}) =>
+                    buildCounter: (_,
+                            {required currentLength,
+                            required isFocused,
+                            maxLength}) =>
                         null,
                     inputFormatters: [
                       LengthLimitingTextInputFormatter(_maxLength)
@@ -1021,10 +1158,10 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                   child: Row(
                     children: [
                       Text(
-                        '$wordCount/$_minWords words min',
+                        '$charCount/$_minChars chars min',
                         style: GoogleFonts.inter(
                             fontSize: 11.sp,
-                            color: wordCount < _minWords
+                            color: charCount < _minChars
                                 ? Colors.red.shade400
                                 : AppColors.successGreen),
                       ),
@@ -1104,8 +1241,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
         SizedBox(height: 6.h),
         Text(
           'Your proposal has been sent to the buyer.',
-          style:
-              GoogleFonts.inter(fontSize: 13.sp, color: AppColors.textHint),
+          style: GoogleFonts.inter(fontSize: 13.sp, color: AppColors.textHint),
           textAlign: TextAlign.center,
         ),
         SizedBox(height: 20.h),

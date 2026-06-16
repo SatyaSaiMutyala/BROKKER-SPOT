@@ -191,6 +191,7 @@ class AnnouncementModel {
   // they've already sent a proposal on it.
   final bool? isOwner;
   final bool? isProposalSent;
+  final bool? isChatAvailable;
 
   /// Which side created this announcement: 1 = user side, 2 = broker side.
   /// Used to compute chat user_role (sent in socket events so the server knows
@@ -243,6 +244,7 @@ class AnnouncementModel {
     this.latestProposals,
     this.isOwner,
     this.isProposalSent,
+    this.isChatAvailable,
     this.userRole,
   });
 
@@ -352,6 +354,7 @@ class AnnouncementModel {
           .toList(),
       isOwner: json['is_owner'] as bool?,
       isProposalSent: json['is_proposal_sent'] as bool?,
+      isChatAvailable: json['is_chat_available'] as bool?,
       userRole: (json['user_role'] as num?)?.toInt(),
     );
   }
