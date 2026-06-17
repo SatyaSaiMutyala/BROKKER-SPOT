@@ -9,6 +9,7 @@ import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/models/chat_message.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_controller.dart';
+import 'package:brokkerspot/views/user/announcements/publish_announcement_view.dart';
 
 class AnnouncementChatView extends StatefulWidget {
   final String announcementId;
@@ -266,7 +267,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           button = _bannerButton(
             icon: Icons.article_outlined,
             label: 'View Contract',
-            onTap: _showTermsDialog,
+            onTap: () => _showTermsDialog(onAccept: _chat.approveProposal),
             filled: false,
           );
         case 1:
@@ -303,7 +304,24 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           button = _bannerButton(
             icon: Icons.draw_outlined,
             label: 'Sign & Accept',
-            onTap: _chat.brokerAcceptProposal,
+            onTap: () => _showTermsDialog(
+              onAccept: _chat.brokerAcceptProposal,
+              bodyText: 'By signing this contract, you agree to advertise this '
+                  'property on BrokerSpot under the terms set by the owner. '
+                  'You confirm that you are a verified broker authorized to '
+                  'act on this proposal.\n\n'
+                  'You agree to negotiate with potential buyers and tenants '
+                  'in good faith and within the parameters agreed upon with '
+                  'the owner. BrokerSpot acts solely as an intermediary '
+                  'platform and is not a party to any agreement between you '
+                  'and the owner.\n\n'
+                  'This authorization remains valid until either party '
+                  'withdraws it or the listing period expires.\n\n'
+                  'BrokerSpot reserves the right to remove listings that '
+                  'violate platform policies. Both parties are responsible '
+                  'for compliance with applicable real estate laws and '
+                  'regulations.',
+            ),
             color: Colors.green.shade700,
             filled: true,
           );
@@ -313,9 +331,11 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
         case 3:
           text = 'Contract signed. You can now advertise this property.';
           button = _bannerButton(
-            icon: Icons.article_outlined,
-            label: 'Information',
-            onTap: _openAgreement,
+            icon: Icons.campaign_outlined,
+            label: 'Publish',
+            onTap: () => Get.to(() => PublishAnnouncementView(
+                  announcementId: widget.announcementId,
+                )),
             color: Colors.green.shade700,
             filled: true,
           );
@@ -377,7 +397,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     );
   }
 
-  void _showTermsDialog() {
+  void _showTermsDialog({required VoidCallback onAccept, String? bodyText}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -429,21 +449,22 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                 child: SingleChildScrollView(
                   padding: EdgeInsets.symmetric(horizontal: 20.w),
                   child: Text(
-                    'By authorizing a broker to advertise your property on BrokerSpot, '
-                    'you agree that the broker may list and promote your property to '
-                    'potential buyers and tenants through the platform. You confirm that '
-                    'you are the authorized owner or representative of the property and '
-                    'that all information provided is accurate.\n\n'
-                    'The broker is authorized to negotiate on your behalf within the '
-                    'parameters you have agreed upon. BrokerSpot acts solely as an '
-                    'intermediary platform and is not a party to any agreement between '
-                    'you and the broker.\n\n'
-                    'This authorization remains valid until you withdraw it or the '
-                    'listing period expires. You may revoke this authorization at any '
-                    'time by contacting BrokerSpot support or through the app settings.\n\n'
-                    'BrokerSpot reserves the right to remove listings that violate '
-                    'platform policies. Both parties are responsible for compliance '
-                    'with applicable real estate laws and regulations.',
+                    bodyText ??
+                        'By authorizing a broker to advertise your property on BrokerSpot, '
+                            'you agree that the broker may list and promote your property to '
+                            'potential buyers and tenants through the platform. You confirm that '
+                            'you are the authorized owner or representative of the property and '
+                            'that all information provided is accurate.\n\n'
+                            'The broker is authorized to negotiate on your behalf within the '
+                            'parameters you have agreed upon. BrokerSpot acts solely as an '
+                            'intermediary platform and is not a party to any agreement between '
+                            'you and the broker.\n\n'
+                            'This authorization remains valid until you withdraw it or the '
+                            'listing period expires. You may revoke this authorization at any '
+                            'time by contacting BrokerSpot support or through the app settings.\n\n'
+                            'BrokerSpot reserves the right to remove listings that violate '
+                            'platform policies. Both parties are responsible for compliance '
+                            'with applicable real estate laws and regulations.',
                     style: GoogleFonts.inter(
                         fontSize: 13.sp, color: Colors.white70, height: 1.6),
                   ),
@@ -454,7 +475,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                 child: GestureDetector(
                   onTap: () {
                     Navigator.pop(ctx);
-                    _chat.approveProposal();
+                    onAccept();
                   },
                   child: Container(
                     width: double.infinity,

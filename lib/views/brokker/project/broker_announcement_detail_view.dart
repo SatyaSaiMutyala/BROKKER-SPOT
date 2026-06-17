@@ -89,7 +89,8 @@ class _BrokerAnnouncementDetailViewState
   @override
   void dispose() {
     debugPrint('📄 [DetailView] dispose() called');
-    _videoKey.currentState?.forceStop(); // belt-and-suspenders for programmatic closes
+    _videoKey.currentState
+        ?.forceStop(); // belt-and-suspenders for programmatic closes
     _pageCtrl.dispose();
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -155,145 +156,147 @@ class _BrokerAnnouncementDetailViewState
         }
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: Stack(
-          children: [
-            // ── Scrollable body ──
-            SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeroMedia(a, images, hasVideo, totalPages, topPadding),
-                  Transform.translate(
-                    offset: Offset(0, -22.h),
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(22.r),
-                          topRight: Radius.circular(22.r),
-                        ),
-                      ),
-                      padding: EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildPriceRow(a),
-                          SizedBox(height: 6.h),
-                          Text(
-                            a.propertyName ?? '',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16.sp,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black,
-                            ),
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.white,
+          body: Stack(
+            children: [
+              // ── Scrollable body ──
+              SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeroMedia(
+                        a, images, hasVideo, totalPages, topPadding),
+                    Transform.translate(
+                      offset: Offset(0, -22.h),
+                      child: Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(22.r),
+                            topRight: Radius.circular(22.r),
                           ),
-                          SizedBox(height: 4.h),
-                          if ((a.location ?? a.propertyAddress ?? '')
-                              .isNotEmpty)
-                            Row(
-                              children: [
-                                Icon(Icons.location_on_outlined,
-                                    size: 13.sp, color: AppColors.teal),
-                                SizedBox(width: 3.w),
-                                Expanded(
-                                  child: Text(
-                                    a.location ?? a.propertyAddress ?? '',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12.sp,
-                                      color: AppColors.textHint,
+                        ),
+                        padding: EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildPriceRow(a),
+                            SizedBox(height: 6.h),
+                            Text(
+                              a.propertyName ?? '',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black,
+                              ),
+                            ),
+                            SizedBox(height: 4.h),
+                            if ((a.location ?? a.propertyAddress ?? '')
+                                .isNotEmpty)
+                              Row(
+                                children: [
+                                  Icon(Icons.location_on_outlined,
+                                      size: 13.sp, color: AppColors.teal),
+                                  SizedBox(width: 3.w),
+                                  Expanded(
+                                    child: Text(
+                                      a.location ?? a.propertyAddress ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.sp,
+                                        color: AppColors.textHint,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          SizedBox(height: 18.h),
-                          _buildStatsRow(a),
-                          SizedBox(height: 20.h),
-                          if (a.ownerName != null) ...[
-                            _buildOwnerRow(a),
-                            SizedBox(height: 20.h),
-                          ],
-                          Divider(color: Colors.grey.shade100, thickness: 1),
-                          SizedBox(height: 18.h),
-                          if ((a.description ?? '').isNotEmpty) ...[
-                            _sectionTitle('About this property'),
-                            SizedBox(height: 10.h),
-                            _buildDescription(a.description!),
-                            SizedBox(height: 22.h),
-                          ],
-                          _sectionTitle('Property Details'),
-                          SizedBox(height: 12.h),
-                          _buildDetailsGrid(a),
-                          SizedBox(height: 22.h),
-                          if ((a.amenities ?? []).isNotEmpty)
-                            Obx(() {
-                              final names =
-                                  _amenityCtrl.namesForIds(a.amenities!);
-                              if (names.isEmpty) return const SizedBox.shrink();
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _sectionTitle('Amenities'),
-                                  SizedBox(height: 12.h),
-                                  _buildAmenities(names),
-                                  SizedBox(height: 22.h),
                                 ],
-                              );
-                            }),
-                          _sectionTitle('Location'),
-                          SizedBox(height: 12.h),
-                          _buildMapBox(a),
-                          SizedBox(height: 100.h),
-                        ],
+                              ),
+                            SizedBox(height: 18.h),
+                            _buildStatsRow(a),
+                            SizedBox(height: 20.h),
+                            if (a.ownerName != null) ...[
+                              _buildOwnerRow(a),
+                              SizedBox(height: 20.h),
+                            ],
+                            Divider(color: Colors.grey.shade100, thickness: 1),
+                            SizedBox(height: 18.h),
+                            if ((a.description ?? '').isNotEmpty) ...[
+                              _sectionTitle('About this property'),
+                              SizedBox(height: 10.h),
+                              _buildDescription(a.description!),
+                              SizedBox(height: 22.h),
+                            ],
+                            _sectionTitle('Property Details'),
+                            SizedBox(height: 12.h),
+                            _buildDetailsGrid(a),
+                            SizedBox(height: 22.h),
+                            if ((a.amenities ?? []).isNotEmpty)
+                              Obx(() {
+                                final names =
+                                    _amenityCtrl.namesForIds(a.amenities!);
+                                if (names.isEmpty)
+                                  return const SizedBox.shrink();
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _sectionTitle('Amenities'),
+                                    SizedBox(height: 12.h),
+                                    _buildAmenities(names),
+                                    SizedBox(height: 22.h),
+                                  ],
+                                );
+                              }),
+                            _sectionTitle('Location'),
+                            SizedBox(height: 12.h),
+                            _buildMapBox(a),
+                            SizedBox(height: 100.h),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-            // ── Floating back button ──
-            Positioned(
-              top: topPadding + 10.h,
-              left: 16.w,
-              child: GestureDetector(
-                onTap: _stopVideoAndPop,
-                child: Container(
-                  width: 38.w,
-                  height: 38.w,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.arrow_back_ios_new,
-                      size: 16.sp, color: Colors.white),
+                  ],
                 ),
               ),
-            ),
 
-            // ── Sticky bottom button ──
-            // Always shown for non-owners. Shows a shimmer while the detail
-            // fetch is in flight, then transitions to the correct state.
-            if (_data.isOwner != true)
+              // ── Floating back button ──
               Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: _buildBottomBar(),
+                top: topPadding + 10.h,
+                left: 16.w,
+                child: GestureDetector(
+                  onTap: _stopVideoAndPop,
+                  child: Container(
+                    width: 38.w,
+                    height: 38.w,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.arrow_back_ios_new,
+                        size: 16.sp, color: Colors.white),
+                  ),
+                ),
               ),
-          ],
+
+              // ── Sticky bottom button ──
+              // Always shown for non-owners. Shows a shimmer while the detail
+              // fetch is in flight, then transitions to the correct state.
+              if (_data.isOwner != true)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: _buildBottomBar(),
+                ),
+            ],
+          ),
         ),
-      ),
-    ), // AnnotatedRegion
+      ), // AnnotatedRegion
     ); // PopScope
   }
 
@@ -1157,14 +1160,26 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                   padding: EdgeInsets.only(top: 6.h),
                   child: Row(
                     children: [
-                      Text(
-                        '$charCount/$_minChars chars min',
-                        style: GoogleFonts.inter(
-                            fontSize: 11.sp,
-                            color: charCount < _minChars
-                                ? Colors.red.shade400
-                                : AppColors.successGreen),
-                      ),
+                      if (charCount < _minChars)
+                        Text(
+                          'Minimum $_minChars characters required',
+                          style: GoogleFonts.inter(
+                              fontSize: 11.sp, color: Colors.red.shade400),
+                        )
+                      else
+                        Row(
+                          children: [
+                            Icon(Icons.check_circle_rounded,
+                                size: 12.sp, color: AppColors.successGreen),
+                            SizedBox(width: 4.w),
+                            Text(
+                              'Looks good',
+                              style: GoogleFonts.inter(
+                                  fontSize: 11.sp,
+                                  color: AppColors.successGreen),
+                            ),
+                          ],
+                        ),
                       const Spacer(),
                       Text(
                         '$charCount/$_maxLength',

@@ -85,11 +85,13 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     final a = widget.announcement;
     final thumb = a.propertyMedia?.thumbnail;
     if (thumb != null && thumb.startsWith('http')) {
-      precacheImage(CachedNetworkImageProvider(thumb), context);
+      precacheImage(CachedNetworkImageProvider(thumb), context)
+          .catchError((_) {});
     }
     for (final url in (a.imageUrls ?? const []).take(2)) {
       if (url.startsWith('http')) {
-        precacheImage(CachedNetworkImageProvider(url), context);
+        precacheImage(CachedNetworkImageProvider(url), context)
+            .catchError((_) {});
       }
     }
   }
@@ -102,7 +104,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
       if (imgIdx >= 0 && imgIdx < images.length) {
         final url = images[imgIdx];
         if (url.startsWith('http')) {
-          precacheImage(CachedNetworkImageProvider(url), context);
+          precacheImage(CachedNetworkImageProvider(url), context)
+              .catchError((_) {});
         }
       }
     }

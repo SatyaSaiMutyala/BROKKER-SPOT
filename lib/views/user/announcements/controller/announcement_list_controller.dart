@@ -1,6 +1,10 @@
+import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/services/announcement_cache.dart';
+import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/announcements/chat/chat_events.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 /// Single, permanent source of truth for announcement *lists* (read side).
@@ -66,10 +70,38 @@ class AnnouncementListController extends GetxController {
   final brokerMineError = Rxn<String>();
   bool _brokerMineLoaded = false;
 
+  // Real-time "announcement published" updates -------------------------------
+  bool _publishListening = false;
+
+  /// Starts listening for the broker-side `announcement:publish` broadcast so
+  /// the owner sees their lists refresh (+ a toast) the moment a broker
+  /// publishes their property — without needing to pull-to-refresh. Safe to
+  /// call repeatedly; only registers once. Mirrors PresenceService's
+  /// connect-then-listen pattern since the socket must exist before `on()`
+  /// can attach.
+  void ensurePublishListening() {
+    if (_publishListening) return;
+    SocketService.to.connect();
+    SocketService.to.on(ChatEvents.announcementPublish, _onAnnouncementPublished);
+    _publishListening = true;
+  }
+
+  void _onAnnouncementPublished(dynamic data) {
+    refreshAfterMutation();
+    Get.snackbar(
+      'Published',
+      'Your property has been published by the broker.',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: AppColors.successGreen,
+      colorText: Colors.white,
+    );
+  }
+
   /// Loads the public feed (user-role=1, property owners). Shows the local-DB
   /// cache instantly, then refreshes from the network. No network call if
   /// already loaded this session unless [force].
   Future<void> loadAll({bool force = false}) async {
+    ensurePublishListening();
     // Instant render from local DB (offline-first) when we have nothing yet.
     if (allAnnouncements.isEmpty) {
       final cached = AnnouncementCache.readList(AnnouncementCache.keyAll);
@@ -120,6 +152,7 @@ class AnnouncementListController extends GetxController {
 
   /// Loads user-role=2 announcements (brokers). No-op unless [force].
   Future<void> loadBroker({bool force = false}) async {
+    ensurePublishListening();
     if (_brokerLoaded && !force) return;
     try {
       isLoadingBroker.value = true;
@@ -140,6 +173,7 @@ class AnnouncementListController extends GetxController {
   /// Each status is cached separately, so re-clicking an already-loaded tab
   /// shows instantly without another API call. [force] re-fetches.
   Future<void> loadMine({int? status, bool force = false}) async {
+    ensurePublishListening();
     _currentMineStatus = status;
     // Serve from in-memory cache instantly when available.
     if (!force && _mineCache.containsKey(status)) {
@@ -182,6 +216,7 @@ class AnnouncementListController extends GetxController {
   /// Loads the home feed — only 5 records to keep the screen light.
   /// No-op if already loaded unless [force].
   Future<void> loadHome({bool force = false}) async {
+    ensurePublishListening();
     if (homeAnnouncements.isEmpty) {
       final cached = AnnouncementCache.readList(AnnouncementCache.keyHome);
       if (cached.isNotEmpty) {
@@ -207,6 +242,7 @@ class AnnouncementListController extends GetxController {
   /// the backend returns the broker's posts when called from the broker side.
   /// Cache-first, then network. No network call if already loaded unless [force].
   Future<void> loadBrokerMine({bool force = false}) async {
+    ensurePublishListening();
     if (brokerMineAnnouncements.isEmpty) {
       final cached = AnnouncementCache.readList(AnnouncementCache.keyBrokerMine);
       if (cached.isNotEmpty) {

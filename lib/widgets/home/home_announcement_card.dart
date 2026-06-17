@@ -122,7 +122,16 @@ class HomeAnnouncementCard extends StatelessWidget {
                 ),
                 child: ClipOval(
                   child: a.ownerAvatarUrl != null && a.ownerAvatarUrl!.isNotEmpty
-                      ? Image.network(a.ownerAvatarUrl!, fit: BoxFit.cover)
+                      ? Image.network(
+                          a.ownerAvatarUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Image.asset(
+                            _avatarAssets[index % _avatarAssets.length],
+                            fit: BoxFit.cover,
+                            width: 44.w,
+                            height: 44.w,
+                          ),
+                        )
                       : Image.asset(
                           _avatarAssets[index % _avatarAssets.length],
                           fit: BoxFit.cover,

@@ -58,4 +58,13 @@ class ChatEvents {
   /// BE → FE success + real-time broadcast: { _id, announcement_id, user_id, status, agreement_url }
   static const String proposalBrokerAccept = 'announcement:proposal:broker:accept';
   static const String proposalBrokerAcceptError = 'announcement:proposal:broker:accept:error';
+
+  // ── Publish (broker, after both sides sign) ──
+  /// FE → BE + BE → FE response/broadcast (same name, like [history] and
+  /// [proposalStatus]). Broker emits this once both sides have signed the
+  /// agreement to make the property live.
+  /// Request: same body as the Create Announcement REST API, plus `announcement_id`.
+  /// Response/broadcast: the published announcement object — sent back to the
+  /// publishing broker AND pushed in real time to the announcement owner.
+  static const String announcementPublish = 'announcement:publish';
 }
