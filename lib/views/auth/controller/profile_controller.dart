@@ -80,6 +80,8 @@ class ProfileController extends GetxController {
           userCountryCode.value = data['countryCode'] ?? '';
           profileImage.value = data['userProfileImage'] ?? data['profileImage'] ?? '';
           brokerProfileImage.value = data['brokerProfileImage'] ?? '';
+          debugPrint('🖼 profileImage=${profileImage.value}');
+          debugPrint('🖼 brokerProfileImage=${brokerProfileImage.value}');
           accountType.value = data['account_type'] ?? 0;
           role.value = data['role'] ?? 0;
           currentRole.value = data['currentRole'] ?? data['account_type'] ?? 0;
