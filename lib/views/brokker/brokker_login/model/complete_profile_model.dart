@@ -55,7 +55,7 @@ class EditBrokerDetailsModel {
       'professionalEmail': professionalEmail,
     };
     if (profileImage != null && profileImage!.isNotEmpty) {
-      map['profileImage'] = profileImage;
+      map['brokerProfileImage'] = profileImage;
     }
     if (passportImage != null && passportImage!.isNotEmpty) {
       map['passportImage'] = passportImage;

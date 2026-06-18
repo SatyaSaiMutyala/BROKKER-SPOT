@@ -106,7 +106,7 @@ class BrokerMyInformationController extends GetxController {
       if (json['success'] == true) {
         final url = json['url'] ?? json['data']?['url'] ?? json['data']?['fileUrl'] ?? '';
         if (url.isNotEmpty) {
-          await _updateBasicInfo(name: name, imageUrl: url);
+          await _updateBrokerProfileImage(url);
         }
       } else {
         AppToast.error(json['message'] ?? 'Upload failed');
@@ -118,39 +118,63 @@ class BrokerMyInformationController extends GetxController {
     }
   }
 
-  // ─── Update Name / Profile Image ───
-  Future<void> updateName(String newName, {String? imageUrl}) async {
-    isSavingName.value = true;
+  // Broker avatar is persisted through edit-broker-details (the `profileImage`
+  // field) rather than edit-info — edit-info accepted the field but didn't
+  // reliably persist/return it.
+  Future<void> _updateBrokerProfileImage(String url) async {
     try {
-      await _updateBasicInfo(name: newName, imageUrl: imageUrl);
-    } finally {
-      isSavingName.value = false;
+      final model = EditBrokerDetailsModel(
+        profileImage: url,
+        dealingCountry: dealingCountry,
+        dealingCities: dealingCities,
+        dealingAreas: selectedAreas.toList(),
+        experience: _mapExperience(),
+        knownLanguages: selectedLanguages.toList(),
+        professionalEmail: professionalEmail.value,
+        bnrNumber: bnrNumber.isNotEmpty ? bnrNumber : null,
+      );
+      final result = await _repo.editBrokerDetails(model);
+      if (result.success) {
+        _profileCtrl.brokerProfileImage.value = url;
+        AppToast.success('Updated successfully');
+      } else {
+        AppToast.error(result.message.isNotEmpty ? result.message : 'Update failed');
+      }
+    } catch (e) {
+      AppToast.error('Update failed');
     }
   }
 
-  Future<void> _updateBasicInfo({required String name, String? imageUrl}) async {
-    try {
-      final body = <String, dynamic>{'name': name};
-      // Broker avatar is stored in its own backend field so it doesn't
-      // overwrite the user-side avatar (file-upload uses file_type
-      // 'broker-profile-image'; edit-info mirrors that with brokerProfileImage).
-      if (imageUrl != null) body['brokerProfileImage'] = imageUrl;
+  int _mapExperience() {
+    switch (selectedExperience.value) {
+      case '0-1 Years': return 1;
+      case '1-3 Years': return 3;
+      case '3-5 Years': return 5;
+      case '5+ Years': return 6;
+      default: return 0;
+    }
+  }
 
+  // ─── Update Name ───
+  Future<void> updateName(String newName, {String? imageUrl}) async {
+    isSavingName.value = true;
+    try {
       final response = await putRequest(
         endPoint: '$baseUrl${ApiEndpoints.editInfo}',
-        body: body,
+        body: {'name': newName},
         headers: buildHeaders(),
       );
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (json['success'] == true) {
-        _profileCtrl.userName.value = name;
-        if (imageUrl != null) _profileCtrl.brokerProfileImage.value = imageUrl;
+        _profileCtrl.userName.value = newName;
         AppToast.success('Updated successfully');
       } else {
         AppToast.error(json['message'] ?? 'Update failed');
       }
     } catch (e) {
       AppToast.error('Update failed');
+    } finally {
+      isSavingName.value = false;
     }
   }
 
@@ -236,19 +260,11 @@ class BrokerMyInformationController extends GetxController {
   Future<bool> updateBrokerDetails() async {
     isSavingBrokerInfo.value = true;
     try {
-      int experience = 0;
-      switch (selectedExperience.value) {
-        case '0-1 Years': experience = 1; break;
-        case '1-3 Years': experience = 3; break;
-        case '3-5 Years': experience = 5; break;
-        case '5+ Years': experience = 6; break;
-      }
-
       final model = EditBrokerDetailsModel(
         dealingCountry: dealingCountry,
         dealingCities: dealingCities,
         dealingAreas: selectedAreas.toList(),
-        experience: experience,
+        experience: _mapExperience(),
         knownLanguages: selectedLanguages.toList(),
         professionalEmail: professionalEmail.value,
       );

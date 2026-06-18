@@ -7,6 +7,7 @@ import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_events.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
@@ -180,8 +181,12 @@ class _PublishAnnouncementViewState extends State<PublishAnnouncementView> {
         return;
       }
 
+      setState(() => _isPublishing = false);
       AnnouncementListController.to.refreshAfterMutation();
-      Get.back();
+      // Clear the whole proposal/chat/publish stack and land directly on the
+      // broker dashboard's Announcement tab (index 1) — publishing is the end
+      // of this flow, there's nothing to go "back" to.
+      Get.offAll(() => BrokerDashBoardView(initialIndex: 1));
       Get.snackbar(
         'Published',
         'Your announcement has been published.',

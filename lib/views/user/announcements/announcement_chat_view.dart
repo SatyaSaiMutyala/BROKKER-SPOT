@@ -78,6 +78,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
   // some devices (Samsung in particular) and crash with "setState on disposed".
   Worker? _msgsWorker;
   Worker? _errorWorker;
+  bool _navigatingToPublish = false;
 
   @override
   void initState() {
@@ -333,9 +334,15 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           button = _bannerButton(
             icon: Icons.campaign_outlined,
             label: 'Publish',
-            onTap: () => Get.to(() => PublishAnnouncementView(
-                  announcementId: widget.announcementId,
-                )),
+            onTap: _navigatingToPublish
+                ? null
+                : () async {
+                    setState(() => _navigatingToPublish = true);
+                    await Get.to(() => PublishAnnouncementView(
+                          announcementId: widget.announcementId,
+                        ));
+                    if (mounted) setState(() => _navigatingToPublish = false);
+                  },
             color: Colors.green.shade700,
             filled: true,
           );
