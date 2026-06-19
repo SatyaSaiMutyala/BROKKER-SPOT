@@ -118,11 +118,18 @@ class BrokerMyInformationController extends GetxController {
     }
   }
 
-  // Broker avatar is persisted through edit-broker-details (the `profileImage`
-  // field) rather than edit-info — edit-info accepted the field but didn't
-  // reliably persist/return it.
+  // The broker avatar must be saved on both endpoints — edit-info (so the
+  // general profile name/avatar PUT stays consistent) and edit-broker-details
+  // (the endpoint the backend actually reads the broker avatar back from).
   Future<void> _updateBrokerProfileImage(String url) async {
     try {
+      final editInfoResponse = await putRequest(
+        endPoint: '$baseUrl${ApiEndpoints.editInfo}',
+        body: {'name': name, 'brokerProfileImage': url},
+        headers: buildHeaders(),
+      );
+      final editInfoJson = jsonDecode(editInfoResponse.body) as Map<String, dynamic>;
+
       final model = EditBrokerDetailsModel(
         profileImage: url,
         dealingCountry: dealingCountry,
@@ -134,11 +141,14 @@ class BrokerMyInformationController extends GetxController {
         bnrNumber: bnrNumber.isNotEmpty ? bnrNumber : null,
       );
       final result = await _repo.editBrokerDetails(model);
-      if (result.success) {
+
+      if (editInfoJson['success'] == true && result.success) {
         _profileCtrl.brokerProfileImage.value = url;
         AppToast.success('Updated successfully');
       } else {
-        AppToast.error(result.message.isNotEmpty ? result.message : 'Update failed');
+        AppToast.error(result.message.isNotEmpty
+            ? result.message
+            : (editInfoJson['message'] ?? 'Update failed'));
       }
     } catch (e) {
       AppToast.error('Update failed');
