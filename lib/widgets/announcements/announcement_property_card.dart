@@ -427,38 +427,45 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
             ),
           ),
           SizedBox(height: 6.h),
-          // Bedrooms + Sqft
+          // Bedrooms + Sqft (left, shrinks if needed) — broker avatars +
+          // chevron always pinned at the end of the row.
           Row(
             children: [
-              Row(
-                children: [
-                  Icon(Icons.bed_outlined,
-                      size: 16.sp, color: AppColors.primary),
-                  SizedBox(width: 4.w),
-                  Text(
-                    '${a.bedrooms ?? 0} Bedroom',
-                    style: GoogleFonts.poppins(
-                        fontSize: 14.sp, color: AppColors.textHint),
-                  ),
-                ],
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(Icons.bed_outlined,
+                        size: 16.sp, color: AppColors.primary),
+                    SizedBox(width: 4.w),
+                    Flexible(
+                      child: Text(
+                        '${a.bedrooms ?? 0} Bedroom',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                            fontSize: 14.sp, color: AppColors.textHint),
+                      ),
+                    ),
+                    SizedBox(width: 20),
+                    Icon(Icons.square_foot,
+                        size: 16.sp, color: AppColors.primary),
+                    SizedBox(width: 4.w),
+                    Flexible(
+                      child: Text(
+                        '${a.sqft ?? 0} / Sqft',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                            fontSize: 14.sp, color: AppColors.textHint),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              SizedBox(width: 20),
-              Row(
-                children: [
-                  Icon(Icons.square_foot,
-                      size: 16.sp, color: AppColors.primary),
-                  SizedBox(width: 4.w),
-                  Text(
-                    '${a.sqft ?? 0} / Sqft',
-                    style: GoogleFonts.poppins(
-                        fontSize: 14.sp, color: AppColors.textHint),
-                  ),
-                ],
-              ),
-              SizedBox(width: 20),
-              if (widget.showBrokerProfiles) _buildBrokerAvatarWithCount(),
-              SizedBox(width: 20),
-              if (widget.showBrokerProfiles)
+              if (widget.showBrokerProfiles) ...[
+                SizedBox(width: 12),
+                _buildBrokerAvatarWithCount(),
+                SizedBox(width: 12),
                 Container(
                   padding: EdgeInsets.all(5.w),
                   decoration: BoxDecoration(
@@ -468,6 +475,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                   child: Icon(Icons.chevron_right,
                       size: 18.sp, color: AppColors.primary),
                 ),
+              ],
             ],
           ),
           SizedBox(height: 8.h),

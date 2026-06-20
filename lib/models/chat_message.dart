@@ -9,6 +9,10 @@ class ChatMessage {
   final String text;
   final DateTime? createdAt;
   final bool isMine;
+  /// Set by the server once the recipient has viewed this message (from
+  /// `viewed_at` in the chat:history response). Null = not yet seen, or this
+  /// is our own optimistic copy that hasn't been confirmed by the server yet.
+  final DateTime? viewedAt;
 
   ChatMessage({
     this.id,
@@ -17,6 +21,7 @@ class ChatMessage {
     required this.text,
     this.createdAt,
     this.isMine = false,
+    this.viewedAt,
   });
 
   factory ChatMessage.fromJson(
@@ -41,6 +46,7 @@ class ChatMessage {
 
     final createdRaw =
         json['created_at'] ?? json['createdAt'] ?? json['timestamp'];
+    final viewedRaw = json['viewed_at'] ?? json['viewedAt'];
 
     // Determine isMine using the most reliable signal available.
     // Priority 1: If we know the peer's ID, check if recipient == peer —
@@ -71,6 +77,8 @@ class ChatMessage {
       createdAt:
           createdRaw != null ? DateTime.tryParse(createdRaw.toString()) : null,
       isMine: isMine,
+      viewedAt:
+          viewedRaw != null ? DateTime.tryParse(viewedRaw.toString()) : null,
     );
   }
 }

@@ -11,6 +11,7 @@ import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_events.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
+import 'package:brokkerspot/widgets/common/terms_dialog.dart';
 
 /// Shown to a broker after both sides have signed the agreement
 /// (proposalStatus == 3). Reviews the property and, on confirm, emits
@@ -150,6 +151,68 @@ class _PublishAnnouncementViewState extends State<PublishAnnouncementView> {
     if (docs.isNotEmpty) body['property_documents'] = docs;
 
     return body;
+  }
+
+  // The broker may land here straight from proposalStatus==1 (owner approved,
+  // not yet signed) — "I Accept" on this screen now does the signature AND
+  // the publish in one step, so sign first and only publish once the server
+  // confirms the signature went through.
+  void _signAndPublish() {
+    if (_isPublishing) return;
+    setState(() => _isPublishing = true);
+
+    bool settled = false;
+    late void Function(dynamic) onSuccess;
+    late void Function(dynamic) onError;
+
+    void cleanup() {
+      _socket
+        ..off(ChatEvents.proposalBrokerAccept, onSuccess)
+        ..off(ChatEvents.proposalBrokerAcceptError, onError);
+    }
+
+    void fail(String message) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (!mounted) return;
+      setState(() => _isPublishing = false);
+      Get.snackbar(
+        'Sign failed',
+        message,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade600,
+        colorText: Colors.white,
+      );
+    }
+
+    onSuccess = (dynamic data) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (!mounted) return;
+      // Reset the in-flight flag set above — _publish() sets it again itself.
+      setState(() => _isPublishing = false);
+      _publish();
+    };
+
+    onError = (dynamic data) {
+      final msg = data is Map ? data['message'] as String? : null;
+      fail(msg ?? 'Could not confirm your signature. Please try again.');
+    };
+
+    _socket.connect();
+    _socket
+      ..on(ChatEvents.proposalBrokerAccept, onSuccess)
+      ..on(ChatEvents.proposalBrokerAcceptError, onError)
+      ..emit(ChatEvents.proposalBrokerAccept, {
+        'announcement_id': widget.announcementId,
+      });
+
+    Future.delayed(
+      const Duration(seconds: 10),
+      () => fail("Didn't hear back from the server. Please try again."),
+    );
   }
 
   void _publish() {
@@ -376,8 +439,8 @@ class _PublishAnnouncementViewState extends State<PublishAnnouncementView> {
                 ],
                 SizedBox(height: 16.h),
                 Text(
-                  'Both parties have signed the agreement. Publishing makes this '
-                  'property live for buyers and tenants to discover.',
+                  'Publishing confirms your agreement with the owner and makes '
+                  'this property live for buyers and tenants to discover.',
                   style: GoogleFonts.inter(
                       color: Colors.white54, fontSize: 11.sp, height: 1.5),
                 ),
@@ -388,7 +451,13 @@ class _PublishAnnouncementViewState extends State<PublishAnnouncementView> {
         Padding(
           padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 24.h),
           child: GestureDetector(
-            onTap: _isPublishing ? null : _publish,
+            onTap: _isPublishing
+                ? null
+                : () => showTermsDialog(
+                      context,
+                      onAccept: _signAndPublish,
+                      bodyText: brokerAgreementTermsText,
+                    ),
             child: Container(
               width: double.infinity,
               height: 50.h,
