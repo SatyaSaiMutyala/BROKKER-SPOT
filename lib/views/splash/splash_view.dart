@@ -1,5 +1,6 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
+import 'package:brokkerspot/core/services/notification_service.dart';
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -86,6 +87,9 @@ class _SplashViewState extends State<SplashView>
       } else {
         Get.offAll(() => DashboardView());
       }
+      // If the app was launched cold by tapping a push notification, the
+      // dashboard shell now exists to navigate on top of — process it.
+      NotificationService.consumePendingTap();
     } else {
       // No token - go directly to welcome screen, no splash animation
       Get.offAll(() => const WelcomeView());

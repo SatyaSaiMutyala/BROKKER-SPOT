@@ -83,6 +83,14 @@ class SocketService extends GetxService {
           .setAuth({'token': currentToken})
           .setExtraHeaders({'Authorization': 'Bearer $currentToken'})
           .enableReconnection()
+          // socket_io_client caches Manager+namespace Sockets globally, keyed
+          // by host:port (see _lookup() in socket_io_client.dart) — without
+          // forceNew, a fresh io.io() call after logout/login silently returns
+          // the SAME old Socket object with the PREVIOUS account's auth baked
+          // in, so the server keeps authenticating this connection as the
+          // previous user no matter what token we pass here. Force a brand
+          // new Manager/handshake every time we (re)build the socket.
+          .enableForceNew()
           .build(),
     );
 
