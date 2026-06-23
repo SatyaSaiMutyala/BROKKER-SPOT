@@ -56,7 +56,13 @@ class _NotificationsViewState extends State<NotificationsView> {
       if (isBroker) {
         Get.to(() => BrokerAnnouncementDetailView(announcement: a));
       } else {
-        Get.to(() => AnnouncementDetailView(announcement: a, isOwner: false));
+        // a.isOwner comes from the backend's `is_owner` flag — the
+        // "interested brokers" row is gated behind `isOwner`, so hardcoding
+        // false here was hiding it even when this account owns the listing.
+        Get.to(() => AnnouncementDetailView(
+              announcement: a,
+              isOwner: a.isOwner ?? false,
+            ));
       }
     } catch (e) {
       overlay.remove();

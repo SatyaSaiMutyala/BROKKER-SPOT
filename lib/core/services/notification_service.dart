@@ -291,7 +291,14 @@ class NotificationService {
       if (isBroker) {
         Get.to(() => BrokerAnnouncementDetailView(announcement: a));
       } else {
-        Get.to(() => AnnouncementDetailView(announcement: a, isOwner: false));
+        // a.isOwner comes straight from the backend's `is_owner` flag — using
+        // it (instead of hardcoding false) is what makes the "interested
+        // brokers" row show up; that section is gated behind `isOwner` (see
+        // AnnouncementDetailView line ~935).
+        Get.to(() => AnnouncementDetailView(
+              announcement: a,
+              isOwner: a.isOwner ?? false,
+            ));
       }
     } catch (e) {
       debugPrint('⚠️ Failed to open announcement $announcementId from notification: $e');
