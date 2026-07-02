@@ -904,14 +904,13 @@ class _BrokerAnnouncementDetailViewState
     // visible immediately with no flash of wrong content.
     if (!_detailLoaded) {
       return Container(
-        padding: EdgeInsets.fromLTRB(
-            20.w, 12.h, 20.w, MediaQuery.of(context).padding.bottom + 12.h),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
         color: Colors.white,
         child: Shimmer.fromColors(
           baseColor: Colors.grey.shade200,
           highlightColor: Colors.grey.shade100,
           child: Container(
-            height: 52.h,
+            height: 44.h,
             decoration: BoxDecoration(
               color: Colors.grey.shade200,
               borderRadius: BorderRadius.circular(14.r),
@@ -1006,8 +1005,7 @@ class _BrokerAnnouncementDetailViewState
     }
 
     return Container(
-      padding: EdgeInsets.fromLTRB(
-          20.w, 12.h, 20.w, MediaQuery.of(context).padding.bottom + 12.h),
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -1020,7 +1018,7 @@ class _BrokerAnnouncementDetailViewState
       ),
       child: SizedBox(
         width: double.infinity,
-        height: 52.h,
+        height: 44.h,
         child: button,
       ),
     );

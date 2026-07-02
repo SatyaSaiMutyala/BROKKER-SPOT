@@ -12,6 +12,7 @@ import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_proposals_view.dart';
 
@@ -97,11 +98,16 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
   Color _statusColor(String? status) {
     switch (status?.toLowerCase()) {
-      case 'active': return const Color(0xFF1B6B3A);
-      case 'rejected': return const Color(0xFFC0392B);
-      case 'pending': return const Color(0xFFB8600A);
-      case 'draft': return Colors.grey.shade600;
-      default: return Colors.grey.shade600;
+      case 'active':
+        return const Color(0xFF1B6B3A);
+      case 'rejected':
+        return const Color(0xFFC0392B);
+      case 'pending':
+        return const Color(0xFFB8600A);
+      case 'draft':
+        return Colors.grey.shade600;
+      default:
+        return Colors.grey.shade600;
     }
   }
 
@@ -111,7 +117,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     return PopupMenuButton<String>(
       onSelected: (value) {
         if (value == 'edit') {
-          Get.to(() => CreateAnnouncementView(announcement: widget.announcement))
+          Get.to(() =>
+                  CreateAnnouncementView(announcement: widget.announcement))
               ?.then((result) {
             if (result == true && mounted) Get.back(result: true);
           });
@@ -169,8 +176,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
           child: Padding(
-            padding:
-                EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -231,20 +237,21 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                                   await _repo.deleteAnnouncement(id);
                                   // Drop it from the shared cache so every list
                                   // screen updates reactively, no refetch needed.
-                                  AnnouncementListController.to.removeLocally(id);
+                                  AnnouncementListController.to
+                                      .removeLocally(id);
                                   if (mounted) {
                                     Get.back(); // dismiss dialog
                                     Get.back(result: true);
                                   }
                                 } catch (_) {
                                   setDialogState(() => _isDeleting = false);
-                                  AppToast.error('Delete failed. Please try again.');
+                                  AppToast.error(
+                                      'Delete failed. Please try again.');
                                 }
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red.shade600,
-                          disabledBackgroundColor:
-                              Colors.red.shade300,
+                          disabledBackgroundColor: Colors.red.shade300,
                           padding: EdgeInsets.symmetric(vertical: 13.h),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -310,9 +317,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                     : 'No reason provided.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    fontSize: 13.sp,
-                    color: Colors.black54,
-                    height: 1.5),
+                    fontSize: 13.sp, color: Colors.black54, height: 1.5),
               ),
               SizedBox(height: 24.h),
               SizedBox(
@@ -352,9 +357,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     final status = a.status?.toLowerCase() ?? '';
     final hasVideo = (a.propertyMedia?.videos?.isNotEmpty ?? false);
     final hasImages = (a.imageUrls?.length ?? 0) > 0;
-    final images = hasImages
-        ? a.imageUrls!
-        : (hasVideo ? <String>[] : _fallbackImages);
+    final images =
+        hasImages ? a.imageUrls! : (hasVideo ? <String>[] : _fallbackImages);
     final totalPages = (hasVideo ? 1 : 0) + images.length;
     final topPadding = MediaQuery.of(context).padding.top;
 
@@ -372,12 +376,12 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeroMedia(a, images, hasImages, hasVideo,
-                      totalPages, topPadding),
+                  _buildHeroMedia(
+                      a, images, hasImages, hasVideo, totalPages, topPadding),
                   Transform.translate(
                     offset: Offset(0, -22.h),
                     child: Container(
-                       width: double.infinity,
+                      width: double.infinity,
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.only(
@@ -385,8 +389,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                           topRight: Radius.circular(22.r),
                         ),
                       ),
-                      padding:
-                          EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 0),
+                      padding: EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -422,8 +425,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                           SizedBox(height: 18.h),
                           _buildStatsRow(a),
                           SizedBox(height: 20.h),
-                          Divider(
-                              color: Colors.grey.shade100, thickness: 1),
+                          Divider(color: Colors.grey.shade100, thickness: 1),
                           SizedBox(height: 18.h),
                           if ((a.description ?? '').isNotEmpty) ...[
                             _sectionTitle('About this property'),
@@ -537,9 +539,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                   ),
                 )
               : Image.asset(images[imgIdx],
-                  width: double.infinity,
-                  height: height,
-                  fit: BoxFit.cover);
+                  width: double.infinity, height: height, fit: BoxFit.cover);
         },
       );
     }
@@ -578,8 +578,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               right: 0,
               child: Center(
                 child: Container(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 14.w, vertical: 5.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 14.w, vertical: 5.h),
                   decoration: BoxDecoration(
                     color: _statusColor(a.status),
                     borderRadius: BorderRadius.circular(20.r),
@@ -629,8 +629,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               top: topPadding + 10.h,
               right: widget.isOwner ? 62.w : 16.w,
               child: Container(
-                padding: EdgeInsets.symmetric(
-                    horizontal: 10.w, vertical: 4.h),
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(20.r),
@@ -685,13 +684,12 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
         ),
         if (a.listingType != null)
           Container(
-            padding:
-                EdgeInsets.symmetric(horizontal: 14.w, vertical: 5.h),
+            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 5.h),
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20.r),
-              border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.35)),
+              border:
+                  Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
             ),
             child: Text(
               a.listingType!,
@@ -705,8 +703,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
           SizedBox(width: 8.w),
           Text(
             _formatDate(a.createdAt!),
-            style: GoogleFonts.inter(
-                fontSize: 11.sp, color: Colors.grey.shade400),
+            style:
+                GoogleFonts.inter(fontSize: 11.sp, color: Colors.grey.shade400),
           ),
         ],
       ],
@@ -738,8 +736,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
         return Expanded(
           child: Container(
             margin: EdgeInsets.only(right: isLast ? 0 : 8.w),
-            padding:
-                EdgeInsets.symmetric(vertical: 10.h, horizontal: 4.w),
+            padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 4.w),
             decoration: BoxDecoration(
               color: const Color(0xFFF8F6F0),
               borderRadius: BorderRadius.circular(10.r),
@@ -797,9 +794,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   Widget _buildDescription(String desc) {
     const threshold = 160;
     final isLong = desc.length > threshold;
-    final displayText = isLong && !_descExpanded
-        ? '${desc.substring(0, threshold)}...'
-        : desc;
+    final displayText =
+        isLong && !_descExpanded ? '${desc.substring(0, threshold)}...' : desc;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -855,8 +851,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
     if (items.isEmpty) return const SizedBox.shrink();
 
-    final cardWidth =
-        (MediaQuery.of(context).size.width - 48.w) / 2;
+    final cardWidth = (MediaQuery.of(context).size.width - 48.w) / 2;
 
     return Wrap(
       spacing: 8.w,
@@ -864,8 +859,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       children: items
           .map((item) => Container(
                 width: cardWidth,
-                padding: EdgeInsets.symmetric(
-                    horizontal: 14.w, vertical: 12.h),
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(10.r),
@@ -900,8 +894,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       runSpacing: 8.h,
       children: amenities
           .map((label) => Container(
-                padding: EdgeInsets.symmetric(
-                    horizontal: 12.w, vertical: 6.h),
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(20.r),
@@ -932,11 +925,65 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   // ── Bottom bar (status-based) ──────────────────────────────────────────────
 
   Widget _buildBottomBar(String status) {
-    if (!widget.isOwner) return const SizedBox.shrink();
+    if (!widget.isOwner) return _buildChatBar();
     if (status == 'active') return _buildActiveSection();
     if (status == 'rejected') return _buildRejectedSection();
     if (status == 'draft') return _buildDraftSection();
     return const SizedBox.shrink();
+  }
+
+  // Non-owner viewing someone else's listing — same chat entry point as the
+  // "Chat" button on AnnouncementPropertyCard (see AnnouncementsView).
+  Widget _buildChatBar() {
+    final a = widget.announcement;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 14,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      // Equal padding on every side — the button sits dead-centre in a
+      // fixed-height bar, no device-dependent extra strip.
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => AnnouncementChatView.open(
+          announcementId: a.id ?? '',
+          brokerName: a.ownerName ?? 'Owner',
+          brokerAvatar: a.ownerAvatarUrl,
+          peerUserId: a.userId,
+        ),
+        child: Container(
+          width: double.infinity,
+          height: 44.h,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(26.r),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.chat_bubble_outline, size: 18.sp, color: Colors.white),
+              SizedBox(width: 8.w),
+              Text(
+                'Chat',
+                style: GoogleFonts.poppins(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildActiveSection() {
@@ -952,8 +999,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
           ),
         ],
       ),
-      padding:
-          EdgeInsets.fromLTRB(20.w, 14.h, 20.w, bottomPad),
+      padding: EdgeInsets.fromLTRB(20.w, 14.h, 20.w, bottomPad),
       child: _brokerSelected
           ? _buildBrokerSelectedBar()
           : GestureDetector(
@@ -996,8 +1042,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
             color: AppColors.primary.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.chevron_right,
-              size: 18.sp, color: AppColors.primary),
+          child:
+              Icon(Icons.chevron_right, size: 18.sp, color: AppColors.primary),
         ),
       ],
     );
@@ -1106,8 +1152,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                             color: Colors.black87)),
                     Text('Ahmed Al-Rashid',
                         style: GoogleFonts.inter(
-                            fontSize: 12.sp,
-                            color: AppColors.textHint)),
+                            fontSize: 12.sp, color: AppColors.textHint)),
                   ],
                 ),
               ),
@@ -1216,12 +1261,11 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14.r)),
           ),
-          onPressed: () =>
-              Get.to(() => CreateAnnouncementView(
-                      announcement: widget.announcement))
-                  ?.then((result) {
-                if (result == true && mounted) Get.back(result: true);
-              }),
+          onPressed: () => Get.to(() =>
+                  CreateAnnouncementView(announcement: widget.announcement))
+              ?.then((result) {
+            if (result == true && mounted) Get.back(result: true);
+          }),
           child: Text('Complete Your Announcement',
               style: GoogleFonts.poppins(
                   fontSize: 15.sp,
