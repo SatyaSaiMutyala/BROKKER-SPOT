@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/theme/theme_controller.dart';
 import 'package:brokkerspot/views/user/settings/change_password_view.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
 import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
@@ -134,7 +135,7 @@ class SettingsView extends StatelessWidget {
             icon: Icons.light_mode_outlined,
             iconColor: AppColors.goldAccent,
             title: 'Light mode',
-            trailing: _buildSwitch(),
+            trailing: _buildThemeSwitch(),
           ),
           _tileDivider(),
           _settingsTile(
@@ -247,27 +248,29 @@ class SettingsView extends StatelessWidget {
     );
   }
 
-  // ---------------- SWITCH ----------------
-  Widget _buildSwitch() {
-    return SizedBox(
-      width: 40.w,
-      height: 24.h,
-      child: FittedBox(
-        fit: BoxFit.contain,
-        child: Switch(
-          value: false,
-          onChanged: (val) {},
-          thumbColor: WidgetStateProperty.all(Colors.white),
-          trackColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return AppColors.primary;
-            }
-            return Colors.grey.shade300;
-          }),
-          trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+  // ---------------- THEME SWITCH ----------------
+  Widget _buildThemeSwitch() {
+    return Obx(() {
+      final isDark = ThemeController.to.isDark;
+      return SizedBox(
+        width: 40.w,
+        height: 24.h,
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: Switch(
+            value: !isDark,
+            onChanged: (_) => ThemeController.to.toggleTheme(),
+            thumbColor: WidgetStateProperty.all(Colors.white),
+            trackColor: WidgetStateProperty.resolveWith((states) {
+              return states.contains(WidgetState.selected)
+                  ? AppColors.primary
+                  : Colors.grey.shade300;
+            }),
+            trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   // ---------------- DIVIDER ----------------

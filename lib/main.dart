@@ -11,7 +11,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:brokkerspot/core/services/announcement_cache.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
-import 'core/constants/app_colors.dart';
+import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 import 'views/splash/splash_view.dart';
 
 void main() async {
@@ -51,6 +52,7 @@ void main() async {
     ),
   );
 
+  Get.put(ThemeController(), permanent: true);
   runApp(const MyApp());
 }
 
@@ -67,11 +69,9 @@ class MyApp extends StatelessWidget {
         return GetMaterialApp(
           title: 'Brokker',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            fontFamily: 'Poppins',
-            colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
-            useMaterial3: true,
-          ),
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeController.to.themeMode,
           builder: (context, widget) {
             final child = EasyLoading.init()(context, widget);
             return GestureDetector(

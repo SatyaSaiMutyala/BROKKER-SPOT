@@ -58,11 +58,18 @@ class LocalStorageService {
     return _prefs?.getString("last_side") ?? 'user';
   }
 
+  static Future<void> saveDarkMode(bool value) async =>
+      _prefs?.setBool('dark_mode', value);
+
+  static bool getDarkMode() => _prefs?.getBool('dark_mode') ?? false;
+
   static Future<void> clearAll() async {
-    // Preserve last_side across logout
+    // Preserve user preferences across logout.
     final lastSide = getLastSide();
+    final darkMode = getDarkMode();
     await _prefs?.clear();
     await saveLastSide(lastSide);
+    await saveDarkMode(darkMode);
   }
 
   static bool isLoggedIn() {

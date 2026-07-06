@@ -27,8 +27,6 @@ Map<String, String> buildHeader() {
 
 Map<String, String> buildHeaders() {
   String token = LocalStorageService.getAccessToken() ?? "";
-  print("Bearer $token");
-
   return {
     'Content-Type': 'application/json',
     'Authorization': token,
@@ -69,8 +67,23 @@ void _handleUnauthorized(String requestToken) async {
   Get.offAll(() => WelcomeView());
 }
 
+/// Returns true when the server signals that the caller's token is no longer
+/// valid — covers both the standard 401 and backends that (incorrectly) return
+/// 400 with {"message": "Invalid token"}.
+bool _isTokenInvalid(http.Response response) {
+  if (response.statusCode == 401) return true;
+  if (response.statusCode == 400) {
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final message = (body['message'] as String?)?.toLowerCase() ?? '';
+      return message.contains('invalid token');
+    } catch (_) {}
+  }
+  return false;
+}
+
 http.Response _checkUnauthorized(http.Response response, String requestToken) {
-  if (response.statusCode == 401) _handleUnauthorized(requestToken);
+  if (_isTokenInvalid(response)) _handleUnauthorized(requestToken);
   return response;
 }
 
