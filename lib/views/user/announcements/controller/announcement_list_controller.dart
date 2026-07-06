@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/announcement_cache.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
@@ -113,9 +114,9 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingAll.value = true;
       allError.value = null;
-      // Reset pagination cursor — this is a fresh fetch, not append.
-      final result = await _repo.fetchAllAnnouncements(
-          page: 1, perPage: _allPerPage, userRole: 1);
+      final result = LocalStorageService.isLoggedIn()
+          ? await _repo.fetchAllAnnouncements(page: 1, perPage: _allPerPage, userRole: 1)
+          : await _repo.fetchGuestAnnouncements(page: 1, perPage: _allPerPage);
       allAnnouncements.assignAll(result.items);
       _allPage = result.page;
       _allTotalPages = result.totalPages;
@@ -138,8 +139,9 @@ class AnnouncementListController extends GetxController {
     final next = _allPage + 1;
     try {
       isLoadingMoreAll.value = true;
-      final result = await _repo.fetchAllAnnouncements(
-          page: next, perPage: _allPerPage, userRole: 1);
+      final result = LocalStorageService.isLoggedIn()
+          ? await _repo.fetchAllAnnouncements(page: next, perPage: _allPerPage, userRole: 1)
+          : await _repo.fetchGuestAnnouncements(page: next, perPage: _allPerPage);
       allAnnouncements.addAll(result.items);
       _allPage = result.page;
       _allTotalPages = result.totalPages;
@@ -227,7 +229,9 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingHome.value = true;
       homeError.value = null;
-      final result = await _repo.fetchAllAnnouncements(page: 1, perPage: 5, userRole: 1);
+      final result = LocalStorageService.isLoggedIn()
+          ? await _repo.fetchAllAnnouncements(page: 1, perPage: 5, userRole: 1)
+          : await _repo.fetchGuestAnnouncements(page: 1, perPage: 5);
       homeAnnouncements.assignAll(result.items);
       AnnouncementCache.saveList(AnnouncementCache.keyHome, result.raw);
       _homeLoaded = true;

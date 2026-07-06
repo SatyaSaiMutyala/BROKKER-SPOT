@@ -94,6 +94,31 @@ class AnnouncementRepository {
     throw json['message'] ?? 'Failed to fetch announcements';
   }
 
+  /// Fetches announcements for unauthenticated (guest) users.
+  /// Uses the public `/guest/announcements/fetch-all` endpoint — no auth header.
+  Future<({List<AnnouncementModel> items, List<Map<String, dynamic>> raw, int totalRecords, int totalPages, int page})>
+      fetchGuestAnnouncements({int page = 1, int perPage = 10, int userRole = 1}) async {
+    final response = await api.getRequest(
+      endPoint:
+          '${api.baseUrl}${ApiEndpoints.guestFetchAllAnnouncements}?page=$page&perPage=$perPage&user_role=$userRole',
+      headers: api.buildHeader(),
+    );
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['success'] == true) {
+      final data = json['data'] as Map<String, dynamic>;
+      final raw = (data['data'] as List).cast<Map<String, dynamic>>();
+      final items = raw.map(AnnouncementModel.fromJson).toList();
+      return (
+        items: items,
+        raw: raw,
+        totalRecords: data['totalRecords'] as int,
+        totalPages: data['totalPages'] as int,
+        page: data['page'] as int,
+      );
+    }
+    throw json['message'] ?? 'Failed to fetch announcements';
+  }
+
   Future<void> sendProposal(String announcementId, {required String message}) async {
     final response = await api.postRequest(
       '',
@@ -130,6 +155,20 @@ class AnnouncementRepository {
     final response = await api.getRequest(
       endPoint: '${api.baseUrl}${ApiEndpoints.fetchAnnouncementDetail}/$id',
       headers: api.buildHeaders(),
+    );
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['success'] == true) {
+      return AnnouncementModel.fromJson(json['data'] as Map<String, dynamic>);
+    }
+    throw json['message'] ?? 'Failed to fetch announcement';
+  }
+
+  /// Fetches announcement detail for unauthenticated (guest) users.
+  /// Uses the public `/guest/announcements/fetch/{id}` endpoint — no auth header.
+  Future<AnnouncementModel> fetchGuestAnnouncementDetail(String id) async {
+    final response = await api.getRequest(
+      endPoint: '${api.baseUrl}${ApiEndpoints.guestFetchAnnouncementDetail}/$id',
+      headers: api.buildHeader(),
     );
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     if (json['success'] == true) {

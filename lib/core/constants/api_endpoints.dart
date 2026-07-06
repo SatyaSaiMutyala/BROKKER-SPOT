@@ -20,6 +20,10 @@ class ApiEndpoints {
   static const String editEmail = 'user/profile/edit-email';
   static const String verifyEmailOtp = 'user/profile/verify-email-otp';
 
+  // Guest (no auth required)
+  static const String guestFetchAllAnnouncements = 'guest/announcements/fetch-all';
+  static const String guestFetchAnnouncementDetail = 'guest/announcements/fetch';
+
   // Announcements
   static const String addAnnouncement = 'user/announcements/add';
   static const String editAnnouncement = 'user/announcements/edit';
@@ -38,6 +42,11 @@ class ApiEndpoints {
   static const String markAllNotificationsRead = 'user/notifications/mark-all-read';
   static const String deleteNotification = 'user/notifications/delete';
 
-  // Common
+  // Common reference data
   static const String fetchAmenities = 'user/common/fetch-amenities';
+  static const String fetchCountries = 'user/common/fetch-countries';
+  static const String fetchCities = 'user/common/fetch-cities';
+  static const String fetchLocalities = 'user/common/fetch-localities';
+  static const String fetchLanguages = 'user/common/fetch-languages';
+  static const String fetchPropertyTypes = 'user/common/fetch-property-types';
 }

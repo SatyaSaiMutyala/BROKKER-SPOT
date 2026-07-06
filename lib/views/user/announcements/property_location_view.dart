@@ -1,4 +1,8 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/controllers/common_data_controller.dart';
+import 'package:brokkerspot/models/city_model.dart';
+import 'package:brokkerspot/models/country_model.dart';
+import 'package:brokkerspot/models/locality_model.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/views/user/announcements/map_picker_view.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
@@ -19,10 +23,12 @@ class PropertyLocationView extends StatefulWidget {
 }
 
 class _PropertyLocationViewState extends State<PropertyLocationView> {
-  String? _country;
-  String? _city;
-  String? _area;
+  late final CommonDataController _ctrl;
   final _addressCtrl = TextEditingController();
+
+  CountryModel? _selectedCountry;
+  CityModel? _selectedCity;
+  LocalityModel? _selectedLocality;
 
   bool _countryOpen = false;
   bool _cityOpen = false;
@@ -32,39 +38,53 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   double? _longitude;
 
   bool get _isValid =>
-      _country != null &&
-      _city != null &&
-      _area != null &&
+      _selectedCountry != null &&
+      _selectedCity != null &&
+      _selectedLocality != null &&
       _addressCtrl.text.trim().isNotEmpty;
-
-  final _countries = ['India', 'UAE', 'France'];
-  final _cities = [
-    'Dubai',
-    'Abu Dhabi',
-    'Hyderabad',
-    'London',
-    'New York',
-    'Toronto'
-  ];
-  final _areas = ['Downtown', 'Business Bay', 'Marina', 'Jumeirah', 'Deira'];
-
-  void _closeAll() {
-    _countryOpen = false;
-    _cityOpen = false;
-    _areaOpen = false;
-  }
 
   @override
   void initState() {
     super.initState();
+    _ctrl = CommonDataController.to;
+    _addressCtrl.addListener(() => setState(() {}));
+
     final c = Get.find<AnnouncementController>();
-    _country = c.country;
-    _city = c.city;
-    _area = c.area;
     _latitude = c.latitude;
     _longitude = c.longitude;
     if (c.address != null) _addressCtrl.text = c.address!;
-    _addressCtrl.addListener(() => setState(() {}));
+
+    // Load countries then attempt to restore any previously saved selections.
+    _ctrl.loadCountries().then((_) => _restoreSelections(c));
+  }
+
+  /// Restores the country/city/area selections from the announcement controller
+  /// (used when re-entering the screen after a partial save or on edit).
+  Future<void> _restoreSelections(AnnouncementController c) async {
+    if (c.country == null) return;
+
+    final country = _ctrl.countries
+        .where((x) => x.name == c.country)
+        .firstOrNull;
+    if (country == null) return;
+    setState(() => _selectedCountry = country);
+
+    await _ctrl.loadCities(country.id);
+    if (c.city == null) return;
+
+    final city = _ctrl.cities
+        .where((x) => x.name == c.city)
+        .firstOrNull;
+    if (city == null) return;
+    setState(() => _selectedCity = city);
+
+    await _ctrl.loadLocalities(cityId: city.id, countryId: country.id);
+    if (c.area == null) return;
+
+    final locality = _ctrl.localities
+        .where((x) => x.name == c.area)
+        .firstOrNull;
+    if (locality != null) setState(() => _selectedLocality = locality);
   }
 
   @override
@@ -73,7 +93,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
     super.dispose();
   }
 
-  // ── Geo ──────────────────────────────────────────────────────────────────────
+  // ── Geo ───────────────────────────────────────────────────────────────────
 
   Future<void> _useCurrentLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -108,7 +128,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
               initialPosition: LatLng(pos.latitude, pos.longitude)),
         ),
       );
-      if (result != null) _applyResult(result);
+      if (result != null) _applyMapResult(result);
     } catch (_) {
       EasyLoading.dismiss();
       EasyLoading.showError('Failed to get location');
@@ -122,17 +142,13 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
     }
     final result = await Navigator.push<LocationPickerResult>(
       context,
-      MaterialPageRoute(
-          builder: (_) => MapPickerView(initialPosition: initial)),
+      MaterialPageRoute(builder: (_) => MapPickerView(initialPosition: initial)),
     );
-    if (result != null) _applyResult(result);
+    if (result != null) _applyMapResult(result);
   }
 
-  void _applyResult(LocationPickerResult r) {
+  void _applyMapResult(LocationPickerResult r) {
     setState(() {
-      _country = r.country.isNotEmpty ? r.country : _country;
-      _city = r.city.isNotEmpty ? r.city : _city;
-      _area = r.area.isNotEmpty ? r.area : _area;
       _addressCtrl.text = r.address;
       _latitude = r.latitude;
       _longitude = r.longitude;
@@ -140,7 +156,13 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
     });
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────────
+  void _closeAll() {
+    _countryOpen = false;
+    _cityOpen = false;
+    _areaOpen = false;
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -149,74 +171,105 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       body: SafeArea(
         child: Column(
           children: [
-            const CustomHeader(
-                title: 'PROPERTY LOCATION', showBackButton: true),
+            const CustomHeader(title: 'PROPERTY LOCATION', showBackButton: true),
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.all(20.w),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Country dropdown ──────────────────────────────────
+                    // ── Country ───────────────────────────────────────────
                     _label('Select the country where property exist',
                         required: true),
                     SizedBox(height: 8.h),
-                    _inlineDropdown(
-                      hint: 'Select Country',
-                      value: _country,
-                      items: _countries,
-                      isOpen: _countryOpen,
-                      onToggle: () => setState(() {
-                        final wasOpen = _countryOpen;
-                        _closeAll();
-                        _countryOpen = !wasOpen;
-                      }),
-                      onSelect: (v) => setState(() {
-                        _country = v;
-                        _countryOpen = false;
-                      }),
-                    ),
+                    Obx(() => _inlineDropdown(
+                          hint: 'Select Country',
+                          value: _selectedCountry?.name,
+                          items: _ctrl.countries.map((c) => c.name).toList(),
+                          isOpen: _countryOpen,
+                          isLoading: _ctrl.isLoadingCountries.value,
+                          onToggle: () => setState(() {
+                            final was = _countryOpen;
+                            _closeAll();
+                            _countryOpen = !was;
+                          }),
+                          onSelect: (name) {
+                            final country = _ctrl.countries
+                                .where((c) => c.name == name)
+                                .firstOrNull;
+                            if (country == null) return;
+                            setState(() {
+                              _selectedCountry = country;
+                              _selectedCity = null;
+                              _selectedLocality = null;
+                              _countryOpen = false;
+                            });
+                            _ctrl.loadCities(country.id);
+                          },
+                        )),
                     SizedBox(height: 20.h),
 
-                    // ── City dropdown ─────────────────────────────────────
+                    // ── City ──────────────────────────────────────────────
                     _label('Select the City where property exist',
                         required: true),
                     SizedBox(height: 8.h),
-                    _inlineDropdown(
-                      hint: 'Select city',
-                      value: _city,
-                      items: _cities,
-                      isOpen: _cityOpen,
-                      onToggle: () => setState(() {
-                        final wasOpen = _cityOpen;
-                        _closeAll();
-                        _cityOpen = !wasOpen;
-                      }),
-                      onSelect: (v) => setState(() {
-                        _city = v;
-                        _cityOpen = false;
-                      }),
-                    ),
+                    Obx(() => _inlineDropdown(
+                          hint: 'Select City',
+                          value: _selectedCity?.name,
+                          items: _ctrl.cities.map((c) => c.name).toList(),
+                          isOpen: _cityOpen,
+                          isLoading: _ctrl.isLoadingCities.value,
+                          enabled: _selectedCountry != null,
+                          onToggle: () => setState(() {
+                            final was = _cityOpen;
+                            _closeAll();
+                            _cityOpen = !was;
+                          }),
+                          onSelect: (name) {
+                            final city = _ctrl.cities
+                                .where((c) => c.name == name)
+                                .firstOrNull;
+                            if (city == null || _selectedCountry == null) return;
+                            setState(() {
+                              _selectedCity = city;
+                              _selectedLocality = null;
+                              _cityOpen = false;
+                            });
+                            _ctrl.loadLocalities(
+                              cityId: city.id,
+                              countryId: _selectedCountry!.id,
+                            );
+                          },
+                        )),
                     SizedBox(height: 20.h),
 
-                    // ── Area dropdown ─────────────────────────────────────
+                    // ── Area / Locality ───────────────────────────────────
                     _label('Select Area where property exist', required: true),
                     SizedBox(height: 8.h),
-                    _inlineDropdown(
-                      hint: 'Enter Areas',
-                      value: _area,
-                      items: _areas,
-                      isOpen: _areaOpen,
-                      onToggle: () => setState(() {
-                        final wasOpen = _areaOpen;
-                        _closeAll();
-                        _areaOpen = !wasOpen;
-                      }),
-                      onSelect: (v) => setState(() {
-                        _area = v;
-                        _areaOpen = false;
-                      }),
-                    ),
+                    Obx(() => _inlineDropdown(
+                          hint: 'Select Area',
+                          value: _selectedLocality?.name,
+                          items:
+                              _ctrl.localities.map((l) => l.name).toList(),
+                          isOpen: _areaOpen,
+                          isLoading: _ctrl.isLoadingLocalities.value,
+                          enabled: _selectedCity != null,
+                          onToggle: () => setState(() {
+                            final was = _areaOpen;
+                            _closeAll();
+                            _areaOpen = !was;
+                          }),
+                          onSelect: (name) {
+                            final locality = _ctrl.localities
+                                .where((l) => l.name == name)
+                                .firstOrNull;
+                            if (locality == null) return;
+                            setState(() {
+                              _selectedLocality = locality;
+                              _areaOpen = false;
+                            });
+                          },
+                        )),
                     SizedBox(height: 20.h),
 
                     // ── Geo buttons ───────────────────────────────────────
@@ -241,7 +294,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                     ),
                     SizedBox(height: 20.h),
 
-                    // ── Address text area (auto-filled by geo) ────────────
+                    // ── Address ───────────────────────────────────────────
                     _label('Enter Your Address', required: true),
                     SizedBox(height: 8.h),
                     _textArea(controller: _addressCtrl, hint: 'Write here...'),
@@ -260,9 +313,9 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                 onPressed: _isValid
                     ? () {
                         Get.find<AnnouncementController>().setLocation(
-                          country: _country!,
-                          city: _city!,
-                          area: _area!,
+                          country: _selectedCountry!.name,
+                          city: _selectedCity!.name,
+                          area: _selectedLocality!.name,
                           address: _addressCtrl.text.trim(),
                           latitude: _latitude,
                           longitude: _longitude,
@@ -278,7 +331,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
     );
   }
 
-  // ── Widgets ───────────────────────────────────────────────────────────────────
+  // ── Widgets ───────────────────────────────────────────────────────────────
 
   Widget _geoButton({
     required IconData icon,
@@ -321,16 +374,22 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
     required bool isOpen,
     required VoidCallback onToggle,
     required ValueChanged<String> onSelect,
+    bool isLoading = false,
+    bool enabled = true,
   }) {
+    final effectiveColor =
+        enabled ? Colors.grey.shade300 : Colors.grey.shade200;
+    final textColor = enabled ? Colors.black87 : Colors.grey.shade400;
+
     return Column(
       children: [
         GestureDetector(
-          onTap: onToggle,
+          onTap: enabled ? onToggle : null,
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: effectiveColor),
               borderRadius: isOpen
                   ? BorderRadius.vertical(top: Radius.circular(6.r))
                   : BorderRadius.circular(6.r),
@@ -338,17 +397,27 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    value ?? hint,
-                    style: GoogleFonts.inter(
-                      fontSize: 14.sp,
-                      color:
-                          value != null ? Colors.black87 : Colors.grey.shade400,
-                    ),
-                  ),
+                  child: isLoading
+                      ? SizedBox(
+                          height: 16.h,
+                          width: 16.h,
+                          child: const CircularProgressIndicator(
+                              strokeWidth: 2),
+                        )
+                      : Text(
+                          value ?? hint,
+                          style: GoogleFonts.inter(
+                            fontSize: 14.sp,
+                            color: value != null
+                                ? textColor
+                                : Colors.grey.shade400,
+                          ),
+                        ),
                 ),
                 Icon(
-                  isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  isOpen
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
                   color: Colors.grey.shade500,
                   size: 20.sp,
                 ),
@@ -356,7 +425,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
             ),
           ),
         ),
-        if (isOpen)
+        if (isOpen && items.isNotEmpty)
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -365,7 +434,8 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                 right: BorderSide(color: Colors.grey.shade300),
                 bottom: BorderSide(color: Colors.grey.shade300),
               ),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(6.r)),
+              borderRadius:
+                  BorderRadius.vertical(bottom: Radius.circular(6.r)),
             ),
             child: Column(
               children: items.map((item) {
@@ -374,8 +444,8 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                   onTap: () => onSelect(item),
                   child: Container(
                     width: double.infinity,
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 14.w, vertical: 13.h),
                     color: isSelected
                         ? AppColors.primary.withValues(alpha: 0.08)
                         : null,
@@ -383,9 +453,12 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                       item,
                       style: GoogleFonts.inter(
                         fontSize: 14.sp,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: isSelected ? AppColors.primary : Colors.black87,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: isSelected
+                            ? AppColors.primary
+                            : Colors.black87,
                       ),
                     ),
                   ),
@@ -403,17 +476,16 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
         text: text,
         style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87),
         children: required
-            ? [
-                TextSpan(
-                    text: ' *', style: GoogleFonts.inter(color: Colors.red))
-              ]
+            ? [TextSpan(text: ' *', style: GoogleFonts.inter(color: Colors.red))]
             : null,
       ),
     );
   }
 
-  Widget _textArea(
-      {required TextEditingController controller, required String hint}) {
+  Widget _textArea({
+    required TextEditingController controller,
+    required String hint,
+  }) {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.shade300),

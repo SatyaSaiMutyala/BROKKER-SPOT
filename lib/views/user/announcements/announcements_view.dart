@@ -10,6 +10,8 @@ import 'package:brokkerspot/views/user/announcements/controller/announcement_lis
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_card_skeleton.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -72,7 +74,13 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
                     Icon(Icons.search, size: 36.sp, color: AppColors.primary),
               ),
               trailing: GestureDetector(
-                onTap: () => Get.to(() => const CreateAnnouncementView()),
+                onTap: () {
+                  if (!LocalStorageService.isLoggedIn()) {
+                    showLoginRequiredDialog(Get.context!);
+                    return;
+                  }
+                  Get.to(() => const CreateAnnouncementView());
+                },
                 child: Image.asset('assets/images/home_add_icon.png',
                     width: 50.w, height: 50.w),
               ),

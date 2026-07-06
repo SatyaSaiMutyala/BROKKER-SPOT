@@ -14,6 +14,7 @@ import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_proposals_view.dart';
 
 class AnnouncementDetailView extends StatefulWidget {
@@ -70,7 +71,9 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     final id = widget.announcement.id;
     if (id == null) return;
     try {
-      final fresh = await _repo.fetchAnnouncementDetail(id);
+      final fresh = LocalStorageService.isLoggedIn()
+          ? await _repo.fetchAnnouncementDetail(id)
+          : await _repo.fetchGuestAnnouncementDetail(id);
       if (mounted) setState(() => _data = fresh);
     } catch (_) {}
   }

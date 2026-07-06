@@ -6,10 +6,12 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/models/chat_message.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_controller.dart';
 import 'package:brokkerspot/views/user/announcements/publish_announcement_view.dart';
+import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/widgets/common/terms_dialog.dart';
 
 class AnnouncementChatView extends StatefulWidget {
@@ -43,6 +45,10 @@ class AnnouncementChatView extends StatefulWidget {
     String? peerUserId,
     int? userRole,
   }) async {
+    if (!LocalStorageService.isLoggedIn()) {
+      showLoginRequiredDialog(Get.context!);
+      return;
+    }
     // Empty (not just null) avatar strings would crash Image.asset(''), so
     // normalize to the fallback asset here.
     final avatar = (brokerAvatar != null && brokerAvatar.trim().isNotEmpty)
