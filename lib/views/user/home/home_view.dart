@@ -12,7 +12,6 @@ import 'package:get/get.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/widgets/home/story_circle.dart';
-import 'package:brokkerspot/widgets/home/new_launch_banner.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:brokkerspot/views/user/home/property_detail_view.dart';
 import 'package:brokkerspot/views/user/home/search_view.dart';
@@ -26,77 +25,70 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
-  final ProfileController profileController = Get.put(ProfileController());
-  final AnnouncementListController _announcementController =
-      AnnouncementListController.to;
-  final NotificationListController _notificationController =
-      NotificationListController.to;
+  final _profileCtrl = Get.put(ProfileController());
+  final _announcementCtrl = AnnouncementListController.to;
+  final _notificationCtrl = NotificationListController.to;
+
+  static const _stories = [
+    {'name': 'Brokkerspot', 'image': 'assets/images/brocker-icon.png'},
+    {'name': 'Rachid', 'image': 'assets/images/story1.png'},
+    {'name': 'Nisha', 'image': 'assets/images/story2.png'},
+    {'name': 'Joya', 'image': 'assets/images/story3.png'},
+    {'name': 'Aman', 'image': 'assets/images/story4.png'},
+    {'name': 'Sara', 'image': 'assets/images/story1.png'},
+    {'name': 'Ali', 'image': 'assets/images/story2.png'},
+    {'name': 'Riya', 'image': 'assets/images/story3.png'},
+    {'name': 'Omar', 'image': 'assets/images/story4.png'},
+  ];
 
   @override
   void initState() {
     super.initState();
-    // Loads only if not cached yet — fetches just 5 records for the home feed.
-    _announcementController.loadHome();
-    // Cache-first; powers the bell badge.
-    _notificationController.load();
+    _announcementCtrl.loadHome();
+    _notificationCtrl.load();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
+        bottom: false,
         child: RefreshIndicator(
           color: AppColors.primary,
-          onRefresh: () => _announcementController.loadHome(force: true),
+          onRefresh: () => _announcementCtrl.loadHome(force: true),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20.w),
+                  child: _buildHeader(theme),
+                ),
+                SizedBox(height: 16.h),
+                _buildStoryRow(),
+                SizedBox(height: 6.h),
+                _buildBannerImage(),
+                SizedBox(height: 16.h),
+                _buildSectionHeader(
+                  theme: theme,
+                  title: 'Announcements',
+                  onMore: () => Get.to(() => const MorePropertyView()),
+                ),
                 SizedBox(height: 12.h),
-              // Header
-              Padding(
-                padding: EdgeInsets.only(left: 16.h, bottom: 16.h, top: 4.h),
-                child: _buildHeader(),
-              ),
-              Container(
-                height: 4,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.1),
-                      Colors.transparent,
-                    ],
-                  ),
+                _buildAnnouncementsList(),
+                SizedBox(height: 16.h),
+                _buildSectionHeader(
+                  theme: theme,
+                  title: 'Popular Announcements',
+                  onMore: () => Get.to(
+                      () => MorePropertyView(staticList: _getMockPopular())),
                 ),
-              ),
-              SizedBox(height: 12.h),
-              // New Launch Banner
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                child: NewLaunchBanner(
-                  title: 'New Launch',
-                  subtitle: 'CANAL\nHEIGHTS',
-                  timeLeft: '15:00',
-                  imageUrl: 'assets/images/banner-img.png',
-                ),
-              ),
-              SizedBox(height: 14.h),
-              Divider(height: 1, color: Colors.grey.shade200),
-              SizedBox(height: 8.h),
-              // All Story section
-              _buildStorySection(),
-              SizedBox(height: 14.h),
-              Divider(height: 1, color: Colors.grey.shade200),
-              SizedBox(height: 6.h),
-              _buildAnnouncementsSection(),
-              SizedBox(height: 20.h),
-              // DAMAC section
-              _buildDamacSection(),
-              SizedBox(height: 24.h),
+                SizedBox(height: 12.h),
+                _buildPopularList(),
+                SizedBox(height: 100.h),
               ],
             ),
           ),
@@ -105,555 +97,400 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // ─────────── HEADER ───────────
-  Widget _buildHeader() {
+  // ── Header ──────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader(ThemeData theme) {
     return Row(
       children: [
-        // Profile avatar + greeting (tappable)
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              if (!profileController.isGuest) {
-                Get.to(() => ProfileView());
-              }
-            },
-            child: Row(
+        // Avatar + greeting
+        GestureDetector(
+          onTap: () {
+            if (!_profileCtrl.isGuest) Get.to(() => ProfileView());
+          },
+          child: Obx(() {
+            final imgUrl = _profileCtrl.profileImage.value.trim();
+            final isLoading =
+                _profileCtrl.isLoading.value && !_profileCtrl.isGuest;
+            return Row(
               children: [
-                Obx(() {
-                  final isLoading = profileController.isLoading.value;
-                  final imgUrl = profileController.profileImage.value.trim();
-                  if (isLoading && !profileController.isGuest) {
-                    return ShimmerCircle(radius: 23.w);
-                  }
-                  Widget placeholder = Center(
-                    child: Icon(
-                      Icons.person,
-                      size: 24.w,
-                      color: Colors.grey,
+                // Avatar — 41×41 with 1px #DBC483 border
+                Container(
+                  width: 41.w,
+                  height: 41.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFDBC483),
+                      width: 1,
                     ),
-                  );
-                  return Container(
-                    width: 46.w,
-                    height: 46.w,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.grey.shade200,
-                      border: Border.all(color: AppColors.primary, width: 1),
-                    ),
-                    child: ClipOval(
-                        child: imgUrl.isNotEmpty
-                            ? Image.network(imgUrl,
+                    color: Colors.grey.shade200,
+                  ),
+                  child: ClipOval(
+                    child: isLoading
+                        ? ShimmerCircle(radius: 19.w)
+                        : imgUrl.isNotEmpty
+                            ? Image.network(
+                                imgUrl,
                                 key: ValueKey(imgUrl),
                                 fit: BoxFit.cover,
-                                width: 46.w,
-                                height: 46.w,
-                                errorBuilder: (_, __, ___) => placeholder)
-                            : placeholder),
-                  );
-                }),
-                SizedBox(width: 10.w),
-                Expanded(
-                  child: Obx(() {
-                    final isLoading = profileController.isLoading.value;
-                    final name = profileController.userName.value;
-                    if (isLoading && !profileController.isGuest) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                                errorBuilder: (_, __, ___) =>
+                                    _avatarPlaceholder(),
+                              )
+                            : _avatarPlaceholder(),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                // Greeting + location
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isLoading) ...[
+                      ShimmerBox(
+                          width: 120.w,
+                          height: 18.h,
+                          borderRadius: BorderRadius.circular(4.r)),
+                      SizedBox(height: 4.h),
+                      ShimmerBox(
+                          width: 80.w,
+                          height: 14.h,
+                          borderRadius: BorderRadius.circular(4.r)),
+                    ] else ...[
+                      Text(
+                        'Hi, ${_profileCtrl.isGuest ? 'Guest' : _profileCtrl.userName.value.split(' ').first}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurface,
+                          letterSpacing: 14 * 0.075,
+                          height: 1.0,
+                        ),
+                      ),
+                      SizedBox(height: 2.h),
+                      Row(
                         children: [
-                          ShimmerBox(width: 40.w, height: 12.h, borderRadius: BorderRadius.circular(4.r)),
-                          SizedBox(height: 6.h),
-                          ShimmerBox(width: 120.w, height: 18.h, borderRadius: BorderRadius.circular(4.r)),
+                          Icon(Icons.location_on_rounded,
+                              size: 12.sp, color: AppColors.primary),
+                          SizedBox(width: 2.w),
+                          Text(
+                            'Dubai',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w300,
+                              color: theme.colorScheme.onSurface,
+                              height: 1.0,
+                            ),
+                          ),
                         ],
-                      );
-                    }
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hello,',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.w400,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        Text(
-                          profileController.isGuest
-                              ? 'Guest User'
-                              : name.isNotEmpty
-                                  ? name
-                                  : '...',
-                          style: GoogleFonts.poppins(
-                            fontSize: 17.sp,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ],
-                    );
-                  }),
+                      ),
+                    ],
+                  ],
                 ),
               ],
-            ),
+            );
+          }),
+        ),
+
+        const Spacer(),
+
+        // Notification + Search — single pill (#FAF7F1, 91×41, r:39)
+        Container(
+          width: 91.w,
+          height: 41.h,
+          decoration: BoxDecoration(
+            color: theme.brightness == Brightness.dark
+                ? const Color(0xFF2A2A2A)
+                : const Color(0xFFFAF7F1),
+            borderRadius: BorderRadius.circular(39.r),
           ),
-        ),
-
-        SizedBox(width: 10.w),
-        // Search box
-        _buildSearchBox(),
-        SizedBox(width: 10.w),
-        // Notification bell
-        _buildNotificationBell(),
-        SizedBox(width: 6.w),
-      ],
-    );
-  }
-
-  Widget _buildSearchBox() {
-    return GestureDetector(
-      onTap: () => Get.to(() => const SearchView()),
-      child: Container(
-        height: 38.h,
-        width: 120.w,
-        padding: EdgeInsets.symmetric(horizontal: 12.w),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30.r),
-          border: Border.all(color: AppColors.primary, width: 1.2),
-        ),
-        child: Row(
-          children: [
-            Image.asset(
-              'assets/images/search_icon.png',
-              width: 18.sp,
-              height: 18.sp,
-              color: AppColors.primary,
-            ),
-            SizedBox(width: 6.w),
-            Text(
-              'Search...',
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                color: Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotificationBell() {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Get.to(() => const NotificationsView()),
-      child: Obx(() {
-        final count = _notificationController.unseenCount.value;
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            SizedBox(
-              width: 40.w,
-              height: 40.w,
-              child: Icon(
-                Icons.notifications_none_rounded,
-                size: 28.sp,
-                color: AppColors.goldAccent,
-              ),
-            ),
-            if (count > 0)
-              Positioned(
-                right: 0,
-                top: -2,
-                child: Container(
-                  width: 18.w,
-                  height: 18.w,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.red,
-                  ),
-                  child: Center(
-                    child: Text(
-                      count > 9 ? '9+' : '$count',
-                      style: GoogleFonts.inter(
-                        fontSize: 9.sp,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      }),
-    );
-  }
-
-  // ─────────── STORIES ───────────
-  Widget _buildStorySection() {
-    final stories = [
-      {'name': 'Brokkerspot', 'image': 'assets/images/brocker-icon.png'},
-      {'name': 'Rachid', 'image': 'assets/images/story1.png'},
-      {'name': 'Nisha', 'image': 'assets/images/story2.png'},
-      {'name': 'Joya', 'image': 'assets/images/story3.png'},
-      {'name': 'Aman', 'image': 'assets/images/story4.png'},
-      {'name': 'Sara', 'image': 'assets/images/story1.png'},
-      {'name': 'Ali', 'image': 'assets/images/story2.png'},
-      {'name': 'Riya', 'image': 'assets/images/story3.png'},
-      {'name': 'Omar', 'image': 'assets/images/story4.png'},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.w),
+          padding: EdgeInsets.symmetric(horizontal: 12.w),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'All Story',
-                style: GoogleFonts.inter(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
-                ),
+              // Notification bell — outline, 1.5px stroke #343434
+              GestureDetector(
+                onTap: () => Get.to(() => const NotificationsView()),
+                behavior: HitTestBehavior.opaque,
+                child: Obx(() {
+                  final count = _notificationCtrl.unseenCount.value;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        Icons.notifications_outlined,
+                        size: 22.sp,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      if (count > 0)
+                        Positioned(
+                          right: -3,
+                          top: -3,
+                          child: Container(
+                            width: 14.w,
+                            height: 14.w,
+                            decoration: const BoxDecoration(
+                                shape: BoxShape.circle, color: Colors.red),
+                            child: Center(
+                              child: Text(
+                                count > 9 ? '9+' : '$count',
+                                style: GoogleFonts.inter(
+                                    fontSize: 7.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                }),
               ),
-              SizedBox(width: 6.w),
-              Container(
-                width: 20.w,
-                height: 20.w,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary,
-                ),
-                child: const Icon(
-                  Icons.keyboard_arrow_down,
-                  size: 16,
-                  color: Colors.white,
+              // Search icon — asset, 20×20
+              GestureDetector(
+                onTap: () => Get.to(() => const SearchView()),
+                behavior: HitTestBehavior.opaque,
+                child: Image.asset(
+                  'assets/images/search_icon.png',
+                  width: 20.w,
+                  height: 20.w,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
             ],
           ),
         ),
-        SizedBox(height: 12.h),
-        SizedBox(
-          height: 95.h,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            itemCount: stories.length,
-            separatorBuilder: (_, __) => SizedBox(width: 8.w),
-            itemBuilder: (_, index) {
-              return StoryCircle(
-                name: stories[index]['name']!,
-                imageUrl: stories[index]['image'],
-              );
-            },
-          ),
-        ),
       ],
     );
   }
 
-  // ─────────── ANNOUNCEMENTS ───────────
-  Widget _buildAnnouncementsSection() {
+  Widget _avatarPlaceholder() {
     return Container(
-      color: Colors.white,
-      padding: EdgeInsets.symmetric(vertical: 10.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      color: Colors.grey.shade200,
+      child: Icon(Icons.person, size: 22.sp, color: Colors.grey),
+    );
+  }
+
+  // ── Stories ──────────────────────────────────────────────────────────────────
+
+  Widget _buildStoryRow() {
+    return SizedBox(
+      height: 94.h,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: 14.w),
+        itemCount: _stories.length,
+        separatorBuilder: (_, __) => SizedBox(width: 12.w),
+        itemBuilder: (_, i) => StoryCircle(
+          name: _stories[i]['name']!,
+          imageUrl: _stories[i]['image'],
+        ),
+      ),
+    );
+  }
+
+  // ── Banner ───────────────────────────────────────────────────────────────────
+
+  Widget _buildBannerImage() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 19.w),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10.r),
+        child: Image.asset(
+          'assets/images/banner-img.png',
+          width: double.infinity,
+          height: 101.h,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            height: 101.h,
+            color: Colors.grey.shade200,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Section header ───────────────────────────────────────────────────────────
+
+  Widget _buildSectionHeader({
+    required ThemeData theme,
+    required String title,
+    required VoidCallback onMore,
+  }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w),
+      child: Row(
         children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            child: Row(
-              children: [
-                Text(
-                  'Announcements',
-                  style: GoogleFonts.carlito(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-                SizedBox(width: 6.w),
-                InkWell(
-                  onTap: () {
-                    final items = _announcementController.homeAnnouncements;
-                    if (items.isEmpty) return;
-                    Get.to(() => AnnouncementDetailView(
-                          announcement: items.first,
-                          isOwner: false,
-                        ));
-                  },
-                  borderRadius: BorderRadius.circular(9.r),
-                  child: Container(
-                    width: 18.w,
-                    height: 18.w,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.primary,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'i',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                InkWell(
-                  onTap: () => Get.to(() => const MorePropertyView()),
-                  child: Text(
-                    'More',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.backgroundDark,
-                    ),
-                  ),
-                ),
-              ],
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+              height: 1.0,
+              letterSpacing: 0,
             ),
           ),
-          SizedBox(height: 12.h),
-          Obx(() {
-            final ctrl = _announcementController;
-            // First load — nothing cached yet.
-            if (ctrl.isLoadingHome.value && ctrl.homeAnnouncements.isEmpty) {
-              return _buildAnnouncementsShimmer();
-            }
-            if (ctrl.homeError.value != null && ctrl.homeAnnouncements.isEmpty) {
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 24.h),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "Couldn't load announcements. Please try again.",
-                        style: GoogleFonts.inter(
-                            fontSize: 13.sp, color: Colors.grey.shade500),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 4.h),
-                      TextButton(
-                        onPressed: () => ctrl.loadHome(force: true),
-                        child: Text('Retry',
-                            style: GoogleFonts.inter(
-                                fontSize: 13.sp, color: AppColors.primary)),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-            if (ctrl.homeAnnouncements.isEmpty) {
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 32.h),
-                child: Center(
-                  child: Text('No announcements yet',
-                      style: GoogleFonts.inter(
-                          fontSize: 13.sp, color: Colors.grey.shade400)),
-                ),
-              );
-            }
-            return SizedBox(
-              height: 325.h,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                itemCount: ctrl.homeAnnouncements.length,
-                separatorBuilder: (_, __) => SizedBox(width: 14.w),
-                itemBuilder: (_, index) {
-                  final a = ctrl.homeAnnouncements[index];
-                  return HomeAnnouncementCard(
-                    announcement: a,
-                    index: index,
-                    onTap: () => Get.to(() => AnnouncementDetailView(
-                          announcement: a,
-                          isOwner: false,
-                        )),
-                  );
-                },
+          const Spacer(),
+          GestureDetector(
+            onTap: onMore,
+            child: Text(
+              'More',
+              style: GoogleFonts.inter(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w500,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.54),
               ),
-            );
-          }),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // ─────────── ANNOUNCEMENTS SHIMMER ───────────
-  Widget _buildAnnouncementsShimmer() {
+  // ── Announcements list ───────────────────────────────────────────────────────
+
+  Widget _buildAnnouncementsList() {
+    return Obx(() {
+      final ctrl = _announcementCtrl;
+      if (ctrl.isLoadingHome.value && ctrl.homeAnnouncements.isEmpty) {
+        return _buildShimmerList();
+      }
+      if (ctrl.homeError.value != null && ctrl.homeAnnouncements.isEmpty) {
+        return _buildErrorState(onRetry: () => ctrl.loadHome(force: true));
+      }
+      if (ctrl.homeAnnouncements.isEmpty) {
+        return _buildEmptyState();
+      }
+      return SizedBox(
+        height: 273.h,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: 20.w),
+          itemCount: ctrl.homeAnnouncements.length,
+          separatorBuilder: (_, __) => SizedBox(width: 14.w),
+          itemBuilder: (_, i) {
+            final a = ctrl.homeAnnouncements[i];
+            return HomeAnnouncementCard(
+              announcement: a,
+              index: i,
+              onTap: () => Get.to(() => AnnouncementDetailView(
+                    announcement: a,
+                    isOwner: false,
+                  )),
+            );
+          },
+        ),
+      );
+    });
+  }
+
+  // ── Popular list (mock) ───────────────────────────────────────────────────────
+
+  Widget _buildPopularList() {
+    final items = _getMockPopular();
     return SizedBox(
-      height: 325.h,
+      height: 273.h,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: 20.w),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => SizedBox(width: 14.w),
+        itemBuilder: (_, i) => HomeAnnouncementCard(
+          announcement: items[i],
+          index: i,
+          showAvatar: false,
+          onTap: () => Get.to(() => PropertyDetailView(
+                announcement: items[i],
+                sectionTitle: items[i].propertyName ?? '',
+              )),
+        ),
+      ),
+    );
+  }
+
+  // ── States ──────────────────────────────────────────────────────────────────
+
+  Widget _buildShimmerList() {
+    return SizedBox(
+      height: 273.h,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        padding: EdgeInsets.symmetric(horizontal: 20.w),
         itemCount: 3,
         separatorBuilder: (_, __) => SizedBox(width: 14.w),
-        itemBuilder: (_, __) => _announcementShimmerCard(),
+        itemBuilder: (_, __) => Container(
+          width: 329.w,
+          height: 263.h,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20.r),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: ShimmerBox(width: 280.w, height: 400.h),
+        ),
       ),
     );
   }
 
-  Widget _announcementShimmerCard() {
-    return Container(
-      width: 330.w,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F8F8),
-        borderRadius: BorderRadius.circular(16.r),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image block
-          ShimmerBox(width: 330.w, height: 193.h),
-          Padding(
-            padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 12.h),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Price line
-                ShimmerBox(
-                    width: 160.w,
-                    height: 18.h,
-                    borderRadius: BorderRadius.circular(4.r)),
-                SizedBox(height: 10.h),
-                // Property name line
-                ShimmerBox(
-                    width: 220.w,
-                    height: 14.h,
-                    borderRadius: BorderRadius.circular(4.r)),
-                SizedBox(height: 10.h),
-                // Location line
-                ShimmerBox(
-                    width: 180.w,
-                    height: 14.h,
-                    borderRadius: BorderRadius.circular(4.r)),
-              ],
+  Widget _buildErrorState({required VoidCallback onRetry}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Couldn't load announcements.",
+              style: GoogleFonts.inter(
+                  fontSize: 13.sp, color: Colors.grey.shade500),
+              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+            TextButton(
+              onPressed: onRetry,
+              child: Text('Retry',
+                  style: GoogleFonts.inter(
+                      fontSize: 13.sp, color: AppColors.primary)),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // ─────────── DAMAC SECTION ───────────
-  Widget _buildDamacSection() {
-    final damacAnnouncements = _getMockDamacAnnouncements();
-
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.symmetric(vertical: 10.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            child: Row(
-              children: [
-                Text(
-                  'DAMAC',
-                  style: GoogleFonts.carlito(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-                SizedBox(width: 6.w),
-                InkWell(
-                  onTap: () => Get.to(() => PropertyDetailView(
-                        announcement: damacAnnouncements.first,
-                        sectionTitle: 'DAMAC',
-                      )),
-                  borderRadius: BorderRadius.circular(9.r),
-                  child: Container(
-                    width: 18.w,
-                    height: 18.w,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.primary,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'i',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                InkWell(
-                  onTap: () => Get.to(() =>
-                      MorePropertyView(staticList: damacAnnouncements)),
-                  child: Text(
-                    'More',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.backgroundDark,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 12.h),
-          SizedBox(
-            height: 325.h,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
-              itemCount: damacAnnouncements.length,
-              separatorBuilder: (_, __) => SizedBox(width: 14.w),
-              itemBuilder: (_, index) {
-                return HomeAnnouncementCard(
-                  announcement: damacAnnouncements[index],
-                  showAvatar: false,
-                );
-              },
-            ),
-          ),
-        ],
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 32.h),
+      child: Center(
+        child: Text(
+          'No announcements yet',
+          style:
+              GoogleFonts.inter(fontSize: 13.sp, color: Colors.grey.shade400),
+        ),
       ),
     );
   }
 
-  // ─────────── MOCK DATA ───────────
-  List<AnnouncementModel> _getMockDamacAnnouncements() {
-    return [
-      AnnouncementModel(
-        listingType: '80 UNITS',
-        imageUrls: ['assets/images/room.png'],
-        price: 1000000,
-        propertyName: 'SAFA TWO de GRISOGONO',
-        location: 'Dubai | United Arab Emirates',
-        timeAgo: '15 min ago',
-      ),
-      AnnouncementModel(
-        listingType: '45 UNITS',
-        imageUrls: ['assets/images/room.png'],
-        price: 1200000,
-        propertyName: 'DAMAC LAGOONS',
-        location: 'Dubai | United Arab Emirates',
-        timeAgo: '3 hr ago',
-      ),
-    ];
-  }
+  // ── Mock data ────────────────────────────────────────────────────────────────
+
+  List<AnnouncementModel> _getMockPopular() => [
+        AnnouncementModel(
+          listingType: 'Sell',
+          propertyType: 'Villa',
+          imageUrls: ['assets/images/room.png'],
+          price: 1000000,
+          currency: 'AED',
+          propertyName: 'SAFA TWO de GRISOGONO',
+          location: 'Dubai, United Arab Emirates',
+          timeAgo: '15 min ago',
+        ),
+        AnnouncementModel(
+          listingType: 'Rent',
+          propertyType: 'Apartment',
+          imageUrls: ['assets/images/room.png'],
+          price: 1200000,
+          currency: 'AED',
+          propertyName: 'DAMAC LAGOONS',
+          location: 'Dubai, United Arab Emirates',
+          timeAgo: '3 hr ago',
+        ),
+      ];
 }

@@ -21,41 +21,30 @@ class StoryCircle extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        width: 72.w,
+        width: 67.w,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Gold-bordered circle
+            // 67×67 circle, 2px solid #DBC483 border
             Container(
-              width: 72.w,
-              height: 72.w,
+              width: 67.w,
+              height: 67.w,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: hasStory
-                    ? const LinearGradient(
-                        colors: [Color(0xFFD9C27C), Color(0xFFB8923E)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: hasStory ? null : Colors.grey.shade300,
+                border: Border.all(
+                  color:
+                      hasStory ? const Color(0xFFDBC483) : Colors.grey.shade300,
+                  width: 2,
+                ),
               ),
-              padding: EdgeInsets.all(2.5.w),
-              child: Container(
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                ),
-                padding: EdgeInsets.all(1.5.w),
-                child: ClipOval(
-                  child: imageUrl != null && imageUrl!.isNotEmpty
-                      ? Image.asset(
-                          imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _placeholder(),
-                        )
-                      : _placeholder(),
-                ),
+              child: ClipOval(
+                child: imageUrl != null && imageUrl!.isNotEmpty
+                    ? Image.asset(
+                        imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _placeholder(),
+                      )
+                    : _placeholder(),
               ),
             ),
             SizedBox(height: 4.h),
@@ -67,7 +56,7 @@ class StoryCircle extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 10.sp,
                 fontWeight: FontWeight.w500,
-                color: Colors.black87,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],

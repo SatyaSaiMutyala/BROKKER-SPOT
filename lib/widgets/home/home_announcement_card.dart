@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 
+/// Full-image dark overlay property card used on the Home and More screens.
 class HomeAnnouncementCard extends StatelessWidget {
   final AnnouncementModel announcement;
   final VoidCallback? onTap;
@@ -19,232 +20,302 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.index = 0,
   });
 
-  static const List<String> _avatarAssets = [
+  static const _fallbackAvatars = [
     'assets/images/announcement_proffile_icon.png',
     'assets/images/story1.png',
     'assets/images/story2.png',
   ];
 
+  String get _listingBadge {
+    if (announcement.listingType == 'Sell') return 'FOR SELL';
+    if (announcement.listingType == 'Rent') return 'FOR RENT';
+    return announcement.listingType ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final a = announcement;
-    return Padding(
-      padding: EdgeInsets.only(bottom: 20.h),
-      child: GestureDetector(
+    final imgCount = a.imageUrls?.length ?? 0;
+
+    return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 330.w,
+        width: 329.w,
+        height: 263.h,
         decoration: BoxDecoration(
-          color: const Color(0xFFF8F8F8),
-          borderRadius: BorderRadius.circular(16.r),
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(20.r),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 16,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16.r),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildImageSection(a),
-              _buildInfoSection(a),
-              
-            ],
-          ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Full-bleed property image
+            _buildImage(
+              a.imageUrls?.isNotEmpty == true ? a.imageUrls!.first : null,
+            ),
+
+            // Gradient: rgba(39,39,39,0.05) at 55.32% → #000000 at 100%
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x0D272727), // rgba(39,39,39,0.05)
+                    Colors.black,
+                  ],
+                  stops: [0.5532, 1.0],
+                ),
+              ),
+            ),
+
+            // "FOR SELL / FOR RENT" badge — flush left, right-rounded only
+            if (_listingBadge.isNotEmpty)
+              Positioned(
+                top: 21.h,
+                left: 0,
+                child: Container(
+                  width: 64.w,
+                  height: 27.h,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Color(0xDBDBC483),
+                    borderRadius: BorderRadius.only(
+                      topRight: Radius.circular(26),
+                      bottomRight: Radius.circular(26),
+                    ),
+                  ),
+                  child: Text(
+                    _listingBadge,
+                    style: GoogleFonts.poppins(
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                      height: 1.0,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
+              ),
+
+            // Owner avatar — top right, 41×41, 1px #D0D0D0 border, no inner gap
+            if (showAvatar)
+              Positioned(
+                top: 14.h,
+                right: 10.w,
+                child: Container(
+                  width: 41.w,
+                  height: 41.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFD0D0D0),
+                      width: 1,
+                    ),
+                  ),
+                  child: ClipOval(child: _buildAvatar(a)),
+                ),
+              ),
+
+            // Bottom info block
+            Positioned(
+              left: 14.w,
+              right: 10.w,
+              bottom: 16.h,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // AED label
+                  Text(
+                    a.currency ?? 'AED',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w300,
+                      height: 1.0,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  SizedBox(height: 9.h),
+                  // Price — Poppins Bold 24sp, gold
+                  Text(
+                    _formatPrice(a.price ?? 0),
+                    style: GoogleFonts.poppins(
+                      fontSize: 24.sp,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFDBC483),
+                      height: 1.0,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  // Type row: "For Sell • Apartment" left | pill + circle right
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // "For Sell • " (#C8C8C8) + "Apartment" (white)
+                      Expanded(
+                        child: RichText(
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          text: TextSpan(
+                            children: [
+                              if (a.listingType != null)
+                                TextSpan(
+                                  text: 'For ${a.listingType} • ',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w300,
+                                    color: const Color(0xFFC8C8C8),
+                                    height: 1.0,
+                                    letterSpacing: 0,
+                                  ),
+                                ),
+                              if (a.propertyType != null)
+                                TextSpan(
+                                  text: a.propertyType,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w300,
+                                    color: Colors.white,
+                                    height: 1.0,
+                                    letterSpacing: 0,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Time-ago pill
+                      if (a.timeAgo != null) ...[
+                        SizedBox(width: 6.w),
+                        _pill(a.timeAgo!.toUpperCase()),
+                      ],
+                      // Image count circle
+                      if (imgCount > 1) ...[
+                        SizedBox(width: 6.w),
+                        _imageCountCircle(imgCount),
+                      ],
+                    ],
+                  ),
+                  // Location
+                  if (a.location != null)
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_rounded,
+                            size: 12.sp, color: AppColors.primary),
+                        SizedBox(width: 4.w),
+                        Expanded(
+                          child: Text(
+                            a.location!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w300,
+                              color: const Color(0xFF9E9E9E),
+                              height: 1.0,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-    ),
     );
   }
 
-  Widget _buildImageSection(AnnouncementModel a) {
-    return SizedBox(
-      height: 215.h,
-      child: Stack(
-        children: [
-          // Property image - full height
-          Positioned.fill(
-            bottom: 22.h,
-            child: _buildImage(
-                (a.imageUrls != null && a.imageUrls!.isNotEmpty)
-                    ? a.imageUrls!.first
-                    : null),
-          ),
-          // "For Rent" badge - top left
-          if (a.listingType != null)
-            Positioned(
-              top: 26.h,
-              left: 0,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
-                decoration: BoxDecoration(
-                  color: AppColors.goldAccent,
-                  borderRadius: BorderRadius.only(
-                    topRight: Radius.circular(12.r),
-                    bottomRight: Radius.circular(12.r),
-                  ),
-                ),
-                child: Text(
-                  a.listingType!,
-                  style: GoogleFonts.inter(
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          // Owner avatar - bottom left
-          if (showAvatar)
-            Positioned(
-              bottom: 10.h,
-              left: 14.w,
-              child: Container(
-                width: 44.w,
-                height: 44.w,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey.shade200,
-                  border: Border.all(color: Colors.white, width: 2.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: a.ownerAvatarUrl != null && a.ownerAvatarUrl!.isNotEmpty
-                      ? Image.network(
-                          a.ownerAvatarUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Image.asset(
-                            _avatarAssets[index % _avatarAssets.length],
-                            fit: BoxFit.cover,
-                            width: 44.w,
-                            height: 44.w,
-                          ),
-                        )
-                      : Image.asset(
-                          _avatarAssets[index % _avatarAssets.length],
-                          fit: BoxFit.cover,
-                          width: 44.w,
-                          height: 44.w,
-                        ),
-                ),
-              ),
-            ),
-        ],
+  // Time-ago pill — 76×27, r26, Poppins Medium 500 10sp #CFCFCF
+  Widget _pill(String text) {
+    return Container(
+      width: 76.w,
+      height: 27.h,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(26.r),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.poppins(
+          fontSize: 10.sp,
+          fontWeight: FontWeight.w500,
+          color: const Color(0xFFCFCFCF),
+          height: 1.0,
+          letterSpacing: 0,
+        ),
       ),
     );
   }
 
-  Widget _buildInfoSection(AnnouncementModel a) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(14.w, 6.h, 8.w, 0.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Price row + time
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                'AED ',
-                style: GoogleFonts.poppins(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w300,
-                  color: Colors.black,
-                ),
-              ),
-              Text(
-                _formatPrice(a.price ?? 0),
-                style: GoogleFonts.poppins(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-              Text(
-                ' yearly',
-                style: GoogleFonts.poppins(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w400,
-                  color: Colors.black87,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                a.timeAgo ?? '',
-                style: GoogleFonts.poppins(
-                  fontSize: 12.sp,
-                  color: AppColors.textBlack.withOpacity(0.6),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 4.h),
-          // Property name
-          Text(
-            a.propertyName ?? '',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.poppins(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
-            ),
-          ),
-          SizedBox(height: 4.h),
-          // Divider
-          // Divider(height: 1, thickness: 0.5, color: Colors.grey.shade300),
-          // SizedBox(height: 8.h),
-          // Location row
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  a.location ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14.sp,
-                    color: AppColors.textHint,
-                    fontWeight: FontWeight.w500
-                  ),
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                size: 20.sp,
-                color: AppColors.primary,
-              ),
-            ],
-          ),
-        ],
+  // Image count circle — 36×36, 1px #DBC483AB border
+  Widget _imageCountCircle(int count) {
+    return Container(
+      width: 36.w,
+      height: 36.w,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.black.withValues(alpha: 0.35),
+        border: Border.all(
+          color: const Color(0xABDBC483),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        count > 9 ? '9+' : '$count+',
+        style: GoogleFonts.poppins(
+          fontSize: 10.sp,
+          fontWeight: FontWeight.w500,
+          color: Colors.white,
+          height: 1.0,
+        ),
       ),
     );
   }
 
-  /// Renders a network URL (API data) or an asset path (mock data), with a
-  /// graceful placeholder on error/empty.
+  Widget _buildAvatar(AnnouncementModel a) {
+    if (a.ownerAvatarUrl != null && a.ownerAvatarUrl!.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: a.ownerAvatarUrl!,
+        fit: BoxFit.cover,
+        errorWidget: (_, __, ___) => _fallbackAvatar(),
+      );
+    }
+    return _fallbackAvatar();
+  }
+
+  Widget _fallbackAvatar() {
+    return Image.asset(
+      _fallbackAvatars[index % _fallbackAvatars.length],
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        color: Colors.grey.shade700,
+        child: Icon(Icons.person, size: 20.sp, color: Colors.white54),
+      ),
+    );
+  }
+
   Widget _buildImage(String? url) {
     if (url == null || url.isEmpty) return _imagePlaceholder();
-    final isNetwork = url.startsWith('http');
-    if (isNetwork) {
+    if (url.startsWith('http')) {
       return CachedNetworkImage(
         imageUrl: url,
         fit: BoxFit.cover,
-        placeholder: (_, __) => Container(color: Colors.grey.shade200),
+        placeholder: (_, __) => const ColoredBox(color: Color(0xFF2A2A2A)),
         errorWidget: (_, __, ___) => _imagePlaceholder(),
       );
     }
@@ -256,16 +327,17 @@ class HomeAnnouncementCard extends StatelessWidget {
   }
 
   Widget _imagePlaceholder() {
-    return Container(
-      color: Colors.grey.shade300,
+    return ColoredBox(
+      color: const Color(0xFF2A2A2A),
       child: Center(
-        child: Icon(Icons.home_outlined, size: 40.sp, color: Colors.grey),
+        child:
+            Icon(Icons.home_outlined, size: 40.sp, color: Colors.grey.shade600),
       ),
     );
   }
 
   String _formatPrice(double price) {
-    String str = price.toInt().toString();
+    final str = price.toInt().toString();
     final buffer = StringBuffer();
     int count = 0;
     for (int i = str.length - 1; i >= 0; i--) {

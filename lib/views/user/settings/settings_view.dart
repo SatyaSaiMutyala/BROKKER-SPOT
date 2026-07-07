@@ -31,7 +31,8 @@ class SettingsView extends StatelessWidget {
               _buildHeader(context),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
                   child: _buildSettingsCard(),
                 ),
               ),
@@ -131,12 +132,16 @@ class SettingsView extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _settingsTile(
-            icon: Icons.light_mode_outlined,
-            iconColor: AppColors.goldAccent,
-            title: 'Light mode',
-            trailing: _buildThemeSwitch(),
-          ),
+          Obx(() {
+            final isDark = ThemeController.to.isDark;
+            return _settingsTile(
+              icon:
+                  isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+              iconColor: AppColors.goldAccent,
+              title: isDark ? 'Dark mode' : 'Light mode',
+              trailing: _buildThemeSwitch(),
+            );
+          }),
           _tileDivider(),
           _settingsTile(
             icon: Icons.lock_outline,

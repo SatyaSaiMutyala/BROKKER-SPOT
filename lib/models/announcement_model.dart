@@ -248,6 +248,20 @@ class AnnouncementModel {
     this.userRole,
   });
 
+  static String? _timeAgoFromIso(String? iso) {
+    if (iso == null) return null;
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return null;
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} hr ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}w ago';
+    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}mo ago';
+    return '${(diff.inDays / 365).floor()}y ago';
+  }
+
   static String? _statusLabel(int? code) {
     switch (code) {
       case 0:
@@ -333,6 +347,7 @@ class AnnouncementModel {
               json['property_documents'] as Map<String, dynamic>)
           : null,
       createdAt: json['created_at'],
+      timeAgo: _timeAgoFromIso(json['created_at'] as String?),
       updatedAt: json['updated_at'],
       rejectionReason: json['rejection_reason'] as String?,
       // derived display fields

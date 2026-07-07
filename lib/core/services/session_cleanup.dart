@@ -1,3 +1,4 @@
+import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/core/services/announcement_cache.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
@@ -27,6 +28,9 @@ Future<void> clearUserSession() async {
   }
   if (Get.isRegistered<PresenceService>()) {
     PresenceService.to.reset();
+  }
+  if (Get.isRegistered<CommonDataController>()) {
+    CommonDataController.to.clearDependentCaches();
   }
   SocketService.to.shutdown();
   await AnnouncementCache.clear();
