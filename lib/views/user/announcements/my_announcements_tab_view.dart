@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
@@ -25,8 +24,6 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
 
   final _tabs = ['All', 'Pending', 'Active', 'Rejected', 'Draft'];
 
-  /// Maps a tab index to the API status param.
-  /// All=null, Pending=1 (submitted), Active=2 (approved), Rejected=3, Draft=0.
   int? _statusForTab(int i) {
     switch (i) {
       case 1:
@@ -38,7 +35,7 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
       case 4:
         return 0;
       default:
-        return null; // All
+        return null;
     }
   }
 
@@ -49,9 +46,6 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() => setState(() {}));
-    // Always fetch on open so it's never stale. Shimmer shows only on the very
-    // first load (empty list); later entries show cached data instantly and
-    // refresh in the background. Each status is also cached on first tap.
     _controller.loadMine(force: true);
   }
 
@@ -63,19 +57,16 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
 
   void _onTabSelected(int i) {
     _tabController.animateTo(i);
-    // Calls the API for this status (cached per status after first load).
     _controller.loadMine(status: _statusForTab(i));
   }
 
   Future<void> _openDetail(AnnouncementModel a) async {
-    // Edit/delete inside the detail view auto-refresh the cached lists via the
-    // mutation hooks; force a reload too in case it changed something else.
     final result = await Get.to(() => AnnouncementDetailView(announcement: a));
-    if (result == true) _controller.loadMine(status: _currentStatus, force: true);
+    if (result == true)
+      _controller.loadMine(status: _currentStatus, force: true);
   }
 
   Widget _buildList() {
-    // Error state — scrollable so pull-to-refresh still works.
     if (_controller.myError.value != null) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -105,9 +96,7 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
         ],
       );
     }
-    // Server already filtered by status — show the list as-is.
     final list = _controller.myAnnouncements;
-    // Empty state — scrollable so the user can pull to refresh.
     if (list.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -138,26 +127,66 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
     );
   }
 
+  Widget _buildHeader(ThemeData theme, bool isDark) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38.r,
+              height: 38.r,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+              ),
+              child: Icon(
+                Icons.arrow_back_ios_new,
+                size: 16.sp,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Text(
+              'ANNOUNCEMENTS',
+              style: GoogleFonts.poppins(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w500,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => Get.to(() => const CreateAnnouncementView()),
+            child: Image.asset('assets/images/home_add_icon.png',
+                width: 50.w, height: 50.w),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final tabBarBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final inactiveTabText =
+        isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            CustomHeader(
-              title: 'ANNOUNCEMENTS',
-              showBackButton: true,
-              trailing: GestureDetector(
-                onTap: () => Get.to(() => const CreateAnnouncementView()),
-                child: Image.asset('assets/images/home_add_icon.png',
-                    width: 50.w, height: 50.w),
-              ),
-            ),
+            _buildHeader(theme, isDark),
 
-            // ── Tab bar ──
+            // ── Tab bar ──────────────────────────────────────────────────────
             Container(
-              color: Colors.white,
+              color: tabBarBg,
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
               child: Row(
                 children: List.generate(_tabs.length, (i) {
@@ -185,9 +214,7 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
                           style: GoogleFonts.inter(
                             fontSize: 13.sp,
                             fontWeight: FontWeight.w600,
-                            color: isSelected
-                                ? Colors.white
-                                : Colors.grey.shade600,
+                            color: isSelected ? Colors.white : inactiveTabText,
                           ),
                         ),
                       ),
@@ -197,14 +224,12 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
               ),
             ),
 
-            // ── List ──
+            // ── List ─────────────────────────────────────────────────────────
             Expanded(
               child: Obx(() {
-                // Shimmer only on first load (nothing cached). During pull-to-
-                // refresh the list stays visible with the refresh indicator.
                 if (_controller.isLoadingMine.value &&
                     _controller.myAnnouncements.isEmpty) {
-                  return _ShimmerCardList();
+                  return const _ShimmerCardList();
                 }
                 return RefreshIndicator(
                   color: AppColors.primary,
@@ -222,75 +247,78 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
 }
 
 class _ShimmerCardList extends StatelessWidget {
+  const _ShimmerCardList();
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Shimmer.fromColors(
-      baseColor: Colors.grey.shade300,
-      highlightColor: Colors.grey.shade100,
+      baseColor: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300,
+      highlightColor: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade100,
       child: ListView.builder(
         padding: EdgeInsets.symmetric(vertical: 8.h),
         itemCount: 4,
-        itemBuilder: (_, __) => _ShimmerCard(),
+        itemBuilder: (_, __) => const _ShimmerCard(),
       ),
     );
   }
 }
 
 class _ShimmerCard extends StatelessWidget {
+  const _ShimmerCard();
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final blockColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300;
+    final cardBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16.r),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image placeholder
           Container(
             height: 200.h,
             width: double.infinity,
-            color: Colors.grey.shade300,
+            color: blockColor,
           ),
           Padding(
             padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 12.h),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Price row
                 Row(
                   children: [
-                    Container(
-                        width: 120.w, height: 16.h, color: Colors.grey.shade300),
+                    Container(width: 120.w, height: 16.h, color: blockColor),
                     const Spacer(),
-                    Container(
-                        width: 60.w, height: 14.h, color: Colors.grey.shade300),
+                    Container(width: 60.w, height: 14.h, color: blockColor),
                   ],
                 ),
                 SizedBox(height: 10.h),
-                // Property name
-                Container(
-                    width: 180.w, height: 16.h, color: Colors.grey.shade300),
+                Container(width: 180.w, height: 16.h, color: blockColor),
                 SizedBox(height: 10.h),
-                // Bedroom / sqft row
                 Row(
                   children: [
-                    Container(
-                        width: 90.w, height: 14.h, color: Colors.grey.shade300),
+                    Container(width: 90.w, height: 14.h, color: blockColor),
                     SizedBox(width: 20.w),
-                    Container(
-                        width: 80.w, height: 14.h, color: Colors.grey.shade300),
+                    Container(width: 80.w, height: 14.h, color: blockColor),
                   ],
                 ),
                 SizedBox(height: 10.h),
-                Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
+                Divider(
+                    height: 1,
+                    thickness: 0.8,
+                    color: isDark
+                        ? const Color(0xFF2E2E2E)
+                        : Colors.grey.shade200),
                 SizedBox(height: 10.h),
-                // Location row
-                Container(
-                    width: 150.w, height: 14.h, color: Colors.grey.shade300),
+                Container(width: 150.w, height: 14.h, color: blockColor),
               ],
             ),
           ),

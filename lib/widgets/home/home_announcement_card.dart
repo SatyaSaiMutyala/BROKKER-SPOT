@@ -11,6 +11,10 @@ class HomeAnnouncementCard extends StatelessWidget {
   final VoidCallback? onTap;
   final bool showAvatar;
   final int index;
+  /// Override card width (defaults to 329.w for horizontal home cards).
+  final double? cardWidth;
+  /// Override card height (defaults to 263.h for horizontal home cards).
+  final double? cardHeight;
 
   const HomeAnnouncementCard({
     super.key,
@@ -18,6 +22,8 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.onTap,
     this.showAvatar = true,
     this.index = 0,
+    this.cardWidth,
+    this.cardHeight,
   });
 
   static const _fallbackAvatars = [
@@ -40,8 +46,8 @@ class HomeAnnouncementCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 329.w,
-        height: 263.h,
+        width: cardWidth ?? 329.w,
+        height: cardHeight ?? 263.h,
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(20.r),
@@ -146,16 +152,37 @@ class HomeAnnouncementCard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 9.h),
-                  // Price — Poppins Bold 24sp, gold
-                  Text(
-                    _formatPrice(a.price ?? 0),
-                    style: GoogleFonts.poppins(
-                      fontSize: 24.sp,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFFDBC483),
-                      height: 1.0,
-                      letterSpacing: 0,
-                    ),
+                  // Price row — gold price + optional rent period suffix
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        _formatPrice(a.price ?? 0),
+                        style: GoogleFonts.poppins(
+                          fontSize: 24.sp,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDBC483),
+                          height: 1.0,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      if (a.rentPeriod != null && a.listingType == 'Rent') ...[
+                        SizedBox(width: 6.w),
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 2.h),
+                          child: Text(
+                            a.rentPeriod!.substring(0, 1).toUpperCase() +
+                                a.rentPeriod!.substring(1).toLowerCase(),
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.white70,
+                              height: 1.0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   // Type row: "For Sell • Apartment" left | pill + circle right
                   Row(

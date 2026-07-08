@@ -30,8 +30,6 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
   @override
   void initState() {
     super.initState();
-
-    // Initialize controller safely
     controller = Get.put(
       EmailVerificationController(),
       tag: widget.email,
@@ -39,7 +37,6 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
     forgetPasswordController =
         Get.put(ForgetPasswordController(), tag: widget.email);
 
-    // Listen to OTP changes
     final otpCtrl = widget.password == false
         ? controller.otpController
         : forgetPasswordController.otpController;
@@ -61,9 +58,12 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
   Widget build(BuildContext context) {
     return ScreenUtilInit(
       designSize: const Size(375, 812),
-      builder: (_, __) {
+      builder: (context, __) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: theme.scaffoldBackgroundColor,
           resizeToAvoidBottomInset: true,
           body: SafeArea(
             bottom: false,
@@ -71,20 +71,21 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
               builder: (context, constraints) {
                 return SingleChildScrollView(
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    constraints:
+                        BoxConstraints(minHeight: constraints.maxHeight),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Column(
                           children: [
-                            _topSection(context),
+                            _topSection(context, isDark),
                             Padding(
                               padding: EdgeInsets.symmetric(horizontal: 24.w),
-                              child: _contentSection(context),
+                              child: _contentSection(context, isDark),
                             ),
                           ],
                         ),
-                        _bottomCityImage(context),
+                        _bottomCityImage(),
                       ],
                     ),
                   ),
@@ -97,8 +98,13 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
     );
   }
 
-  // ---------------- TOP SECTION ----------------
-  Widget _topSection(BuildContext context) {
+  // ── Top section ───────────────────────────────────────────────────────────────
+
+  Widget _topSection(BuildContext context, bool isDark) {
+    final backBorderColor =
+        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E5E5);
+    final backIconColor = isDark ? Colors.white : Colors.black87;
+
     return SizedBox(
       height: 220.h,
       child: Stack(
@@ -123,9 +129,13 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
                 padding: EdgeInsets.all(8.w),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                  border: Border.all(color: backBorderColor),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 18),
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 18,
+                  color: backIconColor,
+                ),
               ),
             ),
           ),
@@ -134,8 +144,11 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
     );
   }
 
-  // ---------------- CONTENT ----------------
-  Widget _contentSection(BuildContext context) {
+  // ── Content section ───────────────────────────────────────────────────────────
+
+  Widget _contentSection(BuildContext context, bool isDark) {
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.black54;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -153,19 +166,26 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
           'Please Enter The 6-Digit Code We Sent To Your E-Mail',
           style: GoogleFonts.inter(
             fontSize: 12.sp,
-            color: Colors.black54,
+            color: subtitleColor,
           ),
         ),
         SizedBox(height: 30.h),
-        _otpField(),
+        _otpField(isDark),
         SizedBox(height: 30.h),
-        _verifyButton(context),
+        _verifyButton(isDark),
       ],
     );
   }
 
-  // ---------------- OTP FIELD ----------------
-  Widget _otpField() {
+  // ── OTP field ─────────────────────────────────────────────────────────────────
+
+  Widget _otpField(bool isDark) {
+    final inputTextColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? Colors.grey.shade500 : Colors.grey;
+    final enabledBorderColor =
+        isDark ? const Color(0xFF3A3A3A) : Colors.black26;
+    final focusedBorderColor = isDark ? Colors.grey.shade400 : Colors.black;
+
     return TextField(
       controller: widget.password == false
           ? controller.otpController
@@ -176,27 +196,24 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
         fontSize: 16.sp,
         fontWeight: FontWeight.w500,
         letterSpacing: 2,
+        color: inputTextColor,
       ),
       decoration: InputDecoration(
         counterText: '',
         hintText: 'Code',
         hintStyle: GoogleFonts.inter(
           fontSize: 15.sp,
-          color: Colors.grey,
+          color: hintColor,
         ),
         suffixIcon: InkWell(
           onTap: () async {
             if (widget.password == false) {
               bool success = await controller.resendOtp(widget.email);
-              if (success) {
-                controller.otpController.clear();
-              }
+              if (success) controller.otpController.clear();
             } else {
               bool success =
                   await forgetPasswordController.forgetPassword(widget.email);
-              if (success) {
-                controller.otpController.clear();
-              }
+              if (success) controller.otpController.clear();
             }
           },
           child: Padding(
@@ -211,68 +228,71 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
             ),
           ),
         ),
-        enabledBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.black26),
+        enabledBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: enabledBorderColor),
         ),
-        focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.black),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: focusedBorderColor),
         ),
       ),
     );
   }
 
-  // ---------------- VERIFY BUTTON ----------------
-  Widget _verifyButton(BuildContext context) {
-    return Obx(
-      () {
-        final isDisabled = !_isOtpValid || controller.isLoading.value;
-        return SizedBox(
-          width: double.infinity,
-          height: 48.h,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _isOtpValid ? AppColors.primary : Colors.grey.shade300,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-              elevation: 0,
+  // ── Verify button ─────────────────────────────────────────────────────────────
+
+  Widget _verifyButton(bool isDark) {
+    final disabledBg = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300;
+
+    return Obx(() {
+      final isDisabled = !_isOtpValid || controller.isLoading.value;
+      return SizedBox(
+        width: double.infinity,
+        height: 48.h,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _isOtpValid ? AppColors.primary : disabledBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
             ),
-            onPressed: isDisabled
-                ? null
-                : () async {
-                    if (widget.password == true) {
-                      bool success = await forgetPasswordController
-                          .forgotPasswordVerifyOtp(widget.email);
-                      if (success) {
-                        Get.to(() => CreateNewPasswordView(email: widget.email));
-                      }
-                    } else {
-                      bool success = await controller.verifyOtp(widget.email);
-                      if (success) {
-                        _showSuccessBottomSheet(context);
-                      }
-                    }
-                  },
-            child: controller.isLoading.value
-                ? const CircularProgressIndicator(
-                    color: Colors.white,
-                  )
-                : Text(
-                    'Verify Now',
-                    style: GoogleFonts.inter(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
+            elevation: 0,
           ),
-        );
-      },
-    );
+          onPressed: isDisabled
+              ? null
+              : () async {
+                  if (widget.password == true) {
+                    bool success = await forgetPasswordController
+                        .forgotPasswordVerifyOtp(widget.email);
+                    if (success && mounted) {
+                      Get.to(() => CreateNewPasswordView(email: widget.email));
+                    }
+                  } else {
+                    bool success = await controller.verifyOtp(widget.email);
+                    if (success && mounted) {
+                      _showSuccessBottomSheet(isDark);
+                    }
+                  }
+                },
+          child: controller.isLoading.value
+              ? const CircularProgressIndicator(color: Colors.white)
+              : Text(
+                  'Verify Now',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+        ),
+      );
+    });
   }
 
-  // ---------------- SUCCESS BOTTOM SHEET ----------------
-  void _showSuccessBottomSheet(BuildContext context) {
+  // ── Success bottom sheet ──────────────────────────────────────────────────────
+
+  void _showSuccessBottomSheet(bool isDark) {
+    final sheetBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.grey.shade400 : Colors.black54;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -280,9 +300,9 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
         return Container(
           height: 220.h,
           width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(
               top: Radius.circular(24),
             ),
           ),
@@ -308,7 +328,7 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 14.sp,
-                  color: Colors.black54,
+                  color: textColor,
                 ),
               ),
             ],
@@ -322,8 +342,9 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
     });
   }
 
-  // ---------------- BOTTOM IMAGE ----------------
-  Widget _bottomCityImage(BuildContext context) {
+  // ── Bottom image ──────────────────────────────────────────────────────────────
+
+  Widget _bottomCityImage() {
     return Image.asset(
       'assets/images/city.png',
       width: double.infinity,

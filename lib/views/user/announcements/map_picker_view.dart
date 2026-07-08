@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -205,6 +206,15 @@ class _MapPickerViewState extends State<MapPickerView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final primaryText = isDark ? Colors.white : Colors.black87;
+    final hintText = isDark ? Colors.grey.shade600 : Colors.grey.shade400;
+    final iconColor = isDark ? Colors.grey.shade400 : Colors.grey.shade500;
+    final dividerColor =
+        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200;
+    final shadowColor = isDark ? Colors.black54 : Colors.black12;
+
     return Scaffold(
       body: SafeArea(
         child: Stack(
@@ -240,11 +250,11 @@ class _MapPickerViewState extends State<MapPickerView> {
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cardBg,
                       borderRadius: BorderRadius.circular(8.r),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black12,
+                          color: shadowColor,
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -257,17 +267,18 @@ class _MapPickerViewState extends State<MapPickerView> {
                           child: GestureDetector(
                             onTap: () => Navigator.pop(context),
                             child: Icon(Icons.arrow_back,
-                                size: 22.sp, color: Colors.black87),
+                                size: 22.sp, color: primaryText),
                           ),
                         ),
                         Expanded(
                           child: TextField(
                             controller: _searchCtrl,
-                            style: GoogleFonts.inter(fontSize: 14.sp),
+                            style: GoogleFonts.inter(
+                                fontSize: 14.sp, color: primaryText),
                             decoration: InputDecoration(
                               hintText: 'Search location...',
                               hintStyle: GoogleFonts.inter(
-                                  fontSize: 14.sp, color: Colors.grey.shade400),
+                                  fontSize: 14.sp, color: hintText),
                               border: InputBorder.none,
                               contentPadding:
                                   EdgeInsets.symmetric(vertical: 14.h),
@@ -280,8 +291,8 @@ class _MapPickerViewState extends State<MapPickerView> {
                             child: SizedBox(
                               width: 18.w,
                               height: 18.w,
-                              child: const CircularProgressIndicator(
-                                  strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: AppColors.primary),
                             ),
                           )
                         else if (_searchCtrl.text.isNotEmpty)
@@ -296,7 +307,7 @@ class _MapPickerViewState extends State<MapPickerView> {
                             child: Padding(
                               padding: EdgeInsets.symmetric(horizontal: 12.w),
                               child: Icon(Icons.close,
-                                  size: 20.sp, color: Colors.grey),
+                                  size: 20.sp, color: iconColor),
                             ),
                           ),
                       ],
@@ -306,11 +317,11 @@ class _MapPickerViewState extends State<MapPickerView> {
                     Container(
                       margin: EdgeInsets.only(top: 4.h),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardBg,
                         borderRadius: BorderRadius.circular(8.r),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black12,
+                            color: shadowColor,
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -322,7 +333,7 @@ class _MapPickerViewState extends State<MapPickerView> {
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _suggestions.length,
                         separatorBuilder: (_, __) =>
-                            Divider(height: 1, color: Colors.grey.shade200),
+                            Divider(height: 1, color: dividerColor),
                         itemBuilder: (_, i) {
                           final s = _suggestions[i];
                           return InkWell(
@@ -333,12 +344,13 @@ class _MapPickerViewState extends State<MapPickerView> {
                               child: Row(
                                 children: [
                                   Icon(Icons.place_outlined,
-                                      size: 18.sp, color: Colors.grey.shade500),
+                                      size: 18.sp, color: iconColor),
                                   SizedBox(width: 10.w),
                                   Expanded(
                                     child: Text(
                                       s.description,
-                                      style: GoogleFonts.inter(fontSize: 13.sp),
+                                      style: GoogleFonts.inter(
+                                          fontSize: 13.sp, color: primaryText),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -362,12 +374,12 @@ class _MapPickerViewState extends State<MapPickerView> {
               child: Container(
                 padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardBg,
                   borderRadius:
                       BorderRadius.vertical(top: Radius.circular(16.r)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black12,
+                      color: shadowColor,
                       blurRadius: 10,
                       offset: const Offset(0, -2),
                     ),
@@ -379,14 +391,15 @@ class _MapPickerViewState extends State<MapPickerView> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.location_on, color: Colors.red, size: 18.sp),
+                        Icon(Icons.location_on,
+                            color: AppColors.primary, size: 18.sp),
                         SizedBox(width: 6.w),
                         Text(
                           'Selected Location',
                           style: GoogleFonts.inter(
                             fontSize: 13.sp,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                            color: primaryText,
                           ),
                         ),
                         const Spacer(),
@@ -394,8 +407,8 @@ class _MapPickerViewState extends State<MapPickerView> {
                           SizedBox(
                             width: 16.w,
                             height: 16.w,
-                            child:
-                                const CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: AppColors.primary),
                           ),
                       ],
                     ),
@@ -406,9 +419,7 @@ class _MapPickerViewState extends State<MapPickerView> {
                           : 'Move the map to select a location',
                       style: GoogleFonts.inter(
                         fontSize: 13.sp,
-                        color: _address.isNotEmpty
-                            ? Colors.black87
-                            : Colors.grey.shade400,
+                        color: _address.isNotEmpty ? primaryText : hintText,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -421,31 +432,37 @@ class _MapPickerViewState extends State<MapPickerView> {
                             .join(', '),
                         style: GoogleFonts.inter(
                           fontSize: 12.sp,
-                          color: Colors.grey.shade500,
+                          color: iconColor,
                         ),
                       ),
                     ],
                     SizedBox(height: 16.h),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48.h,
-                      child: ElevatedButton(
-                        onPressed: _address.isNotEmpty && !_isGeocoding
-                            ? _confirm
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1A1A2E),
-                          disabledBackgroundColor: Colors.grey.shade300,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.r),
-                          ),
+                    GestureDetector(
+                      onTap: _address.isNotEmpty && !_isGeocoding
+                          ? _confirm
+                          : null,
+                      child: Container(
+                        width: double.infinity,
+                        height: 52.h,
+                        decoration: BoxDecoration(
+                          color: _address.isNotEmpty && !_isGeocoding
+                              ? AppColors.primary
+                              : (isDark
+                                  ? const Color(0xFF2A2A2A)
+                                  : Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(38.r),
                         ),
+                        alignment: Alignment.center,
                         child: Text(
                           'Confirm Location',
-                          style: GoogleFonts.inter(
+                          style: GoogleFonts.poppins(
                             fontSize: 15.sp,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            color: _address.isNotEmpty && !_isGeocoding
+                                ? Colors.white
+                                : (isDark
+                                    ? Colors.grey.shade600
+                                    : Colors.black45),
                           ),
                         ),
                       ),

@@ -6,17 +6,12 @@ import 'package:google_fonts/google_fonts.dart';
 /// A select field whose options list opens as a floating overlay anchored to
 /// the field — instead of expanding inline and pushing everything below it
 /// down. The panel auto-flips upward when there isn't enough room below.
-///
-/// Use this for any compact dropdown (property type, bedroom count, etc.) on
-/// a long form where keeping the layout stable matters.
 class OverlayDropdownField extends StatefulWidget {
   final String hint;
   final String? value;
   final List<String> items;
   final ValueChanged<String> onSelect;
 
-  /// Hard cap so very long lists don't dominate the screen. Internal scroll
-  /// takes over past this.
   final double maxPanelHeight;
 
   const OverlayDropdownField({
@@ -45,6 +40,7 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final size = renderBox.size;
     final position = renderBox.localToGlobal(Offset.zero);
     final media = MediaQuery.of(context);
@@ -52,12 +48,11 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
         media.size.height - media.padding.bottom - position.dy - size.height;
     final itemsHeight = (widget.items.length * 44.0);
     final desiredHeight = itemsHeight.clamp(0.0, widget.maxPanelHeight);
-    // Flip up only when below is genuinely cramped — and only if there IS
-    // more room above. Otherwise stick to below (scrolls internally).
     final spaceAbove = position.dy - media.padding.top;
     _openUpward = spaceBelow < desiredHeight + 12 && spaceAbove > spaceBelow;
 
-    _overlay = OverlayEntry(builder: (_) => _buildOverlay(size, desiredHeight));
+    _overlay =
+        OverlayEntry(builder: (_) => _buildOverlay(size, desiredHeight, isDark));
     overlay.insert(_overlay!);
     setState(() => _isOpen = true);
   }
@@ -74,10 +69,12 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
     super.dispose();
   }
 
-  Widget _buildOverlay(Size fieldSize, double panelHeight) {
+  Widget _buildOverlay(Size fieldSize, double panelHeight, bool isDark) {
+    final panelBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final normalText = isDark ? Colors.white70 : Colors.black87;
+
     return Stack(
       children: [
-        // Tap-outside dismisser.
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -93,7 +90,7 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
           child: Material(
             elevation: 6,
             borderRadius: BorderRadius.circular(6.r),
-            color: Colors.white,
+            color: panelBg,
             child: SizedBox(
               width: fieldSize.width,
               child: ConstrainedBox(
@@ -115,7 +112,7 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
                         padding: EdgeInsets.symmetric(
                             horizontal: 12.w, vertical: 11.h),
                         color: isSelected
-                            ? AppColors.primary.withValues(alpha: 0.08)
+                            ? AppColors.primary.withValues(alpha: 0.12)
                             : null,
                         child: Text(
                           item,
@@ -124,9 +121,8 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
                             fontWeight: isSelected
                                 ? FontWeight.w600
                                 : FontWeight.w400,
-                            color: isSelected
-                                ? AppColors.primary
-                                : Colors.black87,
+                            color:
+                                isSelected ? AppColors.primary : normalText,
                           ),
                         ),
                       ),
@@ -143,20 +139,24 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final value = widget.value;
+    final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final borderColor =
+        isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? Colors.grey.shade600 : Colors.grey.shade400;
+    final chevronColor = isDark ? Colors.grey.shade500 : Colors.grey.shade500;
+
     return CompositedTransformTarget(
       link: _link,
       child: GestureDetector(
         onTap: _toggle,
         child: Container(
-          // Matches the Material TextField height used elsewhere on the form
-          // (Property Name etc.) — InputDecorator adds intrinsic baseline
-          // slack that a plain Container doesn't, so we add a few more dp
-          // here to keep the row of fields visually aligned.
           padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
           decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.grey.shade300),
+            color: bgColor,
+            border: Border.all(color: borderColor),
             borderRadius: BorderRadius.circular(6.r),
           ),
           child: Row(
@@ -166,9 +166,7 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
                   value ?? widget.hint,
                   style: GoogleFonts.inter(
                     fontSize: 13.sp,
-                    color: value != null
-                        ? Colors.black87
-                        : Colors.grey.shade400,
+                    color: value != null ? textColor : hintColor,
                   ),
                 ),
               ),
@@ -176,7 +174,7 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
                 _isOpen
                     ? Icons.keyboard_arrow_up
                     : Icons.keyboard_arrow_down,
-                color: Colors.grey.shade500,
+                color: chevronColor,
                 size: 18.sp,
               ),
             ],

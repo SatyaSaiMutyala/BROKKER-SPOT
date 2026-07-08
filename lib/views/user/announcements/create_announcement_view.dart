@@ -7,11 +7,9 @@ import 'package:brokkerspot/views/user/announcements/property_location_view.dart
 import 'package:brokkerspot/views/user/announcements/property_price_brokerage_view.dart';
 import 'package:brokkerspot/views/user/announcements/property_video_images_view.dart';
 import 'package:brokkerspot/views/user/announcements/upload_document_view.dart';
+import 'package:brokkerspot/widgets/announcements/form_section_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:brokkerspot/widgets/announcements/form_section_tile.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
-import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -32,7 +30,7 @@ class CreateAnnouncementView extends StatefulWidget {
 }
 
 class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
-  late final AnnouncementController _controller;
+  late final AnnouncementController _ctrl;
 
   bool _brokerProposalsEnabled = false;
   String? _brokerProposalLimit;
@@ -44,6 +42,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
   bool _documentsSaved = false;
   bool _isSubmitting = false;
 
+  // Required steps 1-6; step 7 (broker proposals) is optional.
   bool get _allSectionsDone =>
       _propertyFor != null &&
       _locationSaved &&
@@ -52,29 +51,48 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       _priceSaved &&
       _documentsSaved;
 
+  // How many of the 7 steps are complete (for progress bar).
+  List<bool> get _stepFlags => [
+        _propertyFor != null,
+        _locationSaved,
+        _informationSaved,
+        _videoImagesSaved,
+        _priceSaved,
+        _documentsSaved,
+        _brokerProposalsEnabled,
+      ];
+
+  int get _completedCount => _stepFlags.where((b) => b).length;
+
+  // 1-indexed display step for "Step X of 7".
+  int get _currentStepDisplay => (_completedCount + 1).clamp(1, 7);
+
+  // 0-indexed currently active step (first incomplete).
+  int get _activeIndex {
+    for (int i = 0; i < _stepFlags.length; i++) {
+      if (!_stepFlags[i]) return i;
+    }
+    return _stepFlags.length - 1; // all done
+  }
+
   @override
   void initState() {
     super.initState();
-    if (Get.isRegistered<AnnouncementController>()) {
-      _controller = Get.find<AnnouncementController>();
-    } else {
-      _controller = Get.put(AnnouncementController());
-    }
+    _ctrl = Get.isRegistered<AnnouncementController>()
+        ? Get.find<AnnouncementController>()
+        : Get.put(AnnouncementController());
 
     if (widget.isEditing) {
-      _controller.loadFromAnnouncement(widget.announcement!);
+      _ctrl.loadFromAnnouncement(widget.announcement!);
       final a = widget.announcement!;
-      _propertyFor = (a.listingType ?? '').toLowerCase() == 'sell' ? 'Sell' : 'Rent';
-      _brokerProposalLimit =
-          a.proposalsLimit != null ? a.proposalsLimit.toString() : null;
+      _propertyFor =
+          (a.listingType ?? '').toLowerCase() == 'sell' ? 'Sell' : 'Rent';
+      _brokerProposalLimit = a.proposalsLimit?.toString();
       _brokerProposalsEnabled = _brokerProposalLimit != null;
-      _locationSaved = true;
-      _informationSaved = true;
-      _videoImagesSaved = true;
-      _priceSaved = true;
-      _documentsSaved = true;
+      _locationSaved = _informationSaved =
+          _videoImagesSaved = _priceSaved = _documentsSaved = true;
     } else {
-      _controller.loadDraft().then((flags) {
+      _ctrl.loadDraft().then((flags) {
         if (flags != null && mounted) {
           setState(() {
             _propertyFor = flags['propertyFor'] as String?;
@@ -101,7 +119,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
 
   void _saveDraft() {
     if (widget.isEditing) return;
-    _controller.saveDraft(
+    _ctrl.saveDraft(
       propertyFor: _propertyFor,
       locationSaved: _locationSaved,
       informationSaved: _informationSaved,
@@ -112,98 +130,17 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
     );
   }
 
-  void _showBrokerProposalLimitDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['10', '20', '50', '100', '500'].map((option) {
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  _brokerProposalLimit = option;
-                  _brokerProposalsEnabled = true;
-                });
-                _saveDraft();
-                Navigator.pop(context);
-              },
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 18.h),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Colors.grey.shade100, width: 1),
-                  ),
-                ),
-                child: Text(
-                  option,
-                  style: GoogleFonts.inter(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  void _showPropertyForPopup() {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['Rent', 'Sell'].map((option) {
-            return InkWell(
-              onTap: () {
-                setState(() => _propertyFor = option);
-                _controller.setListingType(option == 'Sell' ? 1 : 2);
-                _saveDraft();
-                Navigator.pop(context);
-              },
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 18.h),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Colors.grey.shade100, width: 1),
-                  ),
-                ),
-                child: Text(
-                  option,
-                  style: GoogleFonts.inter(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
   Future<void> _submit() async {
     setState(() => _isSubmitting = true);
-    _controller.setProposalsLimit(
-        _brokerProposalLimit != null ? int.tryParse(_brokerProposalLimit!) : null);
+    _ctrl.setProposalsLimit(_brokerProposalLimit != null
+        ? int.tryParse(_brokerProposalLimit!)
+        : null);
 
     bool success;
     if (widget.isEditing) {
-      success = await _controller.editAnnouncement(widget.announcement!.id!);
+      success = await _ctrl.editAnnouncement(widget.announcement!.id!);
     } else {
-      success = await _controller.createAnnouncement();
+      success = await _ctrl.createAnnouncement();
     }
 
     if (!mounted) return;
@@ -219,201 +156,491 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
             ));
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_controller.errorMessage.value ??
-              (widget.isEditing
-                  ? 'Failed to update announcement'
-                  : 'Failed to create announcement')),
-          backgroundColor: Colors.red.shade600,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_ctrl.errorMessage.value ??
+            (widget.isEditing
+                ? 'Failed to update announcement'
+                : 'Failed to create announcement')),
+        backgroundColor: Colors.red.shade600,
+      ));
     }
   }
 
+  // ── Dialogs ──────────────────────────────────────────────────────────────────
+
+  void _showPropertyForPopup() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    _showPickerDialog(
+      isDark: isDark,
+      options: ['Rent', 'Sell'],
+      onSelect: (option) {
+        setState(() => _propertyFor = option);
+        _ctrl.setListingType(option == 'Sell' ? 1 : 2);
+        _saveDraft();
+      },
+    );
+  }
+
+  void _showBrokerProposalLimitDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    _showPickerDialog(
+      isDark: isDark,
+      options: ['10', '20', '50', '100', '500'],
+      onSelect: (option) {
+        setState(() {
+          _brokerProposalLimit = option;
+          _brokerProposalsEnabled = true;
+        });
+        _saveDraft();
+      },
+    );
+  }
+
+  void _showPickerDialog({
+    required bool isDark,
+    required List<String> options,
+    required ValueChanged<String> onSelect,
+  }) {
+    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final dividerColor =
+        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100;
+    final textColor = isDark ? Colors.white : Colors.black87;
+
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: bgColor,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: options.map((option) {
+            return InkWell(
+              borderRadius: BorderRadius.circular(12.r),
+              onTap: () {
+                Navigator.pop(context);
+                onSelect(option);
+              },
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 18.h),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: dividerColor, width: 1),
+                  ),
+                ),
+                child: Text(
+                  option,
+                  style: GoogleFonts.inter(fontSize: 15.sp, color: textColor),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  // ── Subtitle helpers ─────────────────────────────────────────────────────────
+
+  String get _locationSubtitle {
+    if (!_locationSaved) return '';
+    final parts = [_ctrl.city, _ctrl.area]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(', ');
+    return parts.isNotEmpty ? parts : 'Location saved';
+  }
+
+  String get _infoSubtitle {
+    if (!_informationSaved) return '';
+    final parts = [
+      if (_ctrl.propertyType != null) _ctrl.propertyType!,
+      if (_ctrl.sqft != null) '${_ctrl.sqft!.toInt()} sqft',
+      if (_ctrl.bedrooms != null) '${_ctrl.bedrooms} Beds',
+    ];
+    return parts.isNotEmpty ? parts.join('  ') : 'Details saved';
+  }
+
+  String get _mediaSubtitle {
+    if (!_videoImagesSaved) return '';
+    final photos = _ctrl.imageUrls.length;
+    return photos > 0 ? '$photos photo(s) uploaded' : 'Media uploaded';
+  }
+
+  String get _priceSubtitle {
+    if (!_priceSaved) return '';
+    final price = _ctrl.price;
+    if (price == null) return 'Price set';
+    final formatted = price
+        .toInt()
+        .toString()
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+    return _propertyFor == 'Rent' ? 'AED $formatted / month' : 'AED $formatted';
+  }
+
+  // ── Build ────────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final active = _activeIndex;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
-            CustomHeader(
-              title: widget.isEditing ? 'EDIT ANNOUNCEMENT' : 'ANNOUNCEMENT',
-              showBackButton: true,
-            ),
-            Divider(height: 1.h, color: Colors.grey.shade200),
+            // ── Header ────────────────────────────────────────────────────────
+            _buildHeader(theme, isDark),
+
+            // ── Step progress ─────────────────────────────────────────────────
+            _buildStepProgress(theme, isDark),
+
+            // ── Step tiles ────────────────────────────────────────────────────
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   children: [
+                    SizedBox(height: 8.h),
                     FormSectionTile(
+                      stepNumber: 1,
                       title: 'Property For',
-                      isRequired: true,
-                      enabled: true,
-                      leading: SizedBox(
-                        width: 16.sp,
-                        height: 16.sp,
-                        child: _propertyFor != null
-                            ? Icon(Icons.check, size: 16.sp, color: AppColors.primary)
-                            : null,
-                      ),
-                      selectedValue: _propertyFor,
+                      subtitle: _propertyFor != null ? 'For $_propertyFor' : '',
+                      icon: Icons.home_outlined,
+                      isComplete: _propertyFor != null,
+                      isEnabled: true,
+                      isCurrent: active == 0,
                       onTap: _showPropertyForPopup,
                     ),
                     FormSectionTile(
+                      stepNumber: 2,
                       title: 'Property Location',
-                      isRequired: true,
-                      enabled: _propertyFor != null,
-                      leading: SizedBox(
-                        width: 16.sp,
-                        height: 16.sp,
-                        child: _locationSaved
-                            ? Icon(Icons.check, size: 16.sp, color: AppColors.primary)
-                            : null,
-                      ),
+                      subtitle: _locationSubtitle,
+                      icon: Icons.location_on_outlined,
+                      isComplete: _locationSaved,
+                      isEnabled: _propertyFor != null,
+                      isCurrent: active == 1,
                       onTap: () async {
                         final result = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const PropertyLocationView()));
-                        if (result == true) { setState(() => _locationSaved = true); _saveDraft(); }
+                        if (result == true) {
+                          setState(() => _locationSaved = true);
+                          _saveDraft();
+                        }
                       },
                     ),
                     FormSectionTile(
+                      stepNumber: 3,
                       title: 'Property Information',
-                      isRequired: true,
-                      enabled: _locationSaved,
-                      leading: SizedBox(
-                        width: 16.sp,
-                        height: 16.sp,
-                        child: _informationSaved
-                            ? Icon(Icons.check, size: 16.sp, color: AppColors.primary)
-                            : null,
-                      ),
+                      subtitle: _infoSubtitle,
+                      icon: Icons.description_outlined,
+                      isComplete: _informationSaved,
+                      isEnabled: _locationSaved,
+                      isCurrent: active == 2,
                       onTap: () async {
                         final result = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => const PropertyInformationView()));
-                        if (result == true) { setState(() => _informationSaved = true); _saveDraft(); }
+                                builder: (_) =>
+                                    const PropertyInformationView()));
+                        if (result == true) {
+                          setState(() => _informationSaved = true);
+                          _saveDraft();
+                        }
                       },
                     ),
                     FormSectionTile(
-                      title: 'Property Video & Images',
-                      isRequired: true,
-                      enabled: _informationSaved,
-                      leading: SizedBox(
-                        width: 16.sp,
-                        height: 16.sp,
-                        child: _videoImagesSaved
-                            ? Icon(Icons.check, size: 16.sp, color: AppColors.primary)
-                            : null,
-                      ),
+                      stepNumber: 4,
+                      title: 'Photos & Videos',
+                      subtitle: _mediaSubtitle,
+                      icon: Icons.photo_library_outlined,
+                      isComplete: _videoImagesSaved,
+                      isEnabled: _informationSaved,
+                      isCurrent: active == 3,
                       onTap: () async {
                         final result = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => const PropertyVideoImagesView()));
-                        if (result == true) { setState(() => _videoImagesSaved = true); _saveDraft(); }
+                                builder: (_) =>
+                                    const PropertyVideoImagesView()));
+                        if (result == true) {
+                          setState(() => _videoImagesSaved = true);
+                          _saveDraft();
+                        }
                       },
                     ),
                     FormSectionTile(
-                      title: 'Set Property Price & Availability',
-                      isRequired: true,
-                      enabled: _videoImagesSaved,
-                      leading: SizedBox(
-                        width: 16.sp,
-                        height: 16.sp,
-                        child: _priceSaved
-                            ? Icon(Icons.check, size: 16.sp, color: AppColors.primary)
-                            : null,
-                      ),
+                      stepNumber: 5,
+                      title: 'Price & Availability',
+                      subtitle: _priceSubtitle,
+                      icon: Icons.paid_outlined,
+                      isComplete: _priceSaved,
+                      isEnabled: _videoImagesSaved,
+                      isCurrent: active == 4,
                       onTap: () async {
                         final result = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
                                 builder: (_) => PropertyPriceBrokerageView(
                                     propertyFor: _propertyFor)));
-                        if (result == true) { setState(() => _priceSaved = true); _saveDraft(); }
+                        if (result == true) {
+                          setState(() => _priceSaved = true);
+                          _saveDraft();
+                        }
                       },
                     ),
                     FormSectionTile(
+                      stepNumber: 6,
                       title: 'Documents',
-                      isRequired: true,
-                      enabled: _priceSaved,
-                      leading: SizedBox(
-                        width: 16.sp,
-                        height: 16.sp,
-                        child: _documentsSaved
-                            ? Icon(Icons.check, size: 16.sp, color: AppColors.primary)
-                            : null,
-                      ),
+                      subtitle: _documentsSaved ? 'Documents uploaded' : '',
+                      icon: Icons.folder_outlined,
+                      isComplete: _documentsSaved,
+                      isEnabled: _priceSaved,
+                      isCurrent: active == 5,
                       onTap: () async {
                         final result = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
-                                builder: (_) =>
-                                    UploadDocumentView(propertyFor: _propertyFor)));
-                        if (result == true) { setState(() => _documentsSaved = true); _saveDraft(); }
+                                builder: (_) => UploadDocumentView(
+                                    propertyFor: _propertyFor)));
+                        if (result == true) {
+                          setState(() => _documentsSaved = true);
+                          _saveDraft();
+                        }
                       },
                     ),
                     FormSectionTile(
-                      title: 'Set Broker Proposals Limit',
-                      isRequired: false,
-                      leading: SizedBox(
-                        width: 16.sp,
-                        height: 16.sp,
-                        child: _brokerProposalLimit != null
-                            ? Icon(Icons.check, size: 16.sp, color: AppColors.primary)
-                            : null,
-                      ),
-                      selectedValue: _brokerProposalLimit,
-                      trailing: Transform.scale(
-                        scale: 0.6,
-                        child: Switch(
-                          value: _brokerProposalsEnabled,
-                          onChanged: (value) {
-                            if (value) {
-                              _showBrokerProposalLimitDialog();
-                            } else {
-                              setState(() {
-                                _brokerProposalsEnabled = false;
-                                _brokerProposalLimit = null;
-                              });
-                              _saveDraft();
-                            }
-                          },
-                          thumbColor: WidgetStatePropertyAll(Colors.white),
-                          activeTrackColor: Colors.purple.shade600,
-                          inactiveTrackColor: Colors.grey.shade400,
-                        ),
+                      stepNumber: 7,
+                      title: 'Limit Broker Proposals',
+                      subtitle: _brokerProposalLimit != null
+                          ? '$_brokerProposalLimit broker offers limit.'
+                          : '',
+                      icon: Icons.group_outlined,
+                      isComplete: _brokerProposalsEnabled,
+                      isEnabled: true,
+                      isCurrent: active == 6,
+                      trailingOverride: _buildBrokerToggle(),
+                    ),
+                    SizedBox(height: 20.h),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Announce Now button ───────────────────────────────────────────
+            _buildBottomSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Header: back + title + Save Draft ─────────────────────────────────────
+
+  Widget _buildHeader(ThemeData theme, bool isDark) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 16.h),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Get.back(),
+            child: Container(
+              width: 38.w,
+              height: 38.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color:
+                    isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF2F2F2),
+              ),
+              child: Icon(Icons.arrow_back_ios_new_rounded,
+                  size: 16.sp, color: theme.colorScheme.onSurface),
+            ),
+          ),
+          SizedBox(width: 14.w),
+          Expanded(
+            child: Text(
+              widget.isEditing ? 'Edit Announcement' : 'Create Announcement',
+              style: GoogleFonts.poppins(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w500,
+                color: theme.colorScheme.onSurface,
+                height: 1.0,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: _saveDraft,
+            child: Text(
+              'Save Draft',
+              style: GoogleFonts.poppins(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w500,
+                color: AppColors.primary,
+                height: 1.0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Step progress bar ─────────────────────────────────────────────────────
+
+  Widget _buildStepProgress(ThemeData theme, bool isDark) {
+    final greenCount = _completedCount;
+    return Container(
+      padding: EdgeInsets.fromLTRB(19.w, 12.h, 19.w, 12.h),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Step $_currentStepDisplay of 7',
+            style: GoogleFonts.poppins(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+              height: 1.0,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          // 7 progress capsules
+          Row(
+            children: List.generate(7, (i) {
+              return Expanded(
+                child: Container(
+                  height: 3.h,
+                  margin: EdgeInsets.only(right: i < 6 ? 4.w : 0),
+                  decoration: BoxDecoration(
+                    color: i < greenCount
+                        ? const Color(0xFF149A35)
+                        : const Color(0xFF757575),
+                    borderRadius: BorderRadius.circular(26.r),
+                  ),
+                ),
+              );
+            }),
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            'Fill in all the details to publish your property',
+            style: GoogleFonts.poppins(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF6F6F6F),
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Broker proposals toggle ───────────────────────────────────────────────
+
+  Widget _buildBrokerToggle() {
+    return Switch(
+      value: _brokerProposalsEnabled,
+      onChanged: (value) {
+        if (value) {
+          _showBrokerProposalLimitDialog();
+        } else {
+          setState(() {
+            _brokerProposalsEnabled = false;
+            _brokerProposalLimit = null;
+          });
+          _saveDraft();
+        }
+      },
+      thumbColor: WidgetStateProperty.all(Colors.white),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        return states.contains(WidgetState.selected)
+            ? const Color(0xFF149A35)
+            : Colors.grey.shade300;
+      }),
+      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+    );
+  }
+
+  // ── Bottom section: button + note ────────────────────────────────────────
+
+  Widget _buildBottomSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canSubmit = _allSectionsDone && !_isSubmitting;
+    final disabledColor =
+        isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5);
+    final disabledFg = isDark ? Colors.grey.shade600 : Colors.grey.shade500;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(0, 12.h, 0, 24.h),
+      child: Column(
+        children: [
+          Center(
+            child: GestureDetector(
+              onTap: canSubmit ? _submit : null,
+              child: Container(
+                width: 286.w,
+                height: 51.h,
+                decoration: BoxDecoration(
+                  color: canSubmit ? AppColors.primary : disabledColor,
+                  borderRadius: BorderRadius.circular(38.r),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.campaign_outlined,
+                      size: 20.sp,
+                      color: canSubmit ? Colors.white : disabledFg,
+                    ),
+                    SizedBox(width: 8.w),
+                    Text(
+                      _isSubmitting
+                          ? (widget.isEditing ? 'Updating...' : 'Creating...')
+                          : (widget.isEditing
+                              ? 'Update Announcement'
+                              : 'Announce Now'),
+                      style: GoogleFonts.poppins(
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w500,
+                        color: canSubmit ? Colors.white : disabledFg,
+                        height: 1.0,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            Padding(
-              padding: EdgeInsets.all(20.w),
-              child: CustomPrimaryButton(
-                title: _isSubmitting
-                    ? (widget.isEditing ? 'Updating...' : 'Creating...')
-                    : (widget.isEditing ? 'Update' : 'Announce'),
-                onPressed:
-                    _allSectionsDone && !_isSubmitting ? _submit : () {},
-                backgroundColor: _allSectionsDone && !_isSubmitting
-                    ? AppColors.primary
-                    : Colors.grey.shade300,
-                defaultColor: _allSectionsDone && !_isSubmitting
-                    ? Colors.white
-                    : Colors.black45,
-                height: 50.h,
-                radius: 10,
+          ),
+          SizedBox(height: 10.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_outline_rounded,
+                  size: 12.sp, color: Colors.grey.shade400),
+              SizedBox(width: 4.w),
+              Text(
+                'You can review everything before publishing',
+                style: GoogleFonts.poppins(
+                  fontSize: 11.sp,
+                  color: Colors.grey.shade400,
+                  height: 1.0,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }

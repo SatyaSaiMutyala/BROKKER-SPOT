@@ -15,23 +15,27 @@ class DealTabToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final trackColor =
+        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100;
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w),
       height: 44.h,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10.r),
-        color: Colors.grey.shade100,
+        color: trackColor,
       ),
       child: Row(
         children: [
-          _tab('CURRENT DEALS', 0),
-          _tab('COMPLETED DEALS', 1),
+          _tab('CURRENT DEALS', 0, isDark),
+          _tab('COMPLETED DEALS', 1, isDark),
         ],
       ),
     );
   }
 
-  Widget _tab(String label, int index) {
+  Widget _tab(String label, int index, bool isDark) {
     final isActive = selectedIndex == index;
     return Expanded(
       child: GestureDetector(
@@ -47,7 +51,11 @@ class DealTabToggle extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 12.sp,
                 fontWeight: FontWeight.w700,
-                color: isActive ? Colors.white : Colors.black54,
+                color: isActive
+                    ? Colors.white
+                    : isDark
+                        ? Colors.grey.shade400
+                        : Colors.black54,
               ),
             ),
           ),

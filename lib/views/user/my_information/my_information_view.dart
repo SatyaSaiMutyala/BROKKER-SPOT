@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
 
 class MyInformationView extends StatelessWidget {
   const MyInformationView({super.key});
@@ -13,24 +12,30 @@ class MyInformationView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(MyInformationController());
-    // Always refresh profile when screen opens so latest image/name shows
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final dividerColor =
+        isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.refreshProfile();
     });
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            const CustomHeader(title: 'My Information', showBackButton: true),
+            _buildHeader(context, theme, isDark),
+            Divider(height: 1, thickness: 1, color: dividerColor),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   children: [
                     SizedBox(height: 32.h),
-                    _buildAvatar(controller),
+                    _buildAvatar(controller, isDark),
                     SizedBox(height: 40.h),
-                    _buildInfoCard(context, controller),
+                    _buildInfoCard(context, controller, isDark),
                   ],
                 ),
               ),
@@ -41,8 +46,44 @@ class MyInformationView extends StatelessWidget {
     );
   }
 
-  // ─── Profile Avatar ───
-  Widget _buildAvatar(MyInformationController controller) {
+  Widget _buildHeader(BuildContext context, ThemeData theme, bool isDark) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38.r,
+              height: 38.r,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+              ),
+              child: Icon(
+                Icons.arrow_back_ios_new,
+                size: 16.sp,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Text(
+            'My Information',
+            style: GoogleFonts.poppins(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Profile Avatar ──────────────────────────────────────────────────────────
+
+  Widget _buildAvatar(MyInformationController controller, bool isDark) {
     return Center(
       child: Obx(() {
         final image = controller.profileImage;
@@ -58,16 +99,22 @@ class MyInformationView extends StatelessWidget {
                 height: 90.w,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.grey.shade200,
+                  color:
+                      isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
                   border: Border.all(color: AppColors.primary, width: 1.5),
                 ),
                 child: ClipOval(
                   child: isUploading
-                      ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2))
                       : image.isNotEmpty
-                          ? Image.network(image, fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _defaultAvatar())
-                          : _defaultAvatar(),
+                          ? Image.network(
+                              image,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _defaultAvatar(isDark),
+                            )
+                          : _defaultAvatar(isDark),
                 ),
               ),
             ),
@@ -83,7 +130,8 @@ class MyInformationView extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: AppColors.primary,
                   ),
-                  child: Icon(Icons.camera_alt, color: Colors.white, size: 16.sp),
+                  child:
+                      Icon(Icons.camera_alt, color: Colors.white, size: 16.sp),
                 ),
               ),
             ),
@@ -93,20 +141,31 @@ class MyInformationView extends StatelessWidget {
     );
   }
 
-  Widget _defaultAvatar() => Icon(Icons.person, size: 40.sp, color: Colors.grey);
+  Widget _defaultAvatar(bool isDark) => Icon(
+        Icons.person,
+        size: 40.sp,
+        color: isDark ? Colors.grey.shade600 : Colors.grey,
+      );
 
-  // ─── Info Rows ───
-  Widget _buildInfoCard(BuildContext context, MyInformationController controller) {
+  // ─── Info Rows ───────────────────────────────────────────────────────────────
+
+  Widget _buildInfoCard(
+    BuildContext context,
+    MyInformationController controller,
+    bool isDark,
+  ) {
     return Obx(() => Column(
           children: [
-            _divider(),
+            _divider(isDark),
             _infoRow(
+              isDark: isDark,
               label: 'Name',
               value: controller.name.isEmpty ? '—' : controller.name,
               onEdit: () => _showEditNameDialog(context, controller),
             ),
-            _divider(),
+            _divider(isDark),
             _infoRow(
+              isDark: isDark,
               label: 'Phone',
               value: controller.phone.isEmpty
                   ? '—'
@@ -114,8 +173,9 @@ class MyInformationView extends StatelessWidget {
               isEmpty: controller.phone.isEmpty,
               onEdit: () => _showEditPhoneDialog(context, controller),
             ),
-            _divider(),
+            _divider(isDark),
             _infoRow(
+              isDark: isDark,
               label: 'Email',
               value: controller.email.isEmpty ? '—' : controller.email,
               isVerified: controller.isEmailVerified,
@@ -126,12 +186,16 @@ class MyInformationView extends StatelessWidget {
   }
 
   Widget _infoRow({
+    required bool isDark,
     required String label,
     required String value,
     bool isVerified = false,
     bool isEmpty = false,
     VoidCallback? onEdit,
   }) {
+    final labelColor = isDark ? Colors.grey.shade500 : Colors.black54;
+    final valueColor = isDark ? Colors.white : Colors.black87;
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 22.h),
       child: Row(
@@ -143,7 +207,7 @@ class MyInformationView extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 13.sp,
                 fontWeight: FontWeight.w500,
-                color: Colors.black54,
+                color: labelColor,
               ),
             ),
           ),
@@ -153,7 +217,7 @@ class MyInformationView extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 13.sp,
                 fontWeight: FontWeight.w400,
-                color: Colors.black87,
+                color: valueColor,
               ),
             ),
           ),
@@ -192,16 +256,63 @@ class MyInformationView extends StatelessWidget {
     );
   }
 
-  Widget _divider() =>
-      Divider(height: 1, thickness: 1, color: Colors.grey.shade200);
+  Widget _divider(bool isDark) => Divider(
+        height: 1,
+        thickness: 1,
+        color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200,
+      );
 
-  // ─── Edit Name Dialog ───
-  void _showEditNameDialog(BuildContext context, MyInformationController controller) {
+  // ─── Shared dialog helpers ────────────────────────────────────────────────────
+
+  InputDecoration _fieldDecoration({
+    required String hint,
+    required bool isDark,
+    EdgeInsetsGeometry? contentPadding,
+  }) {
+    final fillColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50;
+    final borderColor = isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: fillColor,
+      hintStyle: GoogleFonts.inter(
+        color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.r),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.r),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.r),
+        borderSide: const BorderSide(color: AppColors.primary),
+      ),
+      contentPadding: contentPadding,
+    );
+  }
+
+  TextStyle _fieldTextStyle(bool isDark) => GoogleFonts.inter(
+        fontSize: 14.sp,
+        color: isDark ? Colors.white : Colors.black87,
+      );
+
+  // ─── Edit Name Dialog ─────────────────────────────────────────────────────────
+
+  void _showEditNameDialog(
+      BuildContext context, MyInformationController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final titleColor = isDark ? Colors.white : Colors.black;
+
     final nameCtrl = TextEditingController(text: controller.name);
     Get.dialog(
       Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+        backgroundColor: bgColor,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
           child: Column(
@@ -212,7 +323,7 @@ class MyInformationView extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 20.sp,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  color: titleColor,
                 ),
               ),
               SizedBox(height: 16.h),
@@ -220,17 +331,9 @@ class MyInformationView extends StatelessWidget {
                 controller: nameCtrl,
                 autofocus: true,
                 textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  hintText: 'Enter your name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                    borderSide: const BorderSide(color: AppColors.primary),
-                  ),
-                ),
+                style: _fieldTextStyle(isDark),
+                decoration:
+                    _fieldDecoration(hint: 'Enter your name', isDark: isDark),
               ),
               SizedBox(height: 20.h),
               Obx(() => SizedBox(
@@ -290,15 +393,22 @@ class MyInformationView extends StatelessWidget {
     );
   }
 
-  // ─── Edit/Add Phone Dialog ───
-  void _showEditPhoneDialog(BuildContext context, MyInformationController controller) {
+  // ─── Edit/Add Phone Dialog ────────────────────────────────────────────────────
+
+  void _showEditPhoneDialog(
+      BuildContext context, MyInformationController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final titleColor = isDark ? Colors.white : Colors.black;
+
     final codeCtrl = TextEditingController(
         text: controller.countryCode.isEmpty ? '+' : controller.countryCode);
     final phoneCtrl = TextEditingController(text: controller.phone);
     Get.dialog(
       Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+        backgroundColor: bgColor,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
           child: Column(
@@ -309,7 +419,7 @@ class MyInformationView extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 20.sp,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  color: titleColor,
                 ),
               ),
               SizedBox(height: 16.h),
@@ -321,17 +431,12 @@ class MyInformationView extends StatelessWidget {
                       controller: codeCtrl,
                       keyboardType: TextInputType.phone,
                       textAlign: TextAlign.center,
-                      decoration: InputDecoration(
-                        hintText: '+91',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                          borderSide: const BorderSide(color: AppColors.primary),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 14.h),
+                      style: _fieldTextStyle(isDark),
+                      decoration: _fieldDecoration(
+                        hint: '+91',
+                        isDark: isDark,
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: 8.w, vertical: 14.h),
                       ),
                     ),
                   ),
@@ -341,17 +446,9 @@ class MyInformationView extends StatelessWidget {
                       controller: phoneCtrl,
                       autofocus: true,
                       keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        hintText: 'Phone number',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                          borderSide: const BorderSide(color: AppColors.primary),
-                        ),
-                      ),
+                      style: _fieldTextStyle(isDark),
+                      decoration: _fieldDecoration(
+                          hint: 'Phone number', isDark: isDark),
                     ),
                   ),
                 ],
@@ -372,7 +469,8 @@ class MyInformationView extends StatelessWidget {
                               final phone = phoneCtrl.text.trim();
                               final code = codeCtrl.text.trim();
                               if (phone.isEmpty) return;
-                              final saved = await controller.updatePhone(code, phone);
+                              final saved =
+                                  await controller.updatePhone(code, phone);
                               if (saved) Get.back();
                             },
                       child: controller.isSavingPhone.value
@@ -415,13 +513,21 @@ class MyInformationView extends StatelessWidget {
     );
   }
 
-  // ─── Edit Email Dialog ───
-  void _showEditEmailDialog(BuildContext context, MyInformationController controller) {
+  // ─── Edit Email Dialog ────────────────────────────────────────────────────────
+
+  void _showEditEmailDialog(
+      BuildContext context, MyInformationController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final titleColor = isDark ? Colors.white : Colors.black;
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.black54;
+
     final emailCtrl = TextEditingController(text: controller.email);
     Get.dialog(
       Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+        backgroundColor: bgColor,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
           child: Column(
@@ -432,7 +538,7 @@ class MyInformationView extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 20.sp,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  color: titleColor,
                 ),
               ),
               SizedBox(height: 8.h),
@@ -441,7 +547,7 @@ class MyInformationView extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 13.sp,
-                  color: Colors.black54,
+                  color: subtitleColor,
                   fontWeight: FontWeight.w400,
                 ),
               ),
@@ -450,17 +556,9 @@ class MyInformationView extends StatelessWidget {
                 controller: emailCtrl,
                 autofocus: true,
                 keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'Enter new email',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                    borderSide: const BorderSide(color: AppColors.primary),
-                  ),
-                ),
+                style: _fieldTextStyle(isDark),
+                decoration:
+                    _fieldDecoration(hint: 'Enter new email', isDark: isDark),
               ),
               SizedBox(height: 20.h),
               Obx(() => SizedBox(
@@ -477,10 +575,11 @@ class MyInformationView extends StatelessWidget {
                           : () async {
                               final newEmail = emailCtrl.text.trim();
                               if (newEmail.isEmpty) return;
-                              final sent = await controller.updateEmail(newEmail);
+                              final sent =
+                                  await controller.updateEmail(newEmail);
                               if (sent) {
                                 Get.back();
-                                _showOtpDialog(controller, newEmail);
+                                _showOtpDialog(controller, newEmail, isDark);
                               }
                             },
                       child: controller.isSavingEmail.value
@@ -523,13 +622,23 @@ class MyInformationView extends StatelessWidget {
     );
   }
 
-  // ─── OTP Verification Dialog ───
-  void _showOtpDialog(MyInformationController controller, String email) {
+  // ─── OTP Verification Dialog ──────────────────────────────────────────────────
+
+  void _showOtpDialog(
+    MyInformationController controller,
+    String email,
+    bool isDark,
+  ) {
+    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final titleColor = isDark ? Colors.white : Colors.black;
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.black54;
+
     final otpCtrl = TextEditingController();
     Get.dialog(
       Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+        backgroundColor: bgColor,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
           child: Column(
@@ -540,7 +649,7 @@ class MyInformationView extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 20.sp,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  color: titleColor,
                 ),
               ),
               SizedBox(height: 8.h),
@@ -549,7 +658,7 @@ class MyInformationView extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 13.sp,
-                  color: Colors.black54,
+                  color: subtitleColor,
                   fontWeight: FontWeight.w400,
                 ),
               ),
@@ -560,18 +669,9 @@ class MyInformationView extends StatelessWidget {
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 maxLength: 6,
-                decoration: InputDecoration(
-                  hintText: 'Enter OTP',
-                  counterText: '',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                    borderSide: const BorderSide(color: AppColors.primary),
-                  ),
-                ),
+                style: _fieldTextStyle(isDark),
+                decoration: _fieldDecoration(hint: 'Enter OTP', isDark: isDark)
+                    .copyWith(counterText: ''),
               ),
               SizedBox(height: 20.h),
               Obx(() => SizedBox(

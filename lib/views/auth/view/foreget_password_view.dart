@@ -28,11 +28,7 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
   @override
   void initState() {
     super.initState();
-
-    controller = Get.put(
-      ForgetPasswordController(),
-    );
-
+    controller = Get.put(ForgetPasswordController());
     emailController.addListener(() {
       final valid = _checkEmail(emailController.text);
       if (valid != _isValidEmail) {
@@ -50,8 +46,11 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         bottom: false,
@@ -65,14 +64,14 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
                   children: [
                     Column(
                       children: [
-                        _topSection(context),
+                        _topSection(context, isDark),
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 24.w),
-                          child: _contentSection(context),
+                          child: _contentSection(isDark),
                         ),
                       ],
                     ),
-                    _bottomCityImage(context),
+                    _bottomCityImage(),
                   ],
                 ),
               ),
@@ -83,8 +82,13 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
     );
   }
 
-  // ---------------- TOP SECTION ----------------
-  Widget _topSection(BuildContext context) {
+  // ── Top section ───────────────────────────────────────────────────────────────
+
+  Widget _topSection(BuildContext context, bool isDark) {
+    final backBorderColor =
+        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E5E5);
+    final backIconColor = isDark ? Colors.white : Colors.black87;
+
     return SizedBox(
       height: 220.h,
       child: Stack(
@@ -109,9 +113,13 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
                 padding: EdgeInsets.all(8.w),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                  border: Border.all(color: backBorderColor),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 18),
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 18,
+                  color: backIconColor,
+                ),
               ),
             ),
           ),
@@ -120,8 +128,11 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
     );
   }
 
-  // ---------------- CONTENT ----------------
-  Widget _contentSection(BuildContext context) {
+  // ── Content section ───────────────────────────────────────────────────────────
+
+  Widget _contentSection(bool isDark) {
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.black54;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -138,9 +149,10 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
         RichText(
           text: TextSpan(
             style: GoogleFonts.carlito(
-                fontSize: 14.sp,
-                color: Colors.black54,
-                fontWeight: FontWeight.w400),
+              fontSize: 14.sp,
+              color: subtitleColor,
+              fontWeight: FontWeight.w400,
+            ),
             children: [
               const TextSpan(
                 text: 'Enter the Email Address with Brokkerspot.',
@@ -153,23 +165,29 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
           ),
         ),
         SizedBox(height: 30.h),
-        _emailField(),
+        _emailField(isDark),
         SizedBox(height: 30.h),
-        _verifyButton(context),
+        _verifyButton(isDark),
       ],
     );
   }
 
-  // ---------------- OTP FIELD ----------------
-  Widget _emailField() {
-    return TextField(
-      // keyboardType: TextInputType.number,
-      controller: emailController,
+  // ── Email field ───────────────────────────────────────────────────────────────
 
+  Widget _emailField(bool isDark) {
+    final inputTextColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? Colors.grey.shade500 : Colors.grey;
+    final enabledBorderColor =
+        isDark ? const Color(0xFF3A3A3A) : Colors.black26;
+    final focusedBorderColor = isDark ? Colors.grey.shade400 : Colors.black;
+
+    return TextField(
+      controller: emailController,
       style: GoogleFonts.roboto(
         fontSize: 16.sp,
         fontWeight: FontWeight.w500,
         letterSpacing: 2,
+        color: inputTextColor,
       ),
       decoration: InputDecoration(
         counterText: '',
@@ -177,42 +195,46 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
         hintStyle: GoogleFonts.roboto(
           fontSize: 14.sp,
           fontWeight: FontWeight.w400,
-          color: Colors.grey,
+          color: hintColor,
         ),
         suffixIconConstraints: const BoxConstraints(minWidth: 0),
-        enabledBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.black26),
+        enabledBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: enabledBorderColor),
         ),
-        focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.black),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: focusedBorderColor),
         ),
       ),
     );
   }
 
-  // ---------------- BUTTON ----------------
-  Widget _verifyButton(BuildContext context) {
+  // ── Verify button ─────────────────────────────────────────────────────────────
+
+  Widget _verifyButton(bool isDark) {
+    final disabledBg = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300;
+    final disabledTextColor = isDark ? Colors.white38 : Colors.black54;
+
     return SizedBox(
       width: double.infinity,
       height: 46.h,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              _isValidEmail ? const Color(0xFFD9C27C) : Colors.grey.shade300,
+          backgroundColor: _isValidEmail ? const Color(0xFFD9C27C) : disabledBg,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
           ),
+          elevation: 0,
         ),
         onPressed: _isValidEmail
             ? () async {
                 bool success = await controller
                     .forgetPassword(emailController.text.trim());
-                if (success) {
+                if (success && mounted) {
                   Get.to(() => EmailVerificationView(
                         password: true,
                         email: emailController.text.trim(),
                       ));
-                } else {
+                } else if (!success) {
                   AppToast.error("Failed to send OTP. Please try again.");
                 }
               }
@@ -222,15 +244,16 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
           style: GoogleFonts.inter(
             fontSize: 14.sp,
             fontWeight: FontWeight.w500,
-            color: _isValidEmail ? Colors.white : Colors.black54,
+            color: _isValidEmail ? Colors.white : disabledTextColor,
           ),
         ),
       ),
     );
   }
 
-  // ---------------- BOTTOM IMAGE ----------------
-  Widget _bottomCityImage(BuildContext context) {
+  // ── Bottom image ──────────────────────────────────────────────────────────────
+
+  Widget _bottomCityImage() {
     return Image.asset(
       'assets/images/city.png',
       width: double.infinity,

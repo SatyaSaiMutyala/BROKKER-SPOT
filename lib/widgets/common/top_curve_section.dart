@@ -22,6 +22,11 @@ class TopCurveSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backBorderColor =
+        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E5E5);
+    final backIconColor = isDark ? Colors.white : Colors.black87;
+
     return SizedBox(
       height: (sectionHeight ?? 220).h,
       child: Stack(
@@ -46,9 +51,13 @@ class TopCurveSection extends StatelessWidget {
                 padding: EdgeInsets.all(8.w),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                  border: Border.all(color: backBorderColor),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 18),
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 18,
+                  color: backIconColor,
+                ),
               ),
             ),
           ),

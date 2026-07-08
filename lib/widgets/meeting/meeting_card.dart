@@ -1,11 +1,10 @@
-import 'package:brokkerspot/core/constants/app_colors.dart';
-import 'package:brokkerspot/models/meeting_item_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/models/meeting_item_model.dart';
 
-/// One row on the Meeting → Announcement list.
 class MeetingCard extends StatelessWidget {
   final MeetingItem meeting;
   final bool isOwn;
@@ -20,124 +19,124 @@ class MeetingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : const Color(0xFF232323);
+
     final a = meeting.announcement;
     final thumb = a.propertyMedia?.thumbnail ?? '';
-    // listingType is the display string ('Rent' | 'Sell'); fall back to Sell.
     final isRent = (a.listingType ?? '').toLowerCase() == 'rent';
     final forLabel = isRent ? 'For RENT' : 'For SELL';
-    final period = (a.rentPeriod ?? '').toLowerCase();
-    final peer = meeting.chatProfiles.isNotEmpty
-        ? meeting.chatProfiles.first
-        : null;
+    final period = (a.rentPeriod ?? '').isNotEmpty
+        ? ' ${a.rentPeriod!.toLowerCase()}'
+        : '';
+
+    final first =
+        meeting.chatProfiles.isNotEmpty ? meeting.chatProfiles.first : null;
+    final second =
+        meeting.chatProfiles.length > 1 ? meeting.chatProfiles[1] : null;
 
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-        child: Row(
-          children: [
-            // Property image (circular).
-            ClipOval(
-              child: thumb.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: thumb,
-                      width: 60.w,
-                      height: 60.w,
-                      fit: BoxFit.cover,
-                      memCacheWidth: 180,
-                      memCacheHeight: 180,
-                      maxWidthDiskCache: 360,
-                      maxHeightDiskCache: 360,
-                      fadeInDuration: Duration.zero,
-                      placeholderFadeInDuration: Duration.zero,
-                      placeholder: (_, __) =>
-                          Container(color: Colors.grey.shade200),
-                      errorWidget: (_, __, ___) => Container(
-                        color: Colors.grey.shade200,
-                        child: Icon(Icons.image_outlined,
-                            color: Colors.grey.shade400),
+      child: SizedBox(
+        height: 89.h,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+          child: Row(
+            children: [
+              _PropertyThumb(url: thumb),
+              SizedBox(width: 13.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Property type
+                    Text(
+                      a.propertyType ?? 'Property',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w500,
+                        color: textColor,
+                        height: 1.0,
+                        letterSpacing: 0,
                       ),
-                    )
-                  : Container(
-                      width: 60.w,
-                      height: 60.w,
-                      color: Colors.grey.shade200,
-                      child: Icon(Icons.home_outlined,
-                          color: Colors.grey.shade400),
                     ),
-            ),
-            SizedBox(width: 12.w),
-            // Title + tags + price.
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    a.propertyType ?? 'Property',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
+                    // OWN (gold) + For RENT/SELL
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          if (isOwn)
+                            TextSpan(
+                              text: 'OWN ',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                                height: 1.0,
+                              ),
+                            ),
+                          TextSpan(
+                            text: forLabel,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w500,
+                              color: textColor,
+                              height: 1.0,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 2.h),
-                  Row(
-                    children: [
-                      if (isOwn) ...[
+                    // AED [price gradient] [period]
+                    Row(
+                      children: [
                         Text(
-                          'OWN',
+                          '${a.currency ?? 'AED'} ',
                           style: GoogleFonts.poppins(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                            color: textColor,
+                            height: 1.0,
                           ),
                         ),
-                        SizedBox(width: 4.w),
+                        ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0xFFCBAB52), Color(0xB2DBC483)],
+                          ).createShader(bounds),
+                          child: Text(
+                            _formatPrice(a.price),
+                            style: GoogleFonts.poppins(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              height: 1.0,
+                            ),
+                          ),
+                        ),
+                        if (period.isNotEmpty)
+                          Text(
+                            period,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w500,
+                              color: textColor,
+                              height: 1.0,
+                            ),
+                          ),
                       ],
-                      Text(
-                        forLabel,
-                        style: GoogleFonts.poppins(
-                          fontSize: 12.sp,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 2.h),
-                  Row(
-                    children: [
-                      Text(
-                        '${a.currency ?? 'AED'} ',
-                        style: GoogleFonts.poppins(
-                            fontSize: 13.sp, color: Colors.black),
-                      ),
-                      Text(
-                        _formatPrice(a.price),
-                        style: GoogleFonts.poppins(
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      if (period.isNotEmpty)
-                        Text(
-                          ' $period',
-                          style: GoogleFonts.poppins(
-                            fontSize: 13.sp,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            // Peer avatar + chat-profile-count badge.
-            _AvatarWithBadge(
-              imageUrl: peer?.profileImageUrl,
-              count: meeting.chatProfilesCount,
-            ),
-          ],
+              _AvatarCluster(
+                first: first,
+                second: second,
+                count: meeting.chatProfilesCount,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -156,66 +155,145 @@ class MeetingCard extends StatelessWidget {
   }
 }
 
-class _AvatarWithBadge extends StatelessWidget {
-  final String? imageUrl;
-  final int count;
+// ── Property thumbnail ────────────────────────────────────────────────────────
 
-  const _AvatarWithBadge({required this.imageUrl, required this.count});
+class _PropertyThumb extends StatelessWidget {
+  final String url;
+
+  const _PropertyThumb({required this.url});
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        ClipOval(
-          child: (imageUrl != null && imageUrl!.isNotEmpty)
-              ? CachedNetworkImage(
-                  imageUrl: imageUrl!,
-                  width: 46.w,
-                  height: 46.w,
-                  fit: BoxFit.cover,
-                  memCacheWidth: 138,
-                  memCacheHeight: 138,
-                  maxWidthDiskCache: 280,
-                  maxHeightDiskCache: 280,
-                  fadeInDuration: Duration.zero,
-                  placeholderFadeInDuration: Duration.zero,
-                  errorWidget: (_, __, ___) => _fallback(),
-                  placeholder: (_, __) => _fallback(),
-                )
-              : _fallback(),
-        ),
-        if (count > 0)
-          Positioned(
-            top: -2,
-            right: -2,
-            child: Container(
-              constraints: BoxConstraints(minWidth: 18.w),
-              height: 18.w,
-              padding: EdgeInsets.symmetric(horizontal: 4.w),
-              decoration: const BoxDecoration(
-                shape: BoxShape.rectangle,
-                color: AppColors.primary,
-                borderRadius: BorderRadius.all(Radius.circular(20)),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                count > 9 ? '9+' : '$count',
-                style: GoogleFonts.poppins(
-                    fontSize: 10.sp,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white),
-              ),
-            ),
-          ),
-      ],
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      width: 65.w,
+      height: 65.w,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.primary, width: 1),
+      ),
+      child: ClipOval(
+        child: url.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                memCacheWidth: 195,
+                memCacheHeight: 195,
+                maxWidthDiskCache: 390,
+                maxHeightDiskCache: 390,
+                fadeInDuration: Duration.zero,
+                placeholderFadeInDuration: Duration.zero,
+                placeholder: (_, __) => _placeholder(isDark),
+                errorWidget: (_, __, ___) => _placeholder(isDark),
+              )
+            : _placeholder(isDark),
+      ),
     );
   }
 
-  Widget _fallback() => Container(
-        width: 46.w,
-        height: 46.w,
-        color: Colors.grey.shade200,
-        child: Icon(Icons.person_outline, color: Colors.grey.shade400),
+  Widget _placeholder(bool isDark) => Container(
+        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+        child: Icon(
+          Icons.home_outlined,
+          color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+        ),
+      );
+}
+
+// ── Overlapping broker avatars + count badge ──────────────────────────────────
+
+class _AvatarCluster extends StatelessWidget {
+  final ChatProfileSummary? first;
+  final ChatProfileSummary? second;
+  final int count;
+
+  const _AvatarCluster({
+    required this.first,
+    required this.second,
+    required this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final showTwo = second != null && count > 1;
+
+    return SizedBox(
+      width: 47.w,
+      height: 46.h,
+      child: Stack(
+        children: [
+          Positioned(
+            bottom: 0,
+            left: 0,
+            child: _circle(first?.profileImageUrl, isDark),
+          ),
+          if (showTwo)
+            Positioned(
+              bottom: 0,
+              left: 5.w,
+              child: _circle(second?.profileImageUrl, isDark),
+            ),
+          if (count > 0)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                width: 22.w,
+                height: 22.w,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  count > 9 ? '9+' : '$count',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _circle(String? url, bool isDark) {
+    return Container(
+      width: 36.w,
+      height: 36.w,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.primary, width: 1),
+      ),
+      child: ClipOval(
+        child: url != null && url.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                memCacheWidth: 108,
+                memCacheHeight: 108,
+                fadeInDuration: Duration.zero,
+                placeholderFadeInDuration: Duration.zero,
+                placeholder: (_, __) => _fallback(isDark),
+                errorWidget: (_, __, ___) => _fallback(isDark),
+              )
+            : _fallback(isDark),
+      ),
+    );
+  }
+
+  Widget _fallback(bool isDark) => Container(
+        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+        child: Icon(
+          Icons.person_outline,
+          color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+          size: 16,
+        ),
       );
 }

@@ -1,8 +1,6 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
-import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:brokkerspot/widgets/common/overlay_dropdown_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -29,11 +27,16 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   final _sqftCtrl = TextEditingController();
   final _spmCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  // Stores the selected amenity ObjectIds (what the API expects).
   final Set<String> _selectedAmenityIds = {};
   final _amenityCtrl = AmenityController.to;
 
-  final _propertyTypes = ['Apartment', 'Villa', 'Townhouse', 'Penthouse', 'Studio'];
+  final _propertyTypes = [
+    'Apartment',
+    'Villa',
+    'Townhouse',
+    'Penthouse',
+    'Studio'
+  ];
   final _bedroomBathroomCounts = ['1', '2', '3', '4', '5+'];
   final _floorCounts = ['G', '1', '2', '3', '4', '5+'];
   final _isPropertyOptions = ['Ready', 'Off Plan'];
@@ -65,7 +68,6 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     _totalFloor = _intToFloorStr(c.totalFloors);
     if (c.description != null) _descCtrl.text = c.description!;
     if (c.amenities.isNotEmpty) _selectedAmenityIds.addAll(c.amenities);
-    // Load the amenities reference list (cached after first fetch).
     _amenityCtrl.loadAmenities();
     if (c.propertyStatus == 1) _isProperty = 'Ready';
     if (c.propertyStatus == 2) _isProperty = 'Off Plan';
@@ -107,23 +109,31 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            const CustomHeader(title: 'INFORMATION', showBackButton: true),
+            _buildHeader(theme, isDark),
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.all(20.w),
+                padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Commercial toggle
+                    // ── Commercial toggle ────────────────────────────────────
                     Row(
                       children: [
-                        Text('Commercial Property',
-                            style: GoogleFonts.inter(fontSize: 14.sp, color: Colors.black87)),
+                        Text(
+                          'Commercial Property',
+                          style: GoogleFonts.inter(
+                            fontSize: 14.sp,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
                         const Spacer(),
                         Transform.scale(
                           scale: 0.6,
@@ -131,7 +141,8 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                             value: _isCommercial,
                             onChanged: (v) => setState(() => _isCommercial = v),
                             activeTrackColor: AppColors.primary,
-                            thumbColor: WidgetStatePropertyAll(Colors.white),
+                            thumbColor:
+                                const WidgetStatePropertyAll(Colors.white),
                             inactiveTrackColor: Colors.grey.shade400,
                           ),
                         ),
@@ -139,8 +150,8 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                     ),
                     SizedBox(height: 16.h),
 
-                    // Property Type
-                    _label('Property Type', required: true),
+                    // ── Property Type ────────────────────────────────────────
+                    _label('Property Type', required: true, isDark: isDark),
                     SizedBox(height: 8.h),
                     OverlayDropdownField(
                       hint: 'Select Now',
@@ -150,25 +161,40 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                     ),
                     SizedBox(height: 16.h),
 
-                    // Property Name
-                    _label('Property Name'),
+                    // ── Property Name ────────────────────────────────────────
+                    _label('Property Name', isDark: isDark),
                     SizedBox(height: 8.h),
-                    _textField(controller: _nameCtrl, hint: 'Write Here...'),
+                    _textField(
+                        controller: _nameCtrl,
+                        hint: 'Write Here...',
+                        isDark: isDark),
                     SizedBox(height: 16.h),
 
-                    // Property Size
-                    _label('Property Size', required: true),
+                    // ── Property Size ────────────────────────────────────────
+                    _label('Property Size', required: true, isDark: isDark),
                     SizedBox(height: 8.h),
                     Row(
                       children: [
-                        Expanded(child: _textFieldSuffix(controller: _sqftCtrl, hint: '0', suffix: 'Sqft')),
+                        Expanded(
+                          child: _textFieldSuffix(
+                              controller: _sqftCtrl,
+                              hint: '0',
+                              suffix: 'Sqft',
+                              isDark: isDark),
+                        ),
                         SizedBox(width: 12.w),
-                        Expanded(child: _textFieldSuffix(controller: _spmCtrl, hint: '0', suffix: 'Spm')),
+                        Expanded(
+                          child: _textFieldSuffix(
+                              controller: _spmCtrl,
+                              hint: '0',
+                              suffix: 'Spm',
+                              isDark: isDark),
+                        ),
                       ],
                     ),
                     SizedBox(height: 16.h),
 
-                    // Bedroom + Bathroom
+                    // ── Bedroom + Bathroom ───────────────────────────────────
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -176,14 +202,13 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _label('Bedroom', required: true),
+                              _label('Bedroom', required: true, isDark: isDark),
                               SizedBox(height: 8.h),
                               OverlayDropdownField(
                                 hint: '0',
                                 value: _bedroom,
                                 items: _bedroomBathroomCounts,
-                                onSelect: (v) =>
-                                    setState(() => _bedroom = v),
+                                onSelect: (v) => setState(() => _bedroom = v),
                               ),
                             ],
                           ),
@@ -193,14 +218,14 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _label('Bathroom', required: true),
+                              _label('Bathroom',
+                                  required: true, isDark: isDark),
                               SizedBox(height: 8.h),
                               OverlayDropdownField(
                                 hint: '0',
                                 value: _bathroom,
                                 items: _bedroomBathroomCounts,
-                                onSelect: (v) =>
-                                    setState(() => _bathroom = v),
+                                onSelect: (v) => setState(() => _bathroom = v),
                               ),
                             ],
                           ),
@@ -209,7 +234,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                     ),
                     SizedBox(height: 16.h),
 
-                    // Floor + Total Floor
+                    // ── Floor + Total Floor ──────────────────────────────────
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -217,14 +242,13 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _label('Floor', required: true),
+                              _label('Floor', required: true, isDark: isDark),
                               SizedBox(height: 8.h),
                               OverlayDropdownField(
                                 hint: 'Select Floor',
                                 value: _floor,
                                 items: _floorCounts,
-                                onSelect: (v) =>
-                                    setState(() => _floor = v),
+                                onSelect: (v) => setState(() => _floor = v),
                               ),
                             ],
                           ),
@@ -234,7 +258,8 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _label('Total Floor', required: true),
+                              _label('Total Floor',
+                                  required: true, isDark: isDark),
                               SizedBox(height: 8.h),
                               OverlayDropdownField(
                                 hint: 'Select Floor',
@@ -250,14 +275,15 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                     ),
                     SizedBox(height: 16.h),
 
-                    // Property Description
-                    _label('Property Description', required: true),
+                    // ── Description ──────────────────────────────────────────
+                    _label('Property Description',
+                        required: true, isDark: isDark),
                     SizedBox(height: 8.h),
-                    _descriptionField(),
+                    _descriptionField(isDark: isDark),
                     SizedBox(height: 16.h),
 
-                    // Is Property
-                    _label('Is Property', required: true),
+                    // ── Is Property ──────────────────────────────────────────
+                    _label('Is Property', required: true, isDark: isDark),
                     SizedBox(height: 8.h),
                     OverlayDropdownField(
                       hint: 'Select Now',
@@ -270,75 +296,35 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                     ),
                     if (_isProperty == 'Off Plan') ...[
                       SizedBox(height: 16.h),
-                      _label('Completion Date of Property', required: true),
+                      _label('Completion Date of Property',
+                          required: true, isDark: isDark),
                       SizedBox(height: 8.h),
-                      GestureDetector(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: DateTime.now(),
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
-                            builder: (context, child) => Theme(
-                              data: Theme.of(context).copyWith(
-                                colorScheme: const ColorScheme.light(
-                                    primary: AppColors.primary),
-                              ),
-                              child: child!,
-                            ),
-                          );
-                          if (picked != null) setState(() => _completionDate = picked);
-                        },
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 13.h),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _completionDate != null
-                                      ? '${_completionDate!.month.toString().padLeft(2, '0')}/${_completionDate!.day.toString().padLeft(2, '0')}/${_completionDate!.year}'
-                                      : 'mm/dd/yyyy',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13.sp,
-                                    color: _completionDate != null
-                                        ? Colors.black87
-                                        : Colors.grey.shade400,
-                                  ),
-                                ),
-                              ),
-                              Icon(Icons.calendar_today_outlined,
-                                  color: AppColors.primary, size: 18.sp),
-                            ],
-                          ),
-                        ),
-                      ),
+                      _datePicker(isDark: isDark),
                     ],
                     SizedBox(height: 20.h),
 
-                    // Amenities
-                    Text('Amenities',
-                        style: GoogleFonts.inter(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87)),
+                    // ── Amenities ────────────────────────────────────────────
+                    Text(
+                      'Amenities',
+                      style: GoogleFonts.inter(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
                     SizedBox(height: 12.h),
-                    _buildAmenities(),
+                    _buildAmenities(isDark: isDark),
                     SizedBox(height: 32.h),
                   ],
                 ),
               ),
             ),
+
+            // ── Done button ──────────────────────────────────────────────────
             Padding(
               padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
-              child: CustomPrimaryButton(
-                title: 'Done',
-                backgroundColor: _isValid ? AppColors.primary : Colors.grey.shade300,
-                defaultColor: _isValid ? Colors.white : Colors.black45,
-                onPressed: _isValid
+              child: GestureDetector(
+                onTap: _isValid
                     ? () {
                         Get.find<AnnouncementController>().setInformation(
                           propertyType: _propertyType!,
@@ -359,7 +345,30 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                         );
                         Navigator.pop(context, true);
                       }
-                    : () {},
+                    : null,
+                child: Container(
+                  width: double.infinity,
+                  height: 52.h,
+                  decoration: BoxDecoration(
+                    color: _isValid
+                        ? AppColors.primary
+                        : (isDark
+                            ? const Color(0xFF2A2A2A)
+                            : Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(38.r),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Done',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w600,
+                      color: _isValid
+                          ? Colors.white
+                          : (isDark ? Colors.grey.shade600 : Colors.black45),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -368,12 +377,265 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     );
   }
 
-  Widget _buildAmenities() {
+  // ── Header ────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader(ThemeData theme, bool isDark) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 8.h),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38.w,
+              height: 38.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color:
+                    isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF2F2F2),
+              ),
+              child: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 16.sp,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+          SizedBox(width: 14.w),
+          Text(
+            'Property Information',
+            style: GoogleFonts.poppins(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+              height: 1.0,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Sub-widgets ───────────────────────────────────────────────────────────
+
+  Widget _label(String text, {bool required = false, required bool isDark}) {
+    return RichText(
+      text: TextSpan(
+        text: text,
+        style: GoogleFonts.inter(
+          fontSize: 13.sp,
+          color: isDark ? Colors.grey.shade300 : Colors.black87,
+        ),
+        children: required
+            ? [
+                TextSpan(
+                    text: ' *', style: GoogleFonts.inter(color: Colors.red))
+              ]
+            : null,
+      ),
+    );
+  }
+
+  Widget _textField({
+    required TextEditingController controller,
+    required String hint,
+    required bool isDark,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        border: Border.all(
+          color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+        ),
+        borderRadius: BorderRadius.circular(6.r),
+      ),
+      child: TextField(
+        controller: controller,
+        style: GoogleFonts.inter(
+          fontSize: 13.sp,
+          color: isDark ? Colors.white : Colors.black87,
+        ),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: GoogleFonts.inter(
+            fontSize: 13.sp,
+            color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+          ),
+          contentPadding:
+              EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+          border: InputBorder.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _textFieldSuffix({
+    required TextEditingController controller,
+    required String hint,
+    required String suffix,
+    required bool isDark,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        border: Border.all(
+          color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+        ),
+        borderRadius: BorderRadius.circular(6.r),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              style: GoogleFonts.inter(
+                fontSize: 13.sp,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+                ),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.only(right: 10.w),
+            child: Text(
+              suffix,
+              style: GoogleFonts.inter(
+                fontSize: 12.sp,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _descriptionField({required bool isDark}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        border: Border.all(
+          color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+        ),
+        borderRadius: BorderRadius.circular(6.r),
+      ),
+      child: Column(
+        children: [
+          TextField(
+            controller: _descCtrl,
+            maxLines: 4,
+            maxLength: 300,
+            style: GoogleFonts.inter(
+              fontSize: 13.sp,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Write Here...',
+              hintStyle: GoogleFonts.inter(
+                fontSize: 13.sp,
+                color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+              ),
+              contentPadding: EdgeInsets.all(12.w),
+              border: InputBorder.none,
+              counterText: '',
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.only(right: 10.w, bottom: 6.h),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '${_descCtrl.text.length}/300',
+                style: GoogleFonts.inter(
+                  fontSize: 11.sp,
+                  color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _datePicker({required bool isDark}) {
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: DateTime.now(),
+          firstDate: DateTime.now(),
+          lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
+          builder: (context, child) => Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: ColorScheme(
+                brightness: isDark ? Brightness.dark : Brightness.light,
+                primary: AppColors.primary,
+                onPrimary: Colors.white,
+                secondary: AppColors.primary,
+                onSecondary: Colors.white,
+                error: Colors.red,
+                onError: Colors.white,
+                surface: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                onSurface: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            child: child!,
+          ),
+        );
+        if (picked != null) setState(() => _completionDate = picked);
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 13.h),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+          border: Border.all(
+            color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+          ),
+          borderRadius: BorderRadius.circular(6.r),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _completionDate != null
+                    ? '${_completionDate!.month.toString().padLeft(2, '0')}/${_completionDate!.day.toString().padLeft(2, '0')}/${_completionDate!.year}'
+                    : 'mm/dd/yyyy',
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  color: _completionDate != null
+                      ? (isDark ? Colors.white : Colors.black87)
+                      : (isDark ? Colors.grey.shade600 : Colors.grey.shade400),
+                ),
+              ),
+            ),
+            Icon(Icons.calendar_today_outlined,
+                color: AppColors.primary, size: 18.sp),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAmenities({required bool isDark}) {
     return Obx(() {
       if (_amenityCtrl.isLoading.value && _amenityCtrl.amenities.isEmpty) {
         return Padding(
           padding: EdgeInsets.symmetric(vertical: 16.h),
-          child: const Center(child: CircularProgressIndicator()),
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
         );
       }
       if (_amenityCtrl.error.value != null && _amenityCtrl.amenities.isEmpty) {
@@ -382,22 +644,29 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
             Expanded(
               child: Text(
                 "Couldn't load amenities.",
-                style:
-                    GoogleFonts.inter(fontSize: 12.sp, color: Colors.grey.shade500),
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+                ),
               ),
             ),
             TextButton(
               onPressed: () => _amenityCtrl.loadAmenities(force: true),
               child: Text('Retry',
-                  style:
-                      GoogleFonts.inter(fontSize: 12.sp, color: AppColors.primary)),
+                  style: GoogleFonts.inter(
+                      fontSize: 12.sp, color: AppColors.primary)),
             ),
           ],
         );
       }
       if (_amenityCtrl.amenities.isEmpty) {
-        return Text('No amenities available',
-            style: GoogleFonts.inter(fontSize: 12.sp, color: Colors.grey.shade400));
+        return Text(
+          'No amenities available',
+          style: GoogleFonts.inter(
+            fontSize: 12.sp,
+            color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+          ),
+        );
       }
       return GridView.count(
         crossAxisCount: 2,
@@ -420,9 +689,17 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                   width: 18.w,
                   height: 18.w,
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade400),
+                    border: Border.all(
+                      color: selected
+                          ? AppColors.primary
+                          : (isDark
+                              ? Colors.grey.shade600
+                              : Colors.grey.shade400),
+                    ),
                     borderRadius: BorderRadius.circular(3.r),
-                    color: selected ? AppColors.primary : Colors.white,
+                    color: selected
+                        ? AppColors.primary
+                        : (isDark ? const Color(0xFF1A1A1A) : Colors.white),
                   ),
                   child: selected
                       ? Icon(Icons.check, size: 12.sp, color: Colors.white)
@@ -430,10 +707,14 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                 ),
                 SizedBox(width: 8.w),
                 Expanded(
-                  child: Text(item.name,
-                      style: GoogleFonts.inter(
-                          fontSize: 12.sp, color: Colors.black87),
-                      overflow: TextOverflow.ellipsis),
+                  child: Text(
+                    item.name,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -441,105 +722,5 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
         }).toList(),
       );
     });
-  }
-
-  Widget _label(String text, {bool required = false}) {
-    return RichText(
-      text: TextSpan(
-        text: text,
-        style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87),
-        children: required
-            ? [TextSpan(text: ' *', style: GoogleFonts.inter(color: Colors.red))]
-            : null,
-      ),
-    );
-  }
-
-  Widget _textField({required TextEditingController controller, required String hint}) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(6.r),
-      ),
-      child: TextField(
-        controller: controller,
-        style: GoogleFonts.inter(fontSize: 13.sp),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: GoogleFonts.inter(fontSize: 13.sp, color: Colors.grey.shade400),
-          contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-          border: InputBorder.none,
-        ),
-      ),
-    );
-  }
-
-  Widget _textFieldSuffix({
-    required TextEditingController controller,
-    required String hint,
-    required String suffix,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(6.r),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              style: GoogleFonts.inter(fontSize: 13.sp),
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: GoogleFonts.inter(fontSize: 13.sp, color: Colors.grey.shade400),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-                border: InputBorder.none,
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.only(right: 10.w),
-            child: Text(suffix,
-                style: GoogleFonts.inter(fontSize: 12.sp, color: Colors.grey.shade500)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _descriptionField() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(6.r),
-      ),
-      child: Column(
-        children: [
-          TextField(
-            controller: _descCtrl,
-            maxLines: 4,
-            maxLength: 300,
-            style: GoogleFonts.inter(fontSize: 13.sp),
-            decoration: InputDecoration(
-              hintText: 'Write Here...',
-              hintStyle: GoogleFonts.inter(fontSize: 13.sp, color: Colors.grey.shade400),
-              contentPadding: EdgeInsets.all(12.w),
-              border: InputBorder.none,
-              counterText: '',
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.only(right: 10.w, bottom: 6.h),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text('${_descCtrl.text.length}/300',
-                  style: GoogleFonts.inter(fontSize: 11.sp, color: Colors.grey.shade400)),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

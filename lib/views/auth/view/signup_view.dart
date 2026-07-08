@@ -2,7 +2,6 @@ import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/auth/controller/signup_controller.dart';
 import 'package:brokkerspot/views/auth/controller/welcome_view_controller.dart';
 import 'package:brokkerspot/views/auth/view/email_verification_view.dart';
-import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:brokkerspot/widgets/common/custom_text_field.dart';
 import 'package:brokkerspot/widgets/common/top_curve_section.dart';
 import 'package:flutter/material.dart';
@@ -22,7 +21,8 @@ class _SignUpViewState extends State<SignUpView> {
   final FocusNode _passwordFocus = FocusNode();
   final FocusNode _phoneFocus = FocusNode();
   final SignupController controller = Get.put(SignupController());
-  final WelcomeViewController socialController = Get.put(WelcomeViewController());
+  final WelcomeViewController socialController =
+      Get.put(WelcomeViewController());
 
   String selectedCode = '+971';
   bool _obscurePassword = true;
@@ -106,12 +106,9 @@ class _SignUpViewState extends State<SignUpView> {
   void initState() {
     super.initState();
     controller.countryCodeController.text = selectedCode.replaceAll('+', '');
-
-    // Listen to password changes for validation
     controller.passwordController.addListener(() {
       controller.validatePassword(controller.passwordController.text);
     });
-
     _phoneFocus.addListener(() => setState(() {}));
   }
 
@@ -127,8 +124,11 @@ class _SignUpViewState extends State<SignUpView> {
     return ScreenUtilInit(
       designSize: const Size(375, 812),
       builder: (context, child) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: theme.scaffoldBackgroundColor,
           resizeToAvoidBottomInset: true,
           body: SafeArea(
             bottom: false,
@@ -143,11 +143,11 @@ class _SignUpViewState extends State<SignUpView> {
                       children: [
                         Column(
                           children: [
-                            _topSection(context),
+                            _topSection(context, isDark),
                             Padding(
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 16.0),
-                              child: _formSection(),
+                              child: _formSection(isDark),
                             ),
                           ],
                         ),
@@ -164,13 +164,15 @@ class _SignUpViewState extends State<SignUpView> {
     );
   }
 
-  Widget _topSection(BuildContext context) {
+  // ── Top section ───────────────────────────────────────────────────────────────
+
+  Widget _topSection(BuildContext context, bool isDark) {
+    final subTextColor = isDark ? Colors.grey.shade400 : null;
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        TopCurveSection(
-          onBack: () => Navigator.pop(context),
-        ),
+        TopCurveSection(onBack: () => Navigator.pop(context)),
         Positioned(
           bottom: 24.h,
           left: 20.w,
@@ -192,7 +194,10 @@ class _SignUpViewState extends State<SignUpView> {
                   children: [
                     Text(
                       'Already have an Account? ',
-                      style: GoogleFonts.inter(fontSize: 13.sp),
+                      style: GoogleFonts.inter(
+                        fontSize: 13.sp,
+                        color: subTextColor,
+                      ),
                     ),
                     Text(
                       'Login',
@@ -212,8 +217,9 @@ class _SignUpViewState extends State<SignUpView> {
     );
   }
 
-  // ---------------- FORM SECTION ----------------
-  Widget _formSection() {
+  // ── Form section ──────────────────────────────────────────────────────────────
+
+  Widget _formSection(bool isDark) {
     return Form(
       child: Column(
         children: [
@@ -221,42 +227,41 @@ class _SignUpViewState extends State<SignUpView> {
             controller: controller.nameController,
             hintText: 'Full Name',
             keyboardType: TextInputType.name,
-            isDark: false,
+            isDark: isDark,
           ),
           SizedBox(height: 8.h),
-          _phoneField(),
+          _phoneField(isDark),
           SizedBox(height: 8.h),
           CustomTextField(
             controller: controller.emailController,
             hintText: 'E-mail',
             keyboardType: TextInputType.emailAddress,
-            isDark: false,
+            isDark: isDark,
           ),
           SizedBox(height: 8.h),
           CustomTextField(
             controller: controller.passwordController,
             hintText: 'Password',
             obscureText: _obscurePassword,
-            isDark: false,
-            suffixIcon: _obscurePassword ? Icons.visibility_off : Icons.visibility,
+            isDark: isDark,
+            suffixIcon:
+                _obscurePassword ? Icons.visibility_off : Icons.visibility,
             onSuffixTap: () {
-              setState(() {
-                _obscurePassword = !_obscurePassword;
-              });
+              setState(() => _obscurePassword = !_obscurePassword);
             },
           ),
           SizedBox(height: 16.h),
           _passwordRules(),
           if (widget.isBrokerSignup) ...[
             SizedBox(height: 20.h),
-            _brokerAccountCheckbox(),
+            _brokerAccountCheckbox(isDark),
           ],
           SizedBox(height: 24.h),
-          _createAccountButton(),
+          _createAccountButton(isDark),
           SizedBox(height: 16.h),
           _termsText(),
           SizedBox(height: 28.h),
-          _buildOrDivider(),
+          _buildOrDivider(isDark),
           SizedBox(height: 28.h),
           _buildSocialButtons(),
           SizedBox(height: 30.h),
@@ -265,8 +270,16 @@ class _SignUpViewState extends State<SignUpView> {
     );
   }
 
-  // ---------------- PHONE FIELD ----------------
-  Widget _phoneField() {
+  // ── Phone field ───────────────────────────────────────────────────────────────
+
+  Widget _phoneField(bool isDark) {
+    final dropdownBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final dropdownTextColor = isDark ? Colors.white : Colors.black87;
+    final underlineColor =
+        isDark ? const Color(0xFF3A3A3A) : const Color(0xFFB5B5B5);
+    final hintColor = isDark ? Colors.grey.shade500 : Colors.grey.shade400;
+    final inputTextColor = isDark ? Colors.white : Colors.black87;
+
     return Column(
       children: [
         Row(
@@ -276,13 +289,22 @@ class _SignUpViewState extends State<SignUpView> {
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: selectedCode,
-                  dropdownColor: Colors.white,
+                  dropdownColor: dropdownBg,
                   menuMaxHeight: 300,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    color: dropdownTextColor,
+                  ),
                   items: _countryCodes
                       .map((c) => DropdownMenuItem(
                             value: c['code'],
-                            child: Text('${c['flag']} ${c['code']}',
-                                style: GoogleFonts.inter(fontSize: 13.sp)),
+                            child: Text(
+                              '${c['flag']} ${c['code']}',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.sp,
+                                color: dropdownTextColor,
+                              ),
+                            ),
                           ))
                       .toList(),
                   onChanged: (value) {
@@ -303,9 +325,16 @@ class _SignUpViewState extends State<SignUpView> {
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.next,
                 maxLength: 10,
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  color: inputTextColor,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Phone Number',
-                  hintStyle: GoogleFonts.inter(fontSize: 13.sp),
+                  hintStyle: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    color: hintColor,
+                  ),
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                   border: InputBorder.none,
@@ -318,35 +347,53 @@ class _SignUpViewState extends State<SignUpView> {
         ),
         Container(
           height: _phoneFocus.hasFocus ? 0.9 : 0.5,
-          color: const Color(0xFFB5B5B5),
+          color: underlineColor,
         ),
       ],
     );
   }
+
+  // ── Password rules ────────────────────────────────────────────────────────────
 
   Widget _passwordRules() {
     return Obx(() => Column(
           children: [
             Row(
               children: [
-                Expanded(child: _Rule(text: '1 Uppercase', active: controller.hasUppercase.value)),
-                Expanded(child: _Rule(text: '1 Lowercase', active: controller.hasLowercase.value)),
-                Expanded(child: _Rule(text: '1 Number', active: controller.hasNumber.value)),
+                Expanded(
+                    child: _Rule(
+                        text: '1 Uppercase',
+                        active: controller.hasUppercase.value)),
+                Expanded(
+                    child: _Rule(
+                        text: '1 Lowercase',
+                        active: controller.hasLowercase.value)),
+                Expanded(
+                    child: _Rule(
+                        text: '1 Number', active: controller.hasNumber.value)),
               ],
             ),
             SizedBox(height: 8.h),
             Row(
               children: [
-                Expanded(child: _Rule(text: '8 characters', active: controller.hasMinLength.value)),
-                Expanded(flex: 2, child: _Rule(text: '1 special character', active: controller.hasSpecialChar.value)),
+                Expanded(
+                    child: _Rule(
+                        text: '8 characters',
+                        active: controller.hasMinLength.value)),
+                Expanded(
+                    flex: 2,
+                    child: _Rule(
+                        text: '1 special character',
+                        active: controller.hasSpecialChar.value)),
               ],
             ),
           ],
         ));
   }
 
-  // ---------------- BROKER CHECKBOX ----------------
-  Widget _brokerAccountCheckbox() {
+  // ── Broker checkbox ───────────────────────────────────────────────────────────
+
+  Widget _brokerAccountCheckbox(bool isDark) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -355,9 +402,8 @@ class _SignUpViewState extends State<SignUpView> {
           height: 24.h,
           child: Checkbox(
             value: _agreeToCreateBroker,
-            onChanged: (value) {
-              setState(() => _agreeToCreateBroker = value ?? false);
-            },
+            onChanged: (value) =>
+                setState(() => _agreeToCreateBroker = value ?? false),
             activeColor: AppColors.primary,
             side: BorderSide(color: Colors.grey.shade400),
             shape: RoundedRectangleBorder(
@@ -368,16 +414,15 @@ class _SignUpViewState extends State<SignUpView> {
         SizedBox(width: 8.w),
         Expanded(
           child: GestureDetector(
-            onTap: () {
-              setState(() => _agreeToCreateBroker = !_agreeToCreateBroker);
-            },
+            onTap: () =>
+                setState(() => _agreeToCreateBroker = !_agreeToCreateBroker),
             child: Padding(
               padding: EdgeInsets.only(top: 2.h),
               child: Text(
                 'By creating a broker account, I agree to also have a user account.',
                 style: GoogleFonts.inter(
                   fontSize: 12.sp,
-                  color: Colors.black87,
+                  color: isDark ? Colors.white70 : Colors.black87,
                 ),
               ),
             ),
@@ -387,17 +432,21 @@ class _SignUpViewState extends State<SignUpView> {
     );
   }
 
-  // ---------------- BUTTON ----------------
-  Widget _createAccountButton() {
+  // ── Create account button ─────────────────────────────────────────────────────
+
+  Widget _createAccountButton(bool isDark) {
     return Obx(() {
       final isValid = controller.isFormValid.value &&
           (!widget.isBrokerSignup || _agreeToCreateBroker);
+      final disabledBg =
+          isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300;
+
       return SizedBox(
         width: double.infinity,
         height: 46.h,
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: isValid ? AppColors.primary : Colors.grey.shade300,
+            backgroundColor: isValid ? AppColors.primary : disabledBg,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30),
             ),
@@ -408,7 +457,7 @@ class _SignUpViewState extends State<SignUpView> {
               : () async {
                   FocusScope.of(context).unfocus();
                   bool success = await controller.signup();
-                  if (success) {
+                  if (success && mounted) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -428,13 +477,19 @@ class _SignUpViewState extends State<SignUpView> {
                   style: GoogleFonts.poppins(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w600,
-                    color: isValid ? AppColors.textWhite : AppColors.textHint,
+                    color: isValid
+                        ? AppColors.textWhite
+                        : isDark
+                            ? Colors.white38
+                            : AppColors.textHint,
                   ),
                 ),
         ),
       );
     });
   }
+
+  // ── Terms text ────────────────────────────────────────────────────────────────
 
   Widget _termsText() {
     return Text.rich(
@@ -456,25 +511,29 @@ class _SignUpViewState extends State<SignUpView> {
     );
   }
 
-  Widget _buildOrDivider() {
+  // ── Or divider ────────────────────────────────────────────────────────────────
+
+  Widget _buildOrDivider(bool isDark) {
+    final lineColor =
+        isDark ? const Color(0xFF3A3A3A) : const Color(0xFFB5B5B5);
+    final textColor = isDark ? Colors.grey.shade400 : Colors.grey;
+
     return Row(
       children: [
-        Expanded(
-          child: Container(height: 0.5, color: const Color(0xFFB5B5B5)),
-        ),
+        Expanded(child: Container(height: 0.5, color: lineColor)),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w),
           child: Text(
             'Or Sign Up With',
-            style: GoogleFonts.inter(color: Colors.grey, fontSize: 13.sp),
+            style: GoogleFonts.inter(color: textColor, fontSize: 13.sp),
           ),
         ),
-        Expanded(
-          child: Container(height: 0.5, color: const Color(0xFFB5B5B5)),
-        ),
+        Expanded(child: Container(height: 0.5, color: lineColor)),
       ],
     );
   }
+
+  // ── Social buttons ────────────────────────────────────────────────────────────
 
   Widget _buildSocialButtons() {
     return Row(
@@ -482,20 +541,14 @@ class _SignUpViewState extends State<SignUpView> {
       children: [
         GestureDetector(
           onTap: socialController.signInWithGoogle,
-          child: Image.asset(
-            'assets/images/google_icon.png',
-            width: 56.w,
-            height: 56.w,
-          ),
+          child: Image.asset('assets/images/google_icon.png',
+              width: 56.w, height: 56.w),
         ),
         SizedBox(width: 20.w),
         GestureDetector(
           onTap: socialController.signInWithApple,
-          child: Image.asset(
-            'assets/images/apple_icon.png',
-            width: 56.w,
-            height: 56.w,
-          ),
+          child: Image.asset('assets/images/apple_icon.png',
+              width: 56.w, height: 56.w),
         ),
       ],
     );
@@ -510,7 +563,8 @@ class _SignUpViewState extends State<SignUpView> {
   }
 }
 
-// ---------------- PASSWORD RULE ----------------
+// ── Password rule chip ────────────────────────────────────────────────────────
+
 class _Rule extends StatelessWidget {
   final String text;
   final bool active;
@@ -519,6 +573,7 @@ class _Rule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -535,7 +590,9 @@ class _Rule extends StatelessWidget {
             maxLines: 1,
             style: GoogleFonts.inter(
               fontSize: 10.sp,
-              color: active ? Colors.black87 : Colors.grey.shade500,
+              color: active
+                  ? (isDark ? Colors.white : Colors.black87)
+                  : Colors.grey.shade500,
               fontWeight: active ? FontWeight.w500 : FontWeight.normal,
             ),
           ),

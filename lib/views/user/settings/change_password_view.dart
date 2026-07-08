@@ -13,8 +13,15 @@ class ChangePasswordView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final inputTextColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? Colors.grey.shade500 : Colors.grey;
+    final underlineColor =
+        isDark ? const Color(0xFF3A3A3A) : const Color(0xFFB5B5B5);
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         bottom: false,
@@ -26,7 +33,7 @@ class ChangePasswordView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _topSection(context),
+                    _topSection(isDark),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 28.w),
                       child: Column(
@@ -60,7 +67,8 @@ class ChangePasswordView extends StatelessWidget {
                             'Enter your current password and set a new one',
                             style: GoogleFonts.roboto(
                               fontSize: 13.sp,
-                              color: Colors.grey,
+                              color:
+                                  isDark ? Colors.grey.shade400 : Colors.grey,
                               fontWeight: FontWeight.w400,
                             ),
                           ),
@@ -74,13 +82,13 @@ class ChangePasswordView extends StatelessWidget {
                                 onChanged: (_) => controller.validateForm(),
                                 style: GoogleFonts.roboto(
                                   fontSize: 15.sp,
-                                  color: Colors.black87,
+                                  color: inputTextColor,
                                 ),
                                 decoration: InputDecoration(
                                   hintText: 'Current Password',
                                   hintStyle: GoogleFonts.roboto(
                                     fontSize: 15.sp,
-                                    color: Colors.grey,
+                                    color: hintColor,
                                   ),
                                   suffixIcon: GestureDetector(
                                     onTap: controller.toggleOldPassword,
@@ -92,13 +100,13 @@ class ChangePasswordView extends StatelessWidget {
                                       size: 22.sp,
                                     ),
                                   ),
-                                  enabledBorder: const UnderlineInputBorder(
+                                  enabledBorder: UnderlineInputBorder(
                                     borderSide:
-                                        BorderSide(color: Color(0xFFB5B5B5)),
+                                        BorderSide(color: underlineColor),
                                   ),
-                                  focusedBorder: const UnderlineInputBorder(
+                                  focusedBorder: UnderlineInputBorder(
                                     borderSide:
-                                        BorderSide(color: Color(0xFFB5B5B5)),
+                                        BorderSide(color: underlineColor),
                                   ),
                                 ),
                               )),
@@ -113,13 +121,13 @@ class ChangePasswordView extends StatelessWidget {
                                     controller.validatePassword(val),
                                 style: GoogleFonts.roboto(
                                   fontSize: 15.sp,
-                                  color: Colors.black87,
+                                  color: inputTextColor,
                                 ),
                                 decoration: InputDecoration(
                                   hintText: 'New Password',
                                   hintStyle: GoogleFonts.roboto(
                                     fontSize: 15.sp,
-                                    color: Colors.grey,
+                                    color: hintColor,
                                   ),
                                   suffixIcon: GestureDetector(
                                     onTap: controller.toggleNewPassword,
@@ -131,13 +139,13 @@ class ChangePasswordView extends StatelessWidget {
                                       size: 22.sp,
                                     ),
                                   ),
-                                  enabledBorder: const UnderlineInputBorder(
+                                  enabledBorder: UnderlineInputBorder(
                                     borderSide:
-                                        BorderSide(color: Color(0xFFB5B5B5)),
+                                        BorderSide(color: underlineColor),
                                   ),
-                                  focusedBorder: const UnderlineInputBorder(
+                                  focusedBorder: UnderlineInputBorder(
                                     borderSide:
-                                        BorderSide(color: Color(0xFFB5B5B5)),
+                                        BorderSide(color: underlineColor),
                                   ),
                                 ),
                               )),
@@ -149,15 +157,15 @@ class ChangePasswordView extends StatelessWidget {
                                 runSpacing: 6.h,
                                 children: [
                                   _passwordRule('1 Uppercase',
-                                      controller.hasUppercase.value),
+                                      controller.hasUppercase.value, isDark),
                                   _passwordRule('1 Lowercase',
-                                      controller.hasLowercase.value),
-                                  _passwordRule(
-                                      '1 Number', controller.hasNumber.value),
+                                      controller.hasLowercase.value, isDark),
+                                  _passwordRule('1 Number',
+                                      controller.hasNumber.value, isDark),
                                   _passwordRule('8 characters',
-                                      controller.hasMinLength.value),
+                                      controller.hasMinLength.value, isDark),
                                   _passwordRule('1 special character',
-                                      controller.hasSpecialChar.value),
+                                      controller.hasSpecialChar.value, isDark),
                                 ],
                               )),
                           SizedBox(height: 20.h),
@@ -171,13 +179,13 @@ class ChangePasswordView extends StatelessWidget {
                                 onChanged: (_) => controller.validateForm(),
                                 style: GoogleFonts.roboto(
                                   fontSize: 15.sp,
-                                  color: Colors.black87,
+                                  color: inputTextColor,
                                 ),
                                 decoration: InputDecoration(
                                   hintText: 'Confirm New Password',
                                   hintStyle: GoogleFonts.roboto(
                                     fontSize: 15.sp,
-                                    color: Colors.grey,
+                                    color: hintColor,
                                   ),
                                   suffixIcon: GestureDetector(
                                     onTap: controller.toggleConfirmPassword,
@@ -189,20 +197,19 @@ class ChangePasswordView extends StatelessWidget {
                                       size: 22.sp,
                                     ),
                                   ),
-                                  enabledBorder: const UnderlineInputBorder(
+                                  enabledBorder: UnderlineInputBorder(
                                     borderSide:
-                                        BorderSide(color: Color(0xFFB5B5B5)),
+                                        BorderSide(color: underlineColor),
                                   ),
-                                  focusedBorder: const UnderlineInputBorder(
+                                  focusedBorder: UnderlineInputBorder(
                                     borderSide:
-                                        BorderSide(color: Color(0xFFB5B5B5)),
+                                        BorderSide(color: underlineColor),
                                   ),
                                 ),
                               )),
                           SizedBox(height: 40.h),
 
-                          // Change Password button
-                          _buildChangeButton(),
+                          _buildChangeButton(isDark),
                           SizedBox(height: 40.h),
                         ],
                       ),
@@ -217,8 +224,13 @@ class ChangePasswordView extends StatelessWidget {
     );
   }
 
-  // ---------------- TOP SECTION ----------------
-  Widget _topSection(BuildContext context) {
+  // ── Top section ───────────────────────────────────────────────────────────────
+
+  Widget _topSection(bool isDark) {
+    final backBorderColor =
+        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E5E5);
+    final backIconColor = isDark ? Colors.white : Colors.black87;
+
     return SizedBox(
       height: 220.h,
       child: Stack(
@@ -243,9 +255,13 @@ class ChangePasswordView extends StatelessWidget {
                 padding: EdgeInsets.all(8.w),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                  border: Border.all(color: backBorderColor),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new, size: 18),
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 18,
+                  color: backIconColor,
+                ),
               ),
             ),
           ),
@@ -254,10 +270,15 @@ class ChangePasswordView extends StatelessWidget {
     );
   }
 
-  // ---------------- CHANGE PASSWORD BUTTON ----------------
-  Widget _buildChangeButton() {
+  // ── Change Password button ────────────────────────────────────────────────────
+
+  Widget _buildChangeButton(bool isDark) {
     return Obx(() {
       final valid = controller.isFormValid.value;
+      final disabledBg =
+          isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300;
+      final disabledText = isDark ? Colors.white38 : Colors.black45;
+
       return Container(
         width: double.infinity,
         height: 52.h,
@@ -279,8 +300,8 @@ class ChangePasswordView extends StatelessWidget {
                   ? controller.changePassword
                   : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: valid ? AppColors.primary : Colors.grey.shade300,
-            disabledBackgroundColor: Colors.grey.shade300,
+            backgroundColor: valid ? AppColors.primary : disabledBg,
+            disabledBackgroundColor: disabledBg,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30.r),
@@ -299,7 +320,7 @@ class ChangePasswordView extends StatelessWidget {
                   'Change Password',
                   style: GoogleFonts.roboto(
                     fontSize: 15.sp,
-                    color: valid ? Colors.white : Colors.black45,
+                    color: valid ? Colors.white : disabledText,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -308,7 +329,9 @@ class ChangePasswordView extends StatelessWidget {
     });
   }
 
-  Widget _passwordRule(String text, bool active) {
+  // ── Password rule chip ────────────────────────────────────────────────────────
+
+  Widget _passwordRule(String text, bool active, bool isDark) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -322,7 +345,9 @@ class ChangePasswordView extends StatelessWidget {
           text,
           style: GoogleFonts.inter(
             fontSize: 10.sp,
-            color: active ? Colors.black87 : Colors.grey.shade500,
+            color: active
+                ? (isDark ? Colors.white : Colors.black87)
+                : Colors.grey.shade500,
             fontWeight: active ? FontWeight.w500 : FontWeight.normal,
           ),
         ),

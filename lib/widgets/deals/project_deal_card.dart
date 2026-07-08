@@ -20,14 +20,20 @@ class ProjectDealCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.3)
+        : Colors.black.withValues(alpha: 0.05);
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(12.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: shadowColor,
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -36,16 +42,14 @@ class ProjectDealCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Date header
           _buildDateHeader(),
-          // Card body
           Padding(
             padding: EdgeInsets.all(12.w),
             child: Column(
               children: [
-                _buildPropertyRow(),
+                _buildPropertyRow(isDark),
                 SizedBox(height: 10.h),
-                _buildDetailsRow(),
+                _buildDetailsRow(isDark),
               ],
             ),
           ),
@@ -87,11 +91,14 @@ class ProjectDealCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPropertyRow() {
+  Widget _buildPropertyRow(bool isDark) {
+    final nameColor = isDark ? Colors.white : Colors.black;
+    final locationColor =
+        isDark ? Colors.grey.shade500 : Colors.grey.shade600;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Property image
         ClipRRect(
           borderRadius: BorderRadius.circular(8.r),
           child: SizedBox(
@@ -101,18 +108,16 @@ class ProjectDealCard extends StatelessWidget {
                 ? Image.asset(
                     deal.imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                    errorBuilder: (_, __, ___) => _imagePlaceholder(isDark),
                   )
-                : _imagePlaceholder(),
+                : _imagePlaceholder(isDark),
           ),
         ),
         SizedBox(width: 12.w),
-        // Info
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Price
               Text(
                 '${deal.currency ?? '€'} ${_formatPrice(deal.price ?? 0)}',
                 style: GoogleFonts.inter(
@@ -122,34 +127,38 @@ class ProjectDealCard extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 3.h),
-              // Name
               Text(
                 deal.propertyName ?? '',
                 style: GoogleFonts.inter(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w700,
-                  color: Colors.black,
+                  color: nameColor,
                 ),
               ),
               SizedBox(height: 3.h),
-              // Location
               Text(
                 deal.location ?? '',
                 style: GoogleFonts.inter(
                   fontSize: 12.sp,
-                  color: Colors.grey.shade600,
+                  color: locationColor,
                 ),
               ),
             ],
           ),
         ),
-        // Broker avatar + name
-        _buildBrokerBadge(),
+        _buildBrokerBadge(isDark),
       ],
     );
   }
 
-  Widget _buildBrokerBadge() {
+  Widget _buildBrokerBadge(bool isDark) {
+    final avatarBg =
+        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200;
+    final avatarBorder =
+        isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
+    final brokerNameColor =
+        isDark ? Colors.white70 : Colors.black87;
+
     return Column(
       children: [
         Stack(
@@ -160,8 +169,8 @@ class ProjectDealCard extends StatelessWidget {
               height: 36.w,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.grey.shade200,
-                border: Border.all(color: Colors.grey.shade300),
+                color: avatarBg,
+                border: Border.all(color: avatarBorder),
               ),
               child: ClipOval(
                 child: deal.brokerAvatarUrl != null
@@ -206,28 +215,31 @@ class ProjectDealCard extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 10.sp,
             fontWeight: FontWeight.w500,
-            color: Colors.black87,
+            color: brokerNameColor,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildDetailsRow() {
+  Widget _buildDetailsRow(bool isDark) {
+    final metaColor = isDark ? Colors.grey.shade500 : Colors.grey.shade600;
+    final iconColor = isDark ? Colors.grey.shade600 : Colors.grey.shade500;
+
     return Row(
       children: [
-        Icon(Icons.bed_outlined, size: 16.sp, color: Colors.grey.shade500),
+        Icon(Icons.bed_outlined, size: 16.sp, color: iconColor),
         SizedBox(width: 4.w),
         Text(
           '${deal.bedrooms ?? 0} Bedroom',
-          style: GoogleFonts.inter(fontSize: 11.sp, color: Colors.grey.shade600),
+          style: GoogleFonts.inter(fontSize: 11.sp, color: metaColor),
         ),
         SizedBox(width: 14.w),
-        Icon(Icons.square_foot, size: 16.sp, color: Colors.grey.shade500),
+        Icon(Icons.square_foot, size: 16.sp, color: iconColor),
         SizedBox(width: 4.w),
         Text(
           '${deal.sqft ?? 0} / Sqft',
-          style: GoogleFonts.inter(fontSize: 11.sp, color: Colors.grey.shade600),
+          style: GoogleFonts.inter(fontSize: 11.sp, color: metaColor),
         ),
         if (showUid && deal.uid != null) ...[
           SizedBox(width: 14.w),
@@ -242,17 +254,16 @@ class ProjectDealCard extends StatelessWidget {
           SizedBox(width: 4.w),
           Text(
             deal.uid!,
-            style:
-                GoogleFonts.inter(fontSize: 11.sp, color: Colors.grey.shade600),
+            style: GoogleFonts.inter(fontSize: 11.sp, color: metaColor),
           ),
         ],
       ],
     );
   }
 
-  Widget _imagePlaceholder() {
+  Widget _imagePlaceholder(bool isDark) {
     return Container(
-      color: Colors.grey.shade300,
+      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300,
       child: Icon(Icons.home_outlined, size: 28.sp, color: Colors.grey),
     );
   }

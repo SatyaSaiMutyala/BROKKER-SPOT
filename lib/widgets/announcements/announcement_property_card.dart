@@ -57,14 +57,8 @@ class AnnouncementPropertyCard extends StatefulWidget {
 class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     with AutomaticKeepAliveClientMixin {
   int _currentImageIndex = 0;
-  // True only while >60% of this card is visible — the CachedVideoPlayer's
-  // global single-active lock takes care of "only one decoder at a time"
-  // and the cleanup-delay between release and re-init keeps the previous
-  // player's buffers from overlapping on the heap.
   bool _videoVisible = false;
 
-  // Keep this card (and its decoded images / current page) alive when it
-  // scrolls out of view, so coming back doesn't re-decode or reset the carousel.
   @override
   bool get wantKeepAlive => true;
 
@@ -80,8 +74,6 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     super.didChangeDependencies();
     if (_precachedInitial) return;
     _precachedInitial = true;
-    // Warm the first image (and the video thumbnail) so the carousel paints
-    // instantly and the first swipe has no loading flash.
     final a = widget.announcement;
     final thumb = a.propertyMedia?.thumbnail;
     if (thumb != null && thumb.startsWith('http')) {
@@ -96,8 +88,6 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     }
   }
 
-  /// Preload the images adjacent to [pageIndex] so swiping is instant and a
-  /// page that's already been seen never reloads.
   void _precacheAround(int pageIndex, bool hasVideo, List<String> images) {
     for (final p in [pageIndex - 1, pageIndex + 1]) {
       final imgIdx = hasVideo ? p - 1 : p;
@@ -113,7 +103,12 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // required by AutomaticKeepAliveClientMixin
+    super.build(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.3)
+        : Colors.black.withValues(alpha: 0.07);
     final a = widget.announcement;
 
     return GestureDetector(
@@ -123,7 +118,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
             ? EdgeInsets.only(left: 16.w, top: 8.h, bottom: 8.h)
             : EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardBg,
           borderRadius: widget.squareRightSide
               ? BorderRadius.only(
                   topLeft: Radius.circular(16.r),
@@ -132,7 +127,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
               : BorderRadius.circular(16.r),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
+              color: shadowColor,
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -142,9 +137,9 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.ownerRowAboveImage) _buildOwnerRow(a),
-            _buildImageSection(a),
-            _buildInfoSection(a),
+            if (widget.ownerRowAboveImage) _buildOwnerRow(a, isDark),
+            _buildImageSection(a, isDark),
+            _buildInfoSection(a, isDark),
             if (widget.showActionButtons) _buildActionButtons(),
           ],
         ),
@@ -152,15 +147,14 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     );
   }
 
-  // ─── Owner row above the image (used when ownerRowAboveImage = true) ───
-  Widget _buildOwnerRow(AnnouncementModel a) {
+  // ─── Owner row above the image ───────────────────────────────────────────────
+
+  Widget _buildOwnerRow(AnnouncementModel a, bool isDark) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
       child: Row(
         children: [
-          ClipOval(
-            child: _avatarWidget(a.ownerAvatarUrl, 36.w),
-          ),
+          ClipOval(child: _avatarWidget(a.ownerAvatarUrl, 36.w)),
           SizedBox(width: 8.w),
           Expanded(
             child: Text(
@@ -168,7 +162,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
               style: GoogleFonts.poppins(
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                color: isDark ? Colors.white : Colors.black87,
               ),
             ),
           ),
@@ -186,8 +180,9 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     );
   }
 
-  // ─── Image + video carousel ───
-  Widget _buildImageSection(AnnouncementModel a) {
+  // ─── Image + video carousel ───────────────────────────────────────────────────
+
+  Widget _buildImageSection(AnnouncementModel a, bool isDark) {
     final videoUrl = a.propertyMedia?.videos;
     final hasVideo = videoUrl != null && videoUrl.isNotEmpty;
     final hasImages = (a.imageUrls?.length ?? 0) > 0;
@@ -197,7 +192,6 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
 
     return Stack(
       children: [
-        // Video + Image carousel
         SizedBox(
           height: 200.h,
           width: double.infinity,
@@ -211,25 +205,12 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
               final dpr = MediaQuery.of(context).devicePixelRatio;
               final cacheWidth =
                   (MediaQuery.of(context).size.width * dpr).round();
-              // First page when there's a video: autoplay it (looped, muted)
-              // ONLY for the visible card. Multiple safeguards keep memory
-              // sane on low-RAM devices:
-              //  • VisibilityDetector → active=true only when >60% visible
-              //  • CachedVideoPlayer's global single-active lock → at most
-              //    one decoder allocated at any time
-              //  • Cleanup delay between release and re-init → previous
-              //    player's native buffers fully GC'd before next allocation
-              //  • Scroll gate → no init mid-fling
               if (hasVideo && i == 0) {
                 final thumb = a.propertyMedia?.thumbnail;
                 final fallback = images.isNotEmpty ? images.first : null;
                 return VisibilityDetector(
                   key: ValueKey('vid_${a.id}_${widget.index}'),
                   onVisibilityChanged: (info) {
-                    // 60% threshold — the original, working value.
-                    // CachedVideoPlayer disposes its decoder the moment
-                    // active flips false, so at most ONE decoder is alive
-                    // at any time and we never OOM.
                     final visible = info.visibleFraction > 0.6;
                     if (visible != _videoVisible && mounted) {
                       setState(() => _videoVisible = visible);
@@ -241,17 +222,16 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                     muted: true,
                     loop: true,
                     tapToTogglePlay: true,
-                    placeholder: _videoThumb(thumb ?? fallback, cacheWidth),
+                    placeholder: _videoThumb(thumb ?? fallback, cacheWidth, isDark),
                   ),
                 );
               }
               final imgIdx = hasVideo ? i - 1 : i;
-              return _networkImage(images[imgIdx], cacheWidth);
+              return _networkImage(images[imgIdx], cacheWidth, isDark);
             },
           ),
         ),
 
-        // Dark gradient overlay + owner overlay (only when NOT ownerRowAboveImage)
         if (!widget.ownerRowAboveImage) ...[
           Positioned(
             top: 0,
@@ -280,9 +260,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                   width: 55.w,
                   height: 55.h,
                   decoration: const BoxDecoration(shape: BoxShape.circle),
-                  child: ClipOval(
-                    child: _avatarWidget(a.ownerAvatarUrl, 55.w),
-                  ),
+                  child: ClipOval(child: _avatarWidget(a.ownerAvatarUrl, 55.w)),
                 ),
                 SizedBox(width: 8.w),
                 Text(
@@ -310,8 +288,6 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                 ),
               ),
             ),
-
-          // Listing type badge on image (only when NOT ownerRowAboveImage)
           if (a.listingType != null && a.listingType!.isNotEmpty)
             Positioned(
               top: widget.listingBadgeAtTop ? 0 : null,
@@ -342,7 +318,6 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
             ),
         ],
 
-        // Dot indicators (bottom center)
         Positioned(
           bottom: 10.h,
           left: 0,
@@ -369,14 +344,20 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     );
   }
 
-  // ─── Price, name, location ───
-  Widget _buildInfoSection(AnnouncementModel a) {
+  // ─── Price, name, location ────────────────────────────────────────────────────
+
+  Widget _buildInfoSection(AnnouncementModel a, bool isDark) {
+    final primaryText = isDark ? Colors.white : Colors.black;
+    final metaText = isDark ? Colors.grey.shade400 : AppColors.textHint;
+    final dividerColor =
+        isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200;
+    final timeAgoColor = isDark ? Colors.grey.shade500 : Colors.grey;
+
     return Padding(
       padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 8.h),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Price row
           Row(
             children: [
               Text(
@@ -384,7 +365,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                 style: GoogleFonts.inter(
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w500,
-                  color: Colors.black,
+                  color: primaryText,
                 ),
               ),
               Text(
@@ -400,7 +381,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                 style: GoogleFonts.inter(
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w500,
-                  color: Colors.black,
+                  color: primaryText,
                 ),
               ),
               const Spacer(),
@@ -409,13 +390,12 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                 style: GoogleFonts.inter(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w400,
-                  color: Colors.grey,
+                  color: timeAgoColor,
                 ),
               ),
             ],
           ),
           SizedBox(height: 6.h),
-          // Property name
           Text(
             a.propertyName ?? '',
             maxLines: 1,
@@ -423,12 +403,10 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
             style: GoogleFonts.poppins(
               fontSize: 16.sp,
               fontWeight: FontWeight.w600,
-              color: Colors.black,
+              color: primaryText,
             ),
           ),
           SizedBox(height: 6.h),
-          // Bedrooms + Sqft (left, shrinks if needed) — broker avatars +
-          // chevron always pinned at the end of the row.
           Row(
             children: [
               Expanded(
@@ -443,10 +421,10 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
-                            fontSize: 14.sp, color: AppColors.textHint),
+                            fontSize: 14.sp, color: metaText),
                       ),
                     ),
-                    SizedBox(width: 20),
+                    const SizedBox(width: 20),
                     Icon(Icons.square_foot,
                         size: 16.sp, color: AppColors.primary),
                     SizedBox(width: 4.w),
@@ -456,16 +434,16 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
-                            fontSize: 14.sp, color: AppColors.textHint),
+                            fontSize: 14.sp, color: metaText),
                       ),
                     ),
                   ],
                 ),
               ),
               if (widget.showBrokerProfiles) ...[
-                SizedBox(width: 12),
-                _buildBrokerAvatarWithCount(),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
+                _buildBrokerAvatarWithCount(isDark),
+                const SizedBox(width: 12),
                 Container(
                   padding: EdgeInsets.all(5.w),
                   decoration: BoxDecoration(
@@ -479,9 +457,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
             ],
           ),
           SizedBox(height: 8.h),
-          Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
+          Divider(height: 1, thickness: 0.8, color: dividerColor),
           SizedBox(height: 8.h),
-          // Location
           GestureDetector(
             onTap: widget.onLocationTap,
             child: Row(
@@ -496,7 +473,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
                       fontSize: 13.sp,
-                      color: AppColors.textHint,
+                      color: metaText,
                     ),
                   ),
                 ),
@@ -511,7 +488,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     );
   }
 
-  // ─── Call / Chat buttons ───
+  // ─── Call / Chat buttons ──────────────────────────────────────────────────────
+
   Widget _buildActionButtons() {
     return Container(
       decoration: BoxDecoration(
@@ -546,7 +524,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                 ),
               ),
             ),
-            VerticalDivider(width: 1, thickness: 0.8, color: AppColors.primary),
+            VerticalDivider(
+                width: 1, thickness: 0.8, color: AppColors.primary),
             Expanded(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -571,18 +550,19 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     );
   }
 
-  Widget _buildBrokerAvatarWithCount() {
+  // ─── Broker avatar stack ──────────────────────────────────────────────────────
+
+  Widget _buildBrokerAvatarWithCount(bool isDark) {
     final proposals = widget.announcement.latestProposals ?? [];
     final count = widget.announcement.proposalCount ?? proposals.length;
-    // Nothing to show until at least one broker has sent a proposal.
     if (count == 0 && proposals.isEmpty) return const SizedBox.shrink();
 
     const avatarSize = 44.0;
     const peekAmount = 10.0;
-    // Show up to 3 broker avatars, peeking behind one another.
     final shown = proposals.take(3).toList();
     final totalWidth =
         avatarSize + (shown.length - 1).clamp(0, 2) * 18 + peekAmount;
+    final badgeBorder = isDark ? const Color(0xFF1A1A1A) : Colors.white;
 
     return SizedBox(
       width: totalWidth.w,
@@ -590,13 +570,11 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Stack avatars right-to-left so the first one sits on top.
           for (int i = shown.length - 1; i >= 0; i--)
             Positioned(
               left: i * 18.w,
-              child: _avatar(shown[i].brokerProfileImage, avatarSize),
+              child: _avatar(shown[i].brokerProfileImage, avatarSize, isDark),
             ),
-          // Count badge on the top-most (first) avatar.
           Positioned(
             top: -4.h,
             left: 38.w,
@@ -606,7 +584,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
               decoration: BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(color: badgeBorder, width: 2),
               ),
               child: Center(
                 child: Text(
@@ -625,22 +603,25 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     );
   }
 
-  Widget _avatar(String? imageUrl, double size) {
+  Widget _avatar(String? imageUrl, double size, bool isDark) {
     final hasUrl = imageUrl != null && imageUrl.isNotEmpty;
+    final avatarBg = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200;
+    final avatarBorder = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+
     return Container(
       width: size.w,
       height: size.w,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
-        color: Colors.grey.shade200,
+        border: Border.all(color: avatarBorder, width: 2),
+        color: avatarBg,
       ),
       child: ClipOval(
         child: hasUrl
             ? CachedNetworkImage(
                 imageUrl: imageUrl,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(color: Colors.grey.shade200),
+                placeholder: (_, __) => Container(color: avatarBg),
                 errorWidget: (_, __, ___) =>
                     Image.asset('assets/images/story1.png', fit: BoxFit.cover),
               )
@@ -649,7 +630,9 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
     );
   }
 
-  Widget _networkImage(String url, int cacheWidth) {
+  // ─── Image helpers ────────────────────────────────────────────────────────────
+
+  Widget _networkImage(String url, int cacheWidth, bool isDark) {
     return CachedNetworkImage(
       imageUrl: url,
       fit: BoxFit.cover,
@@ -658,33 +641,33 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
       memCacheWidth: cacheWidth,
       fadeInDuration: Duration.zero,
       fadeOutDuration: Duration.zero,
-      placeholder: (_, __) => _shimmerBox(),
-      errorWidget: (_, __, ___) => _imagePlaceholder(),
+      placeholder: (_, __) => _shimmerBox(isDark),
+      errorWidget: (_, __, ___) => _imagePlaceholder(isDark),
     );
   }
 
-  /// Shown while the video loads = just the cached thumbnail (no badge).
-  Widget _videoThumb(String? thumbUrl, int cacheWidth) {
+  Widget _videoThumb(String? thumbUrl, int cacheWidth, bool isDark) {
     if (thumbUrl != null && thumbUrl.isNotEmpty) {
-      return _networkImage(thumbUrl, cacheWidth);
+      return _networkImage(thumbUrl, cacheWidth, isDark);
     }
-    return _imagePlaceholder();
+    return _imagePlaceholder(isDark);
   }
 
-  Widget _imagePlaceholder() {
+  Widget _imagePlaceholder(bool isDark) {
     return Container(
-      color: Colors.grey.shade300,
+      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300,
       child: Center(
         child: Icon(Icons.home_outlined, size: 48.sp, color: Colors.grey),
       ),
     );
   }
 
-  Widget _shimmerBox() {
+  Widget _shimmerBox(bool isDark) {
     return Shimmer.fromColors(
-      baseColor: Colors.grey.shade300,
-      highlightColor: Colors.grey.shade100,
-      child: Container(color: Colors.grey.shade300),
+      baseColor: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300,
+      highlightColor: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade100,
+      child: Container(
+          color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300),
     );
   }
 

@@ -4,18 +4,14 @@ import 'package:brokkerspot/models/meeting_item_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:brokkerspot/views/user/meeting/chat_view.dart';
 import 'package:brokkerspot/views/user/meeting/controller/meeting_controller.dart';
 import 'package:brokkerspot/views/user/meeting/repo/meeting_repo.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
-import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:brokkerspot/widgets/meeting/meeting_card.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shimmer/shimmer.dart';
 
 class MeetingView extends StatefulWidget {
   const MeetingView({super.key});
@@ -25,40 +21,24 @@ class MeetingView extends StatefulWidget {
 }
 
 class _MeetingViewState extends State<MeetingView> {
-  // Default to the Announcement tab — that's the one wired to fetch-meetings.
-  bool _isBookingSelected = false;
   final _ctrl = MeetingController.to;
   final _profile = Get.isRegistered<ProfileController>()
       ? Get.find<ProfileController>()
       : Get.put(ProfileController());
 
-  final List<({String label, MeetingFilter filter})> _filters = const [
+  static final _filters = [
     (label: 'ALL', filter: MeetingFilter.all),
     (label: 'BUY', filter: MeetingFilter.buy),
     (label: 'RENT', filter: MeetingFilter.rent),
     (label: 'OWN', filter: MeetingFilter.own),
   ];
 
-  // Booking still uses the old mock data — no API for it yet.
-  final List<Map<String, String>> _bookingList = const [
-    {
-      'name': 'Aman',
-      'subtitle': 'SAFA/TWO\nFrom AED 99,000',
-      'time': '2 min ago',
-    },
-  ];
-
-  // Saved so we can dispose; pre-warms avatar images the moment a meetings
-  // page arrives so the conversations screen opens with photos already loaded.
   Worker? _precacheWorker;
 
   @override
   void initState() {
     super.initState();
     _precacheWorker = ever(_ctrl.meetings, (_) => _precacheAvatars());
-    // Defer until after the first frame — load()'s sync list.clear() would
-    // otherwise mark a listening Obx dirty while the IndexedStack is still
-    // building this tab post-login (setState-during-build crash).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _ctrl.load();
     });
@@ -71,42 +51,27 @@ class _MeetingViewState extends State<MeetingView> {
   }
 
   Future<void> _openConversations(MeetingItem m) async {
-    // Use JWT as the authoritative source for the logged-in user's id.
     final myId = LocalStorageService.getUserIdFromToken() ??
-        LocalStorageService.getUser()?.data?.id ?? '';
+        LocalStorageService.getUser()?.data?.id ??
+        '';
     final isOwner = myId.isNotEmpty && m.announcement.userId == myId;
 
-    debugPrint('📋 [Meeting] tap ann=${m.announcementId}');
-    debugPrint('📋 [Meeting]   myId=$myId  ann.userId=${m.announcement.userId}  isOwner=$isOwner');
-    debugPrint('📋 [Meeting]   chatProfiles=[${m.chatProfiles.map((p) => "${p.name}(${p.id})").join(", ")}]');
-
     if (isOwner) {
-      // My announcement — show everyone who chatted with me.
-      debugPrint('📋 [Meeting]   → owner path: opening AnnouncementConversationsView');
       await Get.to(() => AnnouncementConversationsView(meeting: m));
     } else {
-      // I initiated a chat about someone else's announcement.
-      // chat:announcement:conversations returns MY own profile as the peer in
-      // this case (server perspective is the owner's), so skip it entirely and
-      // go straight to chat with the announcement owner.
       final peers = myId.isNotEmpty
           ? m.chatProfiles.where((p) => p.id != myId).toList()
           : List<ChatProfileSummary>.from(m.chatProfiles);
       final peer = peers.isNotEmpty ? peers.first : null;
       final ownerId = peer?.id ?? m.announcement.userId ?? '';
-      if (ownerId.isEmpty || ownerId == myId) {
-        debugPrint('📋 [Meeting]   → non-owner path: no valid peer found, aborting');
-        return;
-      }
+      if (ownerId.isEmpty || ownerId == myId) return;
       final annRole = m.announcement.userRole ?? 1;
-      final chatUserRole = 3 - annRole;
-      debugPrint('📋 [Meeting]   → non-owner path: peer=${peer?.name}($ownerId) chatUserRole=$chatUserRole');
       await AnnouncementChatView.open(
         announcementId: m.announcementId,
         brokerName: peer?.name ?? m.announcement.ownerName ?? 'User',
         brokerAvatar: peer?.profileImageUrl ?? m.announcement.ownerAvatarUrl,
         peerUserId: ownerId,
-        userRole: chatUserRole,
+        userRole: 3 - annRole,
       );
     }
     if (!mounted) return;
@@ -115,9 +80,6 @@ class _MeetingViewState extends State<MeetingView> {
   }
 
   void _precacheAvatars() {
-    // Warm the image cache for every peer avatar + announcement thumbnail in
-    // the list. precacheImage uses the same network/disk cache CachedNetwork
-    // Image reads from, so re-displaying these is instant.
     if (!mounted) return;
     final urls = <String>{};
     for (final m in _ctrl.meetings) {
@@ -135,71 +97,58 @@ class _MeetingViewState extends State<MeetingView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
+        bottom: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const CustomHeader(title: 'Meeting'),
-            _buildTopTabs(),
-            if (_isBookingSelected)
-              Expanded(child: _buildBookingList())
-            else
-              Expanded(
-                child: Column(
-                  children: [
-                    _buildFilterChips(),
-                    Expanded(child: _buildMeetingList()),
-                  ],
-                ),
-              ),
+            _buildHeader(theme),
+            SizedBox(height: 20.h),
+            _buildFilterRow(theme),
+            SizedBox(height: 12.h),
+            Divider(
+                height: 1,
+                thickness: 1,
+                color:
+                    isDark ? const Color(0xFF3D3D3D) : const Color(0xFFECECEC)),
+            Expanded(child: _buildBody(theme, isDark)),
           ],
         ),
       ),
     );
   }
 
-  // ─── Booking / Announcement top tabs ───
-  Widget _buildTopTabs() {
+  // ── Header ────────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader(ThemeData theme) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-      child: Row(
-        children: [
-          Expanded(
-            child: CustomPrimaryButton(
-              title: 'Booking',
-              defaultColor: _isBookingSelected ? Colors.white : Colors.black,
-              backgroundColor: _isBookingSelected
-                  ? AppColors.primary
-                  : Colors.grey.shade300,
-              fontWeight: _isBookingSelected ? FontWeight.bold : FontWeight.normal,
-              onPressed: () => setState(() => _isBookingSelected = true),
-            ),
-          ),
-          SizedBox(width: 8.w),
-          Expanded(
-            child: CustomPrimaryButton(
-              title: 'Announcement',
-              defaultColor: !_isBookingSelected ? Colors.white : Colors.black,
-              backgroundColor: !_isBookingSelected
-                  ? AppColors.primary
-                  : Colors.grey.shade300,
-              fontWeight: !_isBookingSelected ? FontWeight.bold : FontWeight.normal,
-              onPressed: () => setState(() => _isBookingSelected = false),
-            ),
-          ),
-        ],
+      padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 0),
+      child: Text(
+        'Broker Meetings',
+        style: GoogleFonts.poppins(
+          fontSize: 20.sp,
+          fontWeight: FontWeight.w500,
+          color: theme.colorScheme.onSurface,
+          height: 1.0,
+          letterSpacing: 0,
+        ),
       ),
     );
   }
 
-  // ─── Filter chips for the Announcement tab ───
-  Widget _buildFilterChips() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-      child: Obx(() {
-        final current = _ctrl.filter.value;
-        return Row(
+  // ── Filter chips — ALL / BUY / RENT / OWN ────────────────────────────────────
+
+  Widget _buildFilterRow(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    return Obx(() {
+      final current = _ctrl.filter.value;
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: 14.w),
+        child: Row(
           children: _filters.map((f) {
             final isSelected = current == f.filter;
             return Padding(
@@ -207,75 +156,61 @@ class _MeetingViewState extends State<MeetingView> {
               child: GestureDetector(
                 onTap: () => _ctrl.load(f: f.filter),
                 child: Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 24.w, vertical: 6.h),
+                  height: 34.h,
+                  padding: EdgeInsets.symmetric(horizontal: 18.w),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : Colors.white,
-                    borderRadius: BorderRadius.circular(20.r),
-                    border: Border.all(
-                      color: isSelected
-                          ? AppColors.primary
-                          : Colors.grey.shade300,
-                    ),
+                    color: isSelected
+                        ? AppColors.primary
+                        : isDark
+                            ? const Color(0xFF3D3D3D)
+                            : Colors.white,
+                    borderRadius: BorderRadius.circular(62.r),
+                    border: isSelected
+                        ? null
+                        : Border.all(
+                            color: isDark
+                                ? Colors.grey.shade700
+                                : Colors.grey.shade300,
+                          ),
                   ),
                   child: Text(
                     f.label,
                     style: GoogleFonts.poppins(
                       fontSize: 12.sp,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.normal,
-                      color: isSelected ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.w400,
+                      color: isSelected
+                          ? Colors.white
+                          : isDark
+                              ? Colors.white70
+                              : Colors.black87,
+                      height: 1.0,
+                      letterSpacing: 0,
                     ),
                   ),
                 ),
               ),
             );
           }).toList(),
-        );
-      }),
-    );
+        ),
+      );
+    });
   }
 
-  // ─── Meeting list (real data) ───
-  Widget _buildMeetingList() {
+  // ── Body ──────────────────────────────────────────────────────────────────────
+
+  Widget _buildBody(ThemeData theme, bool isDark) {
+    final dividerColor =
+        isDark ? const Color(0xFF3D3D3D) : const Color(0xFFECECEC);
     return Obx(() {
       if (_ctrl.isLoading.value && _ctrl.meetings.isEmpty) {
-        return const _MeetingShimmer();
+        return _buildShimmer(theme);
       }
       if (_ctrl.error.value != null && _ctrl.meetings.isEmpty) {
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24.w),
-                child: Text(
-                  _ctrl.error.value!,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                      fontSize: 14.sp, color: Colors.grey.shade500),
-                ),
-              ),
-              SizedBox(height: 12.h),
-              TextButton(
-                onPressed: () => _ctrl.load(force: true),
-                child: Text('Retry',
-                    style: GoogleFonts.inter(
-                        fontSize: 14.sp, color: AppColors.primary)),
-              ),
-            ],
-          ),
-        );
+        return _buildError();
       }
       if (_ctrl.meetings.isEmpty) {
-        return RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => _ctrl.load(force: true),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [SizedBox(height: 200.h), _buildEmptyState()],
-          ),
-        );
+        return _buildEmpty();
       }
       final myId = _profile.currentUserId;
       return RefreshIndicator(
@@ -283,14 +218,11 @@ class _MeetingViewState extends State<MeetingView> {
         onRefresh: () => _ctrl.load(force: true),
         child: ListView.separated(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.symmetric(vertical: 8.h),
           itemCount: _ctrl.meetings.length,
           separatorBuilder: (_, __) => Divider(
-            height: 1.5,
+            height: 1,
             thickness: 1,
-            color: Colors.grey.shade200,
-            indent: 16.w,
-            endIndent: 16.w,
+            color: dividerColor,
           ),
           itemBuilder: (_, i) {
             final m = _ctrl.meetings[i];
@@ -306,92 +238,133 @@ class _MeetingViewState extends State<MeetingView> {
     });
   }
 
-  // ─── Booking (unchanged mock for now) ───
-  Widget _buildBookingList() {
-    if (_bookingList.isEmpty) return _buildEmptyState();
-    return ListView.builder(
-      itemCount: _bookingList.length,
-      itemBuilder: (context, index) {
-        final item = _bookingList[index];
-        return ListTile(
-          leading: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset('assets/images/rent1.png',
-                width: 60, height: 60, fit: BoxFit.cover),
+  Widget _buildError() {
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () => _ctrl.load(force: true),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: 200.h),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24.w),
+                  child: Text(
+                    _ctrl.error.value!,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                        fontSize: 14.sp, color: Colors.grey.shade500),
+                  ),
+                ),
+                SizedBox(height: 12.h),
+                TextButton(
+                  onPressed: () => _ctrl.load(force: true),
+                  child: Text('Retry',
+                      style: GoogleFonts.inter(
+                          fontSize: 14.sp, color: AppColors.primary)),
+                ),
+              ],
+            ),
           ),
-          title: Text(item['name']!,
-              style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text(item['subtitle']!),
-          trailing: Text(item['time']!),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ChatView()),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.info_outline, size: 48, color: Colors.grey),
-          SizedBox(height: 10),
-          Text('No data found',
-              style: TextStyle(color: Colors.grey, fontSize: 16)),
         ],
       ),
     );
   }
-}
 
-class _MeetingShimmer extends StatelessWidget {
-  const _MeetingShimmer();
+  Widget _buildEmpty() {
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () => _ctrl.load(force: true),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: 200.h),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.forum_outlined,
+                    size: 48.sp, color: Colors.grey.shade300),
+                SizedBox(height: 12.h),
+                Text(
+                  'No meetings yet',
+                  style: GoogleFonts.inter(
+                      fontSize: 14.sp, color: Colors.grey.shade400),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey.shade300,
-      highlightColor: Colors.grey.shade100,
-      child: ListView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.symmetric(vertical: 8.h),
-        itemCount: 5,
-        itemBuilder: (_, __) => Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+  Widget _buildShimmer(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    final shimmerColor = isDark ? Colors.grey.shade800 : Colors.grey.shade300;
+    final dividerColor =
+        isDark ? const Color(0xFF3D3D3D) : const Color(0xFFECECEC);
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 5,
+      separatorBuilder: (_, __) => Divider(
+        height: 1,
+        thickness: 1,
+        color: dividerColor,
+      ),
+      itemBuilder: (_, __) => SizedBox(
+        height: 89.h,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
           child: Row(
             children: [
+              // Thumb placeholder
               Container(
-                width: 60.w,
-                height: 60.w,
-                decoration: const BoxDecoration(
+                width: 65.w,
+                height: 65.w,
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white,
+                  color: shimmerColor,
                 ),
               ),
-              SizedBox(width: 12.w),
+              SizedBox(width: 13.w),
+              // Text placeholders
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     Container(
-                        width: 120.w, height: 12.h, color: Colors.white),
-                    SizedBox(height: 6.h),
-                    Container(width: 80.w, height: 10.h, color: Colors.white),
-                    SizedBox(height: 6.h),
-                    Container(width: 140.w, height: 10.h, color: Colors.white),
+                        height: 14.h,
+                        width: 90.w,
+                        decoration: BoxDecoration(
+                            color: shimmerColor,
+                            borderRadius: BorderRadius.circular(4.r))),
+                    Container(
+                        height: 14.h,
+                        width: 130.w,
+                        decoration: BoxDecoration(
+                            color: shimmerColor,
+                            borderRadius: BorderRadius.circular(4.r))),
+                    Container(
+                        height: 14.h,
+                        width: 150.w,
+                        decoration: BoxDecoration(
+                            color: shimmerColor,
+                            borderRadius: BorderRadius.circular(4.r))),
                   ],
                 ),
               ),
-              SizedBox(width: 8.w),
+              // Avatar placeholder
               Container(
-                width: 46.w,
-                height: 46.w,
-                decoration: const BoxDecoration(
+                width: 36.w,
+                height: 36.w,
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white,
+                  color: shimmerColor,
                 ),
               ),
             ],

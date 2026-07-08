@@ -4,7 +4,6 @@ import 'package:brokkerspot/views/user/settings/change_password_view.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
 import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,243 +16,231 @@ class SettingsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.white,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(context),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
-                  child: _buildSettingsCard(),
-                ),
-              ),
-              // App Version at bottom
-              Padding(
-                padding: EdgeInsets.only(bottom: 24.h),
-                child: Text(
-                  'App Version: 1.0.0',
-                  style: GoogleFonts.inter(
-                    fontSize: 12.sp,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-  // ---------------- HEADER ----------------
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.08),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Back button
-          GestureDetector(
-            onTap: () => Get.back(),
-            child: Container(
-              padding: EdgeInsets.all(8.w),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFE5E5E5)),
-              ),
-              child: Icon(
-                Icons.arrow_back_ios_new,
-                size: 16.sp,
-                color: Colors.black,
-              ),
-            ),
-          ),
-          // Title
-          Expanded(
-            child: Center(
-              child: Text(
-                'Setting',
-                style: GoogleFonts.inter(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-          ),
-          // Logout button (power icon)
-          GestureDetector(
-            onTap: () => _showLogoutDialog(context),
-            child: Container(
-              width: 40.w,
-              height: 40.w,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFFF6B6B), width: 2),
-              ),
-              child: Icon(
-                Icons.power_settings_new,
-                size: 20.sp,
-                color: const Color(0xFFFF6B6B),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------- SETTINGS CARD ----------------
-  Widget _buildSettingsCard() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-      ),
-      child: Column(
-        children: [
-          Obx(() {
-            final isDark = ThemeController.to.isDark;
-            return _settingsTile(
-              icon:
-                  isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
-              iconColor: AppColors.goldAccent,
-              title: isDark ? 'Dark mode' : 'Light mode',
-              trailing: _buildThemeSwitch(),
-            );
-          }),
-          _tileDivider(),
-          _settingsTile(
-            icon: Icons.lock_outline,
-            iconColor: AppColors.goldAccent,
-            title: 'Change Password',
-            onTap: () => Get.to(() => ChangePasswordView()),
-          ),
-          _tileDivider(),
-          _settingsTile(
-            icon: Icons.location_on_outlined,
-            iconColor: AppColors.goldAccent,
-            title: 'Location',
-            onTap: () => Get.dialog(
-              const LocationPickerPopup(),
-              barrierDismissible: false,
-            ),
-          ),
-          _tileDivider(),
-          _settingsTile(
-            icon: Icons.translate,
-            iconColor: AppColors.goldAccent,
-            title: 'Language',
-            trailingText: 'English',
-            onTap: () {},
-          ),
-          _tileDivider(),
-          _settingsTile(
-            icon: Icons.currency_exchange,
-            iconColor: AppColors.goldAccent,
-            title: 'Currency',
-            trailingText: 'Euro',
-            onTap: () {},
-          ),
-          _tileDivider(),
-          _settingsTile(
-            icon: Icons.description_outlined,
-            iconColor: AppColors.goldAccent,
-            title: 'Terms & Conditions',
-            onTap: () {},
-          ),
-          _tileDivider(),
-          _settingsTile(
-            icon: Icons.headset_mic_outlined,
-            iconColor: AppColors.goldAccent,
-            title: 'Help & Support',
-            onTap: () {},
-          ),
-          _tileDivider(),
-          _settingsTile(
-            icon: Icons.help_outline,
-            iconColor: AppColors.goldAccent,
-            title: 'About Us',
-            onTap: () {},
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------- SETTINGS TILE ----------------
-  Widget _settingsTile({
-    required IconData icon,
-    required String title,
-    Color? iconColor,
-    Widget? trailing,
-    String? trailingText,
-    VoidCallback? onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
-        child: Row(
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
           children: [
-            Icon(icon, size: 24.sp, color: iconColor ?? AppColors.goldAccent),
-            SizedBox(width: 16.w),
+            _buildHeader(context, theme, isDark),
             Expanded(
-              child: Text(
-                title,
-                style: GoogleFonts.inter(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(27.w, 24.h, 27.w, 24.h),
+                child: Column(
+                  children: [
+                    // ── Card 1: personalisation ─────────────────────────────
+                    _buildCard(
+                      isDark: isDark,
+                      children: [
+                        Obx(() {
+                          final dark = ThemeController.to.isDark;
+                          return _tile(
+                            title: dark ? 'Dark mode' : 'Light mode',
+                            isDark: isDark,
+                            trailing: _buildThemeSwitch(),
+                          );
+                        }),
+                        _tile(
+                          title: 'Password & Security',
+                          icon: Icons.password_outlined,
+                          isDark: isDark,
+                          onTap: () => Get.to(() => ChangePasswordView()),
+                        ),
+                        _tile(
+                          title: 'Location',
+                          icon: Icons.location_on_outlined,
+                          isDark: isDark,
+                          onTap: () => Get.dialog(
+                            const LocationPickerPopup(),
+                            barrierDismissible: false,
+                          ),
+                        ),
+                        _tile(
+                          title: 'Language',
+                          icon: Icons.translate_outlined,
+                          isDark: isDark,
+                          onTap: () {},
+                        ),
+                        _tile(
+                          title: 'Currency',
+                          icon: Icons.currency_exchange_outlined,
+                          isDark: isDark,
+                          onTap: () {},
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: 16.h),
+
+                    // ── Card 2: legal / support ─────────────────────────────
+                    _buildCard(
+                      isDark: isDark,
+                      children: [
+                        _tile(
+                          title: 'Terms & Conditions',
+                          icon: Icons.description_outlined,
+                          isDark: isDark,
+                          onTap: () {},
+                        ),
+                        _tile(
+                          title: 'Help & Support',
+                          icon: Icons.headset_mic_outlined,
+                          isDark: isDark,
+                          onTap: () {},
+                        ),
+                        _tile(
+                          title: 'About Us',
+                          icon: Icons.info_outline_rounded,
+                          isDark: isDark,
+                          onTap: () {},
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
-            if (trailingText != null)
-              Padding(
-                padding: EdgeInsets.only(right: 8.w),
-                child: Text(
-                  trailingText,
-                  style: GoogleFonts.inter(
-                    fontSize: 13.sp,
-                    color: Colors.grey.shade400,
-                  ),
+
+            // ── App version ────────────────────────────────────────────────
+            Padding(
+              padding: EdgeInsets.only(bottom: 100.h),
+              child: Text(
+                'App Version: 1.0.0',
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                 ),
               ),
-            if (trailing != null)
-              trailing
-            else
-              Icon(
-                Icons.chevron_right,
-                size: 22.sp,
-                color: Colors.grey.shade500,
-              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ---------------- THEME SWITCH ----------------
+  // ── Header: back circle + centered title + red logout circle ───────────────
+
+  Widget _buildHeader(BuildContext context, ThemeData theme, bool isDark) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(18.w, 16.h, 18.w, 0),
+      child: Row(
+        children: [
+          // Back button — gray filled circle
+          GestureDetector(
+            onTap: () => Get.back(),
+            child: Container(
+              width: 36.w,
+              height: 36.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF2F2F2),
+              ),
+              child: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 16.sp,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+          // Title — centered
+          Expanded(
+            child: Center(
+              child: Text(
+                'Setting',
+                style: GoogleFonts.poppins(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                  height: 1.0,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+          ),
+          // Logout — filled red circle
+          GestureDetector(
+            onTap: () => _showLogoutDialog(context),
+            child: Container(
+              width: 36.w,
+              height: 36.w,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFFF4B4B),
+              ),
+              child: Icon(
+                Icons.power_settings_new_rounded,
+                size: 18.sp,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Card wrapper ───────────────────────────────────────────────────────────
+
+  Widget _buildCard({required bool isDark, required List<Widget> children}) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE8E8E8),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      ),
+    );
+  }
+
+  // ── Tile: title left, gold icon (or custom trailing) right ─────────────────
+
+  Widget _tile({
+    required String title,
+    required bool isDark,
+    IconData? icon,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16.r),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 18.h),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                  height: 1.0,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+            if (trailing != null)
+              trailing
+            else if (icon != null)
+              Icon(icon, size: 21.sp, color: AppColors.primary),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Theme toggle switch ────────────────────────────────────────────────────
+
   Widget _buildThemeSwitch() {
     return Obx(() {
       final isDark = ThemeController.to.isDark;
@@ -278,19 +265,8 @@ class SettingsView extends StatelessWidget {
     });
   }
 
-  // ---------------- DIVIDER ----------------
-  Widget _tileDivider() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.w),
-      child: Divider(
-        height: 1,
-        thickness: 0.5,
-        color: Colors.grey.shade200,
-      ),
-    );
-  }
+  // ── Logout bottom sheet ────────────────────────────────────────────────────
 
-  // ---------------- LOGOUT DIALOG ----------------
   void _showLogoutDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -298,7 +274,9 @@ class SettingsView extends StatelessWidget {
       builder: (_) => Container(
         padding: EdgeInsets.fromLTRB(24.w, 28.h, 24.w, 34.h),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF1E1E1E)
+              : Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
         ),
         child: Column(
@@ -306,22 +284,21 @@ class SettingsView extends StatelessWidget {
           children: [
             Text(
               'Logout',
-              style: GoogleFonts.inter(
+              style: GoogleFonts.poppins(
                 fontSize: 18.sp,
                 fontWeight: FontWeight.w700,
-                color: Colors.black,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             SizedBox(height: 12.h),
             Text(
               'Are you sure you want to logout?',
-              style: GoogleFonts.inter(
+              style: GoogleFonts.poppins(
                 fontSize: 14.sp,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
             SizedBox(height: 24.h),
-            // Yes, Logout button
             SizedBox(
               width: double.infinity,
               height: 50.h,
@@ -331,7 +308,7 @@ class SettingsView extends StatelessWidget {
                   _accountController.logout(side: side);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF6B6B),
+                  backgroundColor: const Color(0xFFFF4B4B),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30.r),
@@ -339,7 +316,7 @@ class SettingsView extends StatelessWidget {
                 ),
                 child: Text(
                   'Yes, Logout',
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.poppins(
                     fontSize: 15.sp,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
@@ -348,7 +325,6 @@ class SettingsView extends StatelessWidget {
               ),
             ),
             SizedBox(height: 12.h),
-            // Cancel button
             SizedBox(
               width: double.infinity,
               height: 50.h,
@@ -363,7 +339,7 @@ class SettingsView extends StatelessWidget {
                 ),
                 child: Text(
                   'Cancel',
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.poppins(
                     fontSize: 15.sp,
                     fontWeight: FontWeight.w600,
                     color: Colors.grey.shade600,

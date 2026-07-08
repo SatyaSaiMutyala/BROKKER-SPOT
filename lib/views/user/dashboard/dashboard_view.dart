@@ -105,6 +105,9 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Widget _buildMainPill() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pillBg = isDark ? const Color(0x30FFFFFF) : const Color(0x80DBDBDB);
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(25.r),
       child: BackdropFilter(
@@ -112,17 +115,16 @@ class _DashboardViewState extends State<DashboardView> {
         child: Container(
           height: 50.h,
           decoration: BoxDecoration(
-            color: const Color(0x80DBDBDB),
+            color: pillBg,
             borderRadius: BorderRadius.circular(25.r),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _navItem(index: 0, iconAsset: 'assets/images/home_icon.png'),
-              _navItem(
-                  index: 1, iconAsset: 'assets/images/announcement_icon.png'),
-              _navItem(index: 2, iconAsset: 'assets/images/meeting_icon.png'),
-              _navItem(index: 3, iconAsset: 'assets/images/account_icon.png'),
+              _navItem(index: 0, iconAsset: 'assets/images/home_icon.png', isDark: isDark),
+              _navItem(index: 1, iconAsset: 'assets/images/announcement_icon.png', isDark: isDark),
+              _navItem(index: 2, iconAsset: 'assets/images/meeting_icon.png', isDark: isDark),
+              _navItem(index: 3, iconAsset: 'assets/images/account_icon.png', isDark: isDark),
             ],
           ),
         ),
@@ -130,9 +132,12 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
 
-  Widget _navItem({required int index, required String iconAsset}) {
+  Widget _navItem({required int index, required String iconAsset, required bool isDark}) {
     final isActive = _currentIndex == index;
     final iconSize = isActive ? 30.w : 25.w;
+    final inactiveColor =
+        isDark ? const Color(0xFFBBBBBB) : const Color(0xFF6E6E6E);
+
     return GestureDetector(
       onTap: () => _onNavTap(index),
       behavior: HitTestBehavior.opaque,
@@ -152,7 +157,7 @@ class _DashboardViewState extends State<DashboardView> {
               iconAsset,
               width: iconSize,
               height: iconSize,
-              color: isActive ? Colors.white : const Color(0xFF6E6E6E),
+              color: isActive ? Colors.white : inactiveColor,
               colorBlendMode: BlendMode.srcIn,
             ),
           ),
@@ -162,6 +167,11 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Widget _buildCreateButton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pillBg = isDark ? const Color(0x30FFFFFF) : const Color(0x80DBDBDB);
+    final iconColor =
+        isDark ? const Color(0xFFCCCCCC) : const Color(0xFF444444);
+
     return GestureDetector(
       onTap: _onCreateTap,
       behavior: HitTestBehavior.opaque,
@@ -174,13 +184,13 @@ class _DashboardViewState extends State<DashboardView> {
             height: 50.h,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0x80DBDBDB),
+              color: pillBg,
               borderRadius: BorderRadius.circular(34.r),
             ),
             child: Icon(
               Icons.add_rounded,
               size: 32.sp,
-              color: const Color(0xFF444444),
+              color: iconColor,
             ),
           ),
         ),

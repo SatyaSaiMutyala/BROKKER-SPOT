@@ -1,4 +1,3 @@
-import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,29 +19,63 @@ class _MyProjectDealsViewState extends State<MyProjectDealsView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
-      
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
-        children: [
-            const CustomHeader(title: 'My Project Deal', showBackButton: true),
+          children: [
+            _buildHeader(theme, isDark),
+            SizedBox(height: 12.h),
+            DealTabToggle(
+              selectedIndex: _selectedTab,
+              onChanged: (i) => setState(() => _selectedTab = i),
+            ),
+            SizedBox(height: 16.h),
+            Expanded(
+              child: _selectedTab == 0
+                  ? _buildCurrentDeals()
+                  : _buildCompletedDeals(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          SizedBox(height: 12.h),
-          // Tab toggle
-          DealTabToggle(
-            selectedIndex: _selectedTab,
-            onChanged: (i) => setState(() => _selectedTab = i),
+  Widget _buildHeader(ThemeData theme, bool isDark) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38.r,
+              height: 38.r,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+              ),
+              child: Icon(
+                Icons.arrow_back_ios_new,
+                size: 16.sp,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
           ),
-          SizedBox(height: 16.h),
-          // Deal list
-          Expanded(
-            child: _selectedTab == 0
-                ? _buildCurrentDeals()
-                : _buildCompletedDeals(),
+          SizedBox(width: 12.w),
+          Text(
+            'My Project Deal',
+            style: GoogleFonts.poppins(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+            ),
           ),
         ],
-      ),
       ),
     );
   }

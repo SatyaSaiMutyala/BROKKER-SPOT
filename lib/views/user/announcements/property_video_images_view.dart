@@ -3,8 +3,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
-import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -53,50 +51,28 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
     }
   }
 
-  static const int _maxVideoBytes = 50 * 1024 * 1024; // 50 MB
+  static const int _maxVideoBytes = 50 * 1024 * 1024;
 
-  // ─── Permission gate ───
-  /// Requests the permissions needed for the given source/media. Returns true
-  /// only after the user grants them. If the user previously selected "Don't
-  /// ask again" on Android, shows an in-app dialog routing them to Settings.
   Future<bool> _ensurePermissions({
     required ImageSource source,
     required bool needsMicrophone,
   }) async {
     final permissions = <Permission>[];
-
     if (source == ImageSource.camera) {
       permissions.add(Permission.camera);
       if (needsMicrophone) permissions.add(Permission.microphone);
     } else {
-      // Gallery — on iOS 14+, image_picker uses PHPickerViewController which
-      // grants scoped access without requiring explicit Photos permission.
-      // Checking Permission.photos on iOS causes false "permanently denied"
-      // popups because the OS manages access internally. Skip it on iOS.
       if (!Platform.isIOS) {
-        permissions.add(
-            needsMicrophone ? Permission.videos : Permission.photos);
+        permissions
+            .add(needsMicrophone ? Permission.videos : Permission.photos);
       }
     }
-
     for (final p in permissions) {
       var status = await p.status;
-
       if (status.isGranted || status.isLimited) continue;
-
-      // Restricted (parental/MDM controls) — can't request or change in settings.
       if (status.isRestricted) return false;
-
-      // Always attempt the system request first.
-      // On iOS, permission_handler can wrongly report notDetermined as
-      // permanentlyDenied before a request is ever made, which suppresses the
-      // OS dialog. Calling p.request() on a notDetermined permission shows the
-      // system prompt; on a truly denied permission it returns immediately.
       status = await p.request();
-
       if (status.isGranted || status.isLimited) continue;
-
-      // Truly denied — route user to Settings.
       if (!mounted) return false;
       final opened = await _showSettingsDialog(p);
       if (!opened) return false;
@@ -107,6 +83,7 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
   }
 
   Future<bool> _showSettingsDialog(Permission permission) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final label = permission == Permission.camera
         ? 'Camera'
         : permission == Permission.microphone
@@ -118,21 +95,31 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            backgroundColor: Colors.white,
+            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16.r)),
-            title: Text('$label permission required',
-                style: GoogleFonts.poppins(
-                    fontSize: 16.sp, fontWeight: FontWeight.w600)),
+            title: Text(
+              '$label permission required',
+              style: GoogleFonts.poppins(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
             content: Text(
               'Please enable $label access in Settings to continue.',
-              style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87),
+              style: GoogleFonts.inter(
+                fontSize: 13.sp,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: Text('Cancel',
-                    style: GoogleFonts.inter(color: Colors.black54)),
+                    style: GoogleFonts.inter(
+                      color: isDark ? Colors.grey.shade400 : Colors.black54,
+                    )),
               ),
               TextButton(
                 onPressed: () async {
@@ -150,7 +137,6 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
     return granted;
   }
 
-  // ─── Video picker ───
   void _pickVideo(ImageSource source) async {
     final ok = await _ensurePermissions(source: source, needsMicrophone: true);
     if (!ok) return;
@@ -163,7 +149,8 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
       final file = File(picked.path);
       final size = await file.length();
       if (size > _maxVideoBytes) {
-        EasyLoading.showError('Video must be under 50 MB. Please choose a smaller file.');
+        EasyLoading.showError(
+            'Video must be under 50 MB. Please choose a smaller file.');
         return;
       }
       setState(() => _videoFile = file);
@@ -190,7 +177,6 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
     });
   }
 
-  // ─── Image picker (single box) ───
   void _pickImage(int index) {
     _showSourceSheet(
       onCamera: () async {
@@ -221,7 +207,9 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
             setState(() {
               int slot = index;
               for (final f in picked) {
-                while (slot < 12 && _imageFiles[slot] != null) { slot++; }
+                while (slot < 12 && _imageFiles[slot] != null) {
+                  slot++;
+                }
                 if (slot >= 12) break;
                 _imageFiles[slot] = File(f.path);
                 slot++;
@@ -261,8 +249,8 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
       }
       String? videoUrl;
       if (_videoFile != null) {
-        videoUrl = await api.uploadImage(
-            file: _videoFile!, fileType: 'announcements');
+        videoUrl =
+            await api.uploadImage(file: _videoFile!, fileType: 'announcements');
         setState(() => _uploadedCount++);
       } else {
         videoUrl = _existingVideoUrl;
@@ -272,7 +260,6 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
         videoUrl: videoUrl,
         thumbnailUrl: imageUrls.isNotEmpty ? imageUrls.first : null,
       );
-      // Hold at 100% briefly so user sees completion before navigating back
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -292,9 +279,10 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
     required VoidCallback onCamera,
     required VoidCallback onGallery,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16.r))),
       builder: (_) => SafeArea(
@@ -302,16 +290,30 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.camera_alt_outlined, color: AppColors.primary),
-              title: Text('Camera', style: GoogleFonts.inter(fontSize: 14.sp)),
+              leading:
+                  Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+              title: Text(
+                'Camera',
+                style: GoogleFonts.inter(
+                  fontSize: 14.sp,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 onCamera();
               },
             ),
             ListTile(
-              leading: Icon(Icons.photo_library_outlined, color: AppColors.primary),
-              title: Text('Gallery', style: GoogleFonts.inter(fontSize: 14.sp)),
+              leading:
+                  Icon(Icons.photo_library_outlined, color: AppColors.primary),
+              title: Text(
+                'Gallery',
+                style: GoogleFonts.inter(
+                  fontSize: 14.sp,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 onGallery();
@@ -325,93 +327,177 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
           SafeArea(
-        child: Column(
-          children: [
-            const CustomHeader(title: 'VIDEO & IMAGES', showBackButton: true),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(20.w),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Video
-                    Text('Add Video (Max 1 min, 50 MB)',
-                        style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87)),
-                    SizedBox(height: 12.h),
-                    Stack(
+            child: Column(
+              children: [
+                _buildHeader(theme, isDark),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        GestureDetector(
-                          onTap: _showVideoPicker,
-                          child: _videoBox(),
-                        ),
-                        if (_videoFile != null || _existingVideoUrl != null)
-                          Positioned(
-                            top: 4.h,
-                            right: 4.w,
-                            child: GestureDetector(
-                              onTap: _removeVideo,
-                              child: Container(
-                                width: 20.w,
-                                height: 20.w,
-                                decoration: const BoxDecoration(
-                                    color: Colors.black54,
-                                    shape: BoxShape.circle),
-                                child: Icon(Icons.close,
-                                    size: 13.sp, color: Colors.white),
-                              ),
-                            ),
+                        // ── Video ──────────────────────────────────────────
+                        Text(
+                          'Add Video (Max 1 min, 50 MB)',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.sp,
+                            color:
+                                isDark ? Colors.grey.shade300 : Colors.black87,
                           ),
+                        ),
+                        SizedBox(height: 12.h),
+                        Stack(
+                          children: [
+                            GestureDetector(
+                              onTap: _showVideoPicker,
+                              child: _videoBox(isDark),
+                            ),
+                            if (_videoFile != null || _existingVideoUrl != null)
+                              Positioned(
+                                top: 4.h,
+                                right: 4.w,
+                                child: GestureDetector(
+                                  onTap: _removeVideo,
+                                  child: Container(
+                                    width: 20.w,
+                                    height: 20.w,
+                                    decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle),
+                                    child: Icon(Icons.close,
+                                        size: 13.sp, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        SizedBox(height: 24.h),
+
+                        // ── Images ─────────────────────────────────────────
+                        RichText(
+                          text: TextSpan(
+                            text: 'Add Images minimum 8',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.sp,
+                              color: isDark
+                                  ? Colors.grey.shade300
+                                  : Colors.black87,
+                            ),
+                            children: [
+                              TextSpan(
+                                  text: ' *',
+                                  style: GoogleFonts.inter(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          '$_filledSlotCount/12 selected',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.sp,
+                            color: isDark
+                                ? Colors.grey.shade500
+                                : Colors.grey.shade500,
+                          ),
+                        ),
+                        SizedBox(height: 12.h),
+                        _imageGrid(isDark),
+                        SizedBox(height: 32.h),
                       ],
                     ),
-                    SizedBox(height: 24.h),
+                  ),
+                ),
 
-                    // Images
-                    RichText(
-                      text: TextSpan(
-                        text: 'Add Images minimum 8',
-                        style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87),
-                        children: [
-                          TextSpan(
-                              text: ' *',
-                              style: GoogleFonts.inter(color: Colors.red)),
-                        ],
+                // ── Save button ─────────────────────────────────────────────
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
+                  child: GestureDetector(
+                    onTap: _isValid && !_isUploading ? _uploadAndSave : null,
+                    child: Container(
+                      width: double.infinity,
+                      height: 52.h,
+                      decoration: BoxDecoration(
+                        color: _isValid
+                            ? AppColors.primary
+                            : (isDark
+                                ? const Color(0xFF2A2A2A)
+                                : Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(38.r),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Save',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: _isValid
+                              ? Colors.white
+                              : (isDark
+                                  ? Colors.grey.shade600
+                                  : Colors.black45),
+                        ),
                       ),
                     ),
-                    SizedBox(height: 4.h),
-                    Text(
-                      '$_filledSlotCount/12 selected',
-                      style: GoogleFonts.inter(
-                          fontSize: 11.sp, color: Colors.grey.shade500),
-                    ),
-                    SizedBox(height: 12.h),
-                    _imageGrid(),
-                    SizedBox(height: 32.h),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-            Padding(
-                padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
-                child: CustomPrimaryButton(
-                  title: 'Save',
-                  backgroundColor: _isValid ? AppColors.primary : Colors.grey.shade300,
-                  defaultColor: _isValid ? Colors.white : Colors.black45,
-                  onPressed: _isValid && !_isUploading ? _uploadAndSave : () {},
-                ),
-              ),
-          ],
-        ),
-          ),  // SafeArea
+          ),
           if (_isUploading) _buildUploadOverlay(),
         ],
       ),
     );
   }
+
+  // ── Header ────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader(ThemeData theme, bool isDark) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 8.h),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38.w,
+              height: 38.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color:
+                    isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF2F2F2),
+              ),
+              child: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 16.sp,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+          SizedBox(width: 14.w),
+          Text(
+            'Photos & Videos',
+            style: GoogleFonts.poppins(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+              height: 1.0,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Upload progress overlay ───────────────────────────────────────────────
 
   Widget _buildUploadOverlay() {
     final percent = (_uploadProgress * 100).toInt();
@@ -419,13 +505,13 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
     return Positioned.fill(
       child: AbsorbPointer(
         child: Container(
-          color: Colors.black.withValues(alpha: 0.5),
+          color: Colors.black.withValues(alpha: 0.6),
           child: Center(
             child: Container(
               width: 200.w,
               padding: EdgeInsets.symmetric(vertical: 28.h, horizontal: 24.w),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xFF1E1E1E),
                 borderRadius: BorderRadius.circular(20.r),
               ),
               child: Column(
@@ -444,7 +530,8 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
                             value: _uploadProgress,
                             strokeWidth: 7,
                             strokeCap: StrokeCap.round,
-                            backgroundColor: Colors.grey.shade200,
+                            backgroundColor:
+                                Colors.white.withValues(alpha: 0.1),
                             valueColor: AlwaysStoppedAnimation<Color>(
                                 AppColors.primary),
                           ),
@@ -468,7 +555,7 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
                     style: GoogleFonts.inter(
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                      color: Colors.white70,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -481,18 +568,26 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
     );
   }
 
+  // ── Video box ─────────────────────────────────────────────────────────────
 
-  Widget _videoBox() {
+  Widget _videoBox(bool isDark) {
     final hasVideo = _videoFile != null || _existingVideoUrl != null;
+    final emptyBorderColor =
+        isDark ? Colors.grey.shade700 : Colors.grey.shade300;
+    final emptyIconColor = isDark ? Colors.grey.shade600 : Colors.grey.shade300;
+
     return Container(
       width: 100.w,
       height: 100.w,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6.r),
-        color: hasVideo ? Colors.black : Colors.white,
+        color: hasVideo
+            ? Colors.black
+            : (isDark ? const Color(0xFF1A1A1A) : Colors.white),
       ),
       child: CustomPaint(
-        painter: _DashedBorderPainter(color: Colors.grey.shade300),
+        painter: _DashedBorderPainter(
+            color: hasVideo ? Colors.transparent : emptyBorderColor),
         child: hasVideo
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(6.r),
@@ -520,13 +615,15 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
               )
             : Center(
                 child: Icon(Icons.videocam_outlined,
-                    size: 32.sp, color: Colors.grey.shade300),
+                    size: 32.sp, color: emptyIconColor),
               ),
       ),
     );
   }
 
-  Widget _imageGrid() {
+  // ── Image grid ────────────────────────────────────────────────────────────
+
+  Widget _imageGrid(bool isDark) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -538,12 +635,12 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
       itemCount: 12,
       itemBuilder: (_, i) => GestureDetector(
         onTap: () => _pickImage(i),
-        child: _imageBox(i),
+        child: _imageBox(i, isDark),
       ),
     );
   }
 
-  Widget _imageBox(int index) {
+  Widget _imageBox(int index, bool isDark) {
     final file = _imageFiles[index];
     final existingUrl = _existingImageUrls[index];
 
@@ -559,9 +656,10 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
                     imageUrl: existingUrl!,
                     fit: BoxFit.cover,
                     errorWidget: (_, __, ___) => Container(
-                      color: Colors.grey.shade200,
+                      color:
+                          isDark ? Colors.grey.shade800 : Colors.grey.shade200,
                       child: Icon(Icons.broken_image_outlined,
-                          color: Colors.grey.shade400, size: 28.sp),
+                          color: Colors.grey.shade500, size: 28.sp),
                     ),
                   ),
             Positioned(
@@ -586,11 +684,19 @@ class _PropertyVideoImagesViewState extends State<PropertyVideoImagesView> {
       );
     }
 
-    return CustomPaint(
-      painter: _DashedBorderPainter(color: Colors.grey.shade300),
-      child: Center(
-        child: Icon(Icons.image_outlined,
-            size: 28.sp, color: Colors.grey.shade300),
+    final borderColor = isDark ? Colors.grey.shade700 : Colors.grey.shade300;
+    final iconColor = isDark ? Colors.grey.shade600 : Colors.grey.shade300;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: BorderRadius.circular(4.r),
+      ),
+      child: CustomPaint(
+        painter: _DashedBorderPainter(color: borderColor),
+        child: Center(
+          child: Icon(Icons.image_outlined, size: 28.sp, color: iconColor),
+        ),
       ),
     );
   }
@@ -602,6 +708,7 @@ class _DashedBorderPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (color == Colors.transparent) return;
     final paint = Paint()
       ..color = color
       ..strokeWidth = 1.5

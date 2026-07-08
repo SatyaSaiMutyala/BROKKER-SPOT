@@ -2,17 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
-import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
-import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
-import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
-import 'package:brokkerspot/widgets/announcements/announcement_card_skeleton.dart';
-import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
-import 'package:brokkerspot/core/constants/local_storage.dart';
-import 'package:brokkerspot/views/user/account/account_view.dart';
-import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
+import 'package:brokkerspot/views/user/home/search_view.dart';
+import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AnnouncementsView extends StatefulWidget {
@@ -24,19 +18,24 @@ class AnnouncementsView extends StatefulWidget {
 
 class _AnnouncementsViewState extends State<AnnouncementsView> {
   final _controller = AnnouncementListController.to;
-  final _profileCtrl = Get.isRegistered<ProfileController>()
-      ? Get.find<ProfileController>()
-      : Get.put(ProfileController());
   final _scrollController = ScrollController();
+
+  String? _selectedListingType; // null = all, 'Sell' = Buy, 'Rent' = Rent
+  String? _selectedPropertyType; // null = all
+
+  static const _propertyTypes = [
+    'Apartment',
+    'Villa',
+    'Studio',
+    'Penthouse',
+    'Townhouse',
+    'Office',
+  ];
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    // Defer until after the first frame so loadAll()'s synchronous cache
-    // read (which mutates allAnnouncements before its first await) can't
-    // trigger an Obx rebuild while the framework is still building widgets
-    // up the tree — the post-login transition was hitting that exact race.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _controller.loadAll();
     });
@@ -52,67 +51,221 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
-    // Pre-fetch the next page when we're within 300dp of the end so the new
-    // cards are usually ready by the time the user reaches the bottom.
     if (pos.pixels >= pos.maxScrollExtent - 300 && _controller.hasMoreAll) {
       _controller.loadMoreAll();
     }
   }
 
+  List<AnnouncementModel> _filtered(List<AnnouncementModel> all) {
+    var list = all;
+    if (_selectedListingType != null) {
+      list = list.where((a) => a.listingType == _selectedListingType).toList();
+    }
+    if (_selectedPropertyType != null) {
+      list = list
+          .where((a) =>
+              a.propertyType?.toLowerCase() ==
+              _selectedPropertyType!.toLowerCase())
+          .toList();
+    }
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor:
+          isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8F5F0),
       body: SafeArea(
+        bottom: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CustomHeader(
-              title: 'ANNOUNCEMENTS',
-              leading: GestureDetector(
-                onTap: () {},
-                child:
-                    Icon(Icons.search, size: 36.sp, color: AppColors.primary),
-              ),
-              trailing: GestureDetector(
-                onTap: () {
-                  if (!LocalStorageService.isLoggedIn()) {
-                    showLoginRequiredDialog(Get.context!);
-                    return;
-                  }
-                  Get.to(() => const CreateAnnouncementView());
-                },
-                child: Image.asset('assets/images/home_add_icon.png',
-                    width: 50.w, height: 50.w),
-              ),
-            ),
-            Expanded(
-              child: Obx(() {
-                // Full-screen spinner only on the very first load (nothing cached yet).
-                // During pull-to-refresh the list stays visible with its own indicator.
-                if (_controller.isLoadingAll.value &&
-                    _controller.allAnnouncements.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                return RefreshIndicator(
-                  color: AppColors.primary,
-                  onRefresh: () => _controller.loadAll(force: true),
-                  child: _buildList(),
-                );
-              }),
-            ),
+            _buildHeader(theme),
+            SizedBox(height: 12.h),
+            _buildFilterBar(theme),
+            SizedBox(height: 12.h),
+            Expanded(child: _buildBody(theme)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildList() {
-    // Error state — still scrollable so pull-to-refresh works.
-    if (_controller.allError.value != null) {
+  // ── Header ───────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader(ThemeData theme) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 0),
+      child: Row(
+        children: [
+          Text(
+            'Announcements',
+            style: GoogleFonts.poppins(
+              fontSize: 20.sp,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+              height: 1.0,
+              letterSpacing: 0,
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => Get.to(() => const SearchView()),
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: 35.w,
+              height: 35.w,
+              child: Image.asset(
+                'assets/images/search_icon.png',
+                width: 35.w,
+                height: 35.w,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Filter bar ────────────────────────────────────────────────────────────────
+
+  Widget _buildFilterBar(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    final listingLabel = _selectedListingType == null
+        ? 'All'
+        : _selectedListingType == 'Sell'
+            ? 'Buy'
+            : 'Rent';
+
+    return SizedBox(
+      height: 39.h,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        children: [
+          _filterChip(
+            label: listingLabel,
+            isSelected: _selectedListingType != null,
+            hasDropdown: true,
+            isDark: isDark,
+            onTap: () => setState(() {
+              if (_selectedListingType == null) {
+                _selectedListingType = 'Sell';
+              } else if (_selectedListingType == 'Sell') {
+                _selectedListingType = 'Rent';
+              } else {
+                _selectedListingType = null;
+              }
+            }),
+          ),
+          ..._propertyTypes.map((type) {
+            final isSelected = _selectedPropertyType == type;
+            return Padding(
+              padding: EdgeInsets.only(left: 8.w),
+              child: _filterChip(
+                label: type,
+                isSelected: isSelected,
+                isDark: isDark,
+                onTap: () => setState(() {
+                  _selectedPropertyType = isSelected ? null : type;
+                }),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isDark,
+    bool hasDropdown = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 38.h,
+        padding: EdgeInsets.symmetric(horizontal: 14.w),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary
+              : isDark
+                  ? const Color(0xFF2A2A2A)
+                  : Colors.white,
+          borderRadius: BorderRadius.circular(25.r),
+          border: isSelected
+              ? null
+              : Border.all(
+                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w400,
+                color: isSelected
+                    ? Colors.white
+                    : isDark
+                        ? Colors.white70
+                        : Colors.black87,
+                height: 1.0,
+                letterSpacing: 0,
+              ),
+            ),
+            if (hasDropdown) ...[
+              SizedBox(width: 4.w),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 14.sp,
+                color: isSelected
+                    ? Colors.white
+                    : isDark
+                        ? Colors.white70
+                        : Colors.black87,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Body ──────────────────────────────────────────────────────────────────────
+
+  Widget _buildBody(ThemeData theme) {
+    return Obx(() {
+      if (_controller.isLoadingAll.value &&
+          _controller.allAnnouncements.isEmpty) {
+        return _buildShimmer();
+      }
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => _controller.loadAll(force: true),
+        child: _buildList(theme),
+      );
+    });
+  }
+
+  Widget _buildList(ThemeData theme) {
+    final all = _controller.allAnnouncements.toList();
+
+    if (_controller.allError.value != null && all.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          SizedBox(height: 160.h),
+          SizedBox(height: 200.h),
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -123,7 +276,6 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
                       fontSize: 14.sp, color: Colors.grey.shade500),
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 12.h),
                 TextButton(
                   onPressed: () => _controller.loadAll(force: true),
                   child: Text('Retry',
@@ -136,15 +288,17 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
         ],
       );
     }
-    // Empty state — scrollable so the user can still pull to refresh.
-    if (_controller.allAnnouncements.isEmpty) {
+
+    final items = _filtered(all);
+
+    if (items.isEmpty && !_controller.isLoadingAll.value) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           SizedBox(height: 200.h),
           Center(
             child: Text(
-              'No announcements yet',
+              'No announcements',
               style: GoogleFonts.inter(
                   fontSize: 14.sp, color: Colors.grey.shade400),
             ),
@@ -152,56 +306,53 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
         ],
       );
     }
+
     final loadingMore = _controller.isLoadingMoreAll.value;
-    final length = _controller.allAnnouncements.length;
-    return NotificationListener<ScrollNotification>(
-      // The video-player gate stays shut during scroll and opens INSTANTLY on
-      // ScrollEndNotification — no debounce wait, the card starts loading
-      // the moment your finger lifts.
-      onNotification: (n) {
-        CachedVideoPlayer.notifyScroll(n);
-        return false;
-      },
-      child: ListView.builder(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.symmetric(vertical: 8.h),
-        // 400 dp = roughly one extra card in cache. Was 1200dp which kept
-        // ~3 heavy cards (with their PageViews, image carousels, and
-        // potentially video controllers) mounted off-screen and was a major
-        // OOM contributor on low-RAM devices.
-        // ignore: deprecated_member_use
-        cacheExtent: 400,
-        // +1 row when the next page is fetching → renders the skeleton.
-        itemCount: length + (loadingMore ? 1 : 0),
+    return ListView.separated(
+      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),
+      itemCount: items.length + (loadingMore ? 1 : 0),
+      separatorBuilder: (_, __) => SizedBox(height: 16.h),
       itemBuilder: (_, index) {
-        if (index >= length) {
-          return const AnnouncementCardSkeleton();
+        if (index >= items.length) {
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.w),
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          );
         }
-        final a = _controller.allAnnouncements[index];
-        // RepaintBoundary stops one card's video / image fades from forcing
-        // sibling cards to repaint on every frame during scroll.
+        final a = items[index];
         return RepaintBoundary(
-          child: AnnouncementPropertyCard(
+          child: HomeAnnouncementCard(
             announcement: a,
             index: index,
-            onTap: () async {
-              await Get.to(() => AnnouncementDetailView(
-                    announcement: a,
-                    isOwner: false,
-                  ));
-            },
-            onWishlistTap: () {},
-            onLocationTap: () {},
-            onChatTap: () => AnnouncementChatView.open(
-              announcementId: a.id ?? '',
-              brokerName: a.ownerName ?? 'Owner',
-              brokerAvatar: a.ownerAvatarUrl,
-              peerUserId: a.userId,
-            ),
+            cardWidth: 344.w,
+            cardHeight: 263.h,
+            onTap: () => Get.to(() => AnnouncementDetailView(
+                  announcement: a,
+                  isOwner: false,
+                )),
           ),
         );
-        },
+      },
+    );
+  }
+
+  Widget _buildShimmer() {
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),
+      itemCount: 2,
+      separatorBuilder: (_, __) => SizedBox(height: 16.h),
+      itemBuilder: (_, __) => Container(
+        width: double.infinity,
+        height: 263.h,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade300,
+          borderRadius: BorderRadius.circular(20.r),
+        ),
       ),
     );
   }

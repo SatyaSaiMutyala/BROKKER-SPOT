@@ -1,23 +1,21 @@
+import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/session_cleanup.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:brokkerspot/views/auth/view/signup_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/brokker_login_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/complete_profile_screen.dart';
+import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
 import 'package:brokkerspot/views/user/announcements/my_announcements_tab_view.dart';
 import 'package:brokkerspot/views/user/deals/my_project_deals_view.dart';
 import 'package:brokkerspot/views/user/my_information/my_information_view.dart';
 import 'package:brokkerspot/views/user/settings/settings_view.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:brokkerspot/core/constants/app_colors.dart';
-import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
-import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
 
 class AccountView extends StatelessWidget {
   const AccountView({super.key});
@@ -25,106 +23,121 @@ class AccountView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Get.put(AccountController());
-    final bool isGuest = !LocalStorageService.isLoggedIn();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isGuest = !LocalStorageService.isLoggedIn();
+    final profileCtrl = Get.isRegistered<ProfileController>()
+        ? Get.find<ProfileController>()
+        : Get.put(ProfileController());
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.white,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(27.w, 0, 27.w, 100.h),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const CustomHeader(title: 'My Account'),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
-                  child: Column(
-                    children: [
-                      // First card
-                      _buildCard(
-                        children: [
-                          _accountTile(
-                            iconAsset: 'broker_my_profile_icon.png',
-                            title: 'My Information',
-                            enabled: !isGuest,
-                            onTap: () => Get.to(() => const MyInformationView()),
-                          ),
-                          _accountTile(
-                            iconAsset: 'broker_mydeal_icon.png',
-                            title: 'My Deals',
-                            enabled: !isGuest,
-                            onTap: () {
-                              Get.to(() => const MyProjectDealsView());
-                            },
-                          ),
-                          _accountTile(
-                            iconAsset: 'broker_announcement.png',
-                            title: 'Announcement',
-                            enabled: !isGuest,
-                            onTap: () => Get.to(() => const MyAnnouncementsTabView()),
-                          ),
-                          _accountTile(
-                            iconAsset: 'broker_wishlist_icon.png',
-                            title: 'My Wishlist',
-                            enabled: !isGuest,
-                            onTap: () {},
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 16.h),
-                      // Second card
-                      _buildCard(
-                        children: [
-                          Obx(() {
-                            final profileCtrl = Get.find<ProfileController>();
-                            // role is a bitmask: broker bit set (2 or 3) means
-                            // the user is already a broker and can switch sides.
-                            final hasBrokerRole = profileCtrl.hasBrokerRole;
-                            return _accountTile(
-                              iconAsset: 'switch_to_user_icon.png',
-                              title: hasBrokerRole
-                                  ? 'Switch to Broker'
-                                  : 'Become Broker',
-                              enabled: true,
-                              onTap: () async {
-                                if (hasBrokerRole) {
-                                  Get.dialog(
-                                    const Center(child: CircularProgressIndicator()),
-                                    barrierDismissible: false,
-                                  );
-                                  final ok = await profileCtrl.switchRole(2);
-                                  if (Get.isDialogOpen ?? false) Get.back();
-                                  if (ok) {
-                                    LocalStorageService.saveLastSide('broker');
-                                    // Wipe user-side cached data so the broker
-                                    // side opens with fresh role-correct
-                                    // responses, not stale user-side payloads.
-                                    await clearRoleScopedCache();
-                                    Get.offAll(() => BrokerDashBoardView());
-                                  }
-                                } else {
-                                  Get.to(() => BrokerOnboardingView());
-                                }
-                              },
-                            );
-                          }),
-                          _accountTile(
-                            iconAsset: 'broker_settings_icon.png',
-                            title: 'Setting',
-                            enabled: !isGuest,
-                            onTap: () => Get.to(() => SettingsView()),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+              SizedBox(height: 16.h),
+
+              // ── Header ───────────────────────────────────────────────────
+              Text(
+                'Account',
+                style: GoogleFonts.poppins(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w500,
+                  color: theme.colorScheme.onSurface,
+                  height: 1.0,
+                  letterSpacing: 0,
                 ),
               ),
+
+              SizedBox(height: 30.h),
+
+              // ── Profile avatar + name + email ────────────────────────────
+              Center(child: _buildProfile(profileCtrl, isGuest, theme, isDark)),
+
+              SizedBox(height: 28.h),
+
+              // ── Card 1: main menu items ──────────────────────────────────
+              _buildCard(
+                isDark: isDark,
+                children: [
+                  _tile(
+                    title: 'Manage Profile',
+                    iconAsset: 'broker_my_profile_icon.png',
+                    enabled: !isGuest,
+                    isDark: isDark,
+                    onTap: () => Get.to(() => const MyInformationView()),
+                  ),
+                  _tile(
+                    title: 'My Deals',
+                    iconAsset: 'broker_mydeal_icon.png',
+                    enabled: !isGuest,
+                    isDark: isDark,
+                    onTap: () => Get.to(() => const MyProjectDealsView()),
+                  ),
+                  _tile(
+                    title: 'My Announcements',
+                    iconAsset: 'broker_announcement.png',
+                    enabled: !isGuest,
+                    isDark: isDark,
+                    onTap: () => Get.to(() => const MyAnnouncementsTabView()),
+                  ),
+                  _tile(
+                    title: 'Wishlist',
+                    iconAsset: 'broker_wishlist_icon.png',
+                    enabled: !isGuest,
+                    isDark: isDark,
+                    onTap: () {},
+                  ),
+                  _tile(
+                    title: 'Setting',
+                    iconAsset: 'broker_settings_icon.png',
+                    enabled: !isGuest,
+                    isDark: isDark,
+                    onTap: () => Get.to(() => SettingsView()),
+                  ),
+                ],
+              ),
+
+              SizedBox(height: 16.h),
+
+              // ── Card 2: Become a Broker ──────────────────────────────────
+              Obx(() {
+                final hasBrokerRole = profileCtrl.hasBrokerRole;
+                return _buildCard(
+                  isDark: isDark,
+                  children: [
+                    _tile(
+                      title: hasBrokerRole
+                          ? 'Switch to Broker'
+                          : 'Become a Broker',
+                      iconAsset: 'switch_to_user_icon.png',
+                      enabled: true,
+                      isDark: isDark,
+                      onTap: () async {
+                        if (hasBrokerRole) {
+                          Get.dialog(
+                            const Center(child: CircularProgressIndicator()),
+                            barrierDismissible: false,
+                          );
+                          final ok = await profileCtrl.switchRole(2);
+                          if (Get.isDialogOpen ?? false) Get.back();
+                          if (ok) {
+                            LocalStorageService.saveLastSide('broker');
+                            await clearRoleScopedCache();
+                            Get.offAll(() => BrokerDashBoardView());
+                          }
+                        } else {
+                          Get.to(() => BrokerOnboardingView());
+                        }
+                      },
+                    ),
+                  ],
+                );
+              }),
             ],
           ),
         ),
@@ -132,55 +145,131 @@ class AccountView extends StatelessWidget {
     );
   }
 
-  // ---------------- CARD ----------------
-  Widget _buildCard({required List<Widget> children}) {
+  // ── Profile section: 95×95 rounded-square avatar, name, email ─────────────
+
+  Widget _buildProfile(
+      ProfileController ctrl, bool isGuest, ThemeData theme, bool isDark) {
+    return Obx(() {
+      final imgUrl = ctrl.profileImage.value.trim();
+      final name = isGuest
+          ? 'Guest'
+          : ctrl.userName.value.isNotEmpty
+              ? ctrl.userName.value
+              : 'User';
+      final email = isGuest ? '' : ctrl.userEmail.value;
+
+      return Column(
+        children: [
+          // Avatar: 95×95 rounded-square (r20)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20.r),
+            child: SizedBox(
+              width: 95.w,
+              height: 95.w,
+              child: imgUrl.isNotEmpty
+                  ? Image.network(
+                      imgUrl,
+                      key: ValueKey(imgUrl),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _avatarPlaceholder(isDark),
+                    )
+                  : _avatarPlaceholder(isDark),
+            ),
+          ),
+          SizedBox(height: 12.h),
+          Text(
+            name,
+            style: GoogleFonts.poppins(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+              height: 1.0,
+            ),
+          ),
+          if (email.isNotEmpty) ...[
+            SizedBox(height: 4.h),
+            Text(
+              email,
+              style: GoogleFonts.poppins(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w400,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                height: 1.0,
+              ),
+            ),
+          ],
+        ],
+      );
+    });
+  }
+
+  Widget _avatarPlaceholder(bool isDark) {
     return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-      ),
-      child: Column(children: children),
+      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+      child: Icon(Icons.person,
+          size: 40.sp,
+          color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
     );
   }
 
-  // ---------------- TILE ----------------
-  Widget _accountTile({
-    required String iconAsset,
+  // ── Card wrapper: border, radius, white/dark bg ────────────────────────────
+
+  Widget _buildCard({required bool isDark, required List<Widget> children}) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE8E8E8),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      ),
+    );
+  }
+
+  // ── Tile: title left, gold icon right ─────────────────────────────────────
+
+  Widget _tile({
     required String title,
+    required String iconAsset,
     required VoidCallback onTap,
+    required bool isDark,
     bool enabled = true,
   }) {
     return InkWell(
       onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(16.r),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 18.h),
         child: Row(
           children: [
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w500,
+                  color: enabled
+                      ? (isDark ? Colors.white : const Color(0xFF1A1A1A))
+                      : Colors.grey.shade400,
+                  height: 1.0,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
             Opacity(
               opacity: enabled ? 1.0 : 0.4,
               child: Image.asset(
                 'assets/images/$iconAsset',
-                width: 20.w,
-                height: 20.w,
+                width: 21.w,
+                height: 21.w,
+                color: AppColors.primary,
+                colorBlendMode: BlendMode.srcIn,
               ),
-            ),
-            SizedBox(width: 20.w),
-            Expanded(
-              child: Text(
-                title,
-                style: GoogleFonts.inter(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w500,
-                  color: enabled ? Colors.black87 : Colors.grey.shade400,
-                ),
-              ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              size: 22,
-              color: enabled ? Colors.grey.shade500 : Colors.grey.shade300,
             ),
           ],
         ),
@@ -188,20 +277,12 @@ class AccountView extends StatelessWidget {
     );
   }
 
-  // ---------------- DIVIDER ----------------
-  Widget _tileDivider() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.w),
-      child: Divider(
-        height: 1,
-        thickness: 0.5,
-        color: Colors.grey.shade200,
-      ),
-    );
-  }
+  // ── Separator inside card ──────────────────────────────────────────────────
+
 }
 
-// ---------------- LOGIN REQUIRED DIALOG ----------------
+// ── Dialogs (unchanged) ───────────────────────────────────────────────────────
+
 void showLoginRequiredDialog(BuildContext context) {
   showDialog(
     context: context,
@@ -498,9 +579,7 @@ void showCompleteProfileDialog(BuildContext context) {
                     borderRadius: BorderRadius.circular(30.r),
                   ),
                 ),
-                onPressed: () {
-                  Get.back();
-                },
+                onPressed: () => Get.back(),
                 child: Text(
                   'Cancel',
                   style: GoogleFonts.poppins(
