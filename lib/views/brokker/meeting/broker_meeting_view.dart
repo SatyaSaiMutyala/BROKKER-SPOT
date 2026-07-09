@@ -5,7 +5,6 @@ import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart
 import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
 import 'package:brokkerspot/views/user/meeting/controller/meeting_controller.dart';
 import 'package:brokkerspot/views/user/meeting/repo/meeting_repo.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/support_fab.dart';
 import 'package:brokkerspot/widgets/meeting/broker_meeting_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -74,18 +73,29 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
     }
   }
 
+  bool _isOwn(MeetingItem m) {
+    final myId = LocalStorageService.getUserIdFromToken() ??
+        LocalStorageService.getUser()?.data?.id ??
+        '';
+    return myId.isNotEmpty && m.announcement.userId == myId;
+  }
+
   Future<void> _onTap(MeetingItem m) async {
     final myId = LocalStorageService.getUserIdFromToken() ??
-        LocalStorageService.getUser()?.data?.id ?? '';
+        LocalStorageService.getUser()?.data?.id ??
+        '';
     final isOwner = myId.isNotEmpty && m.announcement.userId == myId;
 
     debugPrint('📋 [BrokerMeeting] tap ann=${m.announcementId}');
-    debugPrint('📋 [BrokerMeeting]   myId=$myId  ann.userId=${m.announcement.userId}  isOwner=$isOwner');
-    debugPrint('📋 [BrokerMeeting]   chatProfiles=[${m.chatProfiles.map((p) => "${p.name}(${p.id})").join(", ")}]');
+    debugPrint(
+        '📋 [BrokerMeeting]   myId=$myId  ann.userId=${m.announcement.userId}  isOwner=$isOwner');
+    debugPrint(
+        '📋 [BrokerMeeting]   chatProfiles=[${m.chatProfiles.map((p) => "${p.name}(${p.id})").join(", ")}]');
 
     if (isOwner) {
       // My announcement — show everyone who chatted with me.
-      debugPrint('📋 [BrokerMeeting]   → owner path: opening AnnouncementConversationsView');
+      debugPrint(
+          '📋 [BrokerMeeting]   → owner path: opening AnnouncementConversationsView');
       await Get.to(() => AnnouncementConversationsView(meeting: m));
     } else {
       // I initiated a chat about someone else's announcement — go directly to
@@ -97,12 +107,14 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
       final peer = peers.isNotEmpty ? peers.first : null;
       final ownerId = peer?.id ?? m.announcement.userId ?? '';
       if (ownerId.isEmpty || ownerId == myId) {
-        debugPrint('📋 [BrokerMeeting]   → non-owner path: no valid peer found, aborting');
+        debugPrint(
+            '📋 [BrokerMeeting]   → non-owner path: no valid peer found, aborting');
         return;
       }
       final annRole = m.announcement.userRole ?? 1;
       final chatUserRole = 3 - annRole;
-      debugPrint('📋 [BrokerMeeting]   → non-owner path: peer=${peer?.name}($ownerId) chatUserRole=$chatUserRole');
+      debugPrint(
+          '📋 [BrokerMeeting]   → non-owner path: peer=${peer?.name}($ownerId) chatUserRole=$chatUserRole');
       await AnnouncementChatView.open(
         announcementId: m.announcementId,
         brokerName: peer?.name ?? m.announcement.ownerName ?? 'User',
@@ -118,23 +130,18 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
             Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CustomHeader(
-                  title: 'MEETING',
-                  trailing: GestureDetector(
-                    onTap: () => _ctrl.loadBroker(force: true),
-                    child: Icon(Icons.refresh,
-                        size: 22.sp, color: AppColors.goldAccent),
-                  ),
-                ),
-                _buildFilterChips(),
-                Expanded(child: _buildList()),
+                _buildHeader(theme),
+                _buildFilterChips(theme),
+                Expanded(child: _buildList(theme)),
               ],
             ),
             Positioned(
@@ -148,12 +155,28 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
     );
   }
 
+  // ─── Header ───
+  Widget _buildHeader(ThemeData theme) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 0),
+      child: Text(
+        'Client Meetings',
+        style: GoogleFonts.poppins(
+          fontSize: 24.sp,
+          fontWeight: FontWeight.w600,
+          color: theme.colorScheme.onSurface,
+        ),
+      ),
+    );
+  }
+
   // ─── Filter chips (ALL / BUY / RENT / OWN) ───
   // Identical UI to the user-side meeting screen; taps switch the broker
   // slot's filter and re-fetch (cache-first per filter).
-  Widget _buildFilterChips() {
+  Widget _buildFilterChips(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
       child: Obx(() {
         final current = _ctrl.brokerFilter.value;
         return Row(
@@ -165,14 +188,21 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
                 onTap: () => _ctrl.loadBroker(f: f.filter),
                 child: Container(
                   padding:
-                      EdgeInsets.symmetric(horizontal: 24.w, vertical: 6.h),
+                      EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : Colors.white,
+                    color: isSelected
+                        ? AppColors.primary
+                        : isDark
+                            ? const Color(0xFF2A2A2A)
+                            : Colors.white,
                     borderRadius: BorderRadius.circular(20.r),
-                    border: Border.all(
-                      color:
-                          isSelected ? AppColors.primary : Colors.grey.shade300,
-                    ),
+                    border: isSelected
+                        ? null
+                        : Border.all(
+                            color: isDark
+                                ? Colors.grey.shade700
+                                : Colors.grey.shade300,
+                          ),
                   ),
                   child: Text(
                     f.label,
@@ -180,7 +210,11 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
                       fontSize: 12.sp,
                       fontWeight:
                           isSelected ? FontWeight.w600 : FontWeight.normal,
-                      color: isSelected ? Colors.white : Colors.black,
+                      color: isSelected
+                          ? Colors.white
+                          : isDark
+                              ? Colors.white70
+                              : Colors.black87,
                     ),
                   ),
                 ),
@@ -192,7 +226,7 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(ThemeData theme) {
     return Obx(() {
       if (_ctrl.isLoadingBroker.value && _ctrl.brokerMeetings.isEmpty) {
         return const _BrokerMeetingShimmer();
@@ -248,13 +282,19 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
           itemCount: _ctrl.brokerMeetings.length,
           separatorBuilder: (_, __) => Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.w),
-            child:
-                Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+            child: Divider(
+              height: 1,
+              thickness: 0.5,
+              color: theme.brightness == Brightness.dark
+                  ? Colors.grey.shade800
+                  : Colors.grey.shade200,
+            ),
           ),
           itemBuilder: (_, i) {
             final m = _ctrl.brokerMeetings[i];
             return BrokerMeetingCard(
               meeting: m,
+              isOwn: _isOwn(m),
               onTap: () => _onTap(m),
             );
           },

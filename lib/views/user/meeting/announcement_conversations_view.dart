@@ -84,23 +84,25 @@ class _AnnouncementConversationsViewState
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor:
+          isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       body: SafeArea(
         child: Column(
           children: [
-            CustomHeader(
-              title: 'Announcement',
+            const CustomHeader(
+              title: 'Meetings',
               showBackButton: true,
             ),
-            Expanded(child: _buildBody()),
+            Expanded(child: _buildBody(isDark)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(bool isDark) {
     return Obx(() {
       if (_ctrl.isLoading.value && _ctrl.conversations.isEmpty) {
         return const Center(
@@ -150,6 +152,8 @@ class _AnnouncementConversationsViewState
           ),
         );
       }
+      final dividerColor =
+          isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE8E8E8);
       return RefreshIndicator(
         color: AppColors.primary,
         onRefresh: _ctrl.reload,
@@ -157,7 +161,7 @@ class _AnnouncementConversationsViewState
           physics: const AlwaysScrollableScrollPhysics(),
           itemCount: _ctrl.conversations.length,
           separatorBuilder: (_, __) =>
-              Divider(height: 1, color: Colors.grey.shade200),
+              Divider(height: 1, thickness: 1, color: dividerColor),
           itemBuilder: (_, i) {
             // Controller already enriches with known chat_profiles at
             // ingest, so what's in _ctrl.conversations is render-ready.

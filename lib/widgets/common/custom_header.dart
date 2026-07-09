@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Single reusable app bar used across every screen.
+///
+/// Title is left-aligned (poppins 20sp w500), matching the announcement /
+/// meeting / broker-project screens. When [showBackButton] is true a circular
+/// back-button appears to the left of the title. An optional [trailing] widget
+/// is placed at the far right. A theme-aware hairline divider separates the
+/// header from the content below.
 class CustomHeader extends StatelessWidget {
   final String title;
   final bool showBackButton;
@@ -20,65 +27,67 @@ class CustomHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final iconColor = isDark ? Colors.white : Colors.black87;
+    final iconBg =
+        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100;
+    final dividerColor =
+        isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200;
+
+    Widget? leftWidget;
+    if (leading != null) {
+      leftWidget = leading!;
+    } else if (showBackButton) {
+      leftWidget = GestureDetector(
+        onTap: onBack ?? () => Navigator.pop(context),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 38.w,
+          height: 38.w,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: iconBg,
+          ),
+          child: Icon(Icons.arrow_back_ios_new,
+              size: 14.sp, color: iconColor),
+        ),
+      );
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-          child: Stack(
-            alignment: Alignment.center,
+          padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 12.h),
+          child: Row(
             children: [
-              // Centered title
-              Center(
+              if (leftWidget != null) ...[
+                leftWidget,
+                SizedBox(width: 14.w),
+              ],
+              Expanded(
                 child: Text(
                   title,
-                  style: GoogleFonts.inter(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
+                  style: GoogleFonts.poppins(
+                    fontSize: 20.sp,
+                    fontWeight: FontWeight.w500,
+                    color: textColor,
+                    height: 1.0,
+                    letterSpacing: 0,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              // Leading (left-aligned)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (leading != null)
-                    leading!
-                  else if (showBackButton)
-                    InkWell(
-                      onTap: onBack ?? () => Navigator.pop(context),
-                      child: Container(
-                        padding: EdgeInsets.all(8.w),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFE5E5E5)),
-                        ),
-                        child: const Icon(Icons.arrow_back_ios_new, size: 18),
-                      ),
-                    )
-                  else
-                    const SizedBox.shrink(),
-                  // Trailing (right-aligned)
-                  if (trailing != null) trailing! else const SizedBox.shrink(),
-                ],
-              ),
+              if (trailing != null) ...[
+                SizedBox(width: 10.w),
+                trailing!,
+              ],
             ],
           ),
         ),
-        Container(
-          height: 4,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.1),
-                Colors.transparent,
-              ],
-            ),
-          ),
-        ),
+        Divider(height: 1, thickness: 1, color: dividerColor),
       ],
     );
   }

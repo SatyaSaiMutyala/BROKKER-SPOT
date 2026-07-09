@@ -10,22 +10,15 @@ import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/models/chat_message.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_controller.dart';
+import 'package:brokkerspot/views/user/announcements/broker_agreement_view.dart';
 import 'package:brokkerspot/views/user/announcements/publish_announcement_view.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
-import 'package:brokkerspot/widgets/common/terms_dialog.dart';
 
 class AnnouncementChatView extends StatefulWidget {
   final String announcementId;
   final String brokerName;
   final String brokerAvatar;
-
-  /// The other user's id — used to show their online/offline status.
   final String? peerUserId;
-
-  /// Chat-context role for the socket user: 1=user/owner side, 2=broker side.
-  /// Passed to ChatController and included in socket events so the server's
-  /// directional history lookup works when the announcement owner is the one
-  /// opening chat (e.g. user replies to a broker who initiated).
   final int? userRole;
 
   const AnnouncementChatView({
@@ -37,7 +30,6 @@ class AnnouncementChatView extends StatefulWidget {
     this.userRole,
   });
 
-  /// Reusable entry point — call this from anywhere chat is opened.
   static Future<void> open({
     required String announcementId,
     required String brokerName,
@@ -49,16 +41,10 @@ class AnnouncementChatView extends StatefulWidget {
       showLoginRequiredDialog(Get.context!);
       return;
     }
-    // Empty (not just null) avatar strings would crash Image.asset(''), so
-    // normalize to the fallback asset here.
     final avatar = (brokerAvatar != null && brokerAvatar.trim().isNotEmpty)
         ? brokerAvatar
         : 'assets/images/story1.png';
-    // Wrap the navigation: on some devices (seen on Samsung) a synchronous
-    // throw during route push (theme/MediaQuery edge cases) would otherwise
-    // tear the app down. Show a toast instead.
     try {
-      // No `!` — Get.to can return null; that must never crash the tap.
       await Get.to(() => AnnouncementChatView(
             announcementId: announcementId,
             brokerName: brokerName.isNotEmpty ? brokerName : 'Chat',
@@ -81,8 +67,6 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
   final ScrollController _scrollController = ScrollController();
   late final ChatController _chat;
   late final String _tag;
-  // Saved so we can dispose them — leaked Workers fire on disposed State on
-  // some devices (Samsung in particular) and crash with "setState on disposed".
   Worker? _msgsWorker;
   Worker? _errorWorker;
   bool _navigatingToPublish = false;
@@ -91,13 +75,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
   void initState() {
     super.initState();
     final recipientId = widget.peerUserId ?? '';
-    // One controller per conversation (announcement + peer), so chats don't clash.
     _tag = '${widget.announcementId}:$recipientId';
-    // Force-delete any stale controller with this tag. After a logout/login the
-    // old controller's socket listeners point to the disposed socket — if GetX
-    // returns it via Get.put() instead of creating a fresh one, onInit() never
-    // re-runs so no listeners are registered on the new connection and every
-    // history request times out silently.
     if (Get.isRegistered<ChatController>(tag: _tag)) {
       Get.delete<ChatController>(tag: _tag, force: true);
     }
@@ -111,16 +89,13 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
       ),
       tag: _tag,
     );
-    // Watch the other user's online/offline presence.
     if (recipientId.isNotEmpty) {
       PresenceService.to.watch(recipientId);
     }
-    // Auto-scroll to the newest message whenever the list grows.
     _msgsWorker = ever(_chat.messages, (_) {
       if (!mounted) return;
       _scrollToBottom();
     });
-    // Surface send/history errors.
     _errorWorker = ever(_chat.error, (msg) {
       if (msg.isNotEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -128,13 +103,10 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
         );
       }
     });
-    // Load older messages when scrolled to the top.
     _scrollController.addListener(_onScroll);
   }
 
   void _onScroll() {
-    // Guard against the listener firing before/after the controller is attached
-    // to a scrollable — accessing .position without this throws on some devices.
     if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels <= 40 && _chat.hasMore) {
       _chat.loadMore();
@@ -173,97 +145,172 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final dividerColor =
+        isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: AppColors.teal,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-      ),
+      value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: AppColors.teal,
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: Column(
           children: [
             SizedBox(height: topPadding),
-            _buildHeader(),
-            Obx(() => _buildProposalBanner()),
+            _buildHeader(isDark),
+            Divider(height: 1, thickness: 1, color: dividerColor),
+            Obx(() => _buildProposalBanner(isDark)),
             Expanded(
-              child: Container(
-                color: Colors.grey.shade50,
-                child: Obx(() {
-                  final msgs = _chat.messages;
-                  if (_chat.isLoadingHistory.value && msgs.isEmpty) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (msgs.isEmpty && _chat.error.value.isNotEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 28.w),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              "Couldn't load message history.\nYou can still send a new message below.",
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(
-                                  fontSize: 13.sp, color: Colors.grey.shade600),
-                            ),
-                            SizedBox(height: 12.h),
-                            TextButton.icon(
-                              onPressed: _chat.reloadHistory,
-                              icon: const Icon(Icons.refresh, size: 16),
-                              label: Text('Retry',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 13.sp,
-                                      color: AppColors.primary)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  if (msgs.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No messages yet. Say hello 👋',
-                        style: GoogleFonts.inter(
-                            fontSize: 13.sp, color: Colors.grey.shade500),
-                      ),
-                    );
-                  }
-                  return ListView.builder(
-                    controller: _scrollController,
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                    itemCount: msgs.length,
-                    itemBuilder: (_, i) {
-                      final m = msgs[i];
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: 12.h),
-                        child: m.isMine
-                            ? _sentBubble(m, _time(m))
-                            : _receivedBubble(m.text, _time(m)),
-                      );
-                    },
-                  );
-                }),
-              ),
+              child: Obx(() => _buildMessageList(isDark)),
             ),
-            _buildInputBar(bottomPadding),
+            _buildInputBar(isDark, bottomPadding),
           ],
         ),
       ),
     );
   }
 
-  // ── Proposal banner ──
-  Widget _buildProposalBanner() {
+  // ── Header ────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader(bool isDark) {
+    final iconBg = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100;
+    final iconColor = isDark ? Colors.white : Colors.black87;
+    final nameColor = isDark ? Colors.white : Colors.black87;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38.r,
+              height: 38.r,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: iconBg),
+              child:
+                  Icon(Icons.arrow_back_ios_new, size: 16.sp, color: iconColor),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Container(
+            width: 44.w,
+            height: 44.w,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.primary, width: 1.5),
+            ),
+            child: ClipOval(child: _headerAvatar()),
+          ),
+          SizedBox(width: 10.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.brokerName,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w600,
+                    color: nameColor,
+                    height: 1.1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 3.h),
+                Obx(() {
+                  final peerId = widget.peerUserId ?? '';
+                  final bool isOnline;
+                  final String label;
+                  if (_chat.peerTyping.value) {
+                    isOnline = true;
+                    label = 'typing…';
+                  } else if (peerId.isNotEmpty) {
+                    isOnline = PresenceService.to.isOnline(peerId);
+                    label = isOnline ? 'Online' : 'Offline';
+                  } else {
+                    isOnline = _chat.isConnected.value;
+                    label = isOnline ? 'Connected' : 'Connecting…';
+                  }
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8.r,
+                        height: 8.r,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isOnline ? Colors.green : Colors.grey.shade400,
+                        ),
+                      ),
+                      SizedBox(width: 4.w),
+                      Text(
+                        label,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          ),
+          Container(
+            width: 38.r,
+            height: 38.r,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: iconBg),
+            child: Icon(Icons.more_horiz, size: 20.sp, color: iconColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _fallbackAvatar() => Image.asset(
+        'assets/images/story1.png',
+        width: 44.w,
+        height: 44.w,
+        fit: BoxFit.cover,
+      );
+
+  Widget _headerAvatar() {
+    final a = widget.brokerAvatar;
+    if (a.trim().isEmpty) return _fallbackAvatar();
+    if (a.startsWith('http')) {
+      return CachedNetworkImage(
+        imageUrl: a,
+        width: 44.w,
+        height: 44.w,
+        fit: BoxFit.cover,
+        errorWidget: (_, __, ___) => _fallbackAvatar(),
+      );
+    }
+    return Image.asset(
+      a,
+      width: 44.w,
+      height: 44.w,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _fallbackAvatar(),
+    );
+  }
+
+  // ── Proposal banner ───────────────────────────────────────────────────────
+
+  Widget _buildProposalBanner(bool isDark) {
     final status = _chat.proposalStatus.value;
     if (status == null) return const SizedBox.shrink();
 
     final isOwner = (widget.userRole ?? 1) == 1;
+    final dividerColor =
+        isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200;
+    final textColor = isDark ? Colors.grey.shade300 : Colors.black87;
 
     String text;
     Widget? button;
@@ -274,19 +321,20 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           text = 'Authorize a broker to advertise your property.';
           button = _bannerButton(
             icon: Icons.article_outlined,
-            label: 'View Contract',
-            onTap: () =>
-                showTermsDialog(context, onAccept: _chat.approveProposal),
-            filled: false,
+            label: 'Sign Contract',
+            onTap: () => Get.to(() => BrokerAgreementView(
+                  announcementId: widget.announcementId,
+                  onAccept: _chat.approveProposal,
+                )),
+            color: AppColors.primary,
           );
         case 1:
           text = 'Signed by you. Awaiting broker signature.';
           button = _bannerButton(
-            icon: Icons.check_circle_outline,
+            icon: Icons.article_outlined,
             label: 'Awaiting',
             onTap: null,
-            color: AppColors.primary,
-            filled: true,
+            color: const Color(0xFF8B7530),
           );
         case 2:
           text = 'You declined this proposal.';
@@ -297,8 +345,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
             icon: Icons.article_outlined,
             label: 'Information',
             onTap: _openAgreement,
-            color: Colors.green.shade700,
-            filled: true,
+            color: Colors.green.shade600,
           );
         default:
           return const SizedBox.shrink();
@@ -311,10 +358,6 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
         case 2:
           text = 'Owner declined this proposal.';
           button = null;
-        // Owner approved (1) and contract signed (3) both lead to the same
-        // "Publish" step — signing now happens inline on the publish screen
-        // itself (see PublishAnnouncementView._signAndPublish), so there's no
-        // separate "Sign & Accept" step here anymore.
         case 1:
         case 3:
           text = 'Contract signed. You can now advertise this property.';
@@ -330,29 +373,37 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                         ));
                     if (mounted) setState(() => _navigatingToPublish = false);
                   },
-            color: Colors.green.shade700,
-            filled: true,
+            color: Colors.green.shade600,
           );
         default:
           return const SizedBox.shrink();
       }
     }
 
-    return Container(
-      width: double.infinity,
-      color: AppColors.backgroundDark,
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.inter(fontSize: 12.sp, color: Colors.white),
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  text,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w400,
+                    color: textColor,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              if (button != null) ...[SizedBox(width: 12.w), button],
+            ],
           ),
-          if (button != null) ...[SizedBox(width: 12.w), button],
-        ],
-      ),
+        ),
+        Divider(height: 1, thickness: 1, color: dividerColor),
+      ],
     );
   }
 
@@ -360,29 +411,28 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     required IconData icon,
     required String label,
     required VoidCallback? onTap,
-    Color color = Colors.white,
-    bool filled = false,
+    required Color color,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+        height: 42.h,
+        padding: EdgeInsets.symmetric(horizontal: 14.w),
         decoration: BoxDecoration(
-          color: filled ? color : Colors.transparent,
-          border: Border.all(color: filled ? color : Colors.white70),
-          borderRadius: BorderRadius.circular(6.r),
+          color: color,
+          borderRadius: BorderRadius.circular(12.r),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13.sp, color: Colors.white),
-            SizedBox(width: 4.w),
+            Icon(icon, size: 16.sp, color: Colors.white),
+            SizedBox(width: 6.w),
             Text(
               label,
               style: GoogleFonts.inter(
-                fontSize: 11.sp,
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w600,
                 color: Colors.white,
-                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -404,197 +454,228 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     }
   }
 
-  // ── Header ──
-  Widget _buildHeader() {
-    return Container(
-      color: AppColors.teal,
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Icon(Icons.arrow_back_ios_new,
-                size: 20.sp, color: Colors.white),
-          ),
-          SizedBox(width: 20.w),
-          ClipOval(child: _headerAvatar()),
-          SizedBox(width: 10.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  widget.brokerName,
-                  style: GoogleFonts.poppins(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white),
+  // ── Message list ──────────────────────────────────────────────────────────
+
+  Widget _buildMessageList(bool isDark) {
+    final msgs = _chat.messages;
+    if (_chat.isLoadingHistory.value && msgs.isEmpty) {
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+    if (msgs.isEmpty && _chat.error.value.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 28.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Couldn't load message history.\nYou can still send a new message below.",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
                 ),
-                Obx(() {
-                  final peerId = widget.peerUserId ?? '';
-                  final String label;
-                  if (_chat.peerTyping.value) {
-                    label = 'typing…';
-                  } else if (peerId.isNotEmpty) {
-                    // Real presence of the other user.
-                    label = PresenceService.to.isOnline(peerId)
-                        ? 'Online'
-                        : 'Offline';
-                  } else {
-                    // No peer id — fall back to our own socket state.
-                    label =
-                        _chat.isConnected.value ? 'Connected' : 'Connecting…';
-                  }
-                  return Text(
-                    label,
-                    style: GoogleFonts.inter(
-                        fontSize: 11.sp,
-                        color: Colors.white.withValues(alpha: 0.8)),
-                  );
-                }),
-              ],
+              ),
+              SizedBox(height: 12.h),
+              TextButton.icon(
+                onPressed: _chat.reloadHistory,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: Text(
+                  'Retry',
+                  style: GoogleFonts.inter(
+                      fontSize: 13.sp, color: AppColors.primary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (msgs.isEmpty) {
+      return Center(
+        child: Text(
+          'No messages yet. Say hello 👋',
+          style: GoogleFonts.inter(
+            fontSize: 13.sp,
+            color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+          ),
+        ),
+      );
+    }
+
+    final items = _withDateSeparators(msgs);
+    return ListView.builder(
+      controller: _scrollController,
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      itemCount: items.length,
+      itemBuilder: (_, i) {
+        final item = items[i];
+        if (item is DateTime) {
+          return _dateSeparator(item, isDark);
+        }
+        final m = item as ChatMessage;
+        return Padding(
+          padding: EdgeInsets.only(bottom: 12.h),
+          child: m.isMine
+              ? _sentBubble(m, _time(m), isDark)
+              : _receivedBubble(m.text, _time(m), isDark),
+        );
+      },
+    );
+  }
+
+  List<dynamic> _withDateSeparators(List<ChatMessage> msgs) {
+    final items = <dynamic>[];
+    DateTime? lastDate;
+    for (final m in msgs) {
+      final dt = m.createdAt;
+      if (dt != null) {
+        final date = DateTime(dt.year, dt.month, dt.day);
+        if (lastDate == null || date != lastDate) {
+          items.add(date);
+          lastDate = date;
+        }
+      }
+      items.add(m);
+    }
+    return items;
+  }
+
+  Widget _dateSeparator(DateTime date, bool isDark) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 12.h),
+      child: Center(
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(20.r),
+          ),
+          child: Text(
+            _dateLabel(date),
+            style: GoogleFonts.inter(
+              fontSize: 11.sp,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
             ),
           ),
-          Icon(Icons.videocam_outlined, color: Colors.white, size: 22.sp),
-          SizedBox(width: 16.w),
-          Icon(Icons.call_outlined, color: Colors.white, size: 22.sp),
-          SizedBox(width: 16.w),
-          Icon(Icons.more_vert, color: Colors.white, size: 22.sp),
+        ),
+      ),
+    );
+  }
+
+  String _dateLabel(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (date == today) return 'Today';
+    if (date == yesterday) return 'Yesterday';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  // ── Input bar ─────────────────────────────────────────────────────────────
+
+  Widget _buildInputBar(bool isDark, double bottomPadding) {
+    final barBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final fieldBg = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100;
+    final borderColor = isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
+    final hintColor = isDark ? Colors.grey.shade600 : Colors.grey.shade400;
+    final textColor = isDark ? Colors.white : Colors.black87;
+
+    return Container(
+      color: barBg,
+      padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 10.h + bottomPadding),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              style: GoogleFonts.inter(fontSize: 14.sp, color: textColor),
+              textInputAction: TextInputAction.send,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => _chat.notifyTyping(),
+              onSubmitted: (_) => _send(),
+              decoration: InputDecoration(
+                hintText: 'Type a message..',
+                hintStyle: GoogleFonts.inter(fontSize: 14.sp, color: hintColor),
+                filled: true,
+                fillColor: fieldBg,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30.r),
+                  borderSide: BorderSide(color: borderColor, width: 1),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30.r),
+                  borderSide: BorderSide(color: borderColor, width: 1),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30.r),
+                  borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                      width: 1.5),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: 10.w),
+          GestureDetector(
+            onTap: _send,
+            child: Container(
+              width: 46.w,
+              height: 46.w,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.send_rounded, color: Colors.white, size: 22.sp),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _fallbackAvatar() => Image.asset('assets/images/story1.png',
-      width: 40.w, height: 40.w, fit: BoxFit.cover);
+  // ── Bubbles ───────────────────────────────────────────────────────────────
 
-  Widget _headerAvatar() {
-    final a = widget.brokerAvatar;
-    if (a.trim().isEmpty) return _fallbackAvatar();
-    if (a.startsWith('http')) {
-      return CachedNetworkImage(
-        imageUrl: a,
-        width: 40.w,
-        height: 40.w,
-        fit: BoxFit.cover,
-        errorWidget: (_, __, ___) => _fallbackAvatar(),
-      );
-    }
-    // Local asset — guard with errorBuilder so a bad path can't crash the build.
-    return Image.asset(
-      a,
-      width: 40.w,
-      height: 40.w,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _fallbackAvatar(),
-    );
-  }
+  Widget _receivedBubble(String message, String time, bool isDark) {
+    final bubbleBg = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF2F2F2);
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final timeColor = isDark ? Colors.grey.shade600 : Colors.grey.shade500;
 
-  // ── Input bar ──
-  Widget _buildInputBar(double bottomPadding) {
-    return Material(
-      color: Colors.white,
-      child: Container(
-        color: Colors.white,
-        padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 10.h + bottomPadding),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                style: GoogleFonts.inter(fontSize: 14.sp),
-                textInputAction: TextInputAction.send,
-                // Capitalize the first letter of each sentence (matches
-                // WhatsApp-style behavior).
-                textCapitalization: TextCapitalization.sentences,
-                onChanged: (_) => _chat.notifyTyping(),
-                onSubmitted: (_) => _send(),
-                decoration: InputDecoration(
-                  hintText: 'Say Somthing...',
-                  hintStyle: GoogleFonts.inter(
-                      fontSize: 14.sp, color: AppColors.textHint),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30.r),
-                    borderSide:
-                        BorderSide(color: Colors.grey.shade300, width: 1),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30.r),
-                    borderSide:
-                        BorderSide(color: Colors.grey.shade300, width: 1),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30.r),
-                    borderSide:
-                        BorderSide(color: Colors.grey.shade400, width: 1),
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(width: 10.w),
-            GestureDetector(
-              onTap: _send,
-              child: Container(
-                width: 46.w,
-                height: 46.w,
-                decoration: const BoxDecoration(
-                    color: AppColors.teal, shape: BoxShape.circle),
-                child:
-                    Icon(Icons.send_rounded, color: Colors.white, size: 30.sp),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _time(ChatMessage m) {
-    final dt = m.createdAt;
-    if (dt == null) return '';
-    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-    final mm = dt.minute.toString().padLeft(2, '0');
-    final ampm = dt.hour >= 12 ? 'pm' : 'am';
-    return '$h:$mm $ampm';
-  }
-
-  Widget _receivedBubble(String message, String time) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(maxWidth: 260.w),
-        padding: EdgeInsets.all(12.w),
+        padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 8.h),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: bubbleBg,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(16.r),
             topRight: Radius.circular(16.r),
             bottomRight: Radius.circular(16.r),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(message,
-                style:
-                    GoogleFonts.inter(fontSize: 13.sp, color: Colors.black87)),
+            Text(
+              message,
+              style: GoogleFonts.inter(
+                  fontSize: 13.sp, color: textColor, height: 1.4),
+            ),
             if (time.isNotEmpty) ...[
               SizedBox(height: 4.h),
-              Text(time,
-                  style: GoogleFonts.inter(
-                      fontSize: 10.sp, color: Colors.grey.shade400)),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  time,
+                  style: GoogleFonts.inter(fontSize: 10.sp, color: timeColor),
+                ),
+              ),
             ],
           ],
         ),
@@ -602,15 +683,19 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     );
   }
 
-  Widget _sentBubble(ChatMessage m, String time) {
+  Widget _sentBubble(ChatMessage m, String time, bool isDark) {
+    final bubbleBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE5E5E5);
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final timeColor = isDark ? Colors.grey.shade600 : Colors.grey.shade500;
+
     return Align(
       alignment: Alignment.centerRight,
       child: IntrinsicWidth(
         child: Container(
           constraints: BoxConstraints(minWidth: 90.w, maxWidth: 220.w),
-          padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 8.h),
+          padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 8.h),
           decoration: BoxDecoration(
-            color: Colors.green.shade100,
+            color: bubbleBg,
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(16.r),
               topRight: Radius.circular(16.r),
@@ -620,9 +705,11 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(m.text,
-                  style: GoogleFonts.inter(
-                      fontSize: 13.sp, color: Colors.black87)),
+              Text(
+                m.text,
+                style: GoogleFonts.inter(
+                    fontSize: 13.sp, color: textColor, height: 1.4),
+              ),
               if (time.isNotEmpty) ...[
                 SizedBox(height: 4.h),
                 Align(
@@ -630,9 +717,11 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(time,
-                          style: GoogleFonts.inter(
-                              fontSize: 10.sp, color: Colors.grey.shade500)),
+                      Text(
+                        time,
+                        style: GoogleFonts.inter(
+                            fontSize: 10.sp, color: timeColor),
+                      ),
                       SizedBox(width: 3.w),
                       _tickIcon(m),
                     ],
@@ -646,11 +735,6 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     );
   }
 
-  // Sent/read state for our own messages.
-  // No backend "delivered" signal exists yet (see ChatEvents.message) — only
-  // "sent" (server confirmed, `id` assigned) and "read" (`viewed_at` set from
-  // chat:history) are accurate today, so the middle "delivered" tick state is
-  // intentionally skipped rather than faked from presence.
   Widget _tickIcon(ChatMessage m) {
     if (m.id == null) {
       return Icon(Icons.access_time, size: 12.sp, color: Colors.grey.shade400);
@@ -659,5 +743,14 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
       return Icon(Icons.done_all, size: 14.sp, color: Colors.blue.shade600);
     }
     return Icon(Icons.done, size: 14.sp, color: Colors.grey.shade500);
+  }
+
+  String _time(ChatMessage m) {
+    final dt = m.createdAt;
+    if (dt == null) return '';
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final mm = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'pm' : 'am';
+    return '$h:$mm $ampm';
   }
 }

@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
-import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
+import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
 
@@ -62,8 +62,9 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
 
   Future<void> _openDetail(AnnouncementModel a) async {
     final result = await Get.to(() => AnnouncementDetailView(announcement: a));
-    if (result == true)
+    if (result == true) {
       _controller.loadMine(status: _currentStatus, force: true);
+    }
   }
 
   Widget _buildList() {
@@ -114,7 +115,7 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
     }
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.symmetric(vertical: 8.h),
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
       itemCount: list.length,
       itemBuilder: (_, index) {
         final a = list[index];
@@ -271,58 +272,13 @@ class _ShimmerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final blockColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300;
-    final cardBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      height: 263.h,
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16.r),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 200.h,
-            width: double.infinity,
-            color: blockColor,
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 12.h),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(width: 120.w, height: 16.h, color: blockColor),
-                    const Spacer(),
-                    Container(width: 60.w, height: 14.h, color: blockColor),
-                  ],
-                ),
-                SizedBox(height: 10.h),
-                Container(width: 180.w, height: 16.h, color: blockColor),
-                SizedBox(height: 10.h),
-                Row(
-                  children: [
-                    Container(width: 90.w, height: 14.h, color: blockColor),
-                    SizedBox(width: 20.w),
-                    Container(width: 80.w, height: 14.h, color: blockColor),
-                  ],
-                ),
-                SizedBox(height: 10.h),
-                Divider(
-                    height: 1,
-                    thickness: 0.8,
-                    color: isDark
-                        ? const Color(0xFF2E2E2E)
-                        : Colors.grey.shade200),
-                SizedBox(height: 10.h),
-                Container(width: 150.w, height: 14.h, color: blockColor),
-              ],
-            ),
-          ),
-        ],
+        color: blockColor,
+        borderRadius: BorderRadius.circular(20.r),
       ),
     );
   }
@@ -356,42 +312,47 @@ class _CardWithStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        AnnouncementPropertyCard(
-          announcement: announcement,
-          index: index,
-          showWishlist: false,
-          showActionButtons: false,
-          showBrokerProfiles: true,
-          squareRightSide: false,
-          onTap: onTap,
-          onLocationTap: () {},
-        ),
-        Positioned(
-          top: 24.h,
-          right: 16.w,
-          child: Container(
-            padding:
-                EdgeInsets.only(left: 12.w, right: 10.w, top: 5.h, bottom: 5.h),
-            decoration: BoxDecoration(
-              color: _statusColor(announcement.status),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20.r),
-                bottomLeft: Radius.circular(20.r),
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8.h),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            children: [
+              HomeAnnouncementCard(
+                announcement: announcement,
+                index: index,
+                cardWidth: constraints.maxWidth,
+                cardHeight: 263.h,
+                showAvatar: false,
+                onTap: onTap,
               ),
-            ),
-            child: Text(
-              announcement.status ?? '',
-              style: GoogleFonts.inter(
-                fontSize: 11.sp,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
+              Positioned(
+                top: 21.h,
+                right: 0,
+                child: Container(
+                  padding: EdgeInsets.only(
+                      left: 12.w, right: 10.w, top: 5.h, bottom: 5.h),
+                  decoration: BoxDecoration(
+                    color: _statusColor(announcement.status),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20.r),
+                      bottomLeft: Radius.circular(20.r),
+                    ),
+                  ),
+                  child: Text(
+                    announcement.status ?? '',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
-      ],
+            ],
+          );
+        },
+      ),
     );
   }
 }

@@ -35,14 +35,12 @@ class SettingsView extends StatelessWidget {
                     _buildCard(
                       isDark: isDark,
                       children: [
-                        Obx(() {
-                          final dark = ThemeController.to.isDark;
-                          return _tile(
-                            title: dark ? 'Dark mode' : 'Light mode',
-                            isDark: isDark,
-                            trailing: _buildThemeSwitch(),
-                          );
-                        }),
+                        _tile(
+                          title: 'Theme',
+                          icon: Icons.contrast_rounded,
+                          isDark: isDark,
+                          onTap: () => ThemeController.to.toggleTheme(),
+                        ),
                         _tile(
                           title: 'Password & Security',
                           icon: Icons.password_outlined,
@@ -69,6 +67,7 @@ class SettingsView extends StatelessWidget {
                           icon: Icons.currency_exchange_outlined,
                           isDark: isDark,
                           onTap: () {},
+                          showDivider: false,
                         ),
                       ],
                     ),
@@ -96,6 +95,7 @@ class SettingsView extends StatelessWidget {
                           icon: Icons.info_outline_rounded,
                           isDark: isDark,
                           onTap: () {},
+                          showDivider: false,
                         ),
                       ],
                     ),
@@ -145,18 +145,17 @@ class SettingsView extends StatelessWidget {
               ),
             ),
           ),
-          // Title — centered
+          SizedBox(width: 14.w),
+          // Title — left-aligned next to the back button
           Expanded(
-            child: Center(
-              child: Text(
-                'Setting',
-                style: GoogleFonts.poppins(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface,
-                  height: 1.0,
-                  letterSpacing: 0,
-                ),
+            child: Text(
+              'Setting',
+              style: GoogleFonts.poppins(
+                fontSize: 20.sp,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
+                height: 1.0,
+                letterSpacing: 0,
               ),
             ),
           ),
@@ -209,60 +208,56 @@ class SettingsView extends StatelessWidget {
     IconData? icon,
     Widget? trailing,
     VoidCallback? onTap,
+    bool showDivider = true,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16.r),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 18.h),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w500,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-                  height: 1.0,
-                  letterSpacing: 0,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16.r),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 18.h),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                      height: 1.0,
+                      letterSpacing: 0,
+                    ),
+                  ),
                 ),
-              ),
+                if (trailing != null)
+                  trailing
+                else if (icon != null)
+                  Container(
+                    padding: EdgeInsets.all(6.w),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: AppColors.goldAccent, width: 1),
+                    ),
+                    child: Icon(icon, size: 18.sp, color: AppColors.primary),
+                  ),
+              ],
             ),
-            if (trailing != null)
-              trailing
-            else if (icon != null)
-              Icon(icon, size: 21.sp, color: AppColors.primary),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Theme toggle switch ────────────────────────────────────────────────────
-
-  Widget _buildThemeSwitch() {
-    return Obx(() {
-      final isDark = ThemeController.to.isDark;
-      return SizedBox(
-        width: 40.w,
-        height: 24.h,
-        child: FittedBox(
-          fit: BoxFit.contain,
-          child: Switch(
-            value: !isDark,
-            onChanged: (_) => ThemeController.to.toggleTheme(),
-            thumbColor: WidgetStateProperty.all(Colors.white),
-            trackColor: WidgetStateProperty.resolveWith((states) {
-              return states.contains(WidgetState.selected)
-                  ? AppColors.primary
-                  : Colors.grey.shade300;
-            }),
-            trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
           ),
         ),
-      );
-    });
+        if (showDivider)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14.w),
+            child: Divider(
+              height: 1,
+              thickness: 0.5,
+              color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE8E8E8),
+            ),
+          ),
+      ],
+    );
   }
 
   // ── Logout bottom sheet ────────────────────────────────────────────────────

@@ -1,15 +1,17 @@
-import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/dashboard/bottom_nav_controller.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
 import 'package:brokkerspot/views/notifications/notifications_view.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
+import 'package:brokkerspot/views/user/home/search_view.dart';
+import 'package:brokkerspot/widgets/home/home_app_bar.dart';
+import 'package:brokkerspot/widgets/home/stat_info_card.dart';
+import 'package:brokkerspot/widgets/home/story_circle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 
 class BrokerHomeView extends StatefulWidget {
   const BrokerHomeView({super.key});
@@ -21,10 +23,21 @@ class BrokerHomeView extends StatefulWidget {
 class _BrokerHomeViewState extends State<BrokerHomeView> {
   int _bannerPage = 0;
   final PageController _bannerController = PageController();
-  final _notificationController = NotificationListController.to;
+  final _profileCtrl = Get.put(ProfileController());
+  final _notificationCtrl = NotificationListController.to;
 
-  final List<Map<String, String>> _stories = [
-    {'name': 'Brokkerspot', 'image': 'assets/images/realestate_logo.png'},
+  // TODO: replace with the real dashboard-stats API response once available.
+  final int _leadsOwn = 25;
+  final int _leadsUser = 2;
+  final int _storyOwn = 5;
+  final int _storyUser = 12;
+  final int _announcementOwn = 4;
+  final int _announcementUser = 8;
+  final int _commissionReceived = 2;
+  final int _commissionPending = 3;
+
+  static const _stories = [
+    {'name': 'Brokkerspot', 'image': 'assets/images/brocker-icon.png'},
     {'name': 'Rachid', 'image': 'assets/images/story1.png'},
     {'name': 'Nisha', 'image': 'assets/images/story2.png'},
     {'name': 'Joya', 'image': 'assets/images/story3.png'},
@@ -35,7 +48,7 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
   void initState() {
     super.initState();
     // Cache-first; powers the bell badge.
-    _notificationController.load();
+    _notificationCtrl.load();
   }
 
   @override
@@ -46,36 +59,22 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(height: 10.h),
-              _buildHeader(),
-              SizedBox(height: 10.h),
-              Container(
-                height: 4,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.1),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                child: _buildHeader(),
               ),
-              SizedBox(height: 8.h),
+              SizedBox(height: 16.h),
               _buildStoriesSection(),
-              Divider(height: 1, color: Colors.grey.shade200),
               SizedBox(height: 16.h),
               _buildGridCards(),
-              SizedBox(height: 16.h),
-              Divider(height: 1, color: Colors.grey.shade200),
               SizedBox(height: 16.h),
               _buildBoostBanner(),
               SizedBox(height: 24.h),
@@ -88,213 +87,34 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
 
   // ─── HEADER ───
   Widget _buildHeader() {
-    final profileCtrl = Get.put(ProfileController());
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w),
-      child: Row(
-        children: [
-          // Profile avatar
-          GestureDetector(
-            onTap: () {
-              if (LocalStorageService.isLoggedIn()) {
-                Get.find<BottomNavController>().currentIndex.value = 4;
-              } else {
-                showLoginRequiredDialog(context);
-              }
-            },
-            child: Obx(() {
-              final isLoading = profileCtrl.isLoading.value;
-              // Broker dashboard shows the broker-side avatar (separate
-              // field from the user-side userProfileImage).
-              final image = profileCtrl.brokerProfileImage.value;
-              if (isLoading) {
-                return ShimmerCircle(radius: 30.w);
-              }
-              Widget placeholder = Center(
-                child: Icon(
-                  Icons.person,
-                  size: 26.w,
-                  color: Colors.grey,
-                ),
-              );
-              final isVerified =
-                  profileCtrl.profileData.value?['verificationStatus'] ==
-                      'approved';
-              return SizedBox(
-                width: 60.w,
-                height: 60.w,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: 60.w,
-                      height: 60.w,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.grey.shade200,
-                        border: Border.all(color: AppColors.primary, width: 1),
-                      ),
-                      child: ClipOval(
-                          child: image.isNotEmpty
-                              ? Image.network(image,
-                                  width: 60.w,
-                                  height: 60.w,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => placeholder)
-                              : placeholder),
-                    ),
-                    if (isVerified)
-                      Positioned(
-                        bottom: 2.h,
-                        right: -16.w,
-                        child: Transform.rotate(
-                          angle: -0.45,
-                          child: Image.asset(
-                            'assets/images/verified_icon.png',
-                            width: 60.w,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            }),
-          ),
-          SizedBox(width: 12.w),
-          // Name + badge
-          Obx(() {
-            final isLoading = profileCtrl.isLoading.value;
-            if (isLoading) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ShimmerBox(
-                      width: 40.w,
-                      height: 12.h,
-                      borderRadius: BorderRadius.circular(4.r)),
-                  SizedBox(height: 6.h),
-                  ShimmerBox(
-                      width: 120.w,
-                      height: 20.h,
-                      borderRadius: BorderRadius.circular(4.r)),
-                ],
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello,',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12.sp,
-                    color: Colors.grey,
-                  ),
-                ),
-                Row(
-                  children: [
-                    Text(
-                      profileCtrl.userName.value.isNotEmpty
-                          ? profileCtrl.userName.value
-                          : 'Guest User',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textBlack.withOpacity(0.7),
-                      ),
-                    ),
-                    if (LocalStorageService.isLoggedIn()) ...[
-                      SizedBox(width: 8.w),
-                      Obx(() {
-                        final vs = profileCtrl.profileData
-                            .value?['verificationStatus'] as String?;
-                        if (vs == null) return const SizedBox.shrink();
-                        final label = vs == 'inactive'
-                            ? 'Inactive'
-                            : vs == 'pending'
-                                ? 'In Progress'
-                            : vs == 'rejected'
-                                ? 'Rejected'
-                                : '';
-                        final color = vs == 'inactive'
-                            ? Colors.red
-                            : vs == 'pending'
-                                ? Colors.amber
-                            : vs == 'rejected'
-                                ? Colors.red
-                                : Colors.white;
-                        return Container(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 10.w, vertical: 3.h),
-                          decoration: BoxDecoration(
-                            color: color,
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Text(
-                            label,
-                            style: GoogleFonts.poppins(
-                              fontSize: 10.sp,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
-                  ],
-                ),
-              ],
-            );
-          }),
-          const Spacer(),
-          // Notification bell with reactive badge
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => Get.to(() => const NotificationsView()),
-            child: Obx(() {
-              final count = _notificationController.unseenCount.value;
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(Icons.notifications_none_rounded,
-                      size: 28.sp, color: AppColors.primary),
-                  if (count > 0)
-                    Positioned(
-                      top: -2,
-                      right: -2,
-                      child: Container(
-                        width: 16.w,
-                        height: 16.w,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primary,
-                        ),
-                        child: Center(
-                          child: Text(
-                            count > 9 ? '9+' : '$count',
-                            style: GoogleFonts.poppins(
-                              fontSize: 9.sp,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            }),
-          ),
-        ],
-      ),
-    );
+    return Obx(() {
+      final isLoading = _profileCtrl.isLoading.value;
+      return HomeAppBar(
+        avatarUrl: _profileCtrl.brokerProfileImage.value,
+        isAvatarLoading: isLoading,
+        greetingName: _profileCtrl.userName.value.isNotEmpty
+            ? _profileCtrl.userName.value.split(' ').first
+            : 'Guest',
+        isGreetingLoading: isLoading,
+        location: 'Dubai',
+        notificationCount: _notificationCtrl.unseenCount.value,
+        onAvatarTap: () {
+          if (LocalStorageService.isLoggedIn()) {
+            Get.find<BottomNavController>().currentIndex.value = 4;
+          } else {
+            showLoginRequiredDialog(context);
+          }
+        },
+        onNotificationTap: () => Get.to(() => const NotificationsView()),
+        onSearchTap: () => Get.to(() => const SearchView()),
+      );
+    });
   }
 
   // ─── STORIES SECTION ───
   Widget _buildStoriesSection() {
     return Column(
       children: [
-        // All Story + Filter row
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w),
           child: Row(
@@ -304,80 +124,36 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
                 style: GoogleFonts.poppins(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               SizedBox(width: 2.w),
-              Icon(Icons.keyboard_arrow_down, size: 20.sp, color: Colors.black),
+              Icon(Icons.keyboard_arrow_down,
+                  size: 20.sp, color: Theme.of(context).colorScheme.onSurface),
               const Spacer(),
               Text(
                 '3 Filter',
                 style: GoogleFonts.poppins(
                   fontSize: 13.sp,
-                  color: AppColors.textBlack,
                   fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ],
           ),
         ),
         SizedBox(height: 12.h),
-        // Story circles
         SizedBox(
-          height: 95.h,
+          height: 94.h,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: 16.w),
             itemCount: _stories.length,
-            separatorBuilder: (_, __) => SizedBox(width: 8.w),
-            itemBuilder: (_, index) {
-              final story = _stories[index];
-              final isFirst = index == 0;
-              return SizedBox(
-                width: 72.w,
-                child: Column(
-                  children: [
-                    Container(
-                      width: 72.w,
-                      height: 72.w,
-                      padding: EdgeInsets.all(2.w),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.goldAccent,
-                          width: 2.w,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: isFirst
-                            ? Container(
-                                color: Colors.white,
-                                padding: EdgeInsets.all(8.w),
-                                child: Image.asset(
-                                  story['image']!,
-                                  fit: BoxFit.contain,
-                                ),
-                              )
-                            : Image.asset(
-                                story['image']!,
-                                fit: BoxFit.cover,
-                              ),
-                      ),
-                    ),
-                    SizedBox(height: 6.h),
-                    Text(
-                      story['name']!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 10.sp,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+            separatorBuilder: (_, __) => SizedBox(width: 12.w),
+            itemBuilder: (_, i) => StoryCircle(
+              name: _stories[i]['name']!,
+              imageUrl: _stories[i]['image'],
+            ),
           ),
         ),
       ],
@@ -392,158 +168,54 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
         children: [
           Row(
             children: [
-              _buildInfoCard(
-                title: 'LEADS',
-                items: ['Brokkersopt\nBuyers', 'Your Own\nBuyers'],
+              Expanded(
+                child: StatInfoCard(
+                  title: 'LEADS',
+                  rows: [
+                    StatInfoCardRow(value: '$_leadsOwn', label: 'OWN'),
+                    StatInfoCardRow(value: '$_leadsUser', label: 'USER'),
+                  ],
+                ),
               ),
-              SizedBox(width: 12.w),
-              _buildInfoCard(
-                title: 'PROJECT',
-                items: ['Completed\nDeals', 'Deal Started'],
+              SizedBox(width: 10.w),
+              Expanded(
+                child: StatInfoCard(
+                  title: 'STORY',
+                  rows: [
+                    StatInfoCardRow(value: '$_storyOwn', label: 'OWN'),
+                    StatInfoCardRow(value: '$_storyUser', label: 'USER'),
+                  ],
+                ),
               ),
             ],
           ),
-          SizedBox(height: 12.h),
+          SizedBox(height: 10.h),
           Row(
             children: [
-              _buildInfoCard(
-                title: 'ANNOUNCEMENT',
-                items: ['Your Own', 'Owner'],
+              Expanded(
+                child: StatInfoCard(
+                  title: 'ANNOUNCEMENTS',
+                  rows: [
+                    StatInfoCardRow(value: '$_announcementOwn', label: 'OWN'),
+                    StatInfoCardRow(value: '$_announcementUser', label: 'USER'),
+                  ],
+                ),
               ),
-              SizedBox(width: 12.w),
-              _buildInfoCard(
-                title: 'YOUR COMMISSION',
-                items: ['Received', 'Incoming'],
+              SizedBox(width: 10.w),
+              Expanded(
+                child: StatInfoCard(
+                  title: 'COMMISSION',
+                  rows: [
+                    StatInfoCardRow(
+                        value: '$_commissionReceived', label: 'RECEIVED'),
+                    StatInfoCardRow(
+                        value: '$_commissionPending', label: 'PENDING'),
+                  ],
+                ),
               ),
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard({required String title, required List<String> items}) {
-    return Expanded(
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: Colors.grey.shade300, width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Title badge - full card width, no padding
-            Container(
-              padding: EdgeInsets.symmetric(vertical: 7.h),
-              color: const Color(0xFF6B6B6B),
-              child: Center(
-                child: Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(height: 8.h),
-            // Items with overlapping circles
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10.w),
-              child: SizedBox(
-                height: 80.h,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // Second row (bottom) - rendered first so it's behind
-                    Positioned(
-                      top: 36.h,
-                      left: 0,
-                      right: 0,
-                      child: Row(
-                        children: [
-                          _goldCircle(opacity: 0.6),
-                          SizedBox(width: 8.w),
-                          Expanded(
-                            child: Text(
-                              items[1],
-                              style: GoogleFonts.poppins(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // First row (top) - rendered last so it's on top
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      child: Row(
-                        children: [
-                          _goldCircle(),
-                          SizedBox(width: 8.w),
-                          Expanded(
-                            child: Text(
-                              items[0],
-                              style: GoogleFonts.poppins(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(height: 4.h),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _goldCircle({double opacity = 1.0}) {
-    return Opacity(
-      opacity: opacity,
-      child: Container(
-        width: 46.w,
-        height: 46.w,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.goldAccent,
-              AppColors.goldAccent.withValues(alpha: 0.7),
-            ],
-          ),
-        ),
-        child: Center(
-          child: Text(
-            '-',
-            style: GoogleFonts.poppins(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              height: 1,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -559,7 +231,8 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
       child: Column(
         children: [
           SizedBox(
-            height: 180.h,
+            width: 352.w,
+            height: 160.h,
             child: PageView.builder(
               controller: _bannerController,
               onPageChanged: (i) => setState(() => _bannerPage = i),
@@ -588,8 +261,11 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(4.r),
                   color: i == _bannerPage
-                      ? Colors.grey.shade800
-                      : Colors.grey.shade400,
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.3),
                 ),
               ),
             ),

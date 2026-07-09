@@ -1,116 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
+import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
+import 'package:brokkerspot/widgets/announcements/announcement_filter_bar.dart';
+import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:brokkerspot/widgets/projects/premium_lock_banner.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_card_skeleton.dart';
-import 'package:brokkerspot/widgets/announcements/announcement_property_card.dart';
 import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
+import 'package:brokkerspot/views/user/home/search_view.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:get/get.dart';
 
+/// Broker-side Announcements screen. Shares the exact visual language of the
+/// user-side [AnnouncementsView] (dark full-bleed cards, header, filter bar)
+/// via [HomeAnnouncementCard] and [AnnouncementFilterBar] — the only broker-
+/// specific addition is the brokerage strip on each card, plus a tab
+/// switcher between the public feed and the broker's own posts.
 class BrokerProjectsView extends StatefulWidget {
   const BrokerProjectsView({super.key});
 
   @override
   State<BrokerProjectsView> createState() => _BrokerProjectsViewState();
-}
-
-class _BrokerShimmerList extends StatelessWidget {
-  const _BrokerShimmerList();
-
-  @override
-  Widget build(BuildContext context) {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey.shade200,
-      highlightColor: Colors.grey.shade100,
-      child: ListView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 4,
-        itemBuilder: (_, __) => const _BrokerShimmerCard(),
-      ),
-    );
-  }
-}
-
-class _BrokerShimmerCard extends StatelessWidget {
-  const _BrokerShimmerCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Owner row
-          Row(
-            children: [
-              Container(
-                width: 32.w,
-                height: 32.w,
-                decoration: const BoxDecoration(
-                    color: Colors.white, shape: BoxShape.circle),
-              ),
-              SizedBox(width: 8.w),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(width: 100.w, height: 10.h, color: Colors.white),
-                  SizedBox(height: 4.h),
-                  Container(width: 60.w, height: 8.h, color: Colors.white),
-                ],
-              ),
-              const Spacer(),
-              Container(
-                  width: 60.w,
-                  height: 22.h,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4.r),
-                  )),
-            ],
-          ),
-          SizedBox(height: 8.h),
-          // Image area
-          Container(
-            width: double.infinity,
-            height: 200.h,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-          ),
-          SizedBox(height: 10.h),
-          // Price row
-          Container(width: 120.w, height: 14.h, color: Colors.white),
-          SizedBox(height: 6.h),
-          // Property name
-          Container(width: 200.w, height: 12.h, color: Colors.white),
-          SizedBox(height: 6.h),
-          // Bedroom / sqft row
-          Row(
-            children: [
-              Container(width: 50.w, height: 10.h, color: Colors.white),
-              SizedBox(width: 12.w),
-              Container(width: 50.w, height: 10.h, color: Colors.white),
-            ],
-          ),
-          SizedBox(height: 6.h),
-          Divider(color: Colors.grey.shade200, thickness: 1),
-          SizedBox(height: 4.h),
-          // Location row
-          Container(width: 160.w, height: 10.h, color: Colors.white),
-          SizedBox(height: 8.h),
-        ],
-      ),
-    );
-  }
 }
 
 class _BrokerProjectsViewState extends State<BrokerProjectsView> {
@@ -122,6 +36,9 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
 
   int _selectedTab = 0;
   final _tabs = const ['User Announcement', 'My Announcement'];
+
+  String? _selectedListingType; // null = all, 'Sell' = Buy, 'Rent' = Rent
+  String? _selectedPropertyType; // null = all
 
   @override
   void initState() {
@@ -161,33 +78,155 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
     if (i == 1) _controller.loadBrokerMine();
   }
 
+  List<AnnouncementModel> _filtered(List<AnnouncementModel> all) {
+    var list = all;
+    if (_selectedListingType != null) {
+      list = list.where((a) => a.listingType == _selectedListingType).toList();
+    }
+    if (_selectedPropertyType != null) {
+      list = list
+          .where((a) =>
+              a.propertyType?.toLowerCase() ==
+              _selectedPropertyType!.toLowerCase())
+          .toList();
+    }
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor:
+          isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8F5F0),
       body: SafeArea(
+        bottom: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CustomHeader(
-              title: 'Projects',
-              trailing: GestureDetector(
-                // New announcements auto-refresh the cached list via the
-                // controller's mutation hook, so just navigate.
-                onTap: () => Get.to(
-                    () => const CreateAnnouncementView(fromBroker: true)),
-                child: Image.asset('assets/images/home_add_icon.png',
-                    width: 50.w, height: 50.w),
-              ),
+            _buildHeader(theme),
+            SizedBox(height: 12.h),
+            _buildTabBar(theme),
+            SizedBox(height: 12.h),
+            AnnouncementFilterBar(
+              selectedListingType: _selectedListingType,
+              selectedPropertyType: _selectedPropertyType,
+              onListingTap: () => setState(() {
+                if (_selectedListingType == null) {
+                  _selectedListingType = 'Sell';
+                } else if (_selectedListingType == 'Sell') {
+                  _selectedListingType = 'Rent';
+                } else {
+                  _selectedListingType = null;
+                }
+              }),
+              onPropertyTypeChanged: (type) =>
+                  setState(() => _selectedPropertyType = type),
             ),
-            _buildTabBar(),
-            Expanded(child: _buildContent()),
+            SizedBox(height: 12.h),
+            Expanded(child: _buildContent(theme)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContent() {
+  // ── Header ───────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader(ThemeData theme) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 0),
+      child: Row(
+        children: [
+          Text(
+            'Announcements',
+            style: GoogleFonts.poppins(
+              fontSize: 20.sp,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+              height: 1.0,
+              letterSpacing: 0,
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => Get.to(() => const SearchView()),
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: 35.w,
+              height: 35.w,
+              child: Image.asset(
+                'assets/images/search_icon.png',
+                width: 35.w,
+                height: 35.w,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+          SizedBox(width: 10.w),
+          // New announcements auto-refresh the cached list via the
+          // controller's mutation hook, so just navigate.
+          GestureDetector(
+            onTap: () =>
+                Get.to(() => const CreateAnnouncementView(fromBroker: true)),
+            behavior: HitTestBehavior.opaque,
+            child: Image.asset(
+              'assets/images/home_add_icon.png',
+              width: 35.w,
+              height: 35.w,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Tab bar ──────────────────────────────────────────────────────────────────
+
+  Widget _buildTabBar(ThemeData theme) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: Row(
+        children: List.generate(_tabs.length, (i) {
+          final isSelected = _selectedTab == i;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => _onTabChanged(i),
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 3.w),
+                padding: EdgeInsets.symmetric(vertical: 7.h),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20.r),
+                  border: isSelected
+                      ? null
+                      : Border.all(color: AppColors.primary, width: 1),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _tabs[i],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected
+                        ? Colors.white
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // ── Body ─────────────────────────────────────────────────────────────────────
+
+  Widget _buildContent(ThemeData theme) {
     return Obx(() {
       final isMine = _selectedTab == 1;
 
@@ -201,11 +240,12 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
           ? _controller.brokerMineError.value
           : _controller.allError.value;
       final myId = _profileCtrl.currentUserId;
-      final announcements = isMine
+      final rawList = isMine
           ? _controller.brokerMineAnnouncements.toList()
           : _controller.allAnnouncements
               .where((a) => a.userId != myId)
               .toList();
+      final announcements = _filtered(rawList);
 
       Future<void> refresh() => isMine
           ? _controller.loadBrokerMine(force: true)
@@ -213,7 +253,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
 
       // First-load shimmer only when nothing is cached yet.
       if (isLoading && announcements.isEmpty) {
-        return _BrokerShimmerList();
+        return _buildShimmer();
       }
       if (error != null && announcements.isEmpty) {
         return Center(
@@ -243,6 +283,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
           color: AppColors.primary,
           onRefresh: refresh,
           child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             children: [
               SizedBox(height: 200.h),
               Center(
@@ -290,28 +331,31 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
             // which caused OOM on low-RAM devices.
             // ignore: deprecated_member_use
             cacheExtent: 400,
+            padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),
             itemCount: itemCount,
             itemBuilder: (_, i) {
               if (i == headerIdx) {
                 return Padding(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                  child: _buildSectionHeader(_tabs[_selectedTab],
+                  padding: EdgeInsets.only(bottom: 12.h),
+                  child: _buildSectionHeader(theme, _tabs[_selectedTab],
                       '${announcements.length} announcements'),
                 );
               }
               if (i >= cardStart && i < cardEnd) {
                 final idx = i - cardStart;
                 final a = announcements[idx];
-                return RepaintBoundary(
-                  child: AnnouncementPropertyCard(
-                    announcement: a,
-                    index: idx,
-                    showWishlist: false,
-                    showActionButtons: false,
-                    ownerRowAboveImage: true,
-                    onTap: () => Get.to(
-                        () => BrokerAnnouncementDetailView(announcement: a)),
+                return Padding(
+                  padding: EdgeInsets.only(bottom: 16.h),
+                  child: RepaintBoundary(
+                    child: HomeAnnouncementCard(
+                      announcement: a,
+                      index: idx,
+                      cardWidth: 344.w,
+                      cardHeight: 263.h,
+                      showBrokerageRow: true,
+                      onTap: () => Get.to(
+                          () => BrokerAnnouncementDetailView(announcement: a)),
+                    ),
                   ),
                 );
               }
@@ -330,46 +374,24 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
     });
   }
 
-  Widget _buildTabBar() {
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-      child: Row(
-        children: List.generate(_tabs.length, (i) {
-          final isSelected = _selectedTab == i;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => _onTabChanged(i),
-              child: Container(
-                margin: EdgeInsets.symmetric(horizontal: 3.w),
-                padding: EdgeInsets.symmetric(vertical: 7.h),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20.r),
-                  border: isSelected
-                      ? null
-                      : Border.all(color: AppColors.primary, width: 1),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  _tabs[i],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : Colors.grey.shade600,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
+  Widget _buildShimmer() {
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),
+      itemCount: 2,
+      separatorBuilder: (_, __) => SizedBox(height: 16.h),
+      itemBuilder: (_, __) => Container(
+        width: double.infinity,
+        height: 263.h,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade300,
+          borderRadius: BorderRadius.circular(20.r),
+        ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, String subtitle) {
+  Widget _buildSectionHeader(ThemeData theme, String title, String subtitle) {
     return Row(
       children: [
         Text(
@@ -377,7 +399,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
           style: GoogleFonts.inter(
               fontSize: 15.sp,
               fontWeight: FontWeight.w500,
-              color: Colors.black),
+              color: theme.colorScheme.onSurface),
         ),
         SizedBox(width: 6.w),
         Container(

@@ -1,9 +1,12 @@
 import 'dart:math';
 import 'package:brokkerspot/core/common_widget/full_screen_image_view.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
-import 'package:brokkerspot/views/brokker/brokker_account/broker_account_view.dart';
-import 'package:brokkerspot/widgets/common/custom_header.dart';
+import 'package:brokkerspot/views/brokker/brokker_account/broker_my_information_view.dart';
+import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
+import 'package:brokkerspot/views/user/settings/settings_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -117,319 +120,280 @@ class _VerifiedArcPainter extends CustomPainter {
       oldDelegate.isVerified != isVerified;
 }
 
+/// Broker "Account" tab — profile header (avatar + verified ribbon, name,
+/// email) followed by a menu list. Every action from the old stats screen
+/// and the settings sub-menu lives here now, just restyled into one dark
+/// card list instead of two separate screens.
 class BrokerProfileView extends StatelessWidget {
   BrokerProfileView({super.key});
 
   final ProfileController controller = Get.put(ProfileController());
 
+  static const _avatarSize = 100.0;
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CustomHeader(
-              title: 'My Account',
-              trailing: GestureDetector(
-                onTap: () {
-                  Get.to(() => AccountMenuView());
-                },
-                child: Icon(
-                  Icons.settings_outlined,
-                  size: 22.sp,
-                  color: AppColors.goldAccent,
+            Padding(
+              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 0),
+              child: Text(
+                'Account',
+                style: GoogleFonts.poppins(
+                  fontSize: 24.sp,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
             ),
-            Expanded(child: Obx(() {
-              if (controller.isLoading.value) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              return SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: 20.w),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 20.h),
-                    _buildProfileHeader(),
-                    SizedBox(height: 10.h),
-                    Divider(height: 1, color: Colors.grey.shade200),
-                    SizedBox(height: 20.h),
-                    _buildInfoSection(
-                      'Areas',
-                      controller.dealingAreas.isNotEmpty
-                          ? controller.dealingAreas.join(', ')
-                          : 'Not added yet',
-                    ),
-                    SizedBox(height: 20.h),
-                    _buildInfoSection(
-                      'Language',
-                      controller.knownLanguages.isNotEmpty
-                          ? controller.knownLanguages.join(', ')
-                          : 'Not added yet',
-                    ),
-                    SizedBox(height: 20.h),
-                    _buildInfoSection(
-                      'About me',
-                      controller.profileData.value?['aboutMe'] ??
-                          'No description added yet.',
-                    ),
-                    SizedBox(height: 24.h),
-                    _buildBoostSection(),
-                    SizedBox(height: 30.h),
-                  ],
-                ),
-              );
-            })),
+            Expanded(
+              child: Obx(() {
+                if (controller.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                return SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  child: Column(
+                    children: [
+                      SizedBox(height: 24.h),
+                      _buildProfileHeader(theme),
+                      SizedBox(height: 28.h),
+                      _buildCardGroup(theme, [
+                        _menuItem(
+                          theme,
+                          'assets/images/broker_my_profile_icon.png',
+                          'Manage Profile',
+                          () => Get.to(() => const BrokerMyInformationView()),
+                        ),
+                        _menuItem(
+                          theme,
+                          'assets/images/broker_announcement.png',
+                          'My Announcements',
+                          () {},
+                        ),
+                        _menuItem(
+                          theme,
+                          'assets/images/broker_mydeal_icon.png',
+                          'My Deals',
+                          () {},
+                        ),
+                        _menuItem(
+                          theme,
+                          'assets/images/broker_bank_icon.png',
+                          'My Bank Account Details',
+                          () {},
+                        ),
+                        _menuItem(
+                          theme,
+                          'assets/images/broker_wishlist_icon.png',
+                          'Wishlist',
+                          () {},
+                        ),
+                        _menuItem(
+                          theme,
+                          'assets/images/subscription_icon.png',
+                          'My Subscription',
+                          () {},
+                        ),
+                        _menuItem(
+                          theme,
+                          'assets/images/broker_settings_icon.png',
+                          'Setting',
+                          () => Get.to(() => SettingsView(side: 'broker')),
+                          showDivider: false,
+                        ),
+                      ]),
+                      SizedBox(height: 16.h),
+                      _buildCardGroup(theme, [
+                        _menuItem(
+                          theme,
+                          'assets/images/switch_to_user_icon.png',
+                          'Switch to User side',
+                          () => _switchToUser(),
+                          showDivider: false,
+                        ),
+                      ]),
+                      SizedBox(height: 30.h),
+                    ],
+                  ),
+                );
+              }),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
+  Future<void> _switchToUser() async {
+    Get.dialog(
+      const Center(child: CircularProgressIndicator()),
+      barrierDismissible: false,
+    );
+    final ok = await controller.switchRole(1);
+    if (Get.isDialogOpen ?? false) Get.back();
+    if (ok) {
+      LocalStorageService.saveLastSide('user');
+      // Wipe broker-side cached data so the user side opens with fresh
+      // role-correct responses, not stale broker-side payloads.
+      await clearRoleScopedCache();
+      Get.offAll(() => const DashboardView());
+    }
+  }
+
+  Widget _buildProfileHeader(ThemeData theme) {
     final data = controller.profileData.value;
     final bool isVerified = data?['verificationStatus'] == 'approved';
+    const arcPad = 28.0;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
       children: [
-        // Left: Avatar + Name
-        Column(
-          children: [
-            // Profile image with verified arc + star
-            GestureDetector(
-              onTap: () => FullScreenImageView.show(
-                imageUrl: controller.brokerProfileImage.value.isNotEmpty
-                    ? controller.brokerProfileImage.value
-                    : null,
-                assetPath: controller.brokerProfileImage.value.isEmpty
-                    ? 'assets/images/profile.jpg'
-                    : null,
-              ),
-              child: SizedBox(
-                width: 110.w,
-                height: 110.w,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: 110.w,
-                      height: 110.w,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.grey.shade200,
-                      ),
-                      child: ClipOval(
-                        child: controller.brokerProfileImage.value.isNotEmpty
-                            ? Image.network(
-                                controller.brokerProfileImage.value,
-                                fit: BoxFit.cover,
-                                width: 110.w,
-                                height: 110.w,
-                                errorBuilder: (_, __, ___) => Image.asset(
-                                  'assets/images/profile.jpg',
-                                  fit: BoxFit.cover,
-                                  width: 110.w,
-                                  height: 110.w,
-                                ),
-                              )
-                            : Image.asset(
-                                'assets/images/profile.jpg',
-                                fit: BoxFit.cover,
-                                width: 110.w,
-                                height: 110.w,
-                              ),
-                      ),
-                    ),
-                    if (isVerified)
-                      Positioned(
-                        bottom: 2.h,
-                        right: -26.w,
-                        child: Transform.rotate(
-                          angle: -0.45,
-                          child: Image.asset(
-                            'assets/images/verified_icon.png',
-                            width: 110.w,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(height: 6.h),
-            // Name
-            Text(
-              controller.userName.value.isNotEmpty
-                  ? controller.userName.value
-                  : '-',
-              style: GoogleFonts.inter(
-                fontSize: 15.sp,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
-            ),
-          ],
-        ),
-
-        SizedBox(width: 36.w),
-
-        // Right: Experience, Following, License with BRN/ORN columns
-        Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(top: 8.h),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        GestureDetector(
+          onTap: () => FullScreenImageView.show(
+            imageUrl: controller.brokerProfileImage.value.isNotEmpty
+                ? controller.brokerProfileImage.value
+                : null,
+            assetPath: controller.brokerProfileImage.value.isEmpty
+                ? 'assets/images/profile.jpg'
+                : null,
+          ),
+          child: SizedBox(
+            width: (_avatarSize + arcPad).w,
+            height: (_avatarSize + arcPad).w,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                // Experience & Following row
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildStatColumn(
-                        'Experience',
-                        data?['experience']?.toString() ?? '-',
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildStatColumn(
-                        'Following',
-                        data?['following']?.toString() ?? '0',
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 10.h),
-                // License label
-                Text(
-                  'License',
-                  style: GoogleFonts.inter(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
+                if (isVerified)
+                  CustomPaint(
+                    size: Size((_avatarSize + arcPad).w, (_avatarSize + arcPad).w),
+                    painter: _VerifiedArcPainter(isVerified: isVerified),
                   ),
-                ),
-                SizedBox(height: 4.h),
-                // BRN under Experience, ORN under Following
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'BRN : ${data?['bnrNumber'] ?? '-'}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.sp,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'ORN : ${data?['orn'] ?? '-'}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.sp,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
+                Container(
+                  width: _avatarSize.w,
+                  height: _avatarSize.w,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey,
+                  ),
+                  child: ClipOval(
+                    child: controller.brokerProfileImage.value.isNotEmpty
+                        ? Image.network(
+                            controller.brokerProfileImage.value,
+                            fit: BoxFit.cover,
+                            width: _avatarSize.w,
+                            height: _avatarSize.w,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/images/profile.jpg',
+                              fit: BoxFit.cover,
+                              width: _avatarSize.w,
+                              height: _avatarSize.w,
+                            ),
+                          )
+                        : Image.asset(
+                            'assets/images/profile.jpg',
+                            fit: BoxFit.cover,
+                            width: _avatarSize.w,
+                            height: _avatarSize.w,
+                          ),
+                  ),
                 ),
               ],
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildStatColumn(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        SizedBox(height: 2.h),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 12.sp,
-            color: Colors.black54,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoSection(String title, String content) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.inter(
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
-        ),
-        SizedBox(height: 6.h),
-        Text(
-          content,
-          style: GoogleFonts.inter(
-            fontSize: 13.sp,
-            color: Colors.black54,
-            height: 1.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBoostSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'Boost Your Profile For 7 days',
-              style: GoogleFonts.inter(
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
-            ),
-            SizedBox(width: 6.w),
-            Icon(
-              Icons.info_outline,
-              size: 16.sp,
-              color: Colors.green,
-            ),
-          ],
-        ),
         SizedBox(height: 12.h),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(20.r),
+        Text(
+          controller.userName.value.isNotEmpty ? controller.userName.value : '-',
+          style: GoogleFonts.poppins(
+            fontSize: 18.sp,
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurface,
           ),
-          child: Text(
-            'AED  20',
-            style: GoogleFonts.inter(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+        ),
+        SizedBox(height: 4.h),
+        Text(
+          controller.userEmail.value.isNotEmpty
+              ? controller.userEmail.value
+              : '-',
+          style: GoogleFonts.poppins(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w400,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCardGroup(ThemeData theme, List<Widget> children) {
+    final isDark = theme.brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF161616) : Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+        ),
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _menuItem(
+    ThemeData theme,
+    String assetPath,
+    String title,
+    VoidCallback onTap, {
+    bool showDivider = true,
+  }) {
+    final isDark = theme.brightness == Brightness.dark;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16.r),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w400,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Container(
+                  padding: EdgeInsets.all(6.w),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: AppColors.goldAccent, width: 1),
+                  ),
+                  child: Image.asset(assetPath, width: 18.w, height: 18.w),
+                ),
+              ],
             ),
           ),
         ),
+        if (showDivider)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20.w),
+            child: Divider(
+              height: 1,
+              thickness: 0.5,
+              color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+            ),
+          ),
       ],
     );
   }

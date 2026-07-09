@@ -5,6 +5,7 @@ import 'package:brokkerspot/views/user/announcements/announcements_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/home/home_view.dart';
 import 'package:brokkerspot/views/user/meeting/meeting_view.dart';
+import 'package:brokkerspot/widgets/common/floating_pill_nav_bar.dart';
 import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -87,82 +88,27 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
 
+  static const _navItems = [
+    PillNavItem(
+        iconAsset: 'assets/images/home_icon.png',
+        activeIconAsset: 'assets/images/home_icon.png'),
+    PillNavItem(
+        iconAsset: 'assets/images/announcement_icon.png',
+        activeIconAsset: 'assets/images/announcement_icon.png'),
+    PillNavItem(
+        iconAsset: 'assets/images/meeting_icon.png',
+        activeIconAsset: 'assets/images/meeting_icon.png'),
+    PillNavItem(
+        iconAsset: 'assets/images/account_icon.png',
+        activeIconAsset: 'assets/images/account_icon.png'),
+  ];
+
   Widget _buildFloatingNav() {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(37.w, 0, 38.w, 12.h),
-        child: Row(
-          children: [
-            // 4-item blurred pill
-            Expanded(child: _buildMainPill()),
-            SizedBox(width: 12.w),
-            // Separate create button
-            _buildCreateButton(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMainPill() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pillBg = isDark ? const Color(0x30FFFFFF) : const Color(0x80DBDBDB);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(25.r),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          height: 50.h,
-          decoration: BoxDecoration(
-            color: pillBg,
-            borderRadius: BorderRadius.circular(25.r),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _navItem(index: 0, iconAsset: 'assets/images/home_icon.png', isDark: isDark),
-              _navItem(index: 1, iconAsset: 'assets/images/announcement_icon.png', isDark: isDark),
-              _navItem(index: 2, iconAsset: 'assets/images/meeting_icon.png', isDark: isDark),
-              _navItem(index: 3, iconAsset: 'assets/images/account_icon.png', isDark: isDark),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _navItem({required int index, required String iconAsset, required bool isDark}) {
-    final isActive = _currentIndex == index;
-    final iconSize = isActive ? 30.w : 25.w;
-    final inactiveColor =
-        isDark ? const Color(0xFFBBBBBB) : const Color(0xFF6E6E6E);
-
-    return GestureDetector(
-      onTap: () => _onNavTap(index),
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        height: 50.h,
-        child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: isActive ? 59.w : 35.w,
-            height: isActive ? 38.h : 35.h,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: isActive ? const Color(0xFFE0C78E) : Colors.transparent,
-              borderRadius: BorderRadius.circular(25.r),
-            ),
-            child: Image.asset(
-              iconAsset,
-              width: iconSize,
-              height: iconSize,
-              color: isActive ? Colors.white : inactiveColor,
-              colorBlendMode: BlendMode.srcIn,
-            ),
-          ),
-        ),
-      ),
+    return FloatingPillNavBar(
+      items: _navItems,
+      currentIndex: _currentIndex,
+      onTap: _onNavTap,
+      trailing: _buildCreateButton(),
     );
   }
 

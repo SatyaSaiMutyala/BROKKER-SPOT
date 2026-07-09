@@ -19,13 +19,20 @@ class AmountProgressRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final trackColor =
+        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200;
+    final labelColor =
+        isDark ? Colors.grey.shade500 : Colors.black54;
+    final amountColor = isDark ? Colors.white : Colors.black;
+
     return SizedBox(
       width: 160.w,
       height: 160.w,
       child: CustomPaint(
         painter: _RingPainter(
           progress: progress,
-          trackColor: Colors.grey.shade200,
+          trackColor: trackColor,
           progressColor: progressColor,
           strokeWidth: 16.w,
         ),
@@ -38,7 +45,7 @@ class AmountProgressRing extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w500,
-                  color: Colors.black54,
+                  color: labelColor,
                 ),
               ),
               SizedBox(height: 2.h),
@@ -47,7 +54,7 @@ class AmountProgressRing extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 22.sp,
                   fontWeight: FontWeight.w700,
-                  color: Colors.black,
+                  color: amountColor,
                 ),
               ),
             ],

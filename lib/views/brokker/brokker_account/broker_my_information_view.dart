@@ -16,21 +16,23 @@ class BrokerMyInformationView extends StatelessWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.refreshProfile();
     });
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
             const CustomHeader(title: 'My Information', showBackButton: true),
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.only(bottom: 32.h),
+                padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 32.h),
                 child: Column(
                   children: [
                     SizedBox(height: 32.h),
-                    _buildAvatar(controller),
-                    SizedBox(height: 40.h),
-                    _buildAllRows(context, controller),
+                    _buildAvatar(controller, isDark),
+                    SizedBox(height: 32.h),
+                    _buildAllRows(context, controller, isDark),
                   ],
                 ),
               ),
@@ -42,7 +44,7 @@ class BrokerMyInformationView extends StatelessWidget {
   }
 
   // ─── Avatar ───
-  Widget _buildAvatar(BrokerMyInformationController controller) {
+  Widget _buildAvatar(BrokerMyInformationController controller, bool isDark) {
     return Center(
       child: Obx(() {
         final image = controller.profileImage;
@@ -58,7 +60,7 @@ class BrokerMyInformationView extends StatelessWidget {
                 height: 90.w,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.grey.shade200,
+                  color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
                   border: Border.all(color: AppColors.primary, width: 1.5),
                 ),
                 child: ClipOval(
@@ -97,83 +99,109 @@ class BrokerMyInformationView extends StatelessWidget {
   Widget _defaultAvatar() =>
       Icon(Icons.person, size: 40.sp, color: Colors.grey);
 
+  // ─── Card wrapper — same dark/light card style as Settings/Account ───
+  Widget _buildCard({required bool isDark, required List<Widget> children}) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE8E8E8),
+        ),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: children),
+    );
+  }
+
   // ─── All rows with dividers ───
-  Widget _buildAllRows(
-      BuildContext context, BrokerMyInformationController controller) {
-    return Obx(() => Column(
-            children: [
-              _divider(),
-              _infoRow(
-                label: 'Name',
-                value: controller.name.isEmpty ? '—' : controller.name,
-                onEdit: () => _showEditNameDialog(context, controller),
-              ),
-              _divider(),
-              _infoRow(
-                label: 'Phone',
-                value: controller.phone.isEmpty
-                    ? '—'
-                    : '${controller.countryCode} ${controller.phone}',
-                isEmpty: controller.phone.isEmpty,
-                onEdit: () => _showEditPhoneDialog(context, controller),
-              ),
-              _divider(),
-              _infoRow(
-                label: 'Email',
-                value: controller.email.isEmpty ? '—' : controller.email,
-                isVerified: controller.isEmailVerified,
-                onEdit: () => _showEditEmailDialog(context, controller),
-              ),
-              _divider(),
-              _infoRow(
-                label: 'Professional Email',
-                value: controller.professionalEmail.value.isEmpty
-                    ? '—'
-                    : controller.professionalEmail.value,
-                onEdit: () =>
-                    _showEditProfessionalEmailDialog(context, controller),
-              ),
-              _divider(),
-              _infoRow(
-                label: 'BNR',
-                value:
-                    controller.bnrNumber.isEmpty ? '—' : controller.bnrNumber,
-                isVerified: controller.bnrNumber.isNotEmpty,
-              ),
-              _divider(),
-              _infoRow(
-                label: 'Your Experience',
-                value: controller.selectedExperience.value.isEmpty
-                    ? '—'
-                    : controller.selectedExperience.value,
-                onEdit: () => _showExperienceDialog(context, controller),
-              ),
-              _divider(),
-              _infoRow(
-                label: 'Areas',
-                value: controller.selectedAreas.isEmpty
-                    ? '—'
-                    : controller.selectedAreas.join(', '),
-                onEdit: () => _showAreasDialog(context, controller),
-              ),
-              _divider(),
-              _infoRow(
-                label: 'Language',
-                value: controller.selectedLanguages.isEmpty
-                    ? '—'
-                    : controller.selectedLanguages.join(', '),
-                onEdit: () => _showLanguagesDialog(context, controller),
-              ),
-            ],
-          ));
+  Widget _buildAllRows(BuildContext context,
+      BrokerMyInformationController controller, bool isDark) {
+    return Obx(() => _buildCard(
+          isDark: isDark,
+          children: [
+            _infoRow(
+              isDark: isDark,
+              label: 'Name',
+              value: controller.name.isEmpty ? '—' : controller.name,
+              onEdit: () => _showEditNameDialog(context, controller),
+            ),
+            _divider(isDark),
+            _infoRow(
+              isDark: isDark,
+              label: 'Phone',
+              value: controller.phone.isEmpty
+                  ? '—'
+                  : '${controller.countryCode} ${controller.phone}',
+              isEmpty: controller.phone.isEmpty,
+              onEdit: () => _showEditPhoneDialog(context, controller),
+            ),
+            _divider(isDark),
+            _infoRow(
+              isDark: isDark,
+              label: 'Email',
+              value: controller.email.isEmpty ? '—' : controller.email,
+              isVerified: controller.isEmailVerified,
+              onEdit: () => _showEditEmailDialog(context, controller),
+            ),
+            _divider(isDark),
+            _infoRow(
+              isDark: isDark,
+              label: 'Professional Email',
+              value: controller.professionalEmail.value.isEmpty
+                  ? '—'
+                  : controller.professionalEmail.value,
+              onEdit: () =>
+                  _showEditProfessionalEmailDialog(context, controller),
+            ),
+            _divider(isDark),
+            _infoRow(
+              isDark: isDark,
+              label: 'BNR',
+              value:
+                  controller.bnrNumber.isEmpty ? '—' : controller.bnrNumber,
+              isVerified: controller.bnrNumber.isNotEmpty,
+            ),
+            _divider(isDark),
+            _infoRow(
+              isDark: isDark,
+              label: 'Your Experience',
+              value: controller.selectedExperience.value.isEmpty
+                  ? '—'
+                  : controller.selectedExperience.value,
+              onEdit: () => _showExperienceDialog(context, controller),
+            ),
+            _divider(isDark),
+            _infoRow(
+              isDark: isDark,
+              label: 'Areas',
+              value: controller.selectedAreas.isEmpty
+                  ? '—'
+                  : controller.selectedAreas.join(', '),
+              onEdit: () => _showAreasDialog(context, controller),
+            ),
+            _divider(isDark),
+            _infoRow(
+              isDark: isDark,
+              label: 'Language',
+              value: controller.selectedLanguages.isEmpty
+                  ? '—'
+                  : controller.selectedLanguages.join(', '),
+              onEdit: () => _showLanguagesDialog(context, controller),
+              showDivider: false,
+            ),
+          ],
+        ));
   }
 
   Widget _infoRow({
+    required bool isDark,
     required String label,
     required String value,
     bool isVerified = false,
     bool isEmpty = false,
     VoidCallback? onEdit,
+    bool showDivider = true,
   }) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
@@ -190,7 +218,7 @@ class BrokerMyInformationView extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w500,
-                      color: Colors.black54,
+                      color: isDark ? Colors.white70 : Colors.black54,
                     ),
                   ),
                   if (isVerified)
@@ -233,7 +261,7 @@ class BrokerMyInformationView extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 14.sp,
               fontWeight: FontWeight.w400,
-              color: Colors.black87,
+              color: isDark ? Colors.white : Colors.black87,
             ),
           ),
         ],
@@ -241,17 +269,26 @@ class BrokerMyInformationView extends StatelessWidget {
     );
   }
 
-  Widget _divider() =>
-      Divider(height: 1, thickness: 1, color: Colors.grey.shade200);
+  Widget _divider(bool isDark) => Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20.w),
+        child: Divider(
+          height: 1,
+          thickness: 0.5,
+          color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200,
+        ),
+      );
 
   // ─── Edit Name Dialog ───
   void _showEditNameDialog(
       BuildContext context, BrokerMyInformationController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final nameCtrl = TextEditingController(text: controller.name);
     Get.dialog(_buildDialog(
+      isDark: isDark,
       title: 'Edit Name',
       children: [
-        _dialogField(controller: nameCtrl, hint: 'Enter your name'),
+        _dialogField(
+            isDark: isDark, controller: nameCtrl, hint: 'Enter your name'),
         SizedBox(height: 20.h),
         Obx(() => _saveButton(
               loading: controller.isSavingName.value,
@@ -271,10 +308,12 @@ class BrokerMyInformationView extends StatelessWidget {
   // ─── Edit Phone Dialog ───
   void _showEditPhoneDialog(
       BuildContext context, BrokerMyInformationController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final codeCtrl = TextEditingController(
         text: controller.countryCode.isEmpty ? '+' : controller.countryCode);
     final phoneCtrl = TextEditingController(text: controller.phone);
     Get.dialog(_buildDialog(
+      isDark: isDark,
       title: controller.phone.isEmpty ? 'Add Phone' : 'Edit Phone',
       children: [
         Row(
@@ -285,7 +324,8 @@ class BrokerMyInformationView extends StatelessWidget {
                 controller: codeCtrl,
                 keyboardType: TextInputType.phone,
                 textAlign: TextAlign.center,
-                decoration: _fieldDecoration(hint: '+91'),
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                decoration: _fieldDecoration(isDark: isDark, hint: '+91'),
               ),
             ),
             SizedBox(width: 8.w),
@@ -294,7 +334,9 @@ class BrokerMyInformationView extends StatelessWidget {
                 controller: phoneCtrl,
                 autofocus: true,
                 keyboardType: TextInputType.phone,
-                decoration: _fieldDecoration(hint: 'Phone number'),
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                decoration:
+                    _fieldDecoration(isDark: isDark, hint: 'Phone number'),
               ),
             ),
           ],
@@ -319,13 +361,16 @@ class BrokerMyInformationView extends StatelessWidget {
   // ─── Edit Email Dialog ───
   void _showEditEmailDialog(
       BuildContext context, BrokerMyInformationController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final emailCtrl = TextEditingController(text: controller.email);
     final emailError = ''.obs;
     Get.dialog(_buildDialog(
+      isDark: isDark,
       title: 'Edit Email',
       subtitle: 'An OTP will be sent to your new email for verification.',
       children: [
         _dialogField(
+            isDark: isDark,
             controller: emailCtrl,
             hint: 'Enter new email',
             keyboardType: TextInputType.emailAddress,
@@ -355,7 +400,7 @@ class BrokerMyInformationView extends StatelessWidget {
                 final sent = await controller.updateEmail(newEmail);
                 if (sent) {
                   Get.back();
-                  _showOtpDialog(controller, newEmail);
+                  _showOtpDialog(isDark, controller, newEmail);
                 }
               },
             )),
@@ -367,10 +412,11 @@ class BrokerMyInformationView extends StatelessWidget {
 
   // ─── OTP Dialog ───
   void _showOtpDialog(
-      BrokerMyInformationController controller, String email) {
+      bool isDark, BrokerMyInformationController controller, String email) {
     final otpCtrl = TextEditingController();
     Get.dialog(
       _buildDialog(
+        isDark: isDark,
         title: 'Verify Email',
         subtitle: 'Enter the OTP sent to\n$email',
         children: [
@@ -380,7 +426,8 @@ class BrokerMyInformationView extends StatelessWidget {
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             maxLength: 6,
-            decoration: _fieldDecoration(hint: 'Enter OTP')
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            decoration: _fieldDecoration(isDark: isDark, hint: 'Enter OTP')
                 .copyWith(counterText: ''),
           ),
           SizedBox(height: 20.h),
@@ -406,13 +453,16 @@ class BrokerMyInformationView extends StatelessWidget {
   // ─── Edit Professional Email Dialog ───
   void _showEditProfessionalEmailDialog(
       BuildContext context, BrokerMyInformationController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final emailCtrl =
         TextEditingController(text: controller.professionalEmail.value);
     final emailError = ''.obs;
     Get.dialog(_buildDialog(
+      isDark: isDark,
       title: 'Professional Email',
       children: [
         _dialogField(
+            isDark: isDark,
             controller: emailCtrl,
             hint: 'Enter professional email',
             keyboardType: TextInputType.emailAddress,
@@ -452,8 +502,10 @@ class BrokerMyInformationView extends StatelessWidget {
   // ─── Experience Dialog ───
   void _showExperienceDialog(
       BuildContext context, BrokerMyInformationController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     const options = ['0-1 Years', '1-3 Years', '3-5 Years', '5+ Years'];
     Get.dialog(_buildDialog(
+      isDark: isDark,
       title: 'Your Experience',
       children: [
         Obx(() => Column(
@@ -474,11 +526,13 @@ class BrokerMyInformationView extends StatelessWidget {
                             shape: BoxShape.circle,
                             color: isSelected
                                 ? AppColors.primary
-                                : Colors.white,
+                                : (isDark ? Colors.transparent : Colors.white),
                             border: Border.all(
                               color: isSelected
                                   ? AppColors.primary
-                                  : Colors.grey.shade400,
+                                  : (isDark
+                                      ? Colors.grey.shade600
+                                      : Colors.grey.shade400),
                               width: 1.5,
                             ),
                           ),
@@ -492,7 +546,7 @@ class BrokerMyInformationView extends StatelessWidget {
                           opt,
                           style: GoogleFonts.poppins(
                             fontSize: 14.sp,
-                            color: Colors.black87,
+                            color: isDark ? Colors.white : Colors.black87,
                           ),
                         ),
                       ],
@@ -518,6 +572,7 @@ class BrokerMyInformationView extends StatelessWidget {
   // ─── Areas Dialog ───
   void _showAreasDialog(
       BuildContext context, BrokerMyInformationController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     const options = [
       'Residential',
       'Commercial',
@@ -526,6 +581,7 @@ class BrokerMyInformationView extends StatelessWidget {
       'Mixed Use'
     ];
     Get.dialog(_buildDialog(
+      isDark: isDark,
       title: 'Areas',
       children: [
         Obx(() => Column(
@@ -548,11 +604,13 @@ class BrokerMyInformationView extends StatelessWidget {
                             shape: BoxShape.circle,
                             color: isSelected
                                 ? AppColors.primary
-                                : Colors.white,
+                                : (isDark ? Colors.transparent : Colors.white),
                             border: Border.all(
                               color: isSelected
                                   ? AppColors.primary
-                                  : Colors.grey.shade400,
+                                  : (isDark
+                                      ? Colors.grey.shade600
+                                      : Colors.grey.shade400),
                               width: 1.5,
                             ),
                           ),
@@ -566,7 +624,7 @@ class BrokerMyInformationView extends StatelessWidget {
                           opt,
                           style: GoogleFonts.poppins(
                             fontSize: 14.sp,
-                            color: Colors.black87,
+                            color: isDark ? Colors.white : Colors.black87,
                           ),
                         ),
                       ],
@@ -592,6 +650,7 @@ class BrokerMyInformationView extends StatelessWidget {
   // ─── Languages Dialog ───
   void _showLanguagesDialog(
       BuildContext context, BrokerMyInformationController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     const options = [
       'English',
       'Hindi',
@@ -602,6 +661,7 @@ class BrokerMyInformationView extends StatelessWidget {
       'French'
     ];
     Get.dialog(_buildDialog(
+      isDark: isDark,
       title: 'Language',
       children: [
         Obx(() => Column(
@@ -627,11 +687,13 @@ class BrokerMyInformationView extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? AppColors.primary
-                                : Colors.white,
+                                : (isDark ? Colors.transparent : Colors.white),
                             border: Border.all(
                               color: isSelected
                                   ? AppColors.primary
-                                  : Colors.grey.shade400,
+                                  : (isDark
+                                      ? Colors.grey.shade600
+                                      : Colors.grey.shade400),
                               width: 1.5,
                             ),
                             borderRadius: BorderRadius.circular(4.r),
@@ -646,7 +708,7 @@ class BrokerMyInformationView extends StatelessWidget {
                           opt,
                           style: GoogleFonts.poppins(
                             fontSize: 14.sp,
-                            color: Colors.black87,
+                            color: isDark ? Colors.white : Colors.black87,
                           ),
                         ),
                       ],
@@ -671,12 +733,13 @@ class BrokerMyInformationView extends StatelessWidget {
 
   // ─── Dialog Builder ───
   Widget _buildDialog({
+    required bool isDark,
     required String title,
     String? subtitle,
     required List<Widget> children,
   }) {
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
       child: Padding(
@@ -690,7 +753,7 @@ class BrokerMyInformationView extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 20.sp,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  color: isDark ? Colors.white : Colors.black,
                 ),
               ),
               if (subtitle != null) ...[
@@ -700,7 +763,7 @@ class BrokerMyInformationView extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.poppins(
                     fontSize: 13.sp,
-                    color: Colors.black54,
+                    color: isDark ? Colors.white54 : Colors.black54,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -715,6 +778,7 @@ class BrokerMyInformationView extends StatelessWidget {
   }
 
   Widget _dialogField({
+    required bool isDark,
     required TextEditingController controller,
     required String hint,
     TextInputType? keyboardType,
@@ -725,19 +789,25 @@ class BrokerMyInformationView extends StatelessWidget {
       autofocus: true,
       keyboardType: keyboardType,
       onChanged: onChanged,
-      decoration: _fieldDecoration(hint: hint),
+      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+      decoration: _fieldDecoration(isDark: isDark, hint: hint),
     );
   }
 
   bool _isValidEmail(String email) =>
       RegExp(r'^[\w\.\-\+]+@[\w\-]+\.\w{2,}$').hasMatch(email);
 
-  InputDecoration _fieldDecoration({required String hint}) {
+  InputDecoration _fieldDecoration({required bool isDark, required String hint}) {
     return InputDecoration(
       hintText: hint,
+      hintStyle: TextStyle(
+        color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10.r),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade300,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10.r),

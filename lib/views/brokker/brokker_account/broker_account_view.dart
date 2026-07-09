@@ -31,8 +31,7 @@ class AccountMenuView extends StatelessWidget {
               child: Obx(() {
                 final bool isLoggedIn = profileCtrl.profileData.value != null;
 
-                final vs =
-                    profileCtrl.profileData.value?['verificationStatus'];
+                final vs = profileCtrl.profileData.value?['verificationStatus'];
                 final isPending = isLoggedIn &&
                     profileCtrl.hasBrokerRole &&
                     (vs == 'inactive' || vs == 'pending' || vs == 'rejected');
@@ -45,7 +44,8 @@ class AccountMenuView extends StatelessWidget {
                     children: [
                       // First card group
                       _buildCardGroup([
-                        _menuItem('assets/images/broker_my_profile_icon.png',
+                        _menuItem(
+                            'assets/images/broker_my_profile_icon.png',
                             'My Information',
                             () => Get.to(() => const BrokerMyInformationView()),
                             enabled: canAccess),

@@ -6,6 +6,7 @@ import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/home/search_view.dart';
+import 'package:brokkerspot/widgets/announcements/announcement_filter_bar.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -22,15 +23,6 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
 
   String? _selectedListingType; // null = all, 'Sell' = Buy, 'Rent' = Rent
   String? _selectedPropertyType; // null = all
-
-  static const _propertyTypes = [
-    'Apartment',
-    'Villa',
-    'Studio',
-    'Penthouse',
-    'Townhouse',
-    'Office',
-  ];
 
   @override
   void initState() {
@@ -134,111 +126,20 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
   // ── Filter bar ────────────────────────────────────────────────────────────────
 
   Widget _buildFilterBar(ThemeData theme) {
-    final isDark = theme.brightness == Brightness.dark;
-    final listingLabel = _selectedListingType == null
-        ? 'All'
-        : _selectedListingType == 'Sell'
-            ? 'Buy'
-            : 'Rent';
-
-    return SizedBox(
-      height: 39.h,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: 16.w),
-        children: [
-          _filterChip(
-            label: listingLabel,
-            isSelected: _selectedListingType != null,
-            hasDropdown: true,
-            isDark: isDark,
-            onTap: () => setState(() {
-              if (_selectedListingType == null) {
-                _selectedListingType = 'Sell';
-              } else if (_selectedListingType == 'Sell') {
-                _selectedListingType = 'Rent';
-              } else {
-                _selectedListingType = null;
-              }
-            }),
-          ),
-          ..._propertyTypes.map((type) {
-            final isSelected = _selectedPropertyType == type;
-            return Padding(
-              padding: EdgeInsets.only(left: 8.w),
-              child: _filterChip(
-                label: type,
-                isSelected: isSelected,
-                isDark: isDark,
-                onTap: () => setState(() {
-                  _selectedPropertyType = isSelected ? null : type;
-                }),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _filterChip({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required bool isDark,
-    bool hasDropdown = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 38.h,
-        padding: EdgeInsets.symmetric(horizontal: 14.w),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary
-              : isDark
-                  ? const Color(0xFF2A2A2A)
-                  : Colors.white,
-          borderRadius: BorderRadius.circular(25.r),
-          border: isSelected
-              ? null
-              : Border.all(
-                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-                ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w400,
-                color: isSelected
-                    ? Colors.white
-                    : isDark
-                        ? Colors.white70
-                        : Colors.black87,
-                height: 1.0,
-                letterSpacing: 0,
-              ),
-            ),
-            if (hasDropdown) ...[
-              SizedBox(width: 4.w),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 14.sp,
-                color: isSelected
-                    ? Colors.white
-                    : isDark
-                        ? Colors.white70
-                        : Colors.black87,
-              ),
-            ],
-          ],
-        ),
-      ),
+    return AnnouncementFilterBar(
+      selectedListingType: _selectedListingType,
+      selectedPropertyType: _selectedPropertyType,
+      onListingTap: () => setState(() {
+        if (_selectedListingType == null) {
+          _selectedListingType = 'Sell';
+        } else if (_selectedListingType == 'Sell') {
+          _selectedListingType = 'Rent';
+        } else {
+          _selectedListingType = null;
+        }
+      }),
+      onPropertyTypeChanged: (type) =>
+          setState(() => _selectedPropertyType = type),
     );
   }
 

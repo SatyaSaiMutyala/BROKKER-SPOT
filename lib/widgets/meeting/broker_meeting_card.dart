@@ -5,32 +5,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Broker-side row on the Meeting list.
-///
-/// Matches the original broker design: a stacked avatar (big peer photo on
-/// the left, small property thumbnail overlapping bottom-right), then peer
-/// name + property name + price, with a gold "amount" pill and the
-/// chat-profiles count badge on the right.
+/// Broker-side row on the Meeting list: property thumbnail (left), listing
+/// details (middle), and the client's avatar + unread-chat count (right).
 class BrokerMeetingCard extends StatelessWidget {
   final MeetingItem meeting;
+  final bool isOwn;
   final VoidCallback onTap;
 
   const BrokerMeetingCard({
     super.key,
     required this.meeting,
+    required this.isOwn,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final a = meeting.announcement;
-    final peer = meeting.chatProfiles.isNotEmpty
-        ? meeting.chatProfiles.first
-        : null;
-    final peerName = peer?.name ?? a.propertyType ?? 'User';
-    final projectName = a.propertyName?.trim().isNotEmpty == true
-        ? a.propertyName!
-        : (a.propertyType ?? 'Property');
+    final peer =
+        meeting.chatProfiles.isNotEmpty ? meeting.chatProfiles.first : null;
+    final listingWord = a.listingType == 'Sell' ? 'BUY' : 'RENT';
+    final showPeriod = a.listingType == 'Rent' &&
+        a.rentPeriod != null &&
+        a.rentPeriod!.isNotEmpty;
 
     return GestureDetector(
       onTap: onTap,
@@ -39,227 +37,90 @@ class BrokerMeetingCard extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         child: Row(
           children: [
-            _AvatarStack(
-              peerImageUrl: peer?.profileImageUrl,
-              propertyImageUrl: a.propertyMedia?.thumbnail,
-              fallbackInitial: (peerName.isNotEmpty ? peerName[0] : 'U')
-                  .toUpperCase(),
+            _PropertyThumb(imageUrl: a.propertyMedia?.thumbnail),
+            SizedBox(width: 14.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    a.propertyType ?? 'Property',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        if (isOwn)
+                          TextSpan(
+                            text: 'OWN ',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        TextSpan(
+                          text: 'For $listingWord',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w400,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '${a.currency ?? 'AED'} ',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w400,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        TextSpan(
+                          text: _format(a.price),
+                          style: GoogleFonts.poppins(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        if (showPeriod)
+                          TextSpan(
+                            text: ' ${a.rentPeriod!.toLowerCase()}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w400,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            SizedBox(width: 12.w),
-            Expanded(child: _Info(peerName: peerName, projectName: projectName)),
-            _RightSide(
-              currency: a.currency ?? 'AED',
-              price: a.price,
-              messageCount: meeting.chatProfilesCount,
+            SizedBox(width: 8.w),
+            _ClientAvatar(
+              imageUrl: peer?.profileImageUrl,
+              fallbackInitial:
+                  ((peer?.name?.isNotEmpty == true ? peer!.name![0] : 'U'))
+                      .toUpperCase(),
+              count: meeting.chatProfilesCount,
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _AvatarStack extends StatelessWidget {
-  final String? peerImageUrl;
-  final String? propertyImageUrl;
-  final String fallbackInitial;
-
-  const _AvatarStack({
-    required this.peerImageUrl,
-    required this.propertyImageUrl,
-    required this.fallbackInitial,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 62.w,
-      height: 62.w,
-      child: Stack(
-        children: [
-          // Big avatar — the person you're chatting with.
-          Positioned(
-            left: 0,
-            top: 0,
-            child: Container(
-              width: 54.w,
-              height: 54.w,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.goldAccent, width: 2),
-              ),
-              child: ClipOval(child: _peer()),
-            ),
-          ),
-          // Small avatar — the property thumbnail tucked into the corner.
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              width: 28.w,
-              height: 28.w,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-                color: AppColors.goldAccent.withValues(alpha: 0.15),
-              ),
-              child: ClipOval(child: _property()),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _peer() {
-    final url = peerImageUrl;
-    if (url != null && url.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: url,
-        fit: BoxFit.cover,
-        // Down-sample once; the on-screen size is ~54dp.
-        memCacheWidth: 162,
-        memCacheHeight: 162,
-        maxWidthDiskCache: 300,
-        maxHeightDiskCache: 300,
-        fadeInDuration: Duration.zero,
-        placeholderFadeInDuration: Duration.zero,
-        placeholder: (_, __) => _peerFallback(),
-        errorWidget: (_, __, ___) => _peerFallback(),
-      );
-    }
-    return _peerFallback();
-  }
-
-  Widget _peerFallback() => Container(
-        color: Colors.grey.shade200,
-        alignment: Alignment.center,
-        child: Text(
-          fallbackInitial,
-          style: GoogleFonts.poppins(
-            fontSize: 18.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade600,
-          ),
-        ),
-      );
-
-  Widget _property() {
-    final url = propertyImageUrl;
-    if (url != null && url.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: url,
-        fit: BoxFit.cover,
-        memCacheWidth: 84,
-        memCacheHeight: 84,
-        maxWidthDiskCache: 200,
-        maxHeightDiskCache: 200,
-        fadeInDuration: Duration.zero,
-        placeholderFadeInDuration: Duration.zero,
-        placeholder: (_, __) => _propertyFallback(),
-        errorWidget: (_, __, ___) => _propertyFallback(),
-      );
-    }
-    return _propertyFallback();
-  }
-
-  Widget _propertyFallback() => Container(
-        color: AppColors.goldAccent.withValues(alpha: 0.15),
-        alignment: Alignment.center,
-        child: Icon(Icons.home_outlined,
-            size: 14.sp, color: AppColors.goldAccent),
-      );
-}
-
-class _Info extends StatelessWidget {
-  final String peerName;
-  final String projectName;
-
-  const _Info({required this.peerName, required this.projectName});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          peerName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.poppins(
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textBlack.withValues(alpha: 0.6),
-          ),
-        ),
-        SizedBox(height: 1.h),
-        Text(
-          projectName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.poppins(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textBlack.withValues(alpha: 0.6),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RightSide extends StatelessWidget {
-  final String currency;
-  final double? price;
-  final int messageCount;
-
-  const _RightSide({
-    required this.currency,
-    required this.price,
-    required this.messageCount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        // Price pill in gold.
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(6.r),
-          ),
-          child: Text(
-            '$currency ${_format(price)}',
-            style: GoogleFonts.poppins(
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textWhite,
-            ),
-          ),
-        ),
-        SizedBox(height: 6.h),
-        if (messageCount > 0)
-          Container(
-            width: 20.w,
-            height: 20.w,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primary,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              messageCount > 9 ? '9+' : '$messageCount',
-              style: GoogleFonts.poppins(
-                fontSize: 10.sp,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textWhite,
-              ),
-            ),
-          ),
-      ],
     );
   }
 
@@ -274,4 +135,137 @@ class _RightSide extends StatelessWidget {
     }
     return buf.toString();
   }
+}
+
+class _PropertyThumb extends StatelessWidget {
+  final String? imageUrl;
+
+  const _PropertyThumb({required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 62.w,
+      height: 62.w,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.goldAccent, width: 2),
+      ),
+      child: ClipOval(child: _image()),
+    );
+  }
+
+  Widget _image() {
+    final url = imageUrl;
+    if (url != null && url.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        memCacheWidth: 186,
+        memCacheHeight: 186,
+        maxWidthDiskCache: 300,
+        maxHeightDiskCache: 300,
+        fadeInDuration: Duration.zero,
+        placeholderFadeInDuration: Duration.zero,
+        placeholder: (_, __) => _fallback(),
+        errorWidget: (_, __, ___) => _fallback(),
+      );
+    }
+    return _fallback();
+  }
+
+  Widget _fallback() => Container(
+        color: AppColors.goldAccent.withValues(alpha: 0.15),
+        alignment: Alignment.center,
+        child: Icon(Icons.home_outlined,
+            size: 24.sp, color: AppColors.goldAccent),
+      );
+}
+
+class _ClientAvatar extends StatelessWidget {
+  final String? imageUrl;
+  final String fallbackInitial;
+  final int count;
+
+  const _ClientAvatar({
+    required this.imageUrl,
+    required this.fallbackInitial,
+    required this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 54.w,
+      height: 54.w,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 46.w,
+            height: 46.w,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.goldAccent, width: 2),
+            ),
+            child: ClipOval(child: _image()),
+          ),
+          if (count > 0)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Container(
+                width: 22.w,
+                height: 22.w,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  count > 9 ? '9+' : '$count',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _image() {
+    final url = imageUrl;
+    if (url != null && url.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        memCacheWidth: 138,
+        memCacheHeight: 138,
+        maxWidthDiskCache: 250,
+        maxHeightDiskCache: 250,
+        fadeInDuration: Duration.zero,
+        placeholderFadeInDuration: Duration.zero,
+        placeholder: (_, __) => _fallback(),
+        errorWidget: (_, __, ___) => _fallback(),
+      );
+    }
+    return _fallback();
+  }
+
+  Widget _fallback() => Container(
+        color: Colors.grey.shade200,
+        alignment: Alignment.center,
+        child: Text(
+          fallbackInitial,
+          style: GoogleFonts.poppins(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade600,
+          ),
+        ),
+      );
 }

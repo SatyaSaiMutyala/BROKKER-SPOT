@@ -1,13 +1,15 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:get/get.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
+import 'package:brokkerspot/core/common_widget/fullscreen_media_viewer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
@@ -29,29 +31,45 @@ class BrokerAnnouncementDetailView extends StatefulWidget {
 
 class _BrokerAnnouncementDetailViewState
     extends State<BrokerAnnouncementDetailView> {
-  late AnnouncementModel _data;
-  final PageController _pageCtrl = PageController();
   int _currentPage = 0;
+  int _tabIndex = 0;
   bool _descExpanded = false;
+  bool _isWishlisted = false;
   bool _proposalSent = false;
-  // True once the detail fetch returns is_owner / is_proposal_sent. We hold the
-  // proposal button hidden until then to avoid it flashing on reopen.
   bool _detailLoaded = false;
-  // Flipped to false the moment back is pressed so the video stops immediately
-  // (before the pop animation and dispose() run).
   bool _videoActive = true;
-  // Direct handle to the video state so forceStop() can be called synchronously
-  // without waiting for a setState rebuild.
+
+  late AnnouncementModel _data;
+  late final PageController _pageController;
   final _videoKey = GlobalKey<CachedVideoPlayerState>();
+  final _repo = AnnouncementRepository();
   final _amenityCtrl = AmenityController.to;
+
+  static const List<String> _fallbackImages = [
+    'assets/images/rent1.png',
+    'assets/images/rent2.png',
+  ];
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     _data = widget.announcement;
+    _isWishlisted = widget.announcement.isWishlisted ?? false;
     _fetchDetail();
-    // Cached reference list to resolve amenity ids → names.
     _amenityCtrl.loadAmenities();
+  }
+
+  @override
+  void dispose() {
+    _videoKey.currentState?.forceStop();
+    _pageController.dispose();
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+    ));
+    super.dispose();
   }
 
   Future<void> _fetchDetail() async {
@@ -61,7 +79,7 @@ class _BrokerAnnouncementDetailViewState
       return;
     }
     try {
-      final fresh = await AnnouncementRepository().fetchAnnouncementDetail(id);
+      final fresh = await _repo.fetchAnnouncementDetail(id);
       if (mounted) {
         setState(() {
           _data = fresh;
@@ -73,31 +91,12 @@ class _BrokerAnnouncementDetailViewState
     }
   }
 
-  // Stop video immediately and then pop the route.
-  // Using postFrameCallback so the setState rebuild (which sets active:false on
-  // CachedVideoPlayer → triggers _releaseController → setVolume(0)+pause)
-  // completes BEFORE Navigator.pop starts the exit animation.
   void _stopVideoAndPop() {
-    debugPrint('📄 [DetailView] _stopVideoAndPop called');
-    _videoKey.currentState?.forceStop(); // synchronous, no rebuild needed
+    _videoKey.currentState?.forceStop();
     setState(() => _videoActive = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) Navigator.of(context).pop();
     });
-  }
-
-  @override
-  void dispose() {
-    debugPrint('📄 [DetailView] dispose() called');
-    _videoKey.currentState
-        ?.forceStop(); // belt-and-suspenders for programmatic closes
-    _pageCtrl.dispose();
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      statusBarBrightness: Brightness.light,
-    ));
-    super.dispose();
   }
 
   String _formatPrice(double price) {
@@ -115,775 +114,56 @@ class _BrokerAnnouncementDetailViewState
     return buffer.toString().split('').reversed.join();
   }
 
+  String _fullLocation(AnnouncementModel a) {
+    return [
+      a.propertyAddress,
+      a.propertyArea,
+      a.propertyCity,
+      a.propertyCountry,
+    ].whereType<String>().where((s) => s.isNotEmpty).join(', ');
+  }
+
+  Color _statusDotColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return const Color(0xFF4CAF50);
+      case 'rejected':
+        return const Color(0xFFC0392B);
+      case 'pending':
+        return const Color(0xFFFF9800);
+      case 'draft':
+        return Colors.grey.shade500;
+      default:
+        return Colors.grey.shade500;
+    }
+  }
+
   void _showProposalSheet() async {
     final id = _data.id;
     if (id == null) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sent = await showDialog<bool>(
       context: context,
       builder: (_) => Dialog(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16.r),
         ),
         insetPadding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 60.h),
-        child: _ProposalSheet(announcementId: id),
+        child: _ProposalSheet(announcementId: id, isDark: isDark),
       ),
     );
-    // Proposal sent → hide the button immediately (no need to leave & return).
     if (sent == true && mounted) {
       setState(() => _proposalSent = true);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final a = _data;
-    final images =
-        (a.imageUrls?.isNotEmpty ?? false) ? a.imageUrls! : <String>[];
-    final hasVideo =
-        a.propertyMedia?.videos != null && a.propertyMedia!.videos!.isNotEmpty;
-    final totalPages = (hasVideo ? 1 : 0) + images.length;
-    final topPadding = MediaQuery.of(context).padding.top;
-
-    return PopScope(
-      canPop: true, // allow any back gesture / programmatic pop
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          // Fires at the START of any pop (swipe-back, back button, Get.back()).
-          // Stop audio immediately so it doesn't bleed into the back animation.
-          debugPrint('📄 [DetailView] PopScope.onPopInvoked — stopping video');
-          _videoKey.currentState?.forceStop();
-        }
-      },
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-        ),
-        child: Scaffold(
-          backgroundColor: Colors.white,
-          body: Stack(
-            children: [
-              // ── Scrollable body ──
-              SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeroMedia(
-                        a, images, hasVideo, totalPages, topPadding),
-                    Transform.translate(
-                      offset: Offset(0, -22.h),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(22.r),
-                            topRight: Radius.circular(22.r),
-                          ),
-                        ),
-                        padding: EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildPriceRow(a),
-                            SizedBox(height: 6.h),
-                            Text(
-                              a.propertyName ?? '',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black,
-                              ),
-                            ),
-                            SizedBox(height: 4.h),
-                            if ((a.location ?? a.propertyAddress ?? '')
-                                .isNotEmpty)
-                              Row(
-                                children: [
-                                  Icon(Icons.location_on_outlined,
-                                      size: 13.sp, color: AppColors.teal),
-                                  SizedBox(width: 3.w),
-                                  Expanded(
-                                    child: Text(
-                                      a.location ?? a.propertyAddress ?? '',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12.sp,
-                                        color: AppColors.textHint,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            SizedBox(height: 18.h),
-                            _buildStatsRow(a),
-                            SizedBox(height: 20.h),
-                            if (a.ownerName != null) ...[
-                              _buildOwnerRow(a),
-                              SizedBox(height: 20.h),
-                            ],
-                            Divider(color: Colors.grey.shade100, thickness: 1),
-                            SizedBox(height: 18.h),
-                            if ((a.description ?? '').isNotEmpty) ...[
-                              _sectionTitle('About this property'),
-                              SizedBox(height: 10.h),
-                              _buildDescription(a.description!),
-                              SizedBox(height: 22.h),
-                            ],
-                            _sectionTitle('Property Details'),
-                            SizedBox(height: 12.h),
-                            _buildDetailsGrid(a),
-                            SizedBox(height: 22.h),
-                            if ((a.amenities ?? []).isNotEmpty)
-                              Obx(() {
-                                final names =
-                                    _amenityCtrl.namesForIds(a.amenities!);
-                                if (names.isEmpty)
-                                  return const SizedBox.shrink();
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _sectionTitle('Amenities'),
-                                    SizedBox(height: 12.h),
-                                    _buildAmenities(names),
-                                    SizedBox(height: 22.h),
-                                  ],
-                                );
-                              }),
-                            _sectionTitle('Location'),
-                            SizedBox(height: 12.h),
-                            _buildMapBox(a),
-                            SizedBox(height: 100.h),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ── Floating back button ──
-              Positioned(
-                top: topPadding + 10.h,
-                left: 16.w,
-                child: GestureDetector(
-                  onTap: _stopVideoAndPop,
-                  child: Container(
-                    width: 38.w,
-                    height: 38.w,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.arrow_back_ios_new,
-                        size: 16.sp, color: Colors.white),
-                  ),
-                ),
-              ),
-
-              // ── Sticky bottom button ──
-              // Always shown for non-owners. Shows a shimmer while the detail
-              // fetch is in flight, then transitions to the correct state.
-              if (_data.isOwner != true)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: _buildBottomBar(),
-                ),
-            ],
-          ),
-        ),
-      ), // AnnotatedRegion
-    ); // PopScope
-  }
-
-  // ── Hero carousel ──────────────────────────────────────────────────────────
-
-  Widget _buildHeroMedia(AnnouncementModel a, List<String> images,
-      bool hasVideo, int totalPages, double topPadding) {
-    final height = 300.h + topPadding;
-    Widget carousel;
-
-    if (totalPages == 0) {
-      carousel = Image.asset('assets/images/rent1.png',
-          width: double.infinity, height: height, fit: BoxFit.cover);
-    } else {
-      carousel = PageView.builder(
-        controller: _pageCtrl,
-        itemCount: totalPages,
-        onPageChanged: (i) => setState(() => _currentPage = i),
-        itemBuilder: (_, i) {
-          if (hasVideo && i == 0) return _buildVideoPage();
-          final imgIdx = hasVideo ? i - 1 : i;
-          return CachedNetworkImage(
-            imageUrl: images[imgIdx],
-            width: double.infinity,
-            height: height,
-            fit: BoxFit.fill,
-            placeholder: (_, __) => _shimmerBox(),
-            errorWidget: (_, __, ___) => Container(
-              color: Colors.grey.shade300,
-              child: Icon(Icons.home_outlined, size: 48.sp, color: Colors.grey),
-            ),
-          );
-        },
-      );
-    }
-
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          carousel,
-          // Bottom gradient
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 130.h,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.7),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Animated pill indicators
-          if (totalPages > 1)
-            Positioned(
-              bottom: 30.h,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  totalPages.clamp(0, 8),
-                  (i) {
-                    final active = i == _currentPage.clamp(0, 7);
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeOut,
-                      width: active ? 20.w : 6.w,
-                      height: 6.w,
-                      margin: EdgeInsets.symmetric(horizontal: 2.w),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? AppColors.primary
-                            : Colors.white.withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(3.r),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          // Page counter badge top-right
-          if (totalPages > 1)
-            Positioned(
-              top: (MediaQuery.of(context).padding.top) + 10.h,
-              right: 16.w,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(20.r),
-                ),
-                child: Text(
-                  '${_currentPage + 1} / $totalPages',
-                  style: GoogleFonts.inter(
-                      fontSize: 11.sp,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVideoPage() {
-    final url = _data.propertyMedia?.videos ?? '';
-    if (url.isEmpty) return _shimmerBox();
-    return Container(
-      color: Colors.black,
-      child: CachedVideoPlayer(
-        key: _videoKey,
-        url: url,
-        active: _videoActive && _currentPage == 0,
-        fit: BoxFit.cover,
-        muted: false,
-        tapToToggleMute: true,
-        placeholder: _shimmerBox(),
-      ),
-    );
-  }
-
-  Widget _shimmerBox() {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey.shade300,
-      highlightColor: Colors.grey.shade100,
-      child: Container(color: Colors.grey.shade300),
-    );
-  }
-
-  // ── Price row ──────────────────────────────────────────────────────────────
-
-  Widget _buildPriceRow(AnnouncementModel a) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: '${a.currency ?? 'AED'} ',
-                  style: GoogleFonts.poppins(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black45,
-                  ),
-                ),
-                TextSpan(
-                  text: _formatPrice(a.price ?? 0),
-                  style: GoogleFonts.poppins(
-                    fontSize: 22.sp,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryDark,
-                  ),
-                ),
-                if (a.rentPeriod != null)
-                  TextSpan(
-                    text: ' / ${a.rentPeriod}',
-                    style: GoogleFonts.inter(
-                        fontSize: 12.sp, color: Colors.black38),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        if (a.listingType != null)
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 5.h),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20.r),
-              border:
-                  Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
-            ),
-            child: Text(
-              a.listingType!,
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primaryDark,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // ── Stats chips ────────────────────────────────────────────────────────────
-
-  Widget _buildStatsRow(AnnouncementModel a) {
-    final chips = <_StatChip>[];
-    if (a.bedrooms != null) {
-      chips.add(_StatChip(Icons.bed_outlined, '${a.bedrooms} Beds'));
-    }
-    if (a.bathrooms != null) {
-      chips.add(_StatChip(Icons.bathtub_outlined, '${a.bathrooms} Baths'));
-    }
-    if (a.sqft != null) {
-      chips.add(_StatChip(Icons.straighten_outlined, '${a.sqft} sqft'));
-    }
-    if (a.propertyType != null) {
-      chips.add(_StatChip(Icons.home_work_outlined, a.propertyType!));
-    }
-
-    if (chips.isEmpty) return const SizedBox.shrink();
-
-    return Row(
-      children: chips.asMap().entries.map((e) {
-        final isLast = e.key == chips.length - 1;
-        final chip = e.value;
-        return Expanded(
-          child: Container(
-            margin: EdgeInsets.only(right: isLast ? 0 : 8.w),
-            padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 4.w),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F6F0),
-              borderRadius: BorderRadius.circular(10.r),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(chip.icon, size: 18.sp, color: AppColors.primaryDark),
-                SizedBox(height: 4.h),
-                Text(
-                  chip.label,
-                  style: GoogleFonts.inter(
-                    fontSize: 10.sp,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // ── Owner row ──────────────────────────────────────────────────────────────
-
-  Widget _buildOwnerRow(AnnouncementModel a) {
-    return Row(
-      children: [
-        Container(
-          width: 42.w,
-          height: 42.w,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.grey.shade200,
-            border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.4), width: 1.5),
-          ),
-          child: ClipOval(
-            child: a.ownerAvatarUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: a.ownerAvatarUrl!,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => Icon(Icons.person,
-                        size: 20.sp, color: Colors.grey.shade400),
-                  )
-                : Icon(Icons.person, size: 20.sp, color: Colors.grey.shade400),
-          ),
-        ),
-        SizedBox(width: 10.w),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                a.ownerName ?? '',
-                style: GoogleFonts.inter(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87),
-              ),
-              Text(
-                'Property Owner',
-                style: GoogleFonts.inter(
-                    fontSize: 11.sp, color: AppColors.textHint),
-              ),
-            ],
-          ),
-        ),
-        if (a.brokkeragePercent != null)
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
-            decoration: BoxDecoration(
-              color: AppColors.tealLight,
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: Text(
-              '${a.brokkeragePercent}% fee',
-              style: GoogleFonts.inter(
-                  fontSize: 11.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.teal),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // ── Section title ──────────────────────────────────────────────────────────
-
-  Widget _sectionTitle(String title) {
-    return Row(
-      children: [
-        Container(
-          width: 3.w,
-          height: 16.h,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(2.r),
-          ),
-        ),
-        SizedBox(width: 8.w),
-        Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── Description ────────────────────────────────────────────────────────────
-
-  Widget _buildDescription(String desc) {
-    const threshold = 160;
-    final isLong = desc.length > threshold;
-    final displayText =
-        isLong && !_descExpanded ? '${desc.substring(0, threshold)}...' : desc;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          displayText,
-          style: GoogleFonts.inter(
-              fontSize: 13.sp, color: AppColors.textHint, height: 1.65),
-        ),
-        if (isLong) ...[
-          SizedBox(height: 4.h),
-          GestureDetector(
-            onTap: () => setState(() => _descExpanded = !_descExpanded),
-            child: Text(
-              _descExpanded ? 'Show less' : 'Read more',
-              style: GoogleFonts.inter(
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryDark),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  // ── Details grid ───────────────────────────────────────────────────────────
-
-  Widget _buildDetailsGrid(AnnouncementModel a) {
-    final items = <_DetailItem>[];
-    if (a.propertyType != null) {
-      items.add(_DetailItem('Type', a.propertyType!));
-    }
-    if (a.floor != null && a.totalFloors != null) {
-      items.add(_DetailItem('Floor', '${a.floor} of ${a.totalFloors}'));
-    }
-    if (a.sqft != null) {
-      items.add(_DetailItem('Area', '${a.sqft} sqft'));
-    }
-    if (a.propertySize != null) {
-      items.add(_DetailItem(
-          'Area (sqm)', '${a.propertySize!.sqm.toStringAsFixed(0)} sqm'));
-    }
-    if (a.availableDate != null) {
-      items.add(_DetailItem('Available', a.availableDate!.split('T').first));
-    }
-    if (a.proposalsLimit != null) {
-      items.add(_DetailItem('Proposal Limit', '${a.proposalsLimit}'));
-    }
-    if (a.brokkeragePercent != null) {
-      items.add(_DetailItem('Brokerage', '${a.brokkeragePercent}%'));
-    }
-
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    final cardWidth = (MediaQuery.of(context).size.width - 48.w) / 2;
-
-    return Wrap(
-      spacing: 8.w,
-      runSpacing: 8.h,
-      children: items
-          .map((item) => Container(
-                width: cardWidth,
-                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: Colors.grey.shade100),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.label,
-                      style: GoogleFonts.inter(
-                          fontSize: 10.sp,
-                          color: AppColors.textHint,
-                          fontWeight: FontWeight.w500),
-                    ),
-                    SizedBox(height: 3.h),
-                    Text(
-                      item.value,
-                      style: GoogleFonts.inter(
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87),
-                    ),
-                  ],
-                ),
-              ))
-          .toList(),
-    );
-  }
-
-  // ── Amenities ──────────────────────────────────────────────────────────────
-
-  Widget _buildAmenities(List<String> amenities) {
-    return Wrap(
-      spacing: 8.w,
-      runSpacing: 8.h,
-      children: amenities
-          .map((label) => Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20.r),
-                  border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.25)),
-                ),
-                child: Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.primaryDark,
-                  ),
-                ),
-              ))
-          .toList(),
-    );
-  }
-
-  // ── Map ────────────────────────────────────────────────────────────────────
-
-  Widget _buildMapBox(AnnouncementModel a) {
-    final coords = a.propertyLocation?.coordinates;
-    final hasCoords = coords != null && coords.length >= 2;
-    final location = a.location ?? a.propertyAddress ?? '';
-    final lat = hasCoords ? coords[1] : 0.0;
-    final lng = hasCoords ? coords[0] : 0.0;
-    final target = LatLng(lat, lng);
-
-    return GestureDetector(
-      onTap: () async {
-        final Uri uri = hasCoords
-            ? Uri.parse(
-                'https://www.google.com/maps/search/?api=1&query=$lat,$lng')
-            : Uri.parse(
-                'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(location)}');
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-      },
-      child: Container(
-        height: 180.h,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14.r),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            if (hasCoords)
-              AbsorbPointer(
-                child: SizedBox(
-                  height: 180.h,
-                  width: double.infinity,
-                  child: GoogleMap(
-                    // Unique key per announcement prevents the iOS platform
-                    // view from being recreated with a stale ID when this
-                    // screen is popped and then pushed again.
-                    key: ValueKey('map_${a.id}'),
-                    initialCameraPosition:
-                        CameraPosition(target: target, zoom: 15),
-                    markers: {
-                      Marker(
-                          markerId: const MarkerId('property'),
-                          position: target),
-                    },
-                    zoomControlsEnabled: false,
-                    myLocationButtonEnabled: false,
-                    compassEnabled: false,
-                    mapToolbarEnabled: false,
-                    rotateGesturesEnabled: false,
-                    scrollGesturesEnabled: false,
-                    zoomGesturesEnabled: false,
-                    tiltGesturesEnabled: false,
-                  ),
-                ),
-              )
-            else ...[
-              CustomPaint(
-                  size: Size(double.infinity, 180.h),
-                  painter: _MapGridPainter()),
-              Center(
-                  child: Icon(Icons.location_on,
-                      size: 36.sp, color: Colors.red.shade600)),
-            ],
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                color: Colors.white.withValues(alpha: 0.92),
-                child: Row(
-                  children: [
-                    Icon(Icons.location_on_outlined,
-                        size: 14.sp, color: AppColors.teal),
-                    SizedBox(width: 6.w),
-                    Expanded(
-                      child: Text(
-                        location,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                            fontSize: 12.sp,
-                            color: Colors.black87,
-                            fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                    Icon(Icons.open_in_new, size: 13.sp, color: AppColors.teal),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Bottom bar ─────────────────────────────────────────────────────────────
-
   void _openChat() {
     final id = _data.id;
     final peerId = _data.userId;
     if (id == null || peerId == null) return;
-    // Announcement user_role is the owner's role (1 = buyer).
-    // The broker viewing is the other party → role 2.
     final annRole = _data.userRole ?? 1;
     final brokerRole = 3 - annRole;
-    // The detail endpoint returns user_id as a plain string (no name/avatar).
-    // Fall back to widget.announcement which came from the list endpoint where
-    // user_id is a populated object containing name and profile image.
     final peerName = _data.ownerName?.isNotEmpty == true
         ? _data.ownerName!
         : widget.announcement.ownerName ?? 'User';
@@ -899,21 +179,1206 @@ class _BrokerAnnouncementDetailViewState
     );
   }
 
-  Widget _buildBottomBar() {
-    // While the detail fetch is in flight, show a shimmer so the bar is
-    // visible immediately with no flash of wrong content.
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final a = _data;
+    final hasVideo = (a.propertyMedia?.videos?.isNotEmpty ?? false);
+    final hasImages = (a.imageUrls?.length ?? 0) > 0;
+    final images =
+        hasImages ? a.imageUrls! : (hasVideo ? <String>[] : _fallbackImages);
+    final totalPages = (hasVideo ? 1 : 0) + images.length;
+    final topPadding = MediaQuery.of(context).padding.top;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _videoKey.currentState?.forceStop();
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+        ),
+        child: Scaffold(
+          backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+          body: Stack(
+            children: [
+              // ── Scrollable content ──
+              SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHero(
+                        a, images, hasImages, hasVideo, totalPages, topPadding),
+                    _buildBodyContent(a, isDark),
+                    SizedBox(height: 90.h + bottomPad),
+                  ],
+                ),
+              ),
+
+              // ── Floating top buttons ──
+              _buildTopButtons(topPadding),
+
+              // ── Fixed bottom bar ──
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: _buildBottomBar(isDark, bottomPad),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Fullscreen gallery ───────────────────────────────────────────────────────
+
+  List<MediaGalleryItem> _mediaItems(
+      List<String> images, bool hasImages, bool hasVideo, AnnouncementModel a) {
+    return [
+      if (hasVideo) MediaGalleryItem(url: a.propertyMedia!.videos!, isVideo: true),
+      if (hasImages)
+        ...images.map((url) => MediaGalleryItem(url: url, isVideo: false)),
+    ];
+  }
+
+  void _openFullscreenGallery(
+      List<String> images, bool hasImages, bool hasVideo, AnnouncementModel a) {
+    final items = _mediaItems(images, hasImages, hasVideo, a);
+    FullscreenMediaViewer.show(items: items, initialIndex: _currentPage);
+  }
+
+  // ── Hero ──────────────────────────────────────────────────────────────────
+
+  Widget _buildHero(AnnouncementModel a, List<String> images, bool hasImages,
+      bool hasVideo, int totalPages, double topPadding) {
+    final height = 539.h;
+
+    Widget carousel;
+    if (totalPages == 0) {
+      carousel = Image.asset('assets/images/rent1.png',
+          width: double.infinity, height: height, fit: BoxFit.cover);
+    } else {
+      carousel = PageView.builder(
+        controller: _pageController,
+        itemCount: totalPages,
+        onPageChanged: (i) => setState(() => _currentPage = i),
+        itemBuilder: (_, i) {
+          if (hasVideo && i == 0) {
+            return CachedVideoPlayer(
+              key: _videoKey,
+              url: a.propertyMedia!.videos!,
+              active: _videoActive && _currentPage == 0,
+              muted: true,
+              placeholder: _shimmerBox(),
+            );
+          }
+          final imgIdx = hasVideo ? i - 1 : i;
+          return hasImages
+              ? CachedNetworkImage(
+                  imageUrl: images[imgIdx],
+                  width: double.infinity,
+                  height: height,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => _shimmerBox(),
+                  errorWidget: (_, __, ___) => Container(
+                    color: const Color(0xFF2A2A2A),
+                    child: Icon(Icons.home_outlined,
+                        size: 48.sp, color: Colors.grey),
+                  ),
+                )
+              : Image.asset(images[imgIdx],
+                  width: double.infinity, height: height, fit: BoxFit.cover);
+        },
+      );
+    }
+
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          carousel,
+          // Gradient overlay
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x0D272727), Colors.black],
+                stops: [0.0, 1.0],
+              ),
+            ),
+          ),
+          // Prev arrow
+          if (totalPages > 1)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: GestureDetector(
+                  onTap: () => _currentPage > 0
+                      ? _pageController.previousPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut)
+                      : null,
+                  child: _navArrow(isLeft: true),
+                ),
+              ),
+            ),
+          // Next arrow
+          if (totalPages > 1)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: GestureDetector(
+                  onTap: () => _currentPage < totalPages - 1
+                      ? _pageController.nextPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut)
+                      : null,
+                  child: _navArrow(isLeft: false),
+                ),
+              ),
+            ),
+          // Bottom overlay
+          Positioned(
+            bottom: 20.h,
+            left: 14.w,
+            right: 14.w,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (a.status != null) _buildStatusPill(a),
+                SizedBox(height: 10.h),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            a.currency ?? 'AED',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w300,
+                              color: Colors.white,
+                              height: 1.0,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Text(
+                            _formatPrice(a.price ?? 0),
+                            style: GoogleFonts.poppins(
+                              fontSize: 20.sp,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFDBC483),
+                              height: 1.0,
+                            ),
+                          ),
+                          SizedBox(height: 5.h),
+                          if (a.listingType != null || a.propertyType != null)
+                            Text(
+                              [
+                                if (a.listingType != null)
+                                  'For ${a.listingType}',
+                                if (a.propertyType != null) a.propertyType!,
+                              ].join(' • '),
+                              style: GoogleFonts.poppins(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white,
+                                height: 1.0,
+                              ),
+                            ),
+                          SizedBox(height: 6.h),
+                          if (_fullLocation(a).isNotEmpty)
+                            Row(
+                              children: [
+                                Icon(Icons.location_on_rounded,
+                                    size: 12.sp, color: AppColors.primary),
+                                SizedBox(width: 4.w),
+                                Expanded(
+                                  child: Text(
+                                    _fullLocation(a),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.w300,
+                                      color: const Color(0xFF9E9E9E),
+                                      height: 1.0,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () =>
+                              setState(() => _isWishlisted = !_isWishlisted),
+                          child: Container(
+                            width: 35.w,
+                            height: 35.w,
+                            decoration: const BoxDecoration(
+                              color: Color(0x40FFFFFF),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _isWishlisted
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              size: 20.sp,
+                              color: _isWishlisted
+                                  ? Colors.red.shade400
+                                  : Colors.white,
+                            ),
+                          ),
+                        ),
+                        if (hasImages || hasVideo) ...[
+                          SizedBox(height: 10.h),
+                          GestureDetector(
+                            onTap: () => _openFullscreenGallery(
+                                images, hasImages, hasVideo, a),
+                            child: Container(
+                              width: 35.w,
+                              height: 35.w,
+                              decoration: const BoxDecoration(
+                                color: Color(0x40FFFFFF),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.fullscreen,
+                                  size: 22.sp, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                        SizedBox(height: 10.h),
+                        _buildImageCluster(a),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusPill(AnnouncementModel a) {
+    final dot = _statusDotColor(a.status);
+    final timeAgo = a.timeAgo?.toUpperCase() ?? '';
+    final statusText = (a.status ?? '').toUpperCase();
+
+    return Container(
+      height: 35.h,
+      padding: EdgeInsets.symmetric(horizontal: 12.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFF252525).withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(20.r),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8.w,
+            height: 8.w,
+            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+          ),
+          SizedBox(width: 6.w),
+          Text(
+            statusText,
+            style: GoogleFonts.poppins(
+              fontSize: 10.sp,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+              height: 1.0,
+            ),
+          ),
+          if (timeAgo.isNotEmpty) ...[
+            Text('  •  ',
+                style: GoogleFonts.poppins(
+                    fontSize: 10.sp,
+                    color: const Color(0xFFCFCFCF),
+                    height: 1.0)),
+            Text(timeAgo,
+                style: GoogleFonts.poppins(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFFCFCFCF),
+                    height: 1.0)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageCluster(AnnouncementModel a) {
+    final images = a.imageUrls ?? [];
+    final count = images.length;
+    if (count == 0) return const SizedBox.shrink();
+
+    const double sz = 36.0;
+    const double overlap = 10.0;
+    final shown = images.take(3).toList();
+    final totalWidth = sz + (shown.length - 1) * (sz - overlap) + 8;
+
+    return SizedBox(
+      width: totalWidth.w,
+      height: sz.w,
+      child: Stack(
+        children: [
+          for (int i = shown.length - 1; i >= 0; i--)
+            Positioned(
+              left: i * (sz - overlap).w,
+              child: Container(
+                width: sz.w,
+                height: sz.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xABDBC483), width: 1),
+                ),
+                child: ClipOval(
+                  child: i == 0
+                      ? Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CachedNetworkImage(
+                              imageUrl: shown[i],
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) =>
+                                  Container(color: const Color(0xFF2A2A2A)),
+                            ),
+                            Container(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              alignment: Alignment.center,
+                              child: Text(
+                                count > 9 ? '9+' : '$count',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.white,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: shown[i],
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) =>
+                              Container(color: const Color(0xFF2A2A2A)),
+                        ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _navArrow({required bool isLeft}) {
+    return ClipRRect(
+      borderRadius: isLeft
+          ? BorderRadius.only(
+              topRight: Radius.circular(18.r),
+              bottomRight: Radius.circular(18.r))
+          : BorderRadius.only(
+              topLeft: Radius.circular(18.r),
+              bottomLeft: Radius.circular(18.r)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          width: 40.w,
+          height: 83.h,
+          color: const Color(0x40FFFFFF),
+          alignment: Alignment.center,
+          child: Icon(
+            isLeft
+                ? Icons.keyboard_double_arrow_left
+                : Icons.keyboard_double_arrow_right,
+            color: Colors.white,
+            size: 22.sp,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Top buttons ───────────────────────────────────────────────────────────
+
+  Widget _buildTopButtons(double topPadding) {
+    return Positioned(
+      top: topPadding + 10.h,
+      left: 0,
+      right: 0,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 14.w),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: _stopVideoAndPop,
+              child: Container(
+                width: 38.w,
+                height: 38.w,
+                decoration: const BoxDecoration(
+                  color: Color(0x1AFFFFFF),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.arrow_back_ios_new,
+                    size: 14.sp, color: const Color(0xD1FFFFFF)),
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () {},
+              child: Container(
+                width: 35.w,
+                height: 35.w,
+                decoration: const BoxDecoration(
+                  color: Color(0x40FFFFFF),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.share_outlined,
+                    size: 16.sp, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Body content ──────────────────────────────────────────────────────────
+
+  Widget _buildBodyContent(AnnouncementModel a, bool isDark) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 12.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 16.h),
+          _buildStatsCard(a, isDark),
+          SizedBox(height: 10.h),
+          _buildTabBar(isDark),
+          SizedBox(height: 16.h),
+          _buildTabContent(a, isDark),
+        ],
+      ),
+    );
+  }
+
+  // ── Stats card ────────────────────────────────────────────────────────────
+
+  Widget _buildStatsCard(AnnouncementModel a, bool isDark) {
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final outerBorderColor =
+        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
+    final labelColor = isDark ? Colors.grey.shade400 : const Color(0xFF656565);
+    final dividerColor =
+        isDark ? const Color(0xFF3A3A3A) : const Color(0xFFEDEDED);
+
+    final items = <_StatItem>[];
+    if (a.bedrooms != null) {
+      items.add(_StatItem(Icons.bed_outlined, '${a.bedrooms}', 'Beds'));
+    }
+    if (a.bathrooms != null) {
+      items.add(_StatItem(Icons.bathtub_outlined, '${a.bathrooms}', 'Baths'));
+    }
+    if (a.sqft != null) {
+      items.add(_StatItem(Icons.straighten_outlined, '${a.sqft}', 'Sqft'));
+    }
+    if (a.floor != null) {
+      items.add(_StatItem(Icons.layers_outlined, '${a.floor}', 'Floor'));
+    }
+
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      height: 104.h,
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: outerBorderColor),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 13.w),
+      child: Center(
+        child: SizedBox(
+          height: 60.h,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (int i = 0; i < items.length; i++) ...[
+                Expanded(child: _buildStatItem(items[i], labelColor)),
+                if (i < items.length - 1)
+                  Container(width: 1, color: dividerColor),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem(_StatItem item, Color labelColor) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(item.icon, size: 20.sp, color: AppColors.primary),
+        SizedBox(height: 3.h),
+        Text(item.value,
+            style: GoogleFonts.poppins(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w700,
+                color: labelColor,
+                height: 1.0)),
+        SizedBox(height: 2.h),
+        Text(item.label,
+            style: GoogleFonts.poppins(
+                fontSize: 9.sp,
+                fontWeight: FontWeight.w400,
+                color: labelColor,
+                height: 1.0)),
+      ],
+    );
+  }
+
+  // ── Tab bar ───────────────────────────────────────────────────────────────
+
+  Widget _buildTabBar(bool isDark) {
+    final tabs = [
+      _TabDef(Icons.home_outlined, 'Overview'),
+      _TabDef(Icons.photo_library_outlined, 'Photos'),
+      _TabDef(Icons.dashboard_outlined, 'Floor Plan'),
+      _TabDef(Icons.description_outlined, 'Documents'),
+    ];
+
+    final outerBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final outerBorderColor =
+        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
+    final inactiveBg =
+        isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF2F2F2);
+    const inactiveColor = Color(0xFF656565);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: outerBg,
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(color: outerBorderColor),
+      ),
+      padding: EdgeInsets.all(5.w),
+      child: Row(
+        children: List.generate(tabs.length, (i) {
+          final isActive = _tabIndex == i;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _tabIndex = i),
+              child: Container(
+                height: 55.h,
+                margin: EdgeInsets.symmetric(horizontal: 2.w),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? (isDark ? const Color(0xFF252525) : Colors.white)
+                      : inactiveBg,
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: isActive
+                      ? Border.all(color: AppColors.primary, width: 1.5)
+                      : null,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(tabs[i].icon,
+                        size: 22.sp,
+                        color: isActive ? AppColors.primary : inactiveColor),
+                    SizedBox(height: 4.h),
+                    Text(
+                      tabs[i].label,
+                      style: GoogleFonts.inter(
+                        fontSize: 9.sp,
+                        fontWeight:
+                            isActive ? FontWeight.w600 : FontWeight.w500,
+                        color: isActive ? AppColors.primary : inactiveColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // ── Tab content ───────────────────────────────────────────────────────────
+
+  Widget _buildTabContent(AnnouncementModel a, bool isDark) {
+    switch (_tabIndex) {
+      case 1:
+        return _buildPhotosTab(a, isDark);
+      case 2:
+        return _buildFloorPlanTab(isDark);
+      case 3:
+        return _buildDocumentsTab(a, isDark);
+      default:
+        return _buildOverviewTab(a, isDark);
+    }
+  }
+
+  Widget _buildOverviewTab(AnnouncementModel a, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if ((a.description ?? '').isNotEmpty) ...[
+          _buildDescriptionCard(a.description!, isDark),
+          SizedBox(height: 16.h),
+        ],
+        SizedBox(height: 16.h),
+        _buildPropertyDetailsSection(a, isDark),
+        if ((a.amenities ?? []).isNotEmpty) ...[
+          SizedBox(height: 16.h),
+          Obx(() {
+            final names = _amenityCtrl.namesForIds(a.amenities!);
+            if (names.isEmpty) return const SizedBox.shrink();
+            return _buildAmenitiesSection(names, isDark);
+          }),
+        ],
+        SizedBox(height: 16.h),
+        _buildLocationSection(a, isDark),
+      ],
+    );
+  }
+
+  Widget _buildPhotosTab(AnnouncementModel a, bool isDark) {
+    final images = a.imageUrls ?? [];
+    if (images.isEmpty) {
+      return _emptyTabContent('No photos available', isDark);
+    }
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 8.w,
+        mainAxisSpacing: 8.h,
+        childAspectRatio: 1,
+      ),
+      itemCount: images.length,
+      itemBuilder: (_, i) => ClipRRect(
+        borderRadius: BorderRadius.circular(10.r),
+        child: CachedNetworkImage(
+          imageUrl: images[i],
+          fit: BoxFit.cover,
+          placeholder: (_, __) => Container(
+              color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200),
+          errorWidget: (_, __, ___) => Container(
+            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+            child:
+                Icon(Icons.broken_image_outlined, color: Colors.grey.shade400),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloorPlanTab(bool isDark) {
+    return _emptyTabContent('No floor plan available', isDark);
+  }
+
+  Widget _buildDocumentsTab(AnnouncementModel a, bool isDark) {
+    final docs = a.propertyDocuments;
+    final hasTitle = docs?.titleDeed?.fileUrl?.isNotEmpty == true;
+    final hasNoc = docs?.noc?.fileUrl?.isNotEmpty == true;
+    final hasPassport = docs?.passport?.frontUrl?.isNotEmpty == true ||
+        docs?.passport?.backUrl?.isNotEmpty == true;
+
+    if (!hasTitle && !hasNoc && !hasPassport) {
+      return _emptyTabContent('No documents available', isDark);
+    }
+
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFFAFAFA);
+    final textColor = isDark ? Colors.white : const Color(0xFF202020);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasTitle)
+          _docRow('Title Deed', Icons.article_outlined, cardBg, textColor),
+        if (hasNoc) ...[
+          SizedBox(height: 8.h),
+          _docRow('NOC Document', Icons.verified_outlined, cardBg, textColor),
+        ],
+        if (hasPassport) ...[
+          SizedBox(height: 8.h),
+          _docRow('Passport', Icons.badge_outlined, cardBg, textColor),
+        ],
+      ],
+    );
+  }
+
+  Widget _docRow(String label, IconData icon, Color cardBg, Color textColor) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(10.r),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18.sp, color: AppColors.primary),
+          SizedBox(width: 12.w),
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w500,
+                  color: textColor)),
+          const Spacer(),
+          Icon(Icons.arrow_forward_ios, size: 14.sp, color: AppColors.primary),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyTabContent(String message, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 48.h),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.inter(
+            fontSize: 14.sp,
+            color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+      ),
+    );
+  }
+
+  // ── Description card ──────────────────────────────────────────────────────
+
+  Widget _buildDescriptionCard(String desc, bool isDark) {
+    const threshold = 200;
+    final isLong = desc.length > threshold;
+    final displayText =
+        isLong && !_descExpanded ? '${desc.substring(0, threshold)}...' : desc;
+    final borderColor =
+        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
+    final textColor = isDark ? Colors.grey.shade300 : const Color(0xFF444444);
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(10.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(displayText,
+              style: GoogleFonts.inter(
+                  fontSize: 13.sp, color: textColor, height: 1.6)),
+          if (isLong) ...[
+            SizedBox(height: 6.h),
+            GestureDetector(
+              onTap: () => setState(() => _descExpanded = !_descExpanded),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _descExpanded ? 'Show less' : 'Read More',
+                    style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary),
+                  ),
+                  SizedBox(width: 4.w),
+                  Icon(
+                    _descExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_right,
+                    size: 14.sp,
+                    color: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── Property Details ──────────────────────────────────────────────────────
+
+  Widget _buildPropertyDetailsSection(AnnouncementModel a, bool isDark) {
+    final items = <_DetailItem>[];
+    if (a.propertyType != null) {
+      items.add(_DetailItem(Icons.home_outlined, 'Type', a.propertyType!));
+    }
+    if (a.floor != null && a.totalFloors != null) {
+      items.add(
+          _DetailItem(Icons.stairs, 'Floor', '${a.floor} of ${a.totalFloors}'));
+    }
+    if (a.propertySize != null) {
+      items.add(_DetailItem(Icons.open_in_full, 'Area (sqm)',
+          '${a.propertySize!.sqm.toStringAsFixed(0)} sqm'));
+    }
+    if (a.sqft != null) {
+      items.add(_DetailItem(Icons.square_foot, 'Area', '${a.sqft} sqft'));
+    }
+    if (a.proposalsLimit != null) {
+      items.add(_DetailItem(
+          Icons.people_outline, 'Proposal Limit', '${a.proposalsLimit}'));
+    }
+    if (a.brokkeragePercent != null) {
+      items.add(
+          _DetailItem(Icons.percent, 'Brokerage', '${a.brokkeragePercent}%'));
+    }
+
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final outerBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final outerBorder =
+        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: outerBg,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: outerBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Property Details', isDark),
+          SizedBox(height: 14.h),
+          LayoutBuilder(
+            builder: (_, constraints) {
+              final cellW = (constraints.maxWidth - 2 * 8.w) / 3;
+              return Wrap(
+                spacing: 8.w,
+                runSpacing: 8.h,
+                children: items
+                    .map((item) => _buildDetailCard(item, isDark, cellW))
+                    .toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailCard(_DetailItem item, bool isDark, double cellW) {
+    final cellBg = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5);
+    final labelColor = isDark ? Colors.grey.shade500 : const Color(0xFF6C6C6C);
+    final valueColor = isDark ? Colors.white : const Color(0xFF252525);
+    final iconBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final iconBorder = AppColors.primary.withValues(alpha: 0.35);
+
+    return Container(
+      width: cellW,
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: cellBg,
+        borderRadius: BorderRadius.circular(10.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(item.label,
+              style: GoogleFonts.poppins(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w400,
+                  color: labelColor,
+                  height: 1.0)),
+          SizedBox(height: 8.h),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 26.w,
+                height: 26.w,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(6.r),
+                  border: Border.all(color: iconBorder),
+                ),
+                alignment: Alignment.center,
+                child: Icon(item.icon, size: 14.sp, color: AppColors.primary),
+              ),
+              SizedBox(width: 5.w),
+              Flexible(
+                child: Text(item.value,
+                    style: GoogleFonts.poppins(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w700,
+                        color: valueColor,
+                        height: 1.2),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Amenities ─────────────────────────────────────────────────────────────
+
+  Widget _buildAmenitiesSection(List<String> amenities, bool isDark) {
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final borderColor =
+        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
+    final itemBg = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFFAFAFA);
+    final textColor = isDark ? Colors.white : const Color(0xFF202020);
+
+    const maxVisible = 4;
+    final visible = amenities.take(maxVisible).toList();
+    final extra = amenities.length - maxVisible;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Amenities', isDark),
+          SizedBox(height: 12.h),
+          Wrap(
+            spacing: 8.w,
+            runSpacing: 8.h,
+            children: [
+              ...visible.map((label) => Container(
+                    width: (MediaQuery.of(context).size.width - 88.w) / 2,
+                    height: 38.h,
+                    padding: EdgeInsets.symmetric(horizontal: 12.w),
+                    decoration: BoxDecoration(
+                      color: itemBg,
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle_outline,
+                            size: 14.sp, color: AppColors.primary),
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: Text(label,
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w400,
+                                  color: textColor,
+                                  height: 1.0),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  )),
+              if (extra > 0)
+                Container(
+                  height: 38.h,
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  decoration: BoxDecoration(
+                    color: itemBg,
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Center(
+                    child: Text('+$extra More',
+                        style: GoogleFonts.poppins(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.primary)),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Location ──────────────────────────────────────────────────────────────
+
+  Widget _buildLocationSection(AnnouncementModel a, bool isDark) {
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final borderColor =
+        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
+    final addressColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
+    final coords = a.propertyLocation?.coordinates;
+    final hasCoords = coords != null && coords.length >= 2;
+    final lat = hasCoords ? coords[1] : 25.2048;
+    final lng = hasCoords ? coords[0] : 55.2708;
+    final locationText = _fullLocation(a);
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Location', isDark),
+          SizedBox(height: 12.h),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20.r),
+            child: Container(
+              height: 230.h,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(color: const Color(0xFFF8F8F8)),
+              ),
+              child: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: LatLng(lat, lng),
+                  zoom: 15,
+                ),
+                markers: hasCoords
+                    ? {
+                        Marker(
+                          markerId: const MarkerId('property'),
+                          position: LatLng(lat, lng),
+                          icon: BitmapDescriptor.defaultMarkerWithHue(
+                              BitmapDescriptor.hueOrange),
+                        ),
+                      }
+                    : {},
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                scrollGesturesEnabled: false,
+                zoomGesturesEnabled: false,
+                tiltGesturesEnabled: false,
+                rotateGesturesEnabled: false,
+                liteModeEnabled: true,
+              ),
+            ),
+          ),
+          SizedBox(height: 10.h),
+          Container(
+            padding: EdgeInsets.symmetric(vertical: 8.h),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: borderColor)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.location_on_rounded,
+                    size: 14.sp, color: AppColors.primary),
+                SizedBox(width: 6.w),
+                Expanded(
+                  child: Text(
+                    locationText.isNotEmpty
+                        ? locationText
+                        : 'Location unavailable',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w300,
+                        color: addressColor,
+                        height: 1.3),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                Icon(Icons.open_in_new, size: 14.sp, color: AppColors.primary),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Section title ─────────────────────────────────────────────────────────
+
+  Widget _sectionTitle(String title, bool isDark) {
+    return Row(
+      children: [
+        Container(
+          width: 3.w,
+          height: 21.h,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(2.r),
+          ),
+        ),
+        SizedBox(width: 10.w),
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w500,
+            color: isDark ? Colors.white : const Color(0xFF252525),
+            height: 1.0,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Bottom bar (broker-specific) ──────────────────────────────────────────
+
+  Widget _buildBottomBar(bool isDark, double bottomPad) {
+    final barBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final shadow = [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.08),
+        blurRadius: 14,
+        offset: const Offset(0, -4),
+      ),
+    ];
+
     if (!_detailLoaded) {
       return Container(
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
-        color: Colors.white,
+        decoration: BoxDecoration(color: barBg, boxShadow: shadow),
+        padding: EdgeInsets.fromLTRB(20.w, 14.h, 20.w, 14.h + bottomPad),
         child: Shimmer.fromColors(
-          baseColor: Colors.grey.shade200,
-          highlightColor: Colors.grey.shade100,
+          baseColor: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+          highlightColor:
+              isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade100,
           child: Container(
-            height: 44.h,
+            height: 50.h,
             decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(14.r),
+              color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(26.r),
             ),
           ),
         ),
@@ -926,124 +1391,145 @@ class _BrokerAnnouncementDetailViewState
     final Widget button;
 
     if (chatReady) {
-      // Proposal accepted — broker can now chat with the buyer.
-      button = ElevatedButton(
-        onPressed: _openChat,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          elevation: 0,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.chat_bubble_outline, size: 18.sp, color: Colors.white),
-            SizedBox(width: 8.w),
-            Text(
-              'Chat Now',
-              style: GoogleFonts.poppins(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white),
-            ),
-          ],
+      button = GestureDetector(
+        onTap: _openChat,
+        child: Container(
+          height: 50.h,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(26.r),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.chat_bubble_outline, size: 18.sp, color: Colors.white),
+              SizedBox(width: 8.w),
+              Text('Chat Now',
+                  style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white)),
+            ],
+          ),
         ),
       );
     } else if (alreadySent) {
-      // Proposal already sent — show a disabled grey state.
-      button = ElevatedButton(
-        onPressed: null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.grey.shade300,
-          disabledBackgroundColor: Colors.grey.shade300,
-          elevation: 0,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+      button = Container(
+        height: 50.h,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300,
+          borderRadius: BorderRadius.circular(26.r),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.check_circle_outline,
-                size: 18.sp, color: Colors.grey.shade600),
+                size: 18.sp,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
             SizedBox(width: 8.w),
-            Text(
-              'Proposal Sent',
-              style: GoogleFonts.poppins(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600),
-            ),
+            Text('Proposal Sent',
+                style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color:
+                        isDark ? Colors.grey.shade500 : Colors.grey.shade600)),
           ],
         ),
       );
     } else {
-      // No proposal yet — let the broker send one.
-      button = ElevatedButton(
-        onPressed: _showProposalSheet,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          elevation: 0,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.handshake_outlined, size: 18.sp, color: Colors.white),
-            SizedBox(width: 8.w),
-            Text(
-              'Send Proposal',
-              style: GoogleFonts.poppins(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white),
+      // Same glassmorphism pill treatment as the user-side "Interested
+      // Brokers" tile (blur:12, translucent #E1E1E180, r:77) — just wired
+      // up as a tappable CTA instead of a navigation row.
+      return Padding(
+        padding: EdgeInsets.fromLTRB(44.w, 0, 44.w, 10.h + bottomPad),
+        child: GestureDetector(
+          onTap: _showProposalSheet,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(77.r),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                height: 67.h,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0x80333333)
+                      : const Color(0x80E1E1E1),
+                  borderRadius: BorderRadius.circular(77.r),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.handshake_outlined,
+                        size: 20.sp, color: AppColors.primary),
+                    SizedBox(width: 8.w),
+                    Text('Send Proposal',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        )),
+                  ],
+                ),
+              ),
             ),
-          ],
+          ),
         ),
       );
     }
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.07),
-            blurRadius: 14,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        height: 44.h,
-        child: button,
-      ),
+      decoration: BoxDecoration(color: barBg, boxShadow: shadow),
+      padding: EdgeInsets.fromLTRB(20.w, 14.h, 20.w, 14.h + bottomPad),
+      child: SizedBox(width: double.infinity, child: button),
+    );
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  Widget _shimmerBox() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Container(color: Colors.grey.shade300),
     );
   }
 }
 
-// ── Helper data classes ────────────────────────────────────────────────────
+// ── Data models ───────────────────────────────────────────────────────────────
 
-class _StatChip {
+class _StatItem {
   final IconData icon;
+  final String value;
   final String label;
-  const _StatChip(this.icon, this.label);
+  const _StatItem(this.icon, this.value, this.label);
 }
 
 class _DetailItem {
+  final IconData icon;
   final String label;
   final String value;
-  const _DetailItem(this.label, this.value);
+  const _DetailItem(this.icon, this.label, this.value);
 }
 
-// ── Proposal dialog ────────────────────────────────────────────────────────
+class _TabDef {
+  final IconData icon;
+  final String label;
+  const _TabDef(this.icon, this.label);
+}
+
+// ── Proposal dialog ───────────────────────────────────────────────────────────
 
 class _ProposalSheet extends StatefulWidget {
   final String announcementId;
-  const _ProposalSheet({required this.announcementId});
+  final bool isDark;
+
+  const _ProposalSheet({
+    required this.announcementId,
+    required this.isDark,
+  });
 
   @override
   State<_ProposalSheet> createState() => _ProposalSheetState();
@@ -1107,12 +1593,17 @@ class _ProposalSheetState extends State<_ProposalSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final titleColor = isDark ? Colors.white : Colors.black;
+    final fieldBorder = isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
+    final hintColor = isDark ? Colors.grey.shade600 : Colors.grey.shade400;
+    final textColor = isDark ? Colors.white : Colors.black87;
     final charCount = _controller.text.trim().length;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 20.h),
       child: _submitted
-          ? _buildSuccess()
+          ? _buildSuccess(isDark)
           : Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1122,13 +1613,13 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                   style: GoogleFonts.poppins(
                     fontSize: 15.sp,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black,
+                    color: titleColor,
                   ),
                 ),
                 SizedBox(height: 14.h),
                 Container(
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: fieldBorder),
                     borderRadius: BorderRadius.circular(10.r),
                   ),
                   child: TextField(
@@ -1143,12 +1634,11 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                     inputFormatters: [
                       LengthLimitingTextInputFormatter(_maxLength)
                     ],
-                    style: GoogleFonts.inter(
-                        fontSize: 13.sp, color: Colors.black87),
+                    style: GoogleFonts.inter(fontSize: 13.sp, color: textColor),
                     decoration: InputDecoration(
                       hintText: 'Write Here...',
-                      hintStyle: GoogleFonts.inter(
-                          fontSize: 13.sp, color: Colors.grey.shade400),
+                      hintStyle:
+                          GoogleFonts.inter(fontSize: 13.sp, color: hintColor),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.all(12.w),
                     ),
@@ -1170,31 +1660,25 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                             Icon(Icons.check_circle_rounded,
                                 size: 12.sp, color: AppColors.successGreen),
                             SizedBox(width: 4.w),
-                            Text(
-                              'Looks good',
-                              style: GoogleFonts.inter(
-                                  fontSize: 11.sp,
-                                  color: AppColors.successGreen),
-                            ),
+                            Text('Looks good',
+                                style: GoogleFonts.inter(
+                                    fontSize: 11.sp,
+                                    color: AppColors.successGreen)),
                           ],
                         ),
                       const Spacer(),
-                      Text(
-                        '$charCount/$_maxLength',
-                        style: GoogleFonts.inter(
-                            fontSize: 11.sp, color: Colors.grey.shade500),
-                      ),
+                      Text('$charCount/$_maxLength',
+                          style: GoogleFonts.inter(
+                              fontSize: 11.sp, color: Colors.grey.shade500)),
                     ],
                   ),
                 ),
                 if (_error != null) ...[
                   SizedBox(height: 8.h),
-                  Text(
-                    _error!,
-                    style: GoogleFonts.inter(
-                        fontSize: 12.sp, color: Colors.red.shade600),
-                    textAlign: TextAlign.center,
-                  ),
+                  Text(_error!,
+                      style: GoogleFonts.inter(
+                          fontSize: 12.sp, color: Colors.red.shade600),
+                      textAlign: TextAlign.center),
                 ],
                 SizedBox(height: 14.h),
                 SizedBox(
@@ -1207,7 +1691,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                       disabledBackgroundColor:
                           AppColors.primary.withValues(alpha: 0.6),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.r)),
+                          borderRadius: BorderRadius.circular(14.r)),
                       elevation: 0,
                     ),
                     child: _isLoading
@@ -1217,13 +1701,11 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                             child: const CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2.5),
                           )
-                        : Text(
-                            'Send Proposal Request',
+                        : Text('Send Proposal Request',
                             style: GoogleFonts.poppins(
                                 fontSize: 15.sp,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white),
-                          ),
+                                color: Colors.white)),
                   ),
                 ),
               ],
@@ -1231,7 +1713,8 @@ class _ProposalSheetState extends State<_ProposalSheet> {
     );
   }
 
-  Widget _buildSuccess() {
+  Widget _buildSuccess(bool isDark) {
+    final titleColor = isDark ? Colors.white : Colors.black;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1244,61 +1727,18 @@ class _ProposalSheetState extends State<_ProposalSheet> {
           child: Icon(Icons.check, color: Colors.white, size: 32.sp),
         ),
         SizedBox(height: 12.h),
-        Text(
-          'Proposal Sent!',
-          style: GoogleFonts.poppins(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w700,
-              color: Colors.black),
-        ),
+        Text('Proposal Sent!',
+            style: GoogleFonts.poppins(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w700,
+                color: titleColor)),
         SizedBox(height: 6.h),
-        Text(
-          'Your proposal has been sent to the buyer.',
-          style: GoogleFonts.inter(fontSize: 13.sp, color: AppColors.textHint),
-          textAlign: TextAlign.center,
-        ),
+        Text('Your proposal has been sent to the buyer.',
+            style:
+                GoogleFonts.inter(fontSize: 13.sp, color: AppColors.textHint),
+            textAlign: TextAlign.center),
         SizedBox(height: 20.h),
       ],
     );
   }
-}
-
-// ── Map fallback painter ───────────────────────────────────────────────────
-
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height),
-        Paint()..color = const Color(0xFFE8EFF4));
-    final road = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 10;
-    final minor = Paint()
-      ..color = const Color(0xFFD6E0E8)
-      ..strokeWidth = 1;
-    for (double y = 30; y < size.height; y += 50) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), road);
-    }
-    for (double x = 40; x < size.width; x += 60) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), road);
-    }
-    for (double y = 0; y < size.height; y += 25) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), minor);
-    }
-    for (double x = 0; x < size.width; x += 30) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), minor);
-    }
-    final block = Paint()..color = const Color(0xFFCDD8E0);
-    canvas.drawRect(Rect.fromLTWH(10, 40, 50, 30), block);
-    canvas.drawRect(Rect.fromLTWH(80, 10, 40, 40), block);
-    canvas.drawRect(Rect.fromLTWH(145, 55, 55, 25), block);
-    canvas.drawRect(Rect.fromLTWH(220, 15, 35, 45), block);
-    canvas.drawRect(Rect.fromLTWH(10, 90, 60, 35), block);
-    canvas.drawRect(Rect.fromLTWH(90, 85, 45, 30), block);
-    canvas.drawRect(Rect.fromLTWH(160, 90, 50, 28), block);
-    canvas.drawRect(Rect.fromLTWH(230, 80, 40, 35), block);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

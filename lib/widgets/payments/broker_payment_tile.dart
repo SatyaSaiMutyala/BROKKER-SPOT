@@ -20,6 +20,7 @@ class BrokerPaymentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -27,23 +28,24 @@ class BrokerPaymentTile extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         child: Row(
           children: [
-            _buildAvatarStack(),
+            _buildAvatarStack(isDark),
             SizedBox(width: 12.w),
-            Expanded(child: _buildNameColumn()),
-            _buildAmount(),
+            Expanded(child: _buildNameColumn(isDark)),
+            _buildAmount(isDark),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAvatarStack() {
+  Widget _buildAvatarStack(bool isDark) {
+    final smallBorder = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
     return SizedBox(
       width: 56.w,
       height: 56.w,
       child: Stack(
         children: [
-          // Main large avatar
           Positioned(
             left: 0,
             top: 0,
@@ -70,7 +72,6 @@ class BrokerPaymentTile extends StatelessWidget {
               ),
             ),
           ),
-          // Small overlapping avatar at bottom-right
           Positioned(
             right: 0,
             bottom: 0,
@@ -79,7 +80,7 @@ class BrokerPaymentTile extends StatelessWidget {
               height: 26.w,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(color: smallBorder, width: 2),
               ),
               child: ClipOval(
                 child: Image.asset(
@@ -102,7 +103,8 @@ class BrokerPaymentTile extends StatelessWidget {
     );
   }
 
-  Widget _buildNameColumn() {
+  Widget _buildNameColumn(bool isDark) {
+    final nameColor = isDark ? Colors.white : AppColors.textBlack;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -111,7 +113,7 @@ class BrokerPaymentTile extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontSize: 14.sp,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-            color: AppColors.textBlack.withValues(alpha: 0.6),
+            color: nameColor,
           ),
         ),
         SizedBox(height: 2.h),
@@ -127,13 +129,13 @@ class BrokerPaymentTile extends StatelessWidget {
     );
   }
 
-  Widget _buildAmount() {
+  Widget _buildAmount(bool isDark) {
     return Text(
       'AED $formattedAmount',
       style: GoogleFonts.poppins(
         fontSize: 13.sp,
         fontWeight: FontWeight.w600,
-        color: Colors.black87,
+        color: isDark ? Colors.white : Colors.black87,
       ),
     );
   }

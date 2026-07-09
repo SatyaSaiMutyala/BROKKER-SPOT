@@ -18,36 +18,50 @@ class ConversationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = conversation.user;
     final url = user.profileImageUrl ?? '';
-    return InkWell(
+    final nameColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final msgColor =
+        isDark ? const Color(0xFF9E9E9E) : Colors.grey.shade600;
+    final timeColor = Colors.grey.shade500;
+    final hasUnread = conversation.unseenCount > 0;
+
+    return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
         child: Row(
           children: [
-            ClipOval(
-              child: url.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: url,
-                      width: 48.w,
-                      height: 48.w,
-                      fit: BoxFit.cover,
-                      // Decode only what we render — these avatars are ~48dp;
-                      // downloading + decoding a 2 MP photo for that is what
-                      // makes the row sit grey for seconds.
-                      memCacheWidth: 144,
-                      memCacheHeight: 144,
-                      maxWidthDiskCache: 300,
-                      maxHeightDiskCache: 300,
-                      fadeInDuration: Duration.zero,
-                      placeholderFadeInDuration: Duration.zero,
-                      errorWidget: (_, __, ___) => _avatarFallback(),
-                      placeholder: (_, __) => _avatarFallback(),
-                    )
-                  : _avatarFallback(),
+            // Avatar with gold border
+            Container(
+              width: 54.w,
+              height: 54.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.goldAccent, width: 1.5),
+              ),
+              child: ClipOval(
+                child: url.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: url,
+                        width: 54.w,
+                        height: 54.w,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 162,
+                        memCacheHeight: 162,
+                        maxWidthDiskCache: 300,
+                        maxHeightDiskCache: 300,
+                        fadeInDuration: Duration.zero,
+                        placeholderFadeInDuration: Duration.zero,
+                        errorWidget: (_, __, ___) => _avatarFallback(isDark),
+                        placeholder: (_, __) => _avatarFallback(isDark),
+                      )
+                    : _avatarFallback(isDark),
+              ),
             ),
-            SizedBox(width: 12.w),
+            SizedBox(width: 14.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,19 +69,27 @@ class ConversationTile extends StatelessWidget {
                   Text(
                     user.name ?? 'User',
                     style: GoogleFonts.inter(
-                      fontSize: 14.sp,
+                      fontSize: 15.sp,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black,
+                      color: nameColor,
+                      height: 1.2,
                     ),
                   ),
-                  SizedBox(height: 2.h),
+                  SizedBox(height: 4.h),
                   Text(
                     conversation.lastMessage?.trim().isNotEmpty == true
                         ? conversation.lastMessage!
                         : 'Tap to start a chat',
                     style: GoogleFonts.inter(
                       fontSize: 12.sp,
-                      color: Colors.grey.shade600,
+                      fontWeight: hasUnread
+                          ? FontWeight.w500
+                          : FontWeight.w400,
+                      color: hasUnread
+                          ? (isDark
+                              ? Colors.white.withValues(alpha: 0.85)
+                              : const Color(0xFF444444))
+                          : msgColor,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -75,22 +97,23 @@ class ConversationTile extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(width: 8.w),
+            SizedBox(width: 10.w),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   _relative(conversation.lastMessageAt),
                   style: GoogleFonts.inter(
                     fontSize: 11.sp,
-                    color: Colors.grey.shade500,
+                    color: timeColor,
                   ),
                 ),
-                SizedBox(height: 4.h),
-                if (conversation.unseenCount > 0)
+                SizedBox(height: 5.h),
+                if (hasUnread)
                   Container(
-                    constraints: BoxConstraints(minWidth: 18.w),
-                    height: 18.w,
+                    constraints: BoxConstraints(minWidth: 22.w),
+                    height: 22.w,
                     padding: EdgeInsets.symmetric(horizontal: 6.w),
                     alignment: Alignment.center,
                     decoration: const BoxDecoration(
@@ -107,7 +130,9 @@ class ConversationTile extends StatelessWidget {
                         color: Colors.white,
                       ),
                     ),
-                  ),
+                  )
+                else
+                  SizedBox(height: 22.w),
               ],
             ),
           ],
@@ -116,11 +141,14 @@ class ConversationTile extends StatelessWidget {
     );
   }
 
-  Widget _avatarFallback() => Container(
-        width: 48.w,
-        height: 48.w,
-        color: Colors.grey.shade200,
-        child: Icon(Icons.person_outline, color: Colors.grey.shade400),
+  Widget _avatarFallback(bool isDark) => Container(
+        width: 54.w,
+        height: 54.w,
+        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+        child: Icon(
+          Icons.person_outline,
+          color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+        ),
       );
 
   static String _relative(DateTime? d) {

@@ -16,27 +16,34 @@ class DealCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final borderColor =
+        isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200;
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w),
       padding: EdgeInsets.all(12.w),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(14.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: borderColor),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Row(
         children: [
           _buildPropertyImage(),
           SizedBox(width: 12.w),
-          Expanded(child: _buildProjectInfo()),
-          _buildAvatarStack(),
+          Expanded(child: _buildProjectInfo(isDark)),
+          _buildAvatarStack(isDark),
         ],
       ),
     );
@@ -64,10 +71,14 @@ class DealCard extends StatelessWidget {
     );
   }
 
-  Widget _buildProjectInfo() {
+  Widget _buildProjectInfo(bool isDark) {
     final bool isSuccess = deal.status?.toLowerCase() == 'successfully';
-    final Color statusColor = isSuccess ? Color(0xFF6CBB1D) : const Color(0xFFD4A017);
+    final Color statusColor =
+        isSuccess ? const Color(0xFF6CBB1D) : const Color(0xFFD4A017);
     final String statusText = isSuccess ? 'Successfully' : 'Inprocess';
+    final titleColor = isDark ? Colors.white : Colors.black;
+    final subtitleColor =
+        isDark ? Colors.grey.shade400 : Colors.grey.shade600;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,19 +88,19 @@ class DealCard extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 16.sp,
             fontWeight: FontWeight.w700,
-            color: Colors.black,
+            color: titleColor,
           ),
         ),
         SizedBox(height: 4.h),
         Row(
           children: [
-            Icon(Icons.bed_outlined, size: 14.sp, color: Colors.grey),
+            Icon(Icons.bed_outlined, size: 14.sp, color: subtitleColor),
             SizedBox(width: 4.w),
             Text(
               deal.propertyType ?? '',
               style: GoogleFonts.inter(
                 fontSize: 12.sp,
-                color: Colors.grey.shade600,
+                color: subtitleColor,
               ),
             ),
           ],
@@ -141,13 +152,14 @@ class DealCard extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatarStack() {
+  Widget _buildAvatarStack(bool isDark) {
+    final smallBorder = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
     return SizedBox(
       width: 50.w,
       height: 50.w,
       child: Stack(
         children: [
-          // Large avatar (property/main)
           Positioned(
             left: 0,
             top: 0,
@@ -174,7 +186,6 @@ class DealCard extends StatelessWidget {
               ),
             ),
           ),
-          // Small overlapping avatar (broker)
           Positioned(
             right: 0,
             bottom: 0,
@@ -183,7 +194,7 @@ class DealCard extends StatelessWidget {
               height: 24.w,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(color: smallBorder, width: 2),
               ),
               child: ClipOval(
                 child: Image.asset(
