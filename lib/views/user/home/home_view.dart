@@ -1,9 +1,9 @@
+import 'dart:math' show Random;
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
 import 'package:brokkerspot/views/notifications/notifications_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
-import 'package:brokkerspot/views/user/profile/profile_view.dart';
 import 'package:brokkerspot/views/user/home/more_property_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -14,12 +14,13 @@ import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/widgets/home/story_circle.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:brokkerspot/widgets/home/home_app_bar.dart';
-import 'package:brokkerspot/views/user/home/property_detail_view.dart';
 import 'package:brokkerspot/views/user/home/search_view.dart';
+import 'package:brokkerspot/views/user/settings/settings_view.dart';
 import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 
 class HomeView extends StatefulWidget {
-  const HomeView({super.key});
+  final VoidCallback? onAccountTap;
+  const HomeView({super.key, this.onAccountTap});
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -52,8 +53,9 @@ class _HomeViewState extends State<HomeView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF090B11) : Colors.white,
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
@@ -65,12 +67,12 @@ class _HomeViewState extends State<HomeView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20.w),
+                  padding: EdgeInsets.symmetric(horizontal: 6.w),
                   child: _buildHeader(theme),
                 ),
                 SizedBox(height: 16.h),
                 _buildStoryRow(),
-                SizedBox(height: 6.h),
+                SizedBox(height: 8.h),
                 _buildBannerImage(),
                 SizedBox(height: 16.h),
                 _buildSectionHeader(
@@ -78,16 +80,15 @@ class _HomeViewState extends State<HomeView> {
                   title: 'Announcements',
                   onMore: () => Get.to(() => const MorePropertyView()),
                 ),
-                SizedBox(height: 12.h),
+                SizedBox(height: 16.h),
                 _buildAnnouncementsList(),
                 SizedBox(height: 16.h),
                 _buildSectionHeader(
                   theme: theme,
                   title: 'Popular Announcements',
-                  onMore: () => Get.to(
-                      () => MorePropertyView(staticList: _getMockPopular())),
+                  onMore: () => Get.to(() => const MorePropertyView()),
                 ),
-                SizedBox(height: 12.h),
+                SizedBox(height: 16.h),
                 _buildPopularList(),
                 SizedBox(height: 100.h),
               ],
@@ -107,14 +108,14 @@ class _HomeViewState extends State<HomeView> {
       return HomeAppBar(
         avatarUrl: _profileCtrl.profileImage.value.trim(),
         isAvatarLoading: isProfileLoading,
-        greetingName:
-            _profileCtrl.isGuest ? 'Guest' : _profileCtrl.userName.value.split(' ').first,
+        greetingName: _profileCtrl.isGuest
+            ? 'Guest'
+            : _profileCtrl.userName.value.split(' ').first,
         isGreetingLoading: isProfileLoading,
         location: 'Dubai',
         notificationCount: _notificationCtrl.unseenCount.value,
-        onAvatarTap: () {
-          if (!_profileCtrl.isGuest) Get.to(() => ProfileView());
-        },
+        onAvatarTap: () => widget.onAccountTap?.call(),
+        onLocationTap: () => Get.to(() => SettingsView()),
         onNotificationTap: () => Get.to(() => const NotificationsView()),
         onSearchTap: () => Get.to(() => const SearchView()),
       );
@@ -128,9 +129,9 @@ class _HomeViewState extends State<HomeView> {
       height: 94.h,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: 14.w),
+        padding: EdgeInsets.symmetric(horizontal: 6.w),
         itemCount: _stories.length,
-        separatorBuilder: (_, __) => SizedBox(width: 12.w),
+        separatorBuilder: (_, __) => SizedBox(width: 8.w),
         itemBuilder: (_, i) => StoryCircle(
           name: _stories[i]['name']!,
           imageUrl: _stories[i]['image'],
@@ -143,7 +144,7 @@ class _HomeViewState extends State<HomeView> {
 
   Widget _buildBannerImage() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 19.w),
+      padding: EdgeInsets.symmetric(horizontal: 6.w),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10.r),
         child: Image.asset(
@@ -168,7 +169,7 @@ class _HomeViewState extends State<HomeView> {
     required VoidCallback onMore,
   }) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.w),
+      padding: EdgeInsets.symmetric(horizontal: 6.w),
       child: Row(
         children: [
           Text(
@@ -212,24 +213,27 @@ class _HomeViewState extends State<HomeView> {
       if (ctrl.homeAnnouncements.isEmpty) {
         return _buildEmptyState();
       }
-      return SizedBox(
-        height: 273.h,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.symmetric(horizontal: 20.w),
-          itemCount: ctrl.homeAnnouncements.length,
-          separatorBuilder: (_, __) => SizedBox(width: 14.w),
-          itemBuilder: (_, i) {
-            final a = ctrl.homeAnnouncements[i];
-            return HomeAnnouncementCard(
-              announcement: a,
-              index: i,
-              onTap: () => Get.to(() => AnnouncementDetailView(
-                    announcement: a,
-                    isOwner: false,
-                  )),
-            );
-          },
+      return Material(
+        color: Colors.transparent,
+        child: SizedBox(
+          height: 263.h,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: 6.w),
+            itemCount: ctrl.homeAnnouncements.length,
+            separatorBuilder: (_, __) => SizedBox(width: 8.w),
+            itemBuilder: (_, i) {
+              final a = ctrl.homeAnnouncements[i];
+              return HomeAnnouncementCard(
+                announcement: a,
+                index: i,
+                onTap: () => Get.to(() => AnnouncementDetailView(
+                      announcement: a,
+                      isOwner: false,
+                    )),
+              );
+            },
+          ),
         ),
       );
     });
@@ -238,36 +242,45 @@ class _HomeViewState extends State<HomeView> {
   // ── Popular list (mock) ───────────────────────────────────────────────────────
 
   Widget _buildPopularList() {
-    final items = _getMockPopular();
-    return SizedBox(
-      height: 273.h,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: 20.w),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => SizedBox(width: 14.w),
-        itemBuilder: (_, i) => HomeAnnouncementCard(
-          announcement: items[i],
-          index: i,
-          showAvatar: false,
-          onTap: () => Get.to(() => PropertyDetailView(
-                announcement: items[i],
-                sectionTitle: items[i].propertyName ?? '',
-              )),
+    return Obx(() {
+      final all = _announcementCtrl.homeAnnouncements.toList();
+      if (all.isEmpty) return const SizedBox.shrink();
+      final rng = Random();
+      final pool = List<AnnouncementModel>.from(all)..shuffle(rng);
+      final items = pool.take(5).toList();
+      return Material(
+        color: Colors.transparent,
+        child: SizedBox(
+          height: 263.h,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: 6.w),
+            itemCount: items.length,
+            separatorBuilder: (_, __) => SizedBox(width: 8.w),
+            itemBuilder: (_, i) => HomeAnnouncementCard(
+              announcement: items[i],
+              index: i,
+              showAvatar: false,
+              onTap: () => Get.to(() => AnnouncementDetailView(
+                    announcement: items[i],
+                    isOwner: false,
+                  )),
+            ),
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   // ── States ──────────────────────────────────────────────────────────────────
 
   Widget _buildShimmerList() {
     return SizedBox(
-      height: 273.h,
+      height: 263.h,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.symmetric(horizontal: 20.w),
+        padding: EdgeInsets.symmetric(horizontal: 6.w),
         itemCount: 3,
         separatorBuilder: (_, __) => SizedBox(width: 14.w),
         itemBuilder: (_, __) => Container(
@@ -285,7 +298,7 @@ class _HomeViewState extends State<HomeView> {
 
   Widget _buildErrorState({required VoidCallback onRetry}) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
+      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 24.h),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -310,7 +323,7 @@ class _HomeViewState extends State<HomeView> {
 
   Widget _buildEmptyState() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 32.h),
+      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 32.h),
       child: Center(
         child: Text(
           'No announcements yet',
@@ -320,29 +333,4 @@ class _HomeViewState extends State<HomeView> {
       ),
     );
   }
-
-  // ── Mock data ────────────────────────────────────────────────────────────────
-
-  List<AnnouncementModel> _getMockPopular() => [
-        AnnouncementModel(
-          listingType: 'Sell',
-          propertyType: 'Villa',
-          imageUrls: ['assets/images/room.png'],
-          price: 1000000,
-          currency: 'AED',
-          propertyName: 'SAFA TWO de GRISOGONO',
-          location: 'Dubai, United Arab Emirates',
-          timeAgo: '15 min ago',
-        ),
-        AnnouncementModel(
-          listingType: 'Rent',
-          propertyType: 'Apartment',
-          imageUrls: ['assets/images/room.png'],
-          price: 1200000,
-          currency: 'AED',
-          propertyName: 'DAMAC LAGOONS',
-          location: 'Dubai, United Arab Emirates',
-          timeAgo: '3 hr ago',
-        ),
-      ];
 }

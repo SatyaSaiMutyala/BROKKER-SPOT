@@ -769,10 +769,10 @@ class _BrokerAnnouncementDetailViewState
 
   Widget _buildTabBar(bool isDark) {
     final tabs = [
-      _TabDef(Icons.home_outlined, 'Overview'),
-      _TabDef(Icons.photo_library_outlined, 'Photos'),
-      _TabDef(Icons.dashboard_outlined, 'Floor Plan'),
-      _TabDef(Icons.description_outlined, 'Documents'),
+      _TabDef('assets/images/detail_home_icon.png', 'Overview'),
+      _TabDef('assets/images/photo_icon.png', 'Photos'),
+      _TabDef('assets/images/floor_plan_icon.png', 'Floor Plan'),
+      _TabDef('assets/images/document_icon.png', 'Documents'),
     ];
 
     final outerBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
@@ -810,8 +810,9 @@ class _BrokerAnnouncementDetailViewState
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(tabs[i].icon,
-                        size: 22.sp,
+                    Image.asset(tabs[i].iconAsset,
+                        width: 22.sp,
+                        height: 22.sp,
                         color: isActive ? AppColors.primary : inactiveColor),
                     SizedBox(height: 4.h),
                     Text(
@@ -985,20 +986,26 @@ class _BrokerAnnouncementDetailViewState
     final isLong = desc.length > threshold;
     final displayText =
         isLong && !_descExpanded ? '${desc.substring(0, threshold)}...' : desc;
-    final borderColor =
+    final outerBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final outerBorder =
         isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
     final textColor = isDark ? Colors.grey.shade300 : const Color(0xFF444444);
 
+    // Same outer card treatment as the Property Details section — bg +
+    // border + gold section title — so the two sections read as one family.
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(14.w),
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
-        border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(10.r),
+        color: outerBg,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: outerBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _sectionTitle('About Property', isDark),
+          SizedBox(height: 14.h),
           Text(displayText,
               style: GoogleFonts.inter(
                   fontSize: 13.sp, color: textColor, height: 1.6)),
@@ -1515,9 +1522,9 @@ class _DetailItem {
 }
 
 class _TabDef {
-  final IconData icon;
+  final String iconAsset;
   final String label;
-  const _TabDef(this.icon, this.label);
+  const _TabDef(this.iconAsset, this.label);
 }
 
 // ── Proposal dialog ───────────────────────────────────────────────────────────

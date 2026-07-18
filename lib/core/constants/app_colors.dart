@@ -36,4 +36,21 @@ class AppColors {
   static const Color teal = Color(0xFF2B8B8B);
   static const Color tealLight = Color(0xFFE8F5F5);
   static const Color activeGreen = Color(0xFF4CAF50);
+
+  // App Bar — dark theme
+  static const Color appBarDarkBg = Color(0xFF090B11);
+  static const Color appBarDarkBorder = Color(0xFF1B1D27);
+
+  // App Bar — light theme
+  static const Color appBarLightBg = Color(0xFFFFFFFF);
+  static const Color appBarLightBorder = Color(0xFFE8E8E8);
+
+  // Back button circle — dark theme gradient fill + icon
+  static const Color backBtnDarkFillTop = Color(0xFF3A3A3C); // lighter (top-left)
+  static const Color backBtnDarkFillBottom = Color(0xFF1C1C1E); // darker (bottom-right)
+  static const Color backBtnDarkIcon = Color(0xD1FFFFFF);
+
+  // Back button circle — light theme
+  static const Color backBtnLightBg = Color(0xFFF2F2F2);
+  static const Color backBtnLightIcon = Color(0xDD000000);
 }

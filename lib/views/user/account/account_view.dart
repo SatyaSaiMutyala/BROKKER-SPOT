@@ -31,7 +31,8 @@ class AccountView extends StatelessWidget {
         : Get.put(ProfileController());
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor:
+          isDark ? const Color(0xFF090B11) : theme.scaffoldBackgroundColor,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
@@ -53,7 +54,7 @@ class AccountView extends StatelessWidget {
                 ),
               ),
 
-              SizedBox(height: 30.h),
+              SizedBox(height: 48.h),
 
               // ── Profile avatar + name + email ────────────────────────────
               Center(child: _buildProfile(profileCtrl, isGuest, theme, isDark)),
@@ -71,13 +72,13 @@ class AccountView extends StatelessWidget {
                     isDark: isDark,
                     onTap: () => Get.to(() => const MyInformationView()),
                   ),
-                  _tile(
-                    title: 'My Deals',
-                    iconAsset: 'broker_mydeal_icon.png',
-                    enabled: !isGuest,
-                    isDark: isDark,
-                    onTap: () => Get.to(() => const MyProjectDealsView()),
-                  ),
+                  // _tile(
+                  //   title: 'My Deals',
+                  //   iconAsset: 'broker_mydeal_icon.png',
+                  //   enabled: !isGuest,
+                  //   isDark: isDark,
+                  //   onTap: () => Get.to(() => const MyProjectDealsView()),
+                  // ),
                   _tile(
                     title: 'My Announcements',
                     iconAsset: 'broker_announcement.png',
@@ -176,7 +177,7 @@ class AccountView extends StatelessWidget {
                   : _avatarPlaceholder(isDark),
             ),
           ),
-          SizedBox(height: 12.h),
+          SizedBox(height: 20.h),
           Text(
             name,
             style: GoogleFonts.poppins(
@@ -187,7 +188,7 @@ class AccountView extends StatelessWidget {
             ),
           ),
           if (email.isNotEmpty) ...[
-            SizedBox(height: 4.h),
+            SizedBox(height: 8.h),
             Text(
               email,
               style: GoogleFonts.poppins(
@@ -218,10 +219,10 @@ class AccountView extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: isDark ? const Color(0xFF090B11) : Colors.white,
         borderRadius: BorderRadius.circular(16.r),
         border: Border.all(
-          color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE8E8E8),
+          color: isDark ? const Color(0xFF2A2D3C) : const Color(0xFFE8E8E8),
         ),
       ),
       child: Column(
@@ -251,7 +252,7 @@ class AccountView extends StatelessWidget {
               child: Text(
                 title,
                 style: GoogleFonts.poppins(
-                  fontSize: 14.sp,
+                  fontSize: 15.sp,
                   fontWeight: FontWeight.w500,
                   color: enabled
                       ? (isDark ? Colors.white : const Color(0xFF1A1A1A))
@@ -265,8 +266,8 @@ class AccountView extends StatelessWidget {
               opacity: enabled ? 1.0 : 0.4,
               child: Image.asset(
                 'assets/images/$iconAsset',
-                width: 21.w,
-                height: 21.w,
+                width: 26.w,
+                height: 26.w,
                 color: AppColors.primary,
                 colorBlendMode: BlendMode.srcIn,
               ),
@@ -278,7 +279,6 @@ class AccountView extends StatelessWidget {
   }
 
   // ── Separator inside card ──────────────────────────────────────────────────
-
 }
 
 // ── Dialogs (unchanged) ───────────────────────────────────────────────────────

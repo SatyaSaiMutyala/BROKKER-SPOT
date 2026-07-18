@@ -1,5 +1,7 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/settings/change_password_controller.dart';
+import 'package:brokkerspot/widgets/common/custom_back_button.dart';
+import 'package:brokkerspot/widgets/common/custom_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -15,10 +17,6 @@ class ChangePasswordView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final inputTextColor = isDark ? Colors.white : Colors.black87;
-    final hintColor = isDark ? Colors.grey.shade500 : Colors.grey;
-    final underlineColor =
-        isDark ? const Color(0xFF3A3A3A) : const Color(0xFFB5B5B5);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -75,77 +73,43 @@ class ChangePasswordView extends StatelessWidget {
                           SizedBox(height: 40.h),
 
                           // Old Password field
-                          Obx(() => TextField(
+                          Obx(() => CustomTextField(
                                 controller: controller.oldPasswordController,
+                                hintText: 'Current Password',
                                 obscureText:
                                     controller.obscureOldPassword.value,
+                                isDark: isDark,
                                 onChanged: (_) => controller.validateForm(),
-                                style: GoogleFonts.roboto(
-                                  fontSize: 15.sp,
-                                  color: inputTextColor,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'Current Password',
-                                  hintStyle: GoogleFonts.roboto(
-                                    fontSize: 15.sp,
-                                    color: hintColor,
-                                  ),
-                                  suffixIcon: GestureDetector(
-                                    onTap: controller.toggleOldPassword,
-                                    child: Icon(
-                                      controller.obscureOldPassword.value
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                      color: AppColors.primary,
-                                      size: 22.sp,
-                                    ),
-                                  ),
-                                  enabledBorder: UnderlineInputBorder(
-                                    borderSide:
-                                        BorderSide(color: underlineColor),
-                                  ),
-                                  focusedBorder: UnderlineInputBorder(
-                                    borderSide:
-                                        BorderSide(color: underlineColor),
+                                suffixWidget: GestureDetector(
+                                  onTap: controller.toggleOldPassword,
+                                  child: Icon(
+                                    controller.obscureOldPassword.value
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: AppColors.primary,
+                                    size: 22.sp,
                                   ),
                                 ),
                               )),
                           SizedBox(height: 20.h),
 
                           // New Password field
-                          Obx(() => TextField(
+                          Obx(() => CustomTextField(
                                 controller: controller.newPasswordController,
+                                hintText: 'New Password',
                                 obscureText:
                                     controller.obscureNewPassword.value,
+                                isDark: isDark,
                                 onChanged: (val) =>
                                     controller.validatePassword(val),
-                                style: GoogleFonts.roboto(
-                                  fontSize: 15.sp,
-                                  color: inputTextColor,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'New Password',
-                                  hintStyle: GoogleFonts.roboto(
-                                    fontSize: 15.sp,
-                                    color: hintColor,
-                                  ),
-                                  suffixIcon: GestureDetector(
-                                    onTap: controller.toggleNewPassword,
-                                    child: Icon(
-                                      controller.obscureNewPassword.value
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                      color: AppColors.primary,
-                                      size: 22.sp,
-                                    ),
-                                  ),
-                                  enabledBorder: UnderlineInputBorder(
-                                    borderSide:
-                                        BorderSide(color: underlineColor),
-                                  ),
-                                  focusedBorder: UnderlineInputBorder(
-                                    borderSide:
-                                        BorderSide(color: underlineColor),
+                                suffixWidget: GestureDetector(
+                                  onTap: controller.toggleNewPassword,
+                                  child: Icon(
+                                    controller.obscureNewPassword.value
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: AppColors.primary,
+                                    size: 22.sp,
                                   ),
                                 ),
                               )),
@@ -171,39 +135,22 @@ class ChangePasswordView extends StatelessWidget {
                           SizedBox(height: 20.h),
 
                           // Confirm Password field
-                          Obx(() => TextField(
+                          Obx(() => CustomTextField(
                                 controller:
                                     controller.confirmPasswordController,
+                                hintText: 'Confirm New Password',
                                 obscureText:
                                     controller.obscureConfirmPassword.value,
+                                isDark: isDark,
                                 onChanged: (_) => controller.validateForm(),
-                                style: GoogleFonts.roboto(
-                                  fontSize: 15.sp,
-                                  color: inputTextColor,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'Confirm New Password',
-                                  hintStyle: GoogleFonts.roboto(
-                                    fontSize: 15.sp,
-                                    color: hintColor,
-                                  ),
-                                  suffixIcon: GestureDetector(
-                                    onTap: controller.toggleConfirmPassword,
-                                    child: Icon(
-                                      controller.obscureConfirmPassword.value
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                      color: AppColors.primary,
-                                      size: 22.sp,
-                                    ),
-                                  ),
-                                  enabledBorder: UnderlineInputBorder(
-                                    borderSide:
-                                        BorderSide(color: underlineColor),
-                                  ),
-                                  focusedBorder: UnderlineInputBorder(
-                                    borderSide:
-                                        BorderSide(color: underlineColor),
+                                suffixWidget: GestureDetector(
+                                  onTap: controller.toggleConfirmPassword,
+                                  child: Icon(
+                                    controller.obscureConfirmPassword.value
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: AppColors.primary,
+                                    size: 22.sp,
                                   ),
                                 ),
                               )),
@@ -227,9 +174,8 @@ class ChangePasswordView extends StatelessWidget {
   // ── Top section ───────────────────────────────────────────────────────────────
 
   Widget _topSection(bool isDark) {
-    final backBorderColor =
-        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E5E5);
-    final backIconColor = isDark ? Colors.white : Colors.black87;
+    final iconColor =
+        isDark ? AppColors.backBtnDarkIcon : AppColors.backBtnLightIcon;
 
     return SizedBox(
       height: 220.h,
@@ -249,20 +195,10 @@ class ChangePasswordView extends StatelessWidget {
           Positioned(
             top: 5.h,
             left: 20.w,
-            child: InkWell(
+            child: CustomBackButton(
+              isDark: isDark,
+              iconColor: iconColor,
               onTap: () => Get.back(),
-              child: Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: backBorderColor),
-                ),
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 18,
-                  color: backIconColor,
-                ),
-              ),
             ),
           ),
         ],

@@ -78,7 +78,7 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
             _buildHeader(theme),
             SizedBox(height: 12.h),
             _buildFilterBar(theme),
-            SizedBox(height: 12.h),
+            SizedBox(height: 20.h),
             Expanded(child: _buildBody(theme)),
           ],
         ),
@@ -129,15 +129,8 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
     return AnnouncementFilterBar(
       selectedListingType: _selectedListingType,
       selectedPropertyType: _selectedPropertyType,
-      onListingTap: () => setState(() {
-        if (_selectedListingType == null) {
-          _selectedListingType = 'Sell';
-        } else if (_selectedListingType == 'Sell') {
-          _selectedListingType = 'Rent';
-        } else {
-          _selectedListingType = null;
-        }
-      }),
+      onListingTypeChanged: (val) =>
+          setState(() => _selectedListingType = val),
       onPropertyTypeChanged: (type) =>
           setState(() => _selectedPropertyType = type),
     );

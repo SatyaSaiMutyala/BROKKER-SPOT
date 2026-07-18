@@ -242,7 +242,7 @@ class NotificationService {
       case 'broker_approved':
       case 'broker_rejected':
         await _ensureSide(wantBroker: true);
-        Get.to(() => BrokerDashBoardView(initialIndex: 4));
+        Get.to(() => BrokerDashBoardView(initialIndex: 3));
         break;
 
       default:

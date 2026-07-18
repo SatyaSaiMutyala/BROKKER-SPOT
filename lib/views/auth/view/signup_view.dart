@@ -129,34 +129,30 @@ class _SignUpViewState extends State<SignUpView> {
 
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
-          resizeToAvoidBottomInset: true,
+          resizeToAvoidBottomInset: false,
           body: SafeArea(
+            top: false,
             bottom: false,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  child: ConstrainedBox(
-                    constraints:
-                        BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.viewInsetsOf(context).bottom + 24.h,
+                    ),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          children: [
-                            _topSection(context, isDark),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16.0),
-                              child: _formSection(isDark),
-                            ),
-                          ],
+                        _topSection(context, isDark),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: _formSection(isDark),
                         ),
-                        _bottomCityImage(),
                       ],
                     ),
                   ),
-                );
-              },
+                ),
+                _bottomCityImage(),
+              ],
             ),
           ),
         );
@@ -172,7 +168,7 @@ class _SignUpViewState extends State<SignUpView> {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        TopCurveSection(onBack: () => Navigator.pop(context)),
+        TopCurveSection(onBack: () => Navigator.pop(context), curveTop: -50),
         Positioned(
           bottom: 24.h,
           left: 20.w,
@@ -275,8 +271,9 @@ class _SignUpViewState extends State<SignUpView> {
   Widget _phoneField(bool isDark) {
     final dropdownBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final dropdownTextColor = isDark ? Colors.white : Colors.black87;
-    final underlineColor =
-        isDark ? const Color(0xFF3A3A3A) : const Color(0xFFB5B5B5);
+    final underlineColor = isDark
+        ? Color(0xFFFFFFFF).withValues(alpha: 0.5)
+        : const Color(0xFFB5B5B5);
     final hintColor = isDark ? Colors.grey.shade500 : Colors.grey.shade400;
     final inputTextColor = isDark ? Colors.white : Colors.black87;
 
@@ -335,9 +332,11 @@ class _SignUpViewState extends State<SignUpView> {
                     fontSize: 13.sp,
                     color: hintColor,
                   ),
+                  border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
-                  border: InputBorder.none,
+                  filled: true,
+                  fillColor: Colors.transparent,
                   counterText: '',
                   contentPadding: EdgeInsets.symmetric(vertical: 12.h),
                 ),

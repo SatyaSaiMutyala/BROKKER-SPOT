@@ -15,13 +15,13 @@ import 'package:brokkerspot/views/user/home/search_view.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:get/get.dart';
 
-/// Broker-side Announcements screen. Shares the exact visual language of the
-/// user-side [AnnouncementsView] (dark full-bleed cards, header, filter bar)
-/// via [HomeAnnouncementCard] and [AnnouncementFilterBar] — the only broker-
-/// specific addition is the brokerage strip on each card, plus a tab
-/// switcher between the public feed and the broker's own posts.
 class BrokerProjectsView extends StatefulWidget {
-  const BrokerProjectsView({super.key});
+  /// When true, shows only the broker's own announcements (used from the
+  /// profile "My Announcements" menu item). When false (the default, used as
+  /// the bottom-nav tab) shows the public announcement feed.
+  final bool showMineOnly;
+
+  const BrokerProjectsView({super.key, this.showMineOnly = false});
 
   @override
   State<BrokerProjectsView> createState() => _BrokerProjectsViewState();
@@ -34,23 +34,20 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
       : Get.put(ProfileController());
   final _scrollController = ScrollController();
 
-  int _selectedTab = 0;
-  final _tabs = const ['User Announcement', 'My Announcement'];
-
-  String? _selectedListingType; // null = all, 'Sell' = Buy, 'Rent' = Rent
-  String? _selectedPropertyType; // null = all
+  String? _selectedListingType;
+  String? _selectedPropertyType;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    // Defer so the sync cache-read inside loadAll/loadBrokerMine can't
-    // mutate Rx state while an ancestor is still mid-build (setState-
-    // during-build crash on post-login tab insert).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _controller.loadAll();
-      _controller.loadBrokerMine();
+      if (widget.showMineOnly) {
+        _controller.loadBrokerMine();
+      } else {
+        _controller.loadAll();
+      }
     });
   }
 
@@ -62,20 +59,11 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   }
 
   void _onScroll() {
-    if (!_scrollController.hasClients) return;
-    // Pagination only applies to the public-feed tab today (My Announcement
-    // is not paginated server-side here).
-    if (_selectedTab != 0) return;
+    if (!_scrollController.hasClients || widget.showMineOnly) return;
     final pos = _scrollController.position;
     if (pos.pixels >= pos.maxScrollExtent - 300 && _controller.hasMoreAll) {
       _controller.loadMoreAll();
     }
-  }
-
-  void _onTabChanged(int i) {
-    setState(() => _selectedTab = i);
-    // Lazy-load "My Announcement" the first time it's opened.
-    if (i == 1) _controller.loadBrokerMine();
   }
 
   List<AnnouncementModel> _filtered(List<AnnouncementModel> all) {
@@ -107,24 +95,15 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
           children: [
             _buildHeader(theme),
             SizedBox(height: 12.h),
-            _buildTabBar(theme),
-            SizedBox(height: 12.h),
             AnnouncementFilterBar(
               selectedListingType: _selectedListingType,
               selectedPropertyType: _selectedPropertyType,
-              onListingTap: () => setState(() {
-                if (_selectedListingType == null) {
-                  _selectedListingType = 'Sell';
-                } else if (_selectedListingType == 'Sell') {
-                  _selectedListingType = 'Rent';
-                } else {
-                  _selectedListingType = null;
-                }
-              }),
+              onListingTypeChanged: (val) =>
+                  setState(() => _selectedListingType = val),
               onPropertyTypeChanged: (type) =>
                   setState(() => _selectedPropertyType = type),
             ),
-            SizedBox(height: 12.h),
+            SizedBox(height: 20.h),
             Expanded(child: _buildContent(theme)),
           ],
         ),
@@ -132,9 +111,58 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
     );
   }
 
-  // ── Header ───────────────────────────────────────────────────────────────────
+  // ── Header ────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(ThemeData theme) {
+    if (widget.showMineOnly) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 0),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: () => Get.back(),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 38.w,
+                height: 38.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: theme.brightness == Brightness.dark
+                      ? const Color(0xFF2A2A2A)
+                      : Colors.grey.shade100,
+                ),
+                child: Icon(Icons.arrow_back_ios_new,
+                    size: 14.sp, color: theme.colorScheme.onSurface),
+              ),
+            ),
+            SizedBox(width: 14.w),
+            Expanded(
+              child: Text(
+                'My Announcements',
+                style: GoogleFonts.poppins(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w500,
+                  color: theme.colorScheme.onSurface,
+                  height: 1.0,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: () =>
+                  Get.to(() => const CreateAnnouncementView(fromBroker: true)),
+              behavior: HitTestBehavior.opaque,
+              child: Image.asset(
+                'assets/images/home_add_icon.png',
+                width: 35.w,
+                height: 35.w,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 0),
       child: Row(
@@ -165,8 +193,6 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
             ),
           ),
           SizedBox(width: 10.w),
-          // New announcements auto-refresh the cached list via the
-          // controller's mutation hook, so just navigate.
           GestureDetector(
             onTap: () =>
                 Get.to(() => const CreateAnnouncementView(fromBroker: true)),
@@ -182,57 +208,12 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
     );
   }
 
-  // ── Tab bar ──────────────────────────────────────────────────────────────────
-
-  Widget _buildTabBar(ThemeData theme) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w),
-      child: Row(
-        children: List.generate(_tabs.length, (i) {
-          final isSelected = _selectedTab == i;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => _onTabChanged(i),
-              child: Container(
-                margin: EdgeInsets.symmetric(horizontal: 3.w),
-                padding: EdgeInsets.symmetric(vertical: 7.h),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20.r),
-                  border: isSelected
-                      ? null
-                      : Border.all(color: AppColors.primary, width: 1),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  _tabs[i],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected
-                        ? Colors.white
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  // ── Body ─────────────────────────────────────────────────────────────────────
+  // ── Content ───────────────────────────────────────────────────────────────
 
   Widget _buildContent(ThemeData theme) {
     return Obx(() {
-      final isMine = _selectedTab == 1;
+      final isMine = widget.showMineOnly;
 
-      // Each tab reads from its own slot. "User Announcement" keeps the
-      // existing public feed; "My Announcement" hits /user/announcements/fetch
-      // (backend filters by role → broker's own posts).
       final isLoading = isMine
           ? _controller.isLoadingBrokerMine.value
           : _controller.isLoadingAll.value;
@@ -251,7 +232,6 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
           ? _controller.loadBrokerMine(force: true)
           : _controller.loadAll(force: true);
 
-      // First-load shimmer only when nothing is cached yet.
       if (isLoading && announcements.isEmpty) {
         return _buildShimmer();
       }
@@ -299,15 +279,9 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         );
       }
 
-      // Only the User Announcement tab paginates; on My Announcement we
-      // hide the loading-more skeleton since there's no next page to fetch.
-      final showLoadingMore = !isMine && _controller.isLoadingMoreAll.value;
-      // Lazy list: header at 0, then cards, then optional skeleton, then
-      // banner. SingleChildScrollView built ALL cards up-front which was the
-      // main cause of scroll jank on this heavy card.
-      final headerIdx = 0;
-      final cardStart = 1;
-      final cardEnd = cardStart + announcements.length; // exclusive
+      final showLoadingMore =
+          !isMine && _controller.isLoadingMoreAll.value;
+      final cardEnd = announcements.length;
       final skeletonIdx = showLoadingMore ? cardEnd : -1;
       final bannerIdx = cardEnd + (showLoadingMore ? 1 : 0);
       final itemCount = bannerIdx + 1;
@@ -316,9 +290,6 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
         color: AppColors.primary,
         onRefresh: refresh,
         child: NotificationListener<ScrollNotification>(
-          // The video-player gate stays shut during scroll and opens
-          // INSTANTLY on ScrollEndNotification — the visible card starts
-          // loading the moment the scroll ends, no debounce wait.
           onNotification: (n) {
             CachedVideoPlayer.notifyScroll(n);
             return false;
@@ -326,30 +297,19 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
           child: ListView.builder(
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
-            // 400 dp = roughly one extra card in cache. Larger values
-            // (we had 1200) kept multiple heavy cards mounted off-screen
-            // which caused OOM on low-RAM devices.
             // ignore: deprecated_member_use
             cacheExtent: 400,
             padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),
             itemCount: itemCount,
             itemBuilder: (_, i) {
-              if (i == headerIdx) {
-                return Padding(
-                  padding: EdgeInsets.only(bottom: 12.h),
-                  child: _buildSectionHeader(theme, _tabs[_selectedTab],
-                      '${announcements.length} announcements'),
-                );
-              }
-              if (i >= cardStart && i < cardEnd) {
-                final idx = i - cardStart;
-                final a = announcements[idx];
+              if (i < cardEnd) {
+                final a = announcements[i];
                 return Padding(
                   padding: EdgeInsets.only(bottom: 16.h),
                   child: RepaintBoundary(
                     child: HomeAnnouncementCard(
                       announcement: a,
-                      index: idx,
+                      index: i,
                       cardWidth: 344.w,
                       cardHeight: 263.h,
                       showBrokerageRow: true,
@@ -362,7 +322,6 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
               if (i == skeletonIdx) {
                 return const AnnouncementCardSkeleton();
               }
-              // Footer (banner + trailing spacer).
               return Padding(
                 padding: EdgeInsets.only(top: 8.h, bottom: 24.h),
                 child: PremiumLockBanner(onTap: () {}),
@@ -391,34 +350,4 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
     );
   }
 
-  Widget _buildSectionHeader(ThemeData theme, String title, String subtitle) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.inter(
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w500,
-              color: theme.colorScheme.onSurface),
-        ),
-        SizedBox(width: 6.w),
-        Container(
-          width: 18.w,
-          height: 18.w,
-          decoration: const BoxDecoration(
-              color: AppColors.goldAccent, shape: BoxShape.circle),
-          alignment: Alignment.center,
-          child: Text('!',
-              style: GoogleFonts.inter(
-                  fontSize: 11.sp,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white)),
-        ),
-        const Spacer(),
-        Text(subtitle,
-            style: GoogleFonts.inter(
-                fontSize: 11.sp, color: Colors.grey.shade500)),
-      ],
-    );
-  }
 }

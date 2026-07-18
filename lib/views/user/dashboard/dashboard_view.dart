@@ -25,17 +25,17 @@ class DashboardView extends StatefulWidget {
 
 class _DashboardViewState extends State<DashboardView> {
   late int _currentIndex = widget.initialIndex;
-
-  final List<Widget> _screens = [
-    HomeView(),
-    const AnnouncementsView(),
-    const MeetingView(),
-    const AccountView(),
-  ];
+  late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
+    _screens = [
+      HomeView(onAccountTap: () => _onNavTap(3)),
+      const AnnouncementsView(),
+      const MeetingView(),
+      const AccountView(),
+    ];
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (widget.showLocationPicker) {
         showDialog(
@@ -91,16 +91,16 @@ class _DashboardViewState extends State<DashboardView> {
   static const _navItems = [
     PillNavItem(
         iconAsset: 'assets/images/home_icon.png',
-        activeIconAsset: 'assets/images/home_icon.png'),
+        activeIconAsset: 'assets/images/home_active.png'),
     PillNavItem(
         iconAsset: 'assets/images/announcement_icon.png',
-        activeIconAsset: 'assets/images/announcement_icon.png'),
+        activeIconAsset: 'assets/images/announcement_active_icon.png'),
     PillNavItem(
         iconAsset: 'assets/images/meeting_icon.png',
-        activeIconAsset: 'assets/images/meeting_icon.png'),
+        activeIconAsset: 'assets/images/meeting_active_icon.png'),
     PillNavItem(
         iconAsset: 'assets/images/account_icon.png',
-        activeIconAsset: 'assets/images/account_icon.png'),
+        activeIconAsset: 'assets/images/account_active_icon.png'),
   ];
 
   Widget _buildFloatingNav() {
@@ -114,7 +114,7 @@ class _DashboardViewState extends State<DashboardView> {
 
   Widget _buildCreateButton() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pillBg = isDark ? const Color(0x30FFFFFF) : const Color(0x80DBDBDB);
+    final pillBg = isDark ? const Color(0x99000000) : const Color(0x99DBDBDB);
     final iconColor =
         isDark ? const Color(0xFFCCCCCC) : const Color(0xFF444444);
 

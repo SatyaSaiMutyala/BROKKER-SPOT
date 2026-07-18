@@ -224,17 +224,17 @@ class _AvatarCluster extends StatelessWidget {
       height: 46.h,
       child: Stack(
         children: [
+          if (showTwo)
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: _circle(second?.profileImageUrl, isDark),
+            ),
           Positioned(
             bottom: 0,
             left: 0,
             child: _circle(first?.profileImageUrl, isDark),
           ),
-          if (showTwo)
-            Positioned(
-              bottom: 0,
-              left: 5.w,
-              child: _circle(second?.profileImageUrl, isDark),
-            ),
           if (count > 0)
             Positioned(
               top: 0,

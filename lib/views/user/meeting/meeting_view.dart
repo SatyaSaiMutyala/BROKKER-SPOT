@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/meeting_item_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
@@ -100,13 +101,14 @@ class _MeetingViewState extends State<MeetingView> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor:
+          isDark ? const Color(0xFF090B11) : theme.scaffoldBackgroundColor,
       body: SafeArea(
         bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(theme),
+            CustomHeader(title: 'Broker Meetings', showBackButton: false),
             SizedBox(height: 20.h),
             _buildFilterRow(theme),
             SizedBox(height: 12.h),
@@ -117,24 +119,6 @@ class _MeetingViewState extends State<MeetingView> {
                     isDark ? const Color(0xFF3D3D3D) : const Color(0xFFECECEC)),
             Expanded(child: _buildBody(theme, isDark)),
           ],
-        ),
-      ),
-    );
-  }
-
-  // ── Header ────────────────────────────────────────────────────────────────────
-
-  Widget _buildHeader(ThemeData theme) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 0),
-      child: Text(
-        'Broker Meetings',
-        style: GoogleFonts.poppins(
-          fontSize: 20.sp,
-          fontWeight: FontWeight.w500,
-          color: theme.colorScheme.onSurface,
-          height: 1.0,
-          letterSpacing: 0,
         ),
       ),
     );

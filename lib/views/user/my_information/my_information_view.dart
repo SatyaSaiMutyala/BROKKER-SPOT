@@ -1,6 +1,7 @@
 import 'package:brokkerspot/core/common_widget/full_screen_image_view.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/my_information/my_information_controller.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -14,20 +15,18 @@ class MyInformationView extends StatelessWidget {
     final controller = Get.put(MyInformationController());
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final dividerColor =
-        isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.refreshProfile();
     });
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor:
+          isDark ? const Color(0xFF090B11) : theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context, theme, isDark),
-            Divider(height: 1, thickness: 1, color: dividerColor),
+            CustomHeader(title: 'My Information', showBackButton: true),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
@@ -42,41 +41,6 @@ class MyInformationView extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, ThemeData theme, bool isDark) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 38.r,
-              height: 38.r,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
-              ),
-              child: Icon(
-                Icons.arrow_back_ios_new,
-                size: 16.sp,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-          ),
-          SizedBox(width: 12.w),
-          Text(
-            'My Information',
-            style: GoogleFonts.poppins(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w500,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -204,7 +168,7 @@ class MyInformationView extends StatelessWidget {
             width: 52.w,
             child: Text(
               label,
-              style: GoogleFonts.inter(
+              style: GoogleFonts.poppins(
                 fontSize: 13.sp,
                 fontWeight: FontWeight.w500,
                 color: labelColor,
@@ -214,7 +178,7 @@ class MyInformationView extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: GoogleFonts.inter(
+              style: GoogleFonts.poppins(
                 fontSize: 13.sp,
                 fontWeight: FontWeight.w400,
                 color: valueColor,
@@ -240,7 +204,7 @@ class MyInformationView extends StatelessWidget {
                   SizedBox(width: 4.w),
                   Text(
                     isEmpty ? 'Add' : 'Edit',
-                    style: GoogleFonts.inter(
+                    style: GoogleFonts.poppins(
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w500,
                       color: AppColors.primary,
@@ -264,128 +228,176 @@ class MyInformationView extends StatelessWidget {
 
   // ─── Shared dialog helpers ────────────────────────────────────────────────────
 
+  // Dialog title row with close button
+  Widget _dialogHeader(BuildContext ctx, String title, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                height: 1.0,
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => Navigator.pop(ctx),
+              child: Container(
+                width: 32.w,
+                height: 32.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDark ? Colors.white10 : Colors.grey.shade100,
+                ),
+                child: Icon(Icons.close,
+                    size: 16.sp,
+                    color: isDark ? Colors.white60 : Colors.black45),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 20.h),
+      ],
+    );
+  }
+
+  // Filled gold save button
+  Widget _saveButton({
+    required String label,
+    required bool loading,
+    required VoidCallback? onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52.h,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+        ),
+        onPressed: loading ? null : onPressed,
+        child: loading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.black),
+              )
+            : Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                  height: 1.0,
+                ),
+              ),
+      ),
+    );
+  }
+
+  // Subtle cancel text button
+  Widget _cancelButton(BuildContext ctx, bool isDark) {
+    return TextButton(
+      onPressed: () => Navigator.pop(ctx),
+      child: Text(
+        'Cancel',
+        style: GoogleFonts.poppins(
+          fontSize: 14.sp,
+          fontWeight: FontWeight.w500,
+          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+        ),
+      ),
+    );
+  }
+
   InputDecoration _fieldDecoration({
     required String hint,
     required bool isDark,
     EdgeInsetsGeometry? contentPadding,
   }) {
-    final fillColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50;
-    final borderColor = isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
+    final fillColor = isDark ? const Color(0xFF252836) : Colors.grey.shade100;
+    final borderColor = isDark ? const Color(0xFF2A2D3C) : Colors.grey.shade300;
     return InputDecoration(
       hintText: hint,
       filled: true,
       fillColor: fillColor,
-      hintStyle: GoogleFonts.inter(
+      hintStyle: GoogleFonts.poppins(
+        fontSize: 14.sp,
         color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10.r),
+        borderRadius: BorderRadius.circular(12.r),
         borderSide: BorderSide(color: borderColor),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10.r),
+        borderRadius: BorderRadius.circular(12.r),
         borderSide: BorderSide(color: borderColor),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10.r),
-        borderSide: const BorderSide(color: AppColors.primary),
+        borderRadius: BorderRadius.circular(12.r),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
-      contentPadding: contentPadding,
+      contentPadding: contentPadding ??
+          EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
     );
   }
 
-  TextStyle _fieldTextStyle(bool isDark) => GoogleFonts.inter(
+  TextStyle _fieldTextStyle(bool isDark) => GoogleFonts.poppins(
         fontSize: 14.sp,
         color: isDark ? Colors.white : Colors.black87,
       );
 
-  // ─── Edit Name Dialog ─────────────────────────────────────────────────────────
+  // ─── Edit Name ────────────────────────────────────────────────────────────────
 
   void _showEditNameDialog(
       BuildContext context, MyInformationController controller) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final titleColor = isDark ? Colors.white : Colors.black;
-
     final nameCtrl = TextEditingController(text: controller.name);
-    Get.dialog(
-      Dialog(
-        backgroundColor: bgColor,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1B1D27) : Colors.white,
+            borderRadius: BorderRadius.circular(20.r),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Edit Name',
-                style: GoogleFonts.poppins(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.w600,
-                  color: titleColor,
-                ),
-              ),
-              SizedBox(height: 16.h),
+              _dialogHeader(ctx, 'Edit Name', isDark),
               TextField(
                 controller: nameCtrl,
                 autofocus: true,
                 textCapitalization: TextCapitalization.words,
                 style: _fieldTextStyle(isDark),
-                decoration:
-                    _fieldDecoration(hint: 'Enter your name', isDark: isDark),
+                decoration: _fieldDecoration(hint: 'Full name', isDark: isDark),
               ),
               SizedBox(height: 20.h),
-              Obx(() => SizedBox(
-                    width: double.infinity,
-                    height: 46.h,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30.r)),
-                      ),
-                      onPressed: controller.isSavingName.value
-                          ? null
-                          : () async {
-                              final newName = nameCtrl.text.trim();
-                              if (newName.isEmpty) return;
-                              await controller.updateInfo(name: newName);
-                              Get.back();
-                            },
-                      child: controller.isSavingName.value
-                          ? const CircularProgressIndicator(strokeWidth: 2)
-                          : Text(
-                              'Save',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                    ),
+              Obx(() => _saveButton(
+                    label: 'Save Changes',
+                    loading: controller.isSavingName.value,
+                    onPressed: () async {
+                      final newName = nameCtrl.text.trim();
+                      if (newName.isEmpty) return;
+                      await controller.updateInfo(name: newName);
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
                   )),
-              SizedBox(height: 10.h),
-              SizedBox(
-                width: double.infinity,
-                height: 46.h,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30.r)),
-                  ),
-                  onPressed: () => Get.back(),
-                  child: Text(
-                    'Cancel',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
+              _cancelButton(ctx, isDark),
             ],
           ),
         ),
@@ -393,40 +405,38 @@ class MyInformationView extends StatelessWidget {
     );
   }
 
-  // ─── Edit/Add Phone Dialog ────────────────────────────────────────────────────
+  // ─── Edit/Add Phone ───────────────────────────────────────────────────────────
 
   void _showEditPhoneDialog(
       BuildContext context, MyInformationController controller) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final titleColor = isDark ? Colors.white : Colors.black;
-
     final codeCtrl = TextEditingController(
         text: controller.countryCode.isEmpty ? '+' : controller.countryCode);
     final phoneCtrl = TextEditingController(text: controller.phone);
-    Get.dialog(
-      Dialog(
-        backgroundColor: bgColor,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1B1D27) : Colors.white,
+            borderRadius: BorderRadius.circular(20.r),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              _dialogHeader(
+                ctx,
                 controller.phone.isEmpty ? 'Add Phone' : 'Edit Phone',
-                style: GoogleFonts.poppins(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.w600,
-                  color: titleColor,
-                ),
+                isDark,
               ),
-              SizedBox(height: 16.h),
               Row(
                 children: [
                   SizedBox(
-                    width: 70.w,
+                    width: 74.w,
                     child: TextField(
                       controller: codeCtrl,
                       keyboardType: TextInputType.phone,
@@ -436,11 +446,11 @@ class MyInformationView extends StatelessWidget {
                         hint: '+91',
                         isDark: isDark,
                         contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8.w, vertical: 14.h),
+                            horizontal: 8.w, vertical: 16.h),
                       ),
                     ),
                   ),
-                  SizedBox(width: 8.w),
+                  SizedBox(width: 10.w),
                   Expanded(
                     child: TextField(
                       controller: phoneCtrl,
@@ -454,58 +464,18 @@ class MyInformationView extends StatelessWidget {
                 ],
               ),
               SizedBox(height: 20.h),
-              Obx(() => SizedBox(
-                    width: double.infinity,
-                    height: 46.h,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30.r)),
-                      ),
-                      onPressed: controller.isSavingPhone.value
-                          ? null
-                          : () async {
-                              final phone = phoneCtrl.text.trim();
-                              final code = codeCtrl.text.trim();
-                              if (phone.isEmpty) return;
-                              final saved =
-                                  await controller.updatePhone(code, phone);
-                              if (saved) Get.back();
-                            },
-                      child: controller.isSavingPhone.value
-                          ? const CircularProgressIndicator(strokeWidth: 2)
-                          : Text(
-                              'Save',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                    ),
+              Obx(() => _saveButton(
+                    label: 'Save Changes',
+                    loading: controller.isSavingPhone.value,
+                    onPressed: () async {
+                      final phone = phoneCtrl.text.trim();
+                      final code = codeCtrl.text.trim();
+                      if (phone.isEmpty) return;
+                      final saved = await controller.updatePhone(code, phone);
+                      if (saved && ctx.mounted) Navigator.pop(ctx);
+                    },
                   )),
-              SizedBox(height: 10.h),
-              SizedBox(
-                width: double.infinity,
-                height: 46.h,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30.r)),
-                  ),
-                  onPressed: () => Get.back(),
-                  child: Text(
-                    'Cancel',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
+              _cancelButton(ctx, isDark),
             ],
           ),
         ),
@@ -513,42 +483,35 @@ class MyInformationView extends StatelessWidget {
     );
   }
 
-  // ─── Edit Email Dialog ────────────────────────────────────────────────────────
+  // ─── Edit Email ───────────────────────────────────────────────────────────────
 
   void _showEditEmailDialog(
       BuildContext context, MyInformationController controller) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final titleColor = isDark ? Colors.white : Colors.black;
-    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.black54;
-
     final emailCtrl = TextEditingController(text: controller.email);
-    Get.dialog(
-      Dialog(
-        backgroundColor: bgColor,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1B1D27) : Colors.white,
+            borderRadius: BorderRadius.circular(20.r),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Edit Email',
-                style: GoogleFonts.poppins(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.w600,
-                  color: titleColor,
-                ),
-              ),
-              SizedBox(height: 8.h),
+              _dialogHeader(ctx, 'Edit Email', isDark),
               Text(
                 'An OTP will be sent to your new email for verification.',
-                textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 13.sp,
-                  color: subtitleColor,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                   fontWeight: FontWeight.w400,
+                  height: 1.4,
                 ),
               ),
               SizedBox(height: 16.h),
@@ -558,63 +521,23 @@ class MyInformationView extends StatelessWidget {
                 keyboardType: TextInputType.emailAddress,
                 style: _fieldTextStyle(isDark),
                 decoration:
-                    _fieldDecoration(hint: 'Enter new email', isDark: isDark),
+                    _fieldDecoration(hint: 'New email address', isDark: isDark),
               ),
               SizedBox(height: 20.h),
-              Obx(() => SizedBox(
-                    width: double.infinity,
-                    height: 46.h,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30.r)),
-                      ),
-                      onPressed: controller.isSavingEmail.value
-                          ? null
-                          : () async {
-                              final newEmail = emailCtrl.text.trim();
-                              if (newEmail.isEmpty) return;
-                              final sent =
-                                  await controller.updateEmail(newEmail);
-                              if (sent) {
-                                Get.back();
-                                _showOtpDialog(controller, newEmail, isDark);
-                              }
-                            },
-                      child: controller.isSavingEmail.value
-                          ? const CircularProgressIndicator(strokeWidth: 2)
-                          : Text(
-                              'Send OTP',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                    ),
+              Obx(() => _saveButton(
+                    label: 'Send OTP',
+                    loading: controller.isSavingEmail.value,
+                    onPressed: () async {
+                      final newEmail = emailCtrl.text.trim();
+                      if (newEmail.isEmpty) return;
+                      final sent = await controller.updateEmail(newEmail);
+                      if (sent && ctx.mounted) {
+                        Navigator.pop(ctx);
+                        _showOtpDialog(controller, newEmail, isDark);
+                      }
+                    },
                   )),
-              SizedBox(height: 10.h),
-              SizedBox(
-                width: double.infinity,
-                height: 46.h,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30.r)),
-                  ),
-                  onPressed: () => Get.back(),
-                  child: Text(
-                    'Cancel',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
+              _cancelButton(ctx, isDark),
             ],
           ),
         ),
@@ -629,40 +552,35 @@ class MyInformationView extends StatelessWidget {
     String email,
     bool isDark,
   ) {
-    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final titleColor = isDark ? Colors.white : Colors.black;
-    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.black54;
-
     final otpCtrl = TextEditingController();
-    Get.dialog(
-      Dialog(
-        backgroundColor: bgColor,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1B1D27) : Colors.white,
+            borderRadius: BorderRadius.circular(20.r),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Verify Email',
-                style: GoogleFonts.poppins(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.w600,
-                  color: titleColor,
-                ),
-              ),
-              SizedBox(height: 8.h),
+              _dialogHeader(ctx, 'Verify Email', isDark),
               Text(
                 'Enter the OTP sent to\n$email',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 13.sp,
-                  color: subtitleColor,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                   fontWeight: FontWeight.w400,
+                  height: 1.4,
                 ),
               ),
-              SizedBox(height: 16.h),
+              SizedBox(height: 20.h),
               TextField(
                 controller: otpCtrl,
                 autofocus: true,
@@ -674,62 +592,22 @@ class MyInformationView extends StatelessWidget {
                     .copyWith(counterText: ''),
               ),
               SizedBox(height: 20.h),
-              Obx(() => SizedBox(
-                    width: double.infinity,
-                    height: 46.h,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30.r)),
-                      ),
-                      onPressed: controller.isVerifyingOtp.value
-                          ? null
-                          : () async {
-                              final otp = otpCtrl.text.trim();
-                              if (otp.isEmpty) return;
-                              final verified =
-                                  await controller.verifyEmailOtp(email, otp);
-                              if (verified) Get.back();
-                            },
-                      child: controller.isVerifyingOtp.value
-                          ? const CircularProgressIndicator(strokeWidth: 2)
-                          : Text(
-                              'Verify',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                    ),
+              Obx(() => _saveButton(
+                    label: 'Verify',
+                    loading: controller.isVerifyingOtp.value,
+                    onPressed: () async {
+                      final otp = otpCtrl.text.trim();
+                      if (otp.isEmpty) return;
+                      final verified =
+                          await controller.verifyEmailOtp(email, otp);
+                      if (verified && ctx.mounted) Navigator.pop(ctx);
+                    },
                   )),
-              SizedBox(height: 10.h),
-              SizedBox(
-                width: double.infinity,
-                height: 46.h,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30.r)),
-                  ),
-                  onPressed: () => Get.back(),
-                  child: Text(
-                    'Cancel',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
+              _cancelButton(ctx, isDark),
             ],
           ),
         ),
       ),
-      barrierDismissible: false,
     );
   }
 }

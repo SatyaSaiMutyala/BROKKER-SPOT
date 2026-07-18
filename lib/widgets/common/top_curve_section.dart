@@ -1,4 +1,4 @@
-
+import 'package:brokkerspot/widgets/common/custom_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -23,9 +23,8 @@ class TopCurveSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backBorderColor =
-        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E5E5);
     final backIconColor = isDark ? Colors.white : Colors.black87;
+    final topPadding = MediaQuery.paddingOf(context).top;
 
     return SizedBox(
       height: (sectionHeight ?? 220).h,
@@ -43,22 +42,12 @@ class TopCurveSection extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: (backButtonTop ?? 20).h,
+            top: backButtonTop ?? (topPadding + 10.h),
             left: 20.w,
-            child: InkWell(
+            child: CustomBackButton(
+              isDark: isDark,
+              iconColor: backIconColor,
               onTap: onBack,
-              child: Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: backBorderColor),
-                ),
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 18,
-                  color: backIconColor,
-                ),
-              ),
             ),
           ),
         ],

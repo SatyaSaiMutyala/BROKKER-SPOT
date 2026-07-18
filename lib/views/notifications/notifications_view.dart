@@ -49,10 +49,11 @@ class _NotificationsViewState extends State<NotificationsView> {
     try {
       final a = await _announcementRepo.fetchAnnouncementDetail(announcementId);
       overlay.remove();
-      final isBroker =
-          (Get.isRegistered<ProfileController>() ? Get.find<ProfileController>() : null)
-                  ?.isOnBrokerSide ==
-              true;
+      final isBroker = (Get.isRegistered<ProfileController>()
+                  ? Get.find<ProfileController>()
+                  : null)
+              ?.isOnBrokerSide ==
+          true;
       if (isBroker) {
         Get.to(() => BrokerAnnouncementDetailView(announcement: a));
       } else {
@@ -90,17 +91,22 @@ class _NotificationsViewState extends State<NotificationsView> {
   }
 
   Future<bool> _confirmDelete(NotificationModel n) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ok = await Get.dialog<bool>(
       AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.r)),
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
         title: Text('Delete notification?',
             style: GoogleFonts.inter(
-                fontSize: 16.sp, fontWeight: FontWeight.w700)),
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : Colors.black87)),
         content: Text(
           n.subject ?? 'This notification will be removed.',
-          style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.grey.shade700),
+          style: GoogleFonts.inter(
+              fontSize: 13.sp,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
         ),
         actions: [
           TextButton(
@@ -127,7 +133,7 @@ class _NotificationsViewState extends State<NotificationsView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -143,9 +149,8 @@ class _NotificationsViewState extends State<NotificationsView> {
                     style: GoogleFonts.inter(
                       fontSize: 12.sp,
                       fontWeight: FontWeight.w600,
-                      color: hasUnseen
-                          ? AppColors.primary
-                          : Colors.grey.shade400,
+                      color:
+                          hasUnseen ? AppColors.primary : Colors.grey.shade400,
                     ),
                   ),
                 );
@@ -195,8 +200,7 @@ class _NotificationsViewState extends State<NotificationsView> {
         child: ListView.separated(
           physics: const AlwaysScrollableScrollPhysics(),
           itemCount: _ctrl.notifications.length,
-          separatorBuilder: (_, __) =>
-              Divider(height: 1, color: Colors.grey.shade200),
+          separatorBuilder: (_, __) => const Divider(height: 1),
           itemBuilder: (_, i) {
             final n = _ctrl.notifications[i];
             return Dismissible(
@@ -254,9 +258,10 @@ class _NotificationsShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Shimmer.fromColors(
-      baseColor: Colors.grey.shade300,
-      highlightColor: Colors.grey.shade100,
+      baseColor: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300,
+      highlightColor: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade100,
       child: ListView.separated(
         physics: const NeverScrollableScrollPhysics(),
         itemCount: 6,
@@ -278,16 +283,14 @@ class _NotificationsShimmer extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                        width: 160.w, height: 12.h, color: Colors.white),
+                    Container(width: 160.w, height: 12.h, color: Colors.white),
                     SizedBox(height: 8.h),
                     Container(
                         width: double.infinity,
                         height: 10.h,
                         color: Colors.white),
                     SizedBox(height: 8.h),
-                    Container(
-                        width: 80.w, height: 9.h, color: Colors.white),
+                    Container(width: 80.w, height: 9.h, color: Colors.white),
                   ],
                 ),
               ),

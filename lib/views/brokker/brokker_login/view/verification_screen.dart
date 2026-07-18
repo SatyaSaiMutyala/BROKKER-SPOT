@@ -57,14 +57,17 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Padding(
         padding: EdgeInsets.symmetric(horizontal: 40.w),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
+            SizedBox(
               height: 250,
               child: Center(
                 child: LayoutBuilder(
@@ -88,7 +91,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   style: GoogleFonts.inter(
                     fontSize: 15.sp,
                     fontWeight: FontWeight.w500,
-                    color: Colors.black87,
+                    color: textColor,
                     height: 1.6,
                   ),
                   children: [
@@ -114,7 +117,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 style: GoogleFonts.inter(
                   fontSize: 15.sp,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: textColor,
                   height: 1.4,
                 ),
               ),

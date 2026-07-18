@@ -148,7 +148,8 @@ class LoginView extends StatelessWidget {
   }
 
   Widget _topSection(BuildContext context) {
-    return TopCurveSection(onBack: () => Navigator.pop(context));
+    return TopCurveSection(
+        onBack: () => Navigator.pop(context), curveTop: -110);
   }
 
   // ── Remember me + Forgot password ────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:flutter/material.dart';
@@ -59,8 +60,7 @@ class _SearchViewState extends State<SearchView> {
       }).toList();
     }
     if (_selectedListingType != null) {
-      list =
-          list.where((a) => a.listingType == _selectedListingType).toList();
+      list = list.where((a) => a.listingType == _selectedListingType).toList();
     }
     if (_selectedPropertyType != null) {
       list = list
@@ -85,7 +85,7 @@ class _SearchViewState extends State<SearchView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Header ─────────────────────────────────────────────────────
-            _buildHeader(theme, isDark),
+            const CustomHeader(title: 'Search', showBackButton: true),
             SizedBox(height: 14.h),
 
             // ── Banner image ────────────────────────────────────────────────
@@ -100,9 +100,8 @@ class _SearchViewState extends State<SearchView> {
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
                     height: 101.h,
-                    color: isDark
-                        ? const Color(0xFF2A2A2A)
-                        : Colors.grey.shade200,
+                    color:
+                        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
                   ),
                 ),
               ),
@@ -111,7 +110,7 @@ class _SearchViewState extends State<SearchView> {
 
             // ── Search bar + filter button ──────────────────────────────────
             _buildSearchRow(theme, isDark),
-            SizedBox(height: 10.h),
+            SizedBox(height: 12.h),
 
             // ── Filter chips ────────────────────────────────────────────────
             _buildFilterChips(theme, isDark),
@@ -121,47 +120,6 @@ class _SearchViewState extends State<SearchView> {
             Expanded(child: _buildResults(isDark)),
           ],
         ),
-      ),
-    );
-  }
-
-  // ── Header ────────────────────────────────────────────────────────────────
-
-  Widget _buildHeader(ThemeData theme, bool isDark) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 0),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Get.back(),
-            child: Container(
-              width: 38.w,
-              height: 38.w,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark
-                    ? const Color(0xFF2A2A2A)
-                    : const Color(0xFFF2F2F2),
-              ),
-              child: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                size: 16.sp,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ),
-          SizedBox(width: 17.w),
-          Text(
-            'Search',
-            style: GoogleFonts.poppins(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w500,
-              color: theme.colorScheme.onSurface,
-              height: 1.0,
-              letterSpacing: 0,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -180,10 +138,10 @@ class _SearchViewState extends State<SearchView> {
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(10.r),
-                border:
-                    Border.all(color: AppColors.primary, width: 1),
+                border: Border.all(color: AppColors.primary, width: 1),
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   SizedBox(width: 12.w),
                   Image.asset(
@@ -209,32 +167,30 @@ class _SearchViewState extends State<SearchView> {
                               .withValues(alpha: 0.4),
                         ),
                         border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: true,
+                        fillColor: Colors.transparent,
                         isDense: true,
-                        contentPadding: EdgeInsets.zero,
+                        contentPadding: EdgeInsets.symmetric(vertical: 14.h),
                       ),
                     ),
                   ),
+                  SizedBox(width: 8.w),
                 ],
               ),
             ),
           ),
           SizedBox(width: 6.w),
-          // Filter button — gold border
-          Container(
+          // Filter button
+          SizedBox(
             width: 45.w,
             height: 45.h,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: BorderRadius.circular(10.r),
-              border: Border.all(color: AppColors.primary, width: 1),
-            ),
             child: Center(
               child: Image.asset(
                 'assets/images/filter_icon.png',
-                width: 22.w,
-                height: 22.w,
-                color: AppColors.primary,
-                colorBlendMode: BlendMode.srcIn,
+                width: 45.w,
+                height: 45.w,
               ),
             ),
           ),
@@ -246,33 +202,13 @@ class _SearchViewState extends State<SearchView> {
   // ── Filter chips: listing type + property types ────────────────────────────
 
   Widget _buildFilterChips(ThemeData theme, bool isDark) {
-    final listingLabel = _selectedListingType == null
-        ? 'All'
-        : _selectedListingType == 'Sell'
-            ? 'Buy'
-            : 'Rent';
-
     return SizedBox(
       height: 39.h,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.symmetric(horizontal: 16.w),
         children: [
-          _chip(
-            label: listingLabel,
-            isSelected: _selectedListingType != null,
-            isDark: isDark,
-            hasDropdown: true,
-            onTap: () => setState(() {
-              if (_selectedListingType == null) {
-                _selectedListingType = 'Sell';
-              } else if (_selectedListingType == 'Sell') {
-                _selectedListingType = 'Rent';
-              } else {
-                _selectedListingType = null;
-              }
-            }),
-          ),
+          _listingChip(isDark),
           ..._propertyTypes.map((type) {
             final isSelected = _selectedPropertyType == type;
             return Padding(
@@ -292,12 +228,106 @@ class _SearchViewState extends State<SearchView> {
     );
   }
 
+  Widget _listingChip(bool isDark) {
+    final label = _selectedListingType == null
+        ? 'All'
+        : _selectedListingType == 'Sell'
+            ? 'Buy'
+            : 'Rent';
+    final isSelected = _selectedListingType != null;
+    final textIconColor = isSelected
+        ? Colors.white
+        : isDark
+            ? Colors.white70
+            : Colors.black87;
+
+    return PopupMenuButton<String>(
+      onSelected: (val) =>
+          setState(() => _selectedListingType = val.isEmpty ? null : val),
+      offset: const Offset(0, 42),
+      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+      itemBuilder: (_) => [
+        _menuItem('', 'All', isDark),
+        _menuItem('Sell', 'Buy', isDark),
+        _menuItem('Rent', 'Rent', isDark),
+      ],
+      child: Container(
+        height: 38.h,
+        padding: EdgeInsets.symmetric(horizontal: 14.w),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary
+              : isDark
+                  ? const Color(0xFF2A2A2A)
+                  : Colors.white,
+          borderRadius: BorderRadius.circular(25.r),
+          border: isSelected
+              ? null
+              : Border.all(
+                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w400,
+                color: textIconColor,
+                height: 1.0,
+                letterSpacing: 0,
+              ),
+            ),
+            SizedBox(width: 4.w),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 14.sp,
+              color: textIconColor,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _menuItem(String value, String label, bool isDark) {
+    final isActive = _selectedListingType == (value.isEmpty ? null : value);
+    return PopupMenuItem<String>(
+      value: value,
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 13.sp,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                color: isActive
+                    ? AppColors.primary
+                    : isDark
+                        ? Colors.white
+                        : Colors.black87,
+              ),
+            ),
+          ),
+          if (isActive)
+            Icon(Icons.check, size: 14.sp, color: AppColors.primary),
+        ],
+      ),
+    );
+  }
+
   Widget _chip({
     required String label,
     required bool isSelected,
     required bool isDark,
     required VoidCallback onTap,
-    bool hasDropdown = false,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -315,41 +345,22 @@ class _SearchViewState extends State<SearchView> {
           border: isSelected
               ? null
               : Border.all(
-                  color: isDark
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade300,
+                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
                 ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w400,
-                color: isSelected
-                    ? Colors.white
-                    : isDark
-                        ? Colors.white70
-                        : Colors.black87,
-                height: 1.0,
-                letterSpacing: 0,
-              ),
-            ),
-            if (hasDropdown) ...[
-              SizedBox(width: 4.w),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 14.sp,
-                color: isSelected
-                    ? Colors.white
-                    : isDark
-                        ? Colors.white70
-                        : Colors.black87,
-              ),
-            ],
-          ],
+        child: Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w400,
+            color: isSelected
+                ? Colors.white
+                : isDark
+                    ? Colors.white70
+                    : Colors.black87,
+            height: 1.0,
+            letterSpacing: 0,
+          ),
         ),
       ),
     );
@@ -398,8 +409,7 @@ class _SearchViewState extends State<SearchView> {
   }
 
   Widget _buildShimmer(bool isDark) {
-    final color =
-        isDark ? Colors.grey.shade800 : Colors.grey.shade300;
+    final color = isDark ? Colors.grey.shade800 : Colors.grey.shade300;
     return ListView.separated(
       physics: const NeverScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),

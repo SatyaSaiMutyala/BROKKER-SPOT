@@ -1,3 +1,4 @@
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -181,43 +182,6 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
     );
   }
 
-  Widget _buildHeader(ThemeData theme, bool isDark) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 38.r,
-              height: 38.r,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
-              ),
-              child: Icon(
-                Icons.arrow_back_ios_new,
-                size: 16.sp,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Text(
-              'PROPOSALS',
-              style: GoogleFonts.poppins(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w500,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildLimitRow(bool isDark) {
     final textColor = isDark ? Colors.white : Colors.black87;
     final countColor = isDark ? Colors.white : Colors.black;
@@ -271,12 +235,12 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
     final timeColor = isDark ? Colors.grey.shade500 : Colors.grey.shade500;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor:
+          isDark ? const Color(0xFF090B11) : theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ──────────────────────────────────────────────────────
-            _buildHeader(theme, isDark),
+            CustomHeader(title: 'Proposals', showBackButton: true),
             Divider(height: 1, color: dividerColor),
 
             // ── Limit toggle ─────────────────────────────────────────────────

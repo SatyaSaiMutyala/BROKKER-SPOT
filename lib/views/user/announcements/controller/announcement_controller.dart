@@ -402,6 +402,24 @@ class AnnouncementController extends GetxController {
     }
   }
 
+  Future<bool> createDraftAnnouncement() async {
+    try {
+      isLoading.value = true;
+      errorMessage.value = null;
+      final body = _buildBody();
+      body['status'] = 0;
+      await _repo.createAnnouncement(body);
+      resetDraft();
+      AnnouncementListController.to.refreshAfterMutation();
+      return true;
+    } catch (e) {
+      errorMessage.value = e.toString();
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<bool> editAnnouncement(String id) async {
     try {
       isLoading.value = true;

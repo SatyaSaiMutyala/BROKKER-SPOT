@@ -1,3 +1,4 @@
+import 'dart:ui' show ImageFilter;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -23,6 +24,9 @@ class HomeAnnouncementCard extends StatelessWidget {
   /// price. Off by default so the Home/user-side card is unaffected.
   final bool showBrokerageRow;
 
+  final bool isWishlisted;
+  final VoidCallback? onWishlistTap;
+
   const HomeAnnouncementCard({
     super.key,
     required this.announcement,
@@ -32,6 +36,8 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.cardWidth,
     this.cardHeight,
     this.showBrokerageRow = false,
+    this.isWishlisted = false,
+    this.onWishlistTap,
   });
 
   static const _brokerageRowHeight = 57.0;
@@ -118,13 +124,6 @@ class HomeAnnouncementCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFF1A1A1A),
                   borderRadius: BorderRadius.circular(20.r),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Stack(
@@ -158,8 +157,8 @@ class HomeAnnouncementCard extends StatelessWidget {
                         top: 21.h,
                         left: 0,
                         child: Container(
-                          width: 64.w,
-                          height: 27.h,
+                          width: 70.w,
+                          height: 32.h,
                           alignment: Alignment.center,
                           decoration: const BoxDecoration(
                             color: Color(0xDBDBC483),
@@ -171,7 +170,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                           child: Text(
                             _listingBadge,
                             style: GoogleFonts.poppins(
-                              fontSize: 10.sp,
+                              fontSize: 11.sp,
                               fontWeight: FontWeight.w500,
                               color: Colors.white,
                               height: 1.0,
@@ -210,17 +209,23 @@ class HomeAnnouncementCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // AED label
-                          Text(
-                            a.currency ?? 'AED',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14.sp,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w300,
-                              height: 1.0,
-                              letterSpacing: 0,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4.r),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                              child: Text(
+                                a.currency ?? 'AED',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 19.sp,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w300,
+                                  height: 1.0,
+                                  letterSpacing: 0,
+                                ),
+                              ),
                             ),
                           ),
-                          SizedBox(height: 9.h),
+                          SizedBox(height: 1.h),
                           // Price row — gold price + optional rent period suffix
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -228,7 +233,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                               Text(
                                 _formatPrice(a.price ?? 0),
                                 style: GoogleFonts.poppins(
-                                  fontSize: 24.sp,
+                                  fontSize: 27.sp,
                                   fontWeight: FontWeight.w700,
                                   color: const Color(0xFFDBC483),
                                   height: 1.0,
@@ -248,7 +253,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                                             .substring(1)
                                             .toLowerCase(),
                                     style: GoogleFonts.poppins(
-                                      fontSize: 12.sp,
+                                      fontSize: 15.sp,
                                       fontWeight: FontWeight.w400,
                                       color: Colors.white70,
                                       height: 1.0,
@@ -259,76 +264,82 @@ class HomeAnnouncementCard extends StatelessWidget {
                             ],
                           ),
                           // Type row: "For Sell • Apartment" left | pill + circle right
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // "For Sell • " (#C8C8C8) + "Apartment" (white)
-                              Expanded(
-                                child: RichText(
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  text: TextSpan(
-                                    children: [
-                                      if (a.listingType != null)
-                                        TextSpan(
-                                          text: 'For ${a.listingType} • ',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 14.sp,
-                                            fontWeight: FontWeight.w300,
-                                            color: const Color(0xFFC8C8C8),
-                                            height: 1.0,
-                                            letterSpacing: 0,
-                                          ),
-                                        ),
-                                      if (a.propertyType != null)
-                                        TextSpan(
-                                          text: a.propertyType,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 14.sp,
-                                            fontWeight: FontWeight.w300,
-                                            color: Colors.white,
-                                            height: 1.0,
-                                            letterSpacing: 0,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              // Time-ago pill
-                              if (a.timeAgo != null) ...[
-                                SizedBox(width: 6.w),
-                                _pill(a.timeAgo!.toUpperCase()),
-                              ],
-                              // Image count circle
-                              if (imgCount > 1) ...[
-                                SizedBox(width: 6.w),
-                                _imageCountCircle(imgCount),
-                              ],
-                            ],
-                          ),
-                          // Location
-                          if (a.location != null)
-                            Row(
+                          Transform.translate(
+                            offset: Offset(0, -7.h),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Icon(Icons.location_on_rounded,
-                                    size: 12.sp, color: AppColors.primary),
-                                SizedBox(width: 4.w),
+                                // "For Sell • " (#C8C8C8) + "Apartment" (white)
                                 Expanded(
-                                  child: Text(
-                                    a.location!,
+                                  child: RichText(
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12.sp,
-                                      fontWeight: FontWeight.w300,
-                                      color: const Color(0xFF9E9E9E),
-                                      height: 1.0,
-                                      letterSpacing: 0,
+                                    text: TextSpan(
+                                      children: [
+                                        if (a.listingType != null)
+                                          TextSpan(
+                                            text: 'For ${a.listingType} • ',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 17.sp,
+                                              fontWeight: FontWeight.w300,
+                                              color: const Color(0xFFC8C8C8),
+                                              height: 1.0,
+                                              letterSpacing: 0,
+                                            ),
+                                          ),
+                                        if (a.propertyType != null)
+                                          TextSpan(
+                                            text: a.propertyType,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 17.sp,
+                                              fontWeight: FontWeight.w300,
+                                              color: Colors.white,
+                                              height: 1.0,
+                                              letterSpacing: 0,
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 ),
+                                // Time-ago pill
+                                if (a.timeAgo != null) ...[
+                                  SizedBox(width: 6.w),
+                                  _pill(a.timeAgo!.toUpperCase()),
+                                ],
+                                // Image count circle
+                                if (imgCount > 1) ...[
+                                  SizedBox(width: 6.w),
+                                  _imageCountCircle(imgCount),
+                                ],
                               ],
+                            ),
+                          ),
+                          // Location
+                          if (a.location != null)
+                            Transform.translate(
+                              offset: Offset(0, -18.h),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.location_on_rounded,
+                                      size: 14.sp, color: AppColors.primary),
+                                  SizedBox(width: 4.w),
+                                  Expanded(
+                                    child: Text(
+                                      a.location!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w300,
+                                        color: const Color(0xFF9E9E9E),
+                                        height: 1.0,
+                                        letterSpacing: 0,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                         ],
                       ),
@@ -343,50 +354,41 @@ class HomeAnnouncementCard extends StatelessWidget {
     );
   }
 
-  // Time-ago pill — 76×27, r26, Poppins Medium 500 10sp #CFCFCF
   Widget _pill(String text) {
-    return Container(
-      width: 76.w,
-      height: 27.h,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(26.r),
-      ),
-      child: Text(
-        text,
-        style: GoogleFonts.poppins(
-          fontSize: 10.sp,
-          fontWeight: FontWeight.w500,
-          color: const Color(0xFFCFCFCF),
-          height: 1.0,
-          letterSpacing: 0,
+    return CustomPaint(
+      painter: const _PillPainter(),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+        child: Text(
+          text,
+          style: GoogleFonts.poppins(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFFCFCFCF),
+            height: 1.0,
+            letterSpacing: 0,
+          ),
         ),
       ),
     );
   }
 
-  // Image count circle — 36×36, 1px #DBC483AB border
   Widget _imageCountCircle(int count) {
-    return Container(
-      width: 36.w,
-      height: 36.w,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.black.withValues(alpha: 0.35),
-        border: Border.all(
-          color: const Color(0xABDBC483),
-          width: 1,
-        ),
-      ),
-      child: Text(
-        count > 9 ? '9+' : '$count+',
-        style: GoogleFonts.poppins(
-          fontSize: 10.sp,
-          fontWeight: FontWeight.w500,
-          color: Colors.white,
-          height: 1.0,
+    return SizedBox(
+      width: 42.w,
+      height: 42.w,
+      child: CustomPaint(
+        painter: const _CircleCountPainter(),
+        child: Center(
+          child: Text(
+            count > 7 ? '7+' : '$count+',
+            style: GoogleFonts.poppins(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+              height: 1.0,
+            ),
+          ),
         ),
       ),
     );
@@ -455,4 +457,77 @@ class HomeAnnouncementCard extends StatelessWidget {
     }
     return buffer.toString().split('').reversed.join();
   }
+}
+
+class _PillPainter extends CustomPainter {
+  const _PillPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final radius = size.height / 2;
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+
+    // Gradient fill — lighter top-left → darker bottom-right
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0x503A3A3C), Color(0x501C1C1E)],
+        ).createShader(rect),
+    );
+
+    final innerRRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0.5, 0.5, size.width - 1, size.height - 1),
+      Radius.circular(radius - 0.5),
+    );
+
+    canvas.drawRRect(
+      innerRRect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0
+        ..color = const Color(0x55FFFFFF),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PillPainter old) => false;
+}
+
+class _CircleCountPainter extends CustomPainter {
+  const _CircleCountPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    final bounds = Rect.fromCircle(center: center, radius: radius);
+
+    // Gradient fill — lighter top-left → darker bottom-right (semi-transparent)
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0x503A3A3C), Color(0x501C1C1E)],
+        ).createShader(bounds),
+    );
+
+    canvas.drawCircle(
+      center,
+      radius - 0.75,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = const Color(0x55FFFFFF),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CircleCountPainter old) => false;
 }

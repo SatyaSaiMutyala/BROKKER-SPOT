@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/widgets/common/custom_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -264,10 +265,10 @@ class _MapPickerViewState extends State<MapPickerView> {
                       children: [
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12.w),
-                          child: GestureDetector(
+                          child: CustomBackButton(
+                            isDark: isDark,
+                            iconColor: primaryText,
                             onTap: () => Navigator.pop(context),
-                            child: Icon(Icons.arrow_back,
-                                size: 22.sp, color: primaryText),
                           ),
                         ),
                         Expanded(
@@ -280,6 +281,10 @@ class _MapPickerViewState extends State<MapPickerView> {
                               hintStyle: GoogleFonts.inter(
                                   fontSize: 14.sp, color: hintText),
                               border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              filled: true,
+                              fillColor: Colors.transparent,
                               contentPadding:
                                   EdgeInsets.symmetric(vertical: 14.h),
                             ),

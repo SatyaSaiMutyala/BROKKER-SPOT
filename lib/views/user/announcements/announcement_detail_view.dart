@@ -1,4 +1,6 @@
-import 'dart:ui';
+import 'dart:math' show pi;
+import 'dart:ui' as ui show Gradient;
+import 'dart:ui' show ImageFilter;
 
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
@@ -11,6 +13,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:brokkerspot/widgets/common/custom_back_button.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/core/common_widget/fullscreen_media_viewer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
@@ -99,25 +102,17 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     return buffer.toString().split('').reversed.join();
   }
 
-  Color _statusDotColor(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'active':
-        return const Color(0xFF4CAF50);
-      case 'rejected':
-        return const Color(0xFFC0392B);
-      case 'pending':
-        return const Color(0xFFFF9800);
-      case 'draft':
-        return Colors.grey.shade500;
-      default:
-        return Colors.grey.shade500;
-    }
-  }
-
   String _fullLocation(AnnouncementModel a) {
     return [
       a.propertyAddress,
       a.propertyArea,
+      a.propertyCity,
+      a.propertyCountry,
+    ].whereType<String>().where((s) => s.isNotEmpty).join(', ');
+  }
+
+  String _shortLocation(AnnouncementModel a) {
+    return [
       a.propertyCity,
       a.propertyCountry,
     ].whereType<String>().where((s) => s.isNotEmpty).join(', ');
@@ -143,17 +138,16 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
       offset: const Offset(0, 48),
       itemBuilder: (_) => [
-        _popupItem(value: 'edit', label: 'Edit'),
-        _popupItem(value: 'not_available', label: 'Not Available'),
-        _popupItem(value: 'delete', label: 'Delete', color: Colors.red),
+        _popupItem(value: 'share', label: 'Share'),
+        if (widget.isOwner) ...[
+          _popupItem(value: 'edit', label: 'Edit'),
+          _popupItem(value: 'not_available', label: 'Not Available'),
+          _popupItem(value: 'delete', label: 'Delete', color: Colors.red),
+        ],
       ],
-      child: Container(
-        width: 35.w,
-        height: 35.w,
-        decoration: BoxDecoration(
-          color: const Color(0x40FFFFFF),
-          shape: BoxShape.circle,
-        ),
+      child: CustomIconButton(
+        isDark: true,
+        size: 35,
         child: Icon(Icons.more_horiz, size: 18.sp, color: Colors.white),
       ),
     );
@@ -380,7 +374,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
         statusBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF090B11) : Colors.white,
         body: Stack(
           children: [
             // ── Scrollable content ──
@@ -417,7 +411,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   List<MediaGalleryItem> _mediaItems(
       List<String> images, bool hasImages, bool hasVideo, AnnouncementModel a) {
     return [
-      if (hasVideo) MediaGalleryItem(url: a.propertyMedia!.videos!, isVideo: true),
+      if (hasVideo)
+        MediaGalleryItem(url: a.propertyMedia!.videos!, isVideo: true),
       if (hasImages)
         ...images.map((url) => MediaGalleryItem(url: url, isVideo: false)),
     ];
@@ -454,7 +449,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
             );
           }
           final imgIdx = hasVideo ? i - 1 : i;
-          return hasImages
+          final imageWidget = hasImages
               ? CachedNetworkImage(
                   imageUrl: images[imgIdx],
                   width: double.infinity,
@@ -469,6 +464,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                 )
               : Image.asset(images[imgIdx],
                   width: double.infinity, height: height, fit: BoxFit.cover);
+          return GestureDetector(
+            onTap: () => _openFullscreenGallery(images, hasImages, hasVideo, a),
+            child: imageWidget,
+          );
         },
       );
     }
@@ -558,7 +557,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                           Text(
                             a.currency ?? 'AED',
                             style: GoogleFonts.poppins(
-                              fontSize: 12.sp,
+                              fontSize: 14.sp,
                               fontWeight: FontWeight.w300,
                               color: Colors.white,
                               height: 1.0,
@@ -568,7 +567,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                           Text(
                             _formatPrice(a.price ?? 0),
                             style: GoogleFonts.poppins(
-                              fontSize: 20.sp,
+                              fontSize: 22.sp,
                               fontWeight: FontWeight.w700,
                               color: const Color(0xFFDBC483),
                               height: 1.0,
@@ -583,26 +582,26 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                                 if (a.propertyType != null) a.propertyType!,
                               ].join(' • '),
                               style: GoogleFonts.poppins(
-                                fontSize: 14.sp,
+                                fontSize: 16.sp,
                                 fontWeight: FontWeight.w300,
                                 color: Colors.white,
                                 height: 1.0,
                               ),
                             ),
                           SizedBox(height: 6.h),
-                          if (_fullLocation(a).isNotEmpty)
+                          if (_shortLocation(a).isNotEmpty)
                             Row(
                               children: [
                                 Icon(Icons.location_on_rounded,
-                                    size: 12.sp, color: AppColors.primary),
+                                    size: 14.sp, color: AppColors.primary),
                                 SizedBox(width: 4.w),
                                 Expanded(
                                   child: Text(
-                                    _fullLocation(a),
+                                    _shortLocation(a),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.poppins(
-                                      fontSize: 12.sp,
+                                      fontSize: 14.sp,
                                       fontWeight: FontWeight.w300,
                                       color: const Color(0xFF9E9E9E),
                                       height: 1.0,
@@ -621,47 +620,29 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // Heart / wishlist icon
-                        GestureDetector(
+                        CustomIconButton(
+                          isDark: true,
+                          size: 35,
                           onTap: () =>
                               setState(() => _isWishlisted = !_isWishlisted),
-                          child: Container(
-                            width: 35.w,
-                            height: 35.w,
-                            decoration: BoxDecoration(
-                              color: const Color(0x40FFFFFF),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              _isWishlisted
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              size: 20.sp,
-                              color: _isWishlisted
-                                  ? Colors.red.shade400
-                                  : Colors.white,
-                            ),
+                          child: Icon(
+                            _isWishlisted
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            size: 26.sp,
+                            color: _isWishlisted
+                                ? Colors.red.shade400
+                                : Colors.white,
                           ),
                         ),
-                        if (hasImages || hasVideo) ...[
-                          SizedBox(height: 10.h),
-                          GestureDetector(
-                            onTap: () => _openFullscreenGallery(
-                                images, hasImages, hasVideo, a),
-                            child: Container(
-                              width: 35.w,
-                              height: 35.w,
-                              decoration: const BoxDecoration(
-                                color: Color(0x40FFFFFF),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Icons.fullscreen,
-                                  size: 22.sp, color: Colors.white),
-                            ),
-                          ),
-                        ],
                         SizedBox(height: 10.h),
-                        // Overlapping image thumbnails + count
-                        _buildImageCluster(a),
+                        GestureDetector(
+                          onTap: (hasImages || hasVideo)
+                              ? () => _openFullscreenGallery(
+                                  images, hasImages, hasVideo, a)
+                              : null,
+                          child: _buildImageCluster(a),
+                        ),
                       ],
                     ),
                   ],
@@ -675,56 +656,28 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   }
 
   Widget _buildStatusPill(AnnouncementModel a) {
-    final dot = _statusDotColor(a.status);
     final timeAgo = a.timeAgo?.toUpperCase() ?? '';
-    final statusText = (a.status ?? '').toUpperCase();
 
-    return Container(
-      height: 35.h,
-      padding: EdgeInsets.symmetric(horizontal: 12.w),
-      decoration: BoxDecoration(
-        color: const Color(0xFF252525).withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(20.r),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8.w,
-            height: 8.w,
-            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-          ),
-          SizedBox(width: 6.w),
-          Text(
-            statusText,
-            style: GoogleFonts.poppins(
-              fontSize: 10.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
-              height: 1.0,
-              letterSpacing: 0,
-            ),
-          ),
-          if (timeAgo.isNotEmpty) ...[
-            Text(
-              '  •  ',
-              style: GoogleFonts.poppins(
-                fontSize: 10.sp,
-                color: const Color(0xFFCFCFCF),
-                height: 1.0,
+    return CustomPaint(
+      painter: const _DetailPillPainter(),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (timeAgo.isNotEmpty) ...[
+              Text(
+                timeAgo,
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFFCFCFCF),
+                  height: 1.0,
+                ),
               ),
-            ),
-            Text(
-              timeAgo,
-              style: GoogleFonts.poppins(
-                fontSize: 10.sp,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFFCFCFCF),
-                height: 1.0,
-              ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -734,63 +687,40 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     final count = images.length;
     if (count == 0) return const SizedBox.shrink();
 
-    const double sz = 36.0;
-    const double overlap = 10.0;
-    final shown = images.take(3).toList();
-    final totalWidth = sz + (shown.length - 1) * (sz - overlap) + 8;
+    const double sz = 37.0;
 
-    return SizedBox(
-      width: totalWidth.w,
+    return Container(
+      width: sz.w,
       height: sz.w,
-      child: Stack(
-        children: [
-          for (int i = shown.length - 1; i >= 0; i--)
-            Positioned(
-              left: i * (sz - overlap).w,
-              child: Container(
-                width: sz.w,
-                height: sz.w,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xABDBC483), width: 1),
-                ),
-                child: ClipOval(
-                  child: i == 0
-                      ? Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            CachedNetworkImage(
-                              imageUrl: shown[i],
-                              fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) =>
-                                  Container(color: const Color(0xFF2A2A2A)),
-                            ),
-                            // Count overlay on first (leftmost) circle
-                            Container(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              alignment: Alignment.center,
-                              child: Text(
-                                count > 9 ? '9+' : '$count',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 10.sp,
-                                  fontWeight: FontWeight.w300,
-                                  color: Colors.white,
-                                  height: 1.0,
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: shown[i],
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) =>
-                              Container(color: const Color(0xFF2A2A2A)),
-                        ),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xABDBC483), width: 1),
+      ),
+      child: ClipOval(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CachedNetworkImage(
+              imageUrl: images.first,
+              fit: BoxFit.cover,
+              errorWidget: (_, __, ___) =>
+                  Container(color: const Color(0xFF2A2A2A)),
+            ),
+            Container(
+              color: Colors.black.withValues(alpha: 0.5),
+              alignment: Alignment.center,
+              child: Text(
+                count > 7 ? '7+' : '$count',
+                style: GoogleFonts.poppins(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w300,
+                  color: Colors.white,
+                  height: 1.0,
                 ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -837,40 +767,13 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
         child: Row(
           children: [
             // Back button
-            GestureDetector(
+            CustomBackButton(
+              isDark: true,
+              iconColor: const Color(0xD1FFFFFF),
               onTap: () => Navigator.of(context).pop(),
-              child: Container(
-                width: 38.w,
-                height: 38.w,
-                decoration: const BoxDecoration(
-                  color: Color(0x1AFFFFFF),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 14.sp,
-                  color: const Color(0xD1FFFFFF),
-                ),
-              ),
             ),
             const Spacer(),
-            // Share button
-            GestureDetector(
-              onTap: () {},
-              child: Container(
-                width: 35.w,
-                height: 35.w,
-                decoration: const BoxDecoration(
-                  color: Color(0x40FFFFFF),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.share_outlined,
-                    size: 16.sp, color: Colors.white),
-              ),
-            ),
-            SizedBox(width: 10.w),
-            // More button (owner only)
-            if (widget.isOwner) _buildMoreMenu() else SizedBox(width: 35.w),
+            _buildMoreMenu(),
           ],
         ),
       ),
@@ -889,7 +792,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
           _buildStatsCard(a, isDark),
           SizedBox(height: 10.h),
           _buildTabBar(isDark),
-          SizedBox(height: 16.h),
+          SizedBox(height: 10.h),
           _buildTabContent(a, isDark),
         ],
       ),
@@ -899,50 +802,50 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   // ── Stats card ───────────────────────────────────────────────────────────────
 
   Widget _buildStatsCard(AnnouncementModel a, bool isDark) {
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final outerBorderColor =
-        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
-    final labelColor = isDark ? Colors.grey.shade400 : const Color(0xFF656565);
-    final dividerColor =
-        isDark ? const Color(0xFF3A3A3A) : const Color(0xFFEDEDED);
-
     final items = <_StatItem>[];
     if (a.bedrooms != null) {
-      items.add(_StatItem(Icons.bed_outlined, '${a.bedrooms}', 'Beds'));
+      items.add(
+          _StatItem('assets/images/bed_icon.png', '${a.bedrooms}', 'Beds'));
     }
     if (a.bathrooms != null) {
-      items.add(_StatItem(Icons.bathtub_outlined, '${a.bathrooms}', 'Baths'));
+      items.add(
+          _StatItem('assets/images/baths_icon.png', '${a.bathrooms}', 'Baths'));
     }
     if (a.sqft != null) {
-      items.add(_StatItem(Icons.straighten_outlined, '${a.sqft}', 'Sqft'));
+      items.add(_StatItem('assets/images/sqft_icon.png', '${a.sqft}', 'Sqft'));
     }
     if (a.floor != null) {
-      items.add(_StatItem(Icons.layers_outlined, '${a.floor}', 'Floor'));
+      items.add(
+          _StatItem('assets/images/floor_icon.png', '${a.floor}', 'Floor'));
     }
 
     if (items.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      width: double.infinity,
-      height: 104.h,
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(20.r),
-        border: Border.all(color: outerBorderColor),
-      ),
-      padding: EdgeInsets.symmetric(horizontal: 13.w),
-      child: Center(
-        child: Container(
-          height: 60.h,
+    final borderColor =
+        isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
+    final dividerColor =
+        isDark ? const Color(0xFF4A4A4A) : const Color(0xFFDDDDDD);
+
+    return Padding(
+      padding: EdgeInsets.only(top: 4.h),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 4.h),
+        decoration: BoxDecoration(
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+        child: IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (int i = 0; i < items.length; i++) ...[
-                Expanded(
-                  child: _buildStatItem(items[i], labelColor),
-                ),
+                Expanded(child: _buildStatItem(items[i], isDark)),
                 if (i < items.length - 1)
-                  Container(width: 1, color: dividerColor),
+                  Container(
+                    width: 0.5,
+                    color: dividerColor,
+                    margin: EdgeInsets.symmetric(vertical: 8.h),
+                  ),
               ],
             ],
           ),
@@ -951,32 +854,44 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     );
   }
 
-  Widget _buildStatItem(_StatItem item, Color labelColor) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(item.icon, size: 20.sp, color: AppColors.primary),
-        SizedBox(height: 3.h),
-        Text(
-          item.value,
-          style: GoogleFonts.poppins(
-            fontSize: 12.sp,
-            fontWeight: FontWeight.w700,
-            color: labelColor,
-            height: 1.0,
+  Widget _buildStatItem(_StatItem item, bool isDark) {
+    final textColor = isDark ? AppColors.textWhite : const Color(0xFF252525);
+    final labelColor = isDark ? AppColors.textWhite : const Color(0xFF6C6C6C);
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 6.h),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset(
+            item.iconAsset,
+            width: 24.w,
+            height: 24.w,
+            color: AppColors.primary,
           ),
-        ),
-        SizedBox(height: 2.h),
-        Text(
-          item.label,
-          style: GoogleFonts.poppins(
-            fontSize: 9.sp,
-            fontWeight: FontWeight.w400,
-            color: labelColor,
-            height: 1.0,
+          SizedBox(height: 5.h),
+          Text(
+            item.value,
+            style: GoogleFonts.poppins(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+              height: 1.0,
+            ),
           ),
-        ),
-      ],
+          SizedBox(height: 5.h),
+          Text(
+            item.label,
+            style: GoogleFonts.poppins(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w300,
+              color: labelColor,
+              height: 1.0,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -984,26 +899,24 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
   Widget _buildTabBar(bool isDark) {
     final tabs = [
-      _TabDef(Icons.home_outlined, 'Overview'),
-      _TabDef(Icons.photo_library_outlined, 'Photos'),
-      _TabDef(Icons.dashboard_outlined, 'Floor Plan'),
-      _TabDef(Icons.description_outlined, 'Documents'),
+      _TabDef('assets/images/detail_home_icon.png', 'Overview'),
+      _TabDef('assets/images/photo_icon.png', 'Photos'),
+      _TabDef('assets/images/floor_plan_icon.png', 'Floor Plan'),
+      _TabDef('assets/images/document_icon.png', 'Documents'),
     ];
 
-    final outerBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final outerBorderColor =
-        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
-    final inactiveBg =
-        isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF2F2F2);
-    const inactiveColor = Color(0xFF656565);
+        isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
+    final inactiveColor =
+        isDark ? AppColors.textWhite : const Color(0xFF6C6C6C);
 
     return Container(
       decoration: BoxDecoration(
-        color: outerBg,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(14.r),
         border: Border.all(color: outerBorderColor),
       ),
-      padding: EdgeInsets.all(5.w),
+      padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 4.h),
       child: Row(
         children: List.generate(tabs.length, (i) {
           final isActive = _tabIndex == i;
@@ -1016,8 +929,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                 margin: EdgeInsets.symmetric(horizontal: 2.w),
                 decoration: BoxDecoration(
                   color: isActive
-                      ? (isDark ? const Color(0xFF252525) : Colors.white)
-                      : inactiveBg,
+                      ? Colors.transparent
+                      : isDark
+                          ? const Color(0xFF090B11)
+                          : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(10.r),
                   border: isActive
                       ? Border.all(color: AppColors.primary, width: 1.5)
@@ -1026,16 +941,17 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      tabs[i].icon,
-                      size: 22.sp,
+                    Image.asset(
+                      tabs[i].iconAsset,
+                      width: 22.sp,
+                      height: 22.sp,
                       color: isActive ? AppColors.primary : inactiveColor,
                     ),
                     SizedBox(height: 4.h),
                     Text(
                       tabs[i].label,
                       style: GoogleFonts.inter(
-                        fontSize: 9.sp,
+                        fontSize: 10.sp,
                         fontWeight:
                             isActive ? FontWeight.w600 : FontWeight.w500,
                         color: isActive ? AppColors.primary : inactiveColor,
@@ -1074,19 +990,18 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       children: [
         if ((a.description ?? '').isNotEmpty) ...[
           _buildDescriptionCard(a.description!, isDark),
-          SizedBox(height: 16.h),
+          SizedBox(height: 10.h),
         ],
-        SizedBox(height: 16.h),
         _buildPropertyDetailsSection(a, isDark),
         if ((a.amenities ?? []).isNotEmpty) ...[
-          SizedBox(height: 16.h),
+          SizedBox(height: 10.h),
           Obx(() {
             final names = _amenityCtrl.namesForIds(a.amenities!);
             if (names.isEmpty) return const SizedBox.shrink();
             return _buildAmenitiesSection(names, isDark);
           }),
         ],
-        SizedBox(height: 16.h),
+        SizedBox(height: 10.h),
         _buildLocationSection(a, isDark),
       ],
     );
@@ -1097,30 +1012,60 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     if (images.isEmpty) {
       return _emptyTabContent('No photos available', isDark);
     }
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 8.w,
-        mainAxisSpacing: 8.h,
-        childAspectRatio: 1,
-      ),
-      itemCount: images.length,
-      itemBuilder: (_, i) => ClipRRect(
-        borderRadius: BorderRadius.circular(10.r),
-        child: CachedNetworkImage(
-          imageUrl: images[i],
-          fit: BoxFit.cover,
-          placeholder: (_, __) => Container(
-              color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200),
-          errorWidget: (_, __, ___) => Container(
-            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
-            child:
-                Icon(Icons.broken_image_outlined, color: Colors.grey.shade400),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 170.h,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.only(top: 6.h),
+            itemCount: images.length,
+            separatorBuilder: (_, __) => SizedBox(width: 8.w),
+            itemBuilder: (_, i) => GestureDetector(
+              onTap: () => FullscreenMediaViewer.show(
+                items: images
+                    .map((url) => MediaGalleryItem(url: url, isVideo: false))
+                    .toList(),
+                initialIndex: i,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10.r),
+                child: CachedNetworkImage(
+                  imageUrl: images[i],
+                  width: 170.w,
+                  height: 170.h,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                      width: 170.w,
+                      color: isDark
+                          ? const Color(0xFF2A2A2A)
+                          : Colors.grey.shade200),
+                  errorWidget: (_, __, ___) => Container(
+                    width: 170.w,
+                    color:
+                        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+                    child: Icon(Icons.broken_image_outlined,
+                        color: Colors.grey.shade400),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-      ),
+        SizedBox(height: 12.h),
+        _buildPropertyDetailsSection(a, isDark),
+        if ((a.amenities ?? []).isNotEmpty) ...[
+          SizedBox(height: 10.h),
+          Obx(() {
+            final names = _amenityCtrl.namesForIds(a.amenities!);
+            if (names.isEmpty) return const SizedBox.shrink();
+            return _buildAmenitiesSection(names, isDark);
+          }),
+        ],
+        SizedBox(height: 10.h),
+        _buildLocationSection(a, isDark),
+      ],
     );
   }
 
@@ -1129,57 +1074,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   }
 
   Widget _buildDocumentsTab(AnnouncementModel a, bool isDark) {
-    final docs = a.propertyDocuments;
-    final hasTitle = docs?.titleDeed?.fileUrl?.isNotEmpty == true;
-    final hasNoc = docs?.noc?.fileUrl?.isNotEmpty == true;
-    final hasPassport = docs?.passport?.frontUrl?.isNotEmpty == true ||
-        docs?.passport?.backUrl?.isNotEmpty == true;
-
-    if (!hasTitle && !hasNoc && !hasPassport) {
-      return _emptyTabContent('No documents available', isDark);
-    }
-
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFFAFAFA);
-    final textColor = isDark ? Colors.white : const Color(0xFF202020);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (hasTitle)
-          _docRow('Title Deed', Icons.article_outlined, cardBg, textColor),
-        if (hasNoc) ...[
-          SizedBox(height: 8.h),
-          _docRow('NOC Document', Icons.verified_outlined, cardBg, textColor),
-        ],
-        if (hasPassport) ...[
-          SizedBox(height: 8.h),
-          _docRow('Passport', Icons.badge_outlined, cardBg, textColor),
-        ],
-      ],
-    );
-  }
-
-  Widget _docRow(String label, IconData icon, Color cardBg, Color textColor) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(10.r),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18.sp, color: AppColors.primary),
-          SizedBox(width: 12.w),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-                fontSize: 14.sp, fontWeight: FontWeight.w500, color: textColor),
-          ),
-          const Spacer(),
-          Icon(Icons.arrow_forward_ios, size: 14.sp, color: AppColors.primary),
-        ],
-      ),
-    );
+    return _emptyTabContent('No documents available', isDark);
   }
 
   Widget _emptyTabContent(String message, bool isDark) {
@@ -1203,20 +1098,23 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     final isLong = desc.length > threshold;
     final displayText =
         isLong && !_descExpanded ? '${desc.substring(0, threshold)}...' : desc;
-    final borderColor =
-        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
+    final outerBorder =
+        isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
     final textColor = isDark ? Colors.grey.shade300 : const Color(0xFF444444);
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(14.w),
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
-        border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(10.r),
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: outerBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _sectionTitle('About Property', isDark),
+          SizedBox(height: 14.h),
           Text(
             displayText,
             style: GoogleFonts.inter(
@@ -1283,16 +1181,14 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
     if (items.isEmpty) return const SizedBox.shrink();
 
-    final outerBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final outerBorder =
-        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
+        isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
 
-    // Outer card wraps title + grid (matches screenshot design)
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
-        color: outerBg,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16.r),
         border: Border.all(color: outerBorder),
       ),
@@ -1301,75 +1197,62 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
         children: [
           _sectionTitle('Property Details', isDark),
           SizedBox(height: 14.h),
-          // LayoutBuilder gives exact available width after card's padding+border
-          LayoutBuilder(
-            builder: (_, constraints) {
-              // 2 gaps (8.w each) between 3 columns
-              final cellW = (constraints.maxWidth - 2 * 8.w) / 3;
-              return Wrap(
-                spacing: 8.w,
-                runSpacing: 8.h,
-                children: items
-                    .map((item) => _buildDetailCard(item, isDark, cellW))
-                    .toList(),
-              );
-            },
-          ),
+          // Build explicit rows of 3 so every column aligns perfectly
+          for (int i = 0; i < items.length; i += 3) ...[
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (int j = i; j < (i + 3).clamp(0, items.length); j++) ...[
+                    Expanded(child: _buildDetailCard(items[j], isDark)),
+                    if (j < (i + 3).clamp(0, items.length) - 1)
+                      SizedBox(width: 8.w),
+                  ],
+                  // Pad empty slots in the last row
+                  for (int k = items.length; k < i + 3; k++) ...[
+                    SizedBox(width: 8.w),
+                    const Expanded(child: SizedBox()),
+                  ],
+                ],
+              ),
+            ),
+            if (i + 3 < items.length) SizedBox(height: 8.h),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildDetailCard(_DetailItem item, bool isDark, double cellW) {
-    final cellBg = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5);
+  Widget _buildDetailCard(_DetailItem item, bool isDark) {
     final labelColor = isDark ? Colors.grey.shade500 : const Color(0xFF6C6C6C);
-    final valueColor = isDark ? Colors.white : const Color(0xFF252525);
-    final iconBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final iconBorder = AppColors.primary.withValues(alpha: 0.35);
+    final valueColor = isDark ? AppColors.textWhite : const Color(0xFF252525);
 
-    return Container(
-      width: cellW,
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
-      decoration: BoxDecoration(
-        color: cellBg,
-        borderRadius: BorderRadius.circular(10.r),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 12.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Label at top
-          Text(
-            item.label,
-            style: GoogleFonts.poppins(
-              fontSize: 10.sp,
-              fontWeight: FontWeight.w400,
-              color: labelColor,
-              height: 1.0,
-            ),
-          ),
-          SizedBox(height: 8.h),
-          // Icon box + value in a row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 26.w,
-                height: 26.w,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(6.r),
-                  border: Border.all(color: iconBorder),
+          Icon(item.icon, size: 18.sp, color: AppColors.primary),
+          SizedBox(width: 6.w),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item.label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w400,
+                    color: labelColor,
+                    height: 1.2,
+                  ),
                 ),
-                alignment: Alignment.center,
-                child: Icon(item.icon, size: 14.sp, color: AppColors.primary),
-              ),
-              SizedBox(width: 5.w),
-              Flexible(
-                child: Text(
+                SizedBox(height: 2.h),
+                Text(
                   item.value,
                   style: GoogleFonts.poppins(
-                    fontSize: 11.sp,
+                    fontSize: 12.sp,
                     fontWeight: FontWeight.w700,
                     color: valueColor,
                     height: 1.2,
@@ -1377,8 +1260,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -1388,11 +1271,9 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   // ── Amenities section ────────────────────────────────────────────────────────
 
   Widget _buildAmenitiesSection(List<String> amenities, bool isDark) {
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final borderColor =
-        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
-    final itemBg = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFFAFAFA);
-    final textColor = isDark ? Colors.white : const Color(0xFF202020);
+        isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
+    final textColor = isDark ? AppColors.textWhite : const Color(0xFF202020);
 
     // Show first 4, then "+N More"
     const maxVisible = 4;
@@ -1403,7 +1284,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       width: double.infinity,
       padding: EdgeInsets.all(14.w),
       decoration: BoxDecoration(
-        color: cardBg,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(10.r),
         border: Border.all(color: borderColor),
       ),
@@ -1421,8 +1302,9 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                     height: 38.h,
                     padding: EdgeInsets.symmetric(horizontal: 12.w),
                     decoration: BoxDecoration(
-                      color: itemBg,
+                      color: Colors.transparent,
                       borderRadius: BorderRadius.circular(10.r),
+                      border: Border.all(color: borderColor),
                     ),
                     child: Row(
                       children: [
@@ -1449,8 +1331,9 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                   height: 38.h,
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
                   decoration: BoxDecoration(
-                    color: itemBg,
+                    color: Colors.transparent,
                     borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(color: borderColor),
                   ),
                   child: Center(
                     child: Text(
@@ -1472,9 +1355,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   // ── Location section ─────────────────────────────────────────────────────────
 
   Widget _buildLocationSection(AnnouncementModel a, bool isDark) {
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final borderColor =
-        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
+        isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
     final addressColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
 
     final coords = a.propertyLocation?.coordinates;
@@ -1487,7 +1369,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       width: double.infinity,
       padding: EdgeInsets.all(14.w),
       decoration: BoxDecoration(
-        color: cardBg,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(10.r),
         border: Border.all(color: borderColor),
       ),
@@ -1610,36 +1492,119 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     ];
 
     if (!widget.isOwner) {
-      // Non-owner: Chat button
-      return Container(
-        decoration: BoxDecoration(color: barBg, boxShadow: shadow),
-        padding: EdgeInsets.fromLTRB(20.w, 14.h, 20.w, 14.h + bottomPad),
-        child: GestureDetector(
-          onTap: () => AnnouncementChatView.open(
-            announcementId: a.id ?? '',
-            brokerName: a.ownerName ?? 'Owner',
-            brokerAvatar: a.ownerAvatarUrl,
-            peerUserId: a.userId,
-          ),
-          child: Container(
-            height: 50.h,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(26.r),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.chat_bubble_outline,
-                    size: 18.sp, color: Colors.white),
-                SizedBox(width: 8.w),
-                Text('Chat',
-                    style: GoogleFonts.poppins(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white)),
-              ],
+      return Padding(
+        padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 10.h + bottomPad),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20.r),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+              decoration: BoxDecoration(
+                color:
+                    isDark ? const Color(0x80333333) : const Color(0x80E8E8E8),
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0x30FFFFFF)
+                      : const Color(0x30000000),
+                  width: 0.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  // Avatar
+                  Container(
+                    width: 46.w,
+                    height: 46.w,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary, width: 1.5),
+                    ),
+                    child: ClipOval(
+                      child: (a.ownerAvatarUrl ??
+                                      widget.announcement.ownerAvatarUrl) !=
+                                  null &&
+                              (a.ownerAvatarUrl ??
+                                      widget.announcement.ownerAvatarUrl)!
+                                  .isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: (a.ownerAvatarUrl ??
+                                  widget.announcement.ownerAvatarUrl)!,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => Container(
+                                color: const Color(0xFF2A2A2A),
+                                child: Icon(Icons.person,
+                                    size: 22.sp, color: Colors.white54),
+                              ),
+                            )
+                          : Container(
+                              color: const Color(0xFF2A2A2A),
+                              child: Icon(Icons.person,
+                                  size: 22.sp, color: Colors.white54),
+                            ),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  // Name + role
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          a.ownerName ??
+                              widget.announcement.ownerName ??
+                              'Owner',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : Colors.black87,
+                            height: 1.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Property Expert',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w300,
+                            color: isDark
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  // Chat icon button
+                  GestureDetector(
+                    onTap: () => AnnouncementChatView.open(
+                      announcementId: a.id ?? '',
+                      brokerName: a.ownerName ?? 'Owner',
+                      brokerAvatar: a.ownerAvatarUrl,
+                      peerUserId: a.userId,
+                    ),
+                    child: Container(
+                      width: 42.w,
+                      height: 42.w,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border:
+                            Border.all(color: AppColors.primary, width: 1.5),
+                      ),
+                      child: Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 18.sp,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1650,6 +1615,90 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     if (status == 'active') {
       final proposals = _data.latestProposals ?? [];
       final count = _data.proposalCount ?? proposals.length;
+
+      // Single broker: show expanded broker card layout
+      if (proposals.length == 1) {
+        final b = proposals.first;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 10.h + bottomPad),
+          child: GestureDetector(
+            onTap: () => Get.to(() => AnnouncementProposalsView(
+                  proposals: proposals,
+                  proposalsLimit: _data.proposalsLimit,
+                  announcementId: _data.id,
+                )),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(77.r),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Container(
+                  height: 67.h,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0x80333333)
+                        : const Color(0x80E1E1E1),
+                    borderRadius: BorderRadius.circular(77.r),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 10.w),
+                  child: Row(
+                    children: [
+                      // ── Broker avatar ──────────────────────────────────────
+                      _avatarCircle(b, 49.0),
+                      SizedBox(width: 12.w),
+                      // ── Name + subtitle ────────────────────────────────────
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              b.name ?? 'Broker',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textWhite,
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 2.h),
+                            Text(
+                              'Tap to view proposal',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w300,
+                                color: const Color(0xFF9E9E9E),
+                                height: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 8.w),
+                      // ── Chat icon button ───────────────────────────────────
+                      Container(
+                        width: 44.w,
+                        height: 44.w,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border:
+                              Border.all(color: AppColors.primary, width: 1.5),
+                        ),
+                        child: Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 18.sp,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
 
       return Padding(
         // Figma: left:44, right:375-44-287=44 → symmetric 44.w; bottom ~18px + safe area
@@ -1862,10 +1911,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 // ── Data models ───────────────────────────────────────────────────────────────
 
 class _StatItem {
-  final IconData icon;
+  final String iconAsset;
   final String value;
   final String label;
-  const _StatItem(this.icon, this.value, this.label);
+  const _StatItem(this.iconAsset, this.value, this.label);
 }
 
 class _DetailItem {
@@ -1876,7 +1925,53 @@ class _DetailItem {
 }
 
 class _TabDef {
-  final IconData icon;
+  final String iconAsset;
   final String label;
-  const _TabDef(this.icon, this.label);
+  const _TabDef(this.iconAsset, this.label);
+}
+
+class _DetailPillPainter extends CustomPainter {
+  const _DetailPillPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final radius = size.height / 2;
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF3A3A3C), Color(0xFF1C1C1E)],
+        ).createShader(rect),
+    );
+
+    const peak = Color(0x90FFFFFF);
+    const fade = Color(0x00FFFFFF);
+    final center = Offset(size.width / 2, size.height / 2);
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0.5, 0.5, size.width - 1, size.height - 1),
+        Radius.circular(radius - 0.5),
+      ),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0
+        ..shader = ui.Gradient.sweep(
+          center,
+          [fade, peak, fade, fade, peak, fade, fade],
+          [0.0, 0.125, 0.25, 0.5, 0.625, 0.75, 1.0],
+          TileMode.clamp,
+          0,
+          2 * pi,
+        ),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _DetailPillPainter old) => false;
 }

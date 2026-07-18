@@ -1,5 +1,6 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
+import 'package:brokkerspot/widgets/common/floating_dropdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -56,41 +57,6 @@ class _PropertyPriceBrokerageViewState
   void dispose() {
     _priceCtrl.dispose();
     super.dispose();
-  }
-
-  void _showPicker(
-      List<String> options, String? current, ValueChanged<String> onSelect) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16.r))),
-      builder: (_) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: options
-              .map((opt) => ListTile(
-                    title: Text(
-                      opt,
-                      style: GoogleFonts.inter(
-                        fontSize: 14.sp,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                    trailing: current == opt
-                        ? Icon(Icons.check,
-                            color: AppColors.primary, size: 18.sp)
-                        : null,
-                    onTap: () {
-                      onSelect(opt);
-                      Navigator.pop(context);
-                    },
-                  ))
-              .toList(),
-        ),
-      ),
-    );
   }
 
   Future<void> _pickDate(bool isDark) async {
@@ -278,15 +244,12 @@ class _PropertyPriceBrokerageViewState
                 children: [
                   _label('Monthly/Yearly', required: true, isDark: isDark),
                   SizedBox(height: 8.h),
-                  _dropdownTile(
+                  FloatingDropdown(
                     hint: 'Select Now',
                     value: _priceType,
+                    items: const ['Monthly', 'Yearly'],
                     isDark: isDark,
-                    onTap: () => _showPicker(
-                      ['Monthly', 'Yearly'],
-                      _priceType,
-                      (v) => setState(() => _priceType = v),
-                    ),
+                    onSelect: (v) => setState(() => _priceType = v),
                   ),
                 ],
               ),
@@ -380,6 +343,10 @@ class _PropertyPriceBrokerageViewState
                 ),
                 contentPadding: EdgeInsets.symmetric(vertical: 12.h),
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: true,
+                fillColor: Colors.transparent,
               ),
             ),
           ),
@@ -481,47 +448,6 @@ class _PropertyPriceBrokerageViewState
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _dropdownTile({
-    required String hint,
-    required String? value,
-    required bool isDark,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-          border: Border.all(
-            color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
-          ),
-          borderRadius: BorderRadius.circular(6.r),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                value ?? hint,
-                style: GoogleFonts.inter(
-                  fontSize: 13.sp,
-                  color: value != null
-                      ? (isDark ? Colors.white : Colors.black87)
-                      : (isDark ? Colors.grey.shade600 : Colors.grey.shade400),
-                ),
-              ),
-            ),
-            Icon(
-              Icons.keyboard_arrow_down,
-              color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
-              size: 18.sp,
-            ),
-          ],
-        ),
       ),
     );
   }

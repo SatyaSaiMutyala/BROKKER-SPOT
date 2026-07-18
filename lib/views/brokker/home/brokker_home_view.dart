@@ -100,7 +100,7 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
         notificationCount: _notificationCtrl.unseenCount.value,
         onAvatarTap: () {
           if (LocalStorageService.isLoggedIn()) {
-            Get.find<BottomNavController>().currentIndex.value = 4;
+            Get.find<BottomNavController>().currentIndex.value = 3;
           } else {
             showLoginRequiredDialog(context);
           }

@@ -2,6 +2,7 @@ import 'package:brokkerspot/views/auth/controller/email_verification_controller.
 import 'package:brokkerspot/views/auth/controller/forget_password_controller.dart';
 import 'package:brokkerspot/views/auth/view/email_verification_view.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
+import 'package:brokkerspot/widgets/common/custom_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -165,46 +166,16 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
           ),
         ),
         SizedBox(height: 30.h),
-        _emailField(isDark),
+        CustomTextField(
+          controller: emailController,
+          hintText: 'E-mail',
+          keyboardType: TextInputType.emailAddress,
+          isDark: isDark,
+          onChanged: (_) {},
+        ),
         SizedBox(height: 30.h),
         _verifyButton(isDark),
       ],
-    );
-  }
-
-  // ── Email field ───────────────────────────────────────────────────────────────
-
-  Widget _emailField(bool isDark) {
-    final inputTextColor = isDark ? Colors.white : Colors.black87;
-    final hintColor = isDark ? Colors.grey.shade500 : Colors.grey;
-    final enabledBorderColor =
-        isDark ? const Color(0xFF3A3A3A) : Colors.black26;
-    final focusedBorderColor = isDark ? Colors.grey.shade400 : Colors.black;
-
-    return TextField(
-      controller: emailController,
-      style: GoogleFonts.roboto(
-        fontSize: 16.sp,
-        fontWeight: FontWeight.w500,
-        letterSpacing: 2,
-        color: inputTextColor,
-      ),
-      decoration: InputDecoration(
-        counterText: '',
-        hintText: 'E-mail',
-        hintStyle: GoogleFonts.roboto(
-          fontSize: 14.sp,
-          fontWeight: FontWeight.w400,
-          color: hintColor,
-        ),
-        suffixIconConstraints: const BoxConstraints(minWidth: 0),
-        enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: enabledBorderColor),
-        ),
-        focusedBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: focusedBorderColor),
-        ),
-      ),
     );
   }
 

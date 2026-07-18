@@ -2,6 +2,7 @@ import 'package:brokkerspot/views/auth/controller/email_verification_controller.
 import 'package:brokkerspot/views/auth/controller/forget_password_controller.dart';
 import 'package:brokkerspot/views/auth/view/create_new_password.dart';
 import 'package:brokkerspot/views/auth/view/login_view.dart';
+import 'package:brokkerspot/widgets/common/custom_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -101,8 +102,6 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
   // ── Top section ───────────────────────────────────────────────────────────────
 
   Widget _topSection(BuildContext context, bool isDark) {
-    final backBorderColor =
-        isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E5E5);
     final backIconColor = isDark ? Colors.white : Colors.black87;
 
     return SizedBox(
@@ -123,20 +122,10 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
           Positioned(
             top: 10.h,
             left: 20.w,
-            child: InkWell(
+            child: CustomBackButton(
+              isDark: isDark,
+              iconColor: backIconColor,
               onTap: () => Get.back(),
-              child: Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: backBorderColor),
-                ),
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 18,
-                  color: backIconColor,
-                ),
-              ),
             ),
           ),
         ],
@@ -182,9 +171,7 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
   Widget _otpField(bool isDark) {
     final inputTextColor = isDark ? Colors.white : Colors.black87;
     final hintColor = isDark ? Colors.grey.shade500 : Colors.grey;
-    final enabledBorderColor =
-        isDark ? const Color(0xFF3A3A3A) : Colors.black26;
-    final focusedBorderColor = isDark ? Colors.grey.shade400 : Colors.black;
+    final underlineColor = isDark ? const Color(0xFF3A3A3A) : Colors.black26;
 
     return TextField(
       controller: widget.password == false
@@ -192,6 +179,7 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
           : forgetPasswordController.otpController,
       keyboardType: TextInputType.number,
       maxLength: 6,
+      cursorColor: AppColors.primary,
       style: GoogleFonts.inter(
         fontSize: 16.sp,
         fontWeight: FontWeight.w500,
@@ -205,6 +193,8 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
           fontSize: 15.sp,
           color: hintColor,
         ),
+        filled: true,
+        fillColor: Colors.transparent,
         suffixIcon: InkWell(
           onTap: () async {
             if (widget.password == false) {
@@ -228,11 +218,14 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
             ),
           ),
         ),
+        border: UnderlineInputBorder(
+          borderSide: BorderSide(color: underlineColor),
+        ),
         enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: enabledBorderColor),
+          borderSide: BorderSide(color: underlineColor),
         ),
         focusedBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: focusedBorderColor),
+          borderSide: BorderSide(color: underlineColor),
         ),
       ),
     );

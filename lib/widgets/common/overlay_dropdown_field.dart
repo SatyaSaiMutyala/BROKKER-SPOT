@@ -11,7 +11,7 @@ class OverlayDropdownField extends StatefulWidget {
   final String? value;
   final List<String> items;
   final ValueChanged<String> onSelect;
-
+  final IconData? prefixIcon;
   final double maxPanelHeight;
 
   const OverlayDropdownField({
@@ -20,6 +20,7 @@ class OverlayDropdownField extends StatefulWidget {
     required this.value,
     required this.items,
     required this.onSelect,
+    this.prefixIcon,
     this.maxPanelHeight = 220,
   });
 
@@ -36,6 +37,7 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
   void _toggle() => _isOpen ? _close() : _open();
 
   void _open() {
+    FocusScope.of(context).unfocus();
     final overlay = Overlay.of(context, rootOverlay: true);
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
@@ -161,6 +163,10 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
           ),
           child: Row(
             children: [
+              if (widget.prefixIcon != null) ...[
+                Icon(widget.prefixIcon, size: 20.sp, color: AppColors.primary),
+                SizedBox(width: 10.w),
+              ],
               Expanded(
                 child: Text(
                   value ?? widget.hint,

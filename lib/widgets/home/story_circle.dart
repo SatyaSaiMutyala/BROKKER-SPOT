@@ -47,14 +47,14 @@ class StoryCircle extends StatelessWidget {
                     : _placeholder(),
               ),
             ),
-            SizedBox(height: 4.h),
+            SizedBox(height: 8.h),
             Text(
               name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
-                fontSize: 10.sp,
+                fontSize: 11.sp,
                 fontWeight: FontWeight.w500,
                 color: Theme.of(context).colorScheme.onSurface,
               ),

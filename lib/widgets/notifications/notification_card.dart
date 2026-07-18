@@ -20,11 +20,15 @@ class NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final unread = !notification.isViewed;
+    final unreadBg = isDark
+        ? AppColors.teal.withValues(alpha: 0.12)
+        : AppColors.tealLight;
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: unread ? AppColors.tealLight : Colors.white,
+        color: unread ? unreadBg : Colors.transparent,
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,7 +48,7 @@ class NotificationCard extends StatelessWidget {
                             fontSize: 14.sp,
                             fontWeight:
                                 unread ? FontWeight.w700 : FontWeight.w600,
-                            color: Colors.black,
+                            color: isDark ? Colors.white : Colors.black,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -67,7 +71,7 @@ class NotificationCard extends StatelessWidget {
                       notification.message!,
                       style: GoogleFonts.inter(
                         fontSize: 12.sp,
-                        color: Colors.grey.shade700,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,

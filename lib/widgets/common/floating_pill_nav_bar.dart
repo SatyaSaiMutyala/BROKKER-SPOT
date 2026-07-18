@@ -30,30 +30,29 @@ class FloatingPillNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          trailing != null ? 37.w : 16.w,
-          0,
-          trailing != null ? 38.w : 16.w,
-          12.h,
-        ),
-        child: Row(
-          children: [
-            Expanded(child: _buildPill(context)),
-            if (trailing != null) ...[
-              SizedBox(width: 12.w),
-              trailing!,
-            ],
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        trailing != null ? 37.w : 16.w,
+        0,
+        trailing != null ? 38.w : 16.w,
+        bottomInset + 10.h,
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _buildPill(context)),
+          if (trailing != null) ...[
+            SizedBox(width: 12.w),
+            trailing!,
           ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildPill(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pillBg = isDark ? const Color(0x30FFFFFF) : const Color(0x80DBDBDB);
+    final pillBg = isDark ? const Color(0x99000000) : const Color(0x99DBDBDB);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(25.r),

@@ -5,6 +5,7 @@ import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_account/broker_my_information_view.dart';
+import 'package:brokkerspot/views/brokker/project/broker_projects_view.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:brokkerspot/views/user/settings/settings_view.dart';
 import 'package:flutter/material.dart';
@@ -174,32 +175,32 @@ class BrokerProfileView extends StatelessWidget {
                           theme,
                           'assets/images/broker_announcement.png',
                           'My Announcements',
-                          () {},
+                          () => Get.to(() => const BrokerProjectsView(showMineOnly: true)),
                         ),
-                        _menuItem(
-                          theme,
-                          'assets/images/broker_mydeal_icon.png',
-                          'My Deals',
-                          () {},
-                        ),
-                        _menuItem(
-                          theme,
-                          'assets/images/broker_bank_icon.png',
-                          'My Bank Account Details',
-                          () {},
-                        ),
+                        // _menuItem(
+                        //   theme,
+                        //   'assets/images/broker_mydeal_icon.png',
+                        //   'My Deals',
+                        //   () {},
+                        // ),
+                        // _menuItem(
+                        //   theme,
+                        //   'assets/images/broker_bank_icon.png',
+                        //   'My Bank Account Details',
+                        //   () {},
+                        // ),
                         _menuItem(
                           theme,
                           'assets/images/broker_wishlist_icon.png',
                           'Wishlist',
                           () {},
                         ),
-                        _menuItem(
-                          theme,
-                          'assets/images/subscription_icon.png',
-                          'My Subscription',
-                          () {},
-                        ),
+                        // _menuItem(
+                        //   theme,
+                        //   'assets/images/subscription_icon.png',
+                        //   'My Subscription',
+                        //   () {},
+                        // ),
                         _menuItem(
                           theme,
                           'assets/images/broker_settings_icon.png',
@@ -270,7 +271,8 @@ class BrokerProfileView extends StatelessWidget {
               children: [
                 if (isVerified)
                   CustomPaint(
-                    size: Size((_avatarSize + arcPad).w, (_avatarSize + arcPad).w),
+                    size: Size(
+                        (_avatarSize + arcPad).w, (_avatarSize + arcPad).w),
                     painter: _VerifiedArcPainter(isVerified: isVerified),
                   ),
                 Container(
@@ -308,7 +310,9 @@ class BrokerProfileView extends StatelessWidget {
         ),
         SizedBox(height: 12.h),
         Text(
-          controller.userName.value.isNotEmpty ? controller.userName.value : '-',
+          controller.userName.value.isNotEmpty
+              ? controller.userName.value
+              : '-',
           style: GoogleFonts.poppins(
             fontSize: 18.sp,
             fontWeight: FontWeight.w600,

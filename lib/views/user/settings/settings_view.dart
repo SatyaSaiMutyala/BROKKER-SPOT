@@ -2,6 +2,7 @@ import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/theme/theme_controller.dart';
 import 'package:brokkerspot/views/user/settings/change_password_view.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -20,15 +21,37 @@ class SettingsView extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor:
+          isDark ? const Color(0xFF090B11) : theme.scaffoldBackgroundColor,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            _buildHeader(context, theme, isDark),
+            CustomHeader(
+              title: 'Setting',
+              showBackButton: true,
+              trailing: GestureDetector(
+                onTap: () => _showLogoutDialog(context),
+                child: Container(
+                  width: 36.w,
+                  height: 36.w,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFFFF4B4B),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(2.w),
+                    child: Image.asset(
+                      'assets/images/logout_icon.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(27.w, 24.h, 27.w, 24.h),
+                padding: EdgeInsets.fromLTRB(27.w, 40.h, 27.w, 24.h),
                 child: Column(
                   children: [
                     // ── Card 1: personalisation ─────────────────────────────
@@ -37,13 +60,13 @@ class SettingsView extends StatelessWidget {
                       children: [
                         _tile(
                           title: 'Theme',
-                          icon: Icons.contrast_rounded,
+                          iconAsset: 'assets/images/theme_icon.png',
                           isDark: isDark,
                           onTap: () => ThemeController.to.toggleTheme(),
                         ),
                         _tile(
                           title: 'Password & Security',
-                          icon: Icons.password_outlined,
+                          iconAsset: 'assets/images/password.png',
                           isDark: isDark,
                           onTap: () => Get.to(() => ChangePasswordView()),
                         ),
@@ -58,16 +81,15 @@ class SettingsView extends StatelessWidget {
                         ),
                         _tile(
                           title: 'Language',
-                          icon: Icons.translate_outlined,
+                          iconAsset: 'assets/images/language.png',
                           isDark: isDark,
                           onTap: () {},
                         ),
                         _tile(
                           title: 'Currency',
-                          icon: Icons.currency_exchange_outlined,
+                          iconAsset: 'assets/images/currency.png',
                           isDark: isDark,
                           onTap: () {},
-                          showDivider: false,
                         ),
                       ],
                     ),
@@ -80,22 +102,21 @@ class SettingsView extends StatelessWidget {
                       children: [
                         _tile(
                           title: 'Terms & Conditions',
-                          icon: Icons.description_outlined,
+                          iconAsset: 'assets/images/terms.png',
                           isDark: isDark,
                           onTap: () {},
                         ),
                         _tile(
                           title: 'Help & Support',
-                          icon: Icons.headset_mic_outlined,
+                          iconAsset: 'assets/images/help.png',
                           isDark: isDark,
                           onTap: () {},
                         ),
                         _tile(
                           title: 'About Us',
-                          icon: Icons.info_outline_rounded,
+                          iconAsset: 'assets/images/about_icon.png',
                           isDark: isDark,
                           onTap: () {},
-                          showDivider: false,
                         ),
                       ],
                     ),
@@ -121,76 +142,16 @@ class SettingsView extends StatelessWidget {
     );
   }
 
-  // ── Header: back circle + centered title + red logout circle ───────────────
-
-  Widget _buildHeader(BuildContext context, ThemeData theme, bool isDark) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(18.w, 16.h, 18.w, 0),
-      child: Row(
-        children: [
-          // Back button — gray filled circle
-          GestureDetector(
-            onTap: () => Get.back(),
-            child: Container(
-              width: 36.w,
-              height: 36.w,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF2F2F2),
-              ),
-              child: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                size: 16.sp,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ),
-          SizedBox(width: 14.w),
-          // Title — left-aligned next to the back button
-          Expanded(
-            child: Text(
-              'Setting',
-              style: GoogleFonts.poppins(
-                fontSize: 20.sp,
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface,
-                height: 1.0,
-                letterSpacing: 0,
-              ),
-            ),
-          ),
-          // Logout — filled red circle
-          GestureDetector(
-            onTap: () => _showLogoutDialog(context),
-            child: Container(
-              width: 36.w,
-              height: 36.w,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFFFF4B4B),
-              ),
-              child: Icon(
-                Icons.power_settings_new_rounded,
-                size: 18.sp,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── Card wrapper ───────────────────────────────────────────────────────────
 
   Widget _buildCard({required bool isDark, required List<Widget> children}) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: isDark ? const Color(0xFF090B11) : Colors.white,
         borderRadius: BorderRadius.circular(16.r),
         border: Border.all(
-          color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE8E8E8),
+          color: isDark ? const Color(0xFF2A2D3C) : const Color(0xFFE8E8E8),
         ),
       ),
       child: Column(
@@ -205,11 +166,25 @@ class SettingsView extends StatelessWidget {
   Widget _tile({
     required String title,
     required bool isDark,
+    String? iconAsset,
     IconData? icon,
     Widget? trailing,
     VoidCallback? onTap,
-    bool showDivider = true,
   }) {
+    Widget? iconWidget;
+    if (trailing != null) {
+      iconWidget = trailing;
+    } else if (iconAsset != null) {
+      iconWidget = Image.asset(
+        iconAsset,
+        width: 24.w,
+        height: 24.w,
+        color: AppColors.primary,
+      );
+    } else if (icon != null) {
+      iconWidget = Icon(icon, size: 24.sp, color: AppColors.primary);
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -224,7 +199,7 @@ class SettingsView extends StatelessWidget {
                   child: Text(
                     title,
                     style: GoogleFonts.poppins(
-                      fontSize: 14.sp,
+                      fontSize: 17.sp,
                       fontWeight: FontWeight.w500,
                       color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                       height: 1.0,
@@ -232,30 +207,11 @@ class SettingsView extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (trailing != null)
-                  trailing
-                else if (icon != null)
-                  Container(
-                    padding: EdgeInsets.all(6.w),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(color: AppColors.goldAccent, width: 1),
-                    ),
-                    child: Icon(icon, size: 18.sp, color: AppColors.primary),
-                  ),
+                if (iconWidget != null) iconWidget,
               ],
             ),
           ),
         ),
-        if (showDivider)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14.w),
-            child: Divider(
-              height: 1,
-              thickness: 0.5,
-              color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE8E8E8),
-            ),
-          ),
       ],
     );
   }
@@ -290,7 +246,10 @@ class SettingsView extends StatelessWidget {
               'Are you sure you want to logout?',
               style: GoogleFonts.poppins(
                 fontSize: 14.sp,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.5),
               ),
             ),
             SizedBox(height: 24.h),

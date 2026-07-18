@@ -1,6 +1,7 @@
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -52,34 +53,22 @@ class _MorePropertyViewState extends State<MorePropertyView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFE5E5E5)),
-              ),
-              child: const Center(
-                child: Icon(Icons.arrow_back_ios_new, size: 14, color: Colors.black),
-              ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            CustomHeader(
+              title: 'More Properties',
+              showBackButton: true,
             ),
-          ),
+            Expanded(
+              child: _isStatic
+                  ? _buildStaticList(widget.staticList!)
+                  : _buildLiveList(),
+            ),
+          ],
         ),
-        title: const Text(
-          'More Properties',
-          style: TextStyle(color: Colors.black, fontSize: 16),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
       ),
-      body: _isStatic ? _buildStaticList(widget.staticList!) : _buildLiveList(),
     );
   }
 

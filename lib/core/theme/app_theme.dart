@@ -67,20 +67,22 @@ class AppTheme {
         ),
       );
 
+  static const _darkBg = Color(0xFF090B11);
+
   static ThemeData get dark => ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
         fontFamily: 'Poppins',
-        scaffoldBackgroundColor: AppColors.backgroundDark,
+        scaffoldBackgroundColor: _darkBg,
         colorScheme: ColorScheme.dark(
           primary: AppColors.primary,
           secondary: AppColors.primaryLight,
-          surface: AppColors.backgroundDark,
+          surface: _darkBg,
           onPrimary: Colors.white,
           onSurface: Colors.white,
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: AppColors.backgroundDark,
+          backgroundColor: _darkBg,
           foregroundColor: Colors.white,
           elevation: 0,
           scrolledUnderElevation: 0,

@@ -15,6 +15,7 @@ class HomeAppBar extends StatelessWidget {
   final String location;
   final int notificationCount;
   final VoidCallback? onAvatarTap;
+  final VoidCallback? onLocationTap;
   final VoidCallback onNotificationTap;
   final VoidCallback onSearchTap;
 
@@ -27,6 +28,7 @@ class HomeAppBar extends StatelessWidget {
     required this.location,
     required this.notificationCount,
     this.onAvatarTap,
+    this.onLocationTap,
     required this.onNotificationTap,
     required this.onSearchTap,
   });
@@ -93,21 +95,24 @@ class HomeAppBar extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 2.h),
-                    Row(
-                      children: [
-                        Icon(Icons.location_on_rounded,
-                            size: 12.sp, color: AppColors.primary),
-                        SizedBox(width: 2.w),
-                        Text(
-                          location,
-                          style: GoogleFonts.poppins(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.w300,
-                            color: theme.colorScheme.onSurface,
-                            height: 1.0,
+                    GestureDetector(
+                      onTap: onLocationTap,
+                      child: Row(
+                        children: [
+                          Icon(Icons.location_on_rounded,
+                              size: 15.sp, color: AppColors.primary),
+                          SizedBox(width: 2.w),
+                          Text(
+                            location,
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w300,
+                              color: theme.colorScheme.onSurface,
+                              height: 1.0,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -119,7 +124,7 @@ class HomeAppBar extends StatelessWidget {
         // Notification + Search — single pill (#FAF7F1, 91×41, r:39)
         Container(
           width: 91.w,
-          height: 41.h,
+          height: 42.h,
           decoration: BoxDecoration(
             color: theme.brightness == Brightness.dark
                 ? const Color(0xFF2A2A2A)
@@ -139,7 +144,7 @@ class HomeAppBar extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.notifications_outlined,
-                      size: 22.sp,
+                      size: 26.sp,
                       color: theme.colorScheme.onSurface,
                     ),
                     if (notificationCount > 0)
@@ -153,7 +158,9 @@ class HomeAppBar extends StatelessWidget {
                               shape: BoxShape.circle, color: Colors.red),
                           child: Center(
                             child: Text(
-                              notificationCount > 9 ? '9+' : '$notificationCount',
+                              notificationCount > 9
+                                  ? '9+'
+                                  : '$notificationCount',
                               style: GoogleFonts.inter(
                                   fontSize: 7.sp,
                                   fontWeight: FontWeight.w700,
@@ -171,8 +178,8 @@ class HomeAppBar extends StatelessWidget {
                 behavior: HitTestBehavior.opaque,
                 child: Image.asset(
                   'assets/images/search_icon.png',
-                  width: 20.w,
-                  height: 20.w,
+                  width: 24.w,
+                  height: 24.w,
                   color: theme.colorScheme.onSurface,
                 ),
               ),

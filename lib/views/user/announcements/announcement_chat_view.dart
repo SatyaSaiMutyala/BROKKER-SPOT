@@ -1,3 +1,4 @@
+import 'package:brokkerspot/widgets/common/custom_back_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -155,11 +156,11 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor:
+            isDark ? const Color(0xFF090B11) : theme.scaffoldBackgroundColor,
         body: Column(
           children: [
-            SizedBox(height: topPadding),
-            _buildHeader(isDark),
+            _buildHeader(isDark, topPadding),
             Divider(height: 1, thickness: 1, color: dividerColor),
             Obx(() => _buildProposalBanner(isDark)),
             Expanded(
@@ -174,24 +175,19 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
 
   // ── Header ────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader(bool isDark) {
-    final iconBg = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100;
-    final iconColor = isDark ? Colors.white : Colors.black87;
+  Widget _buildHeader(bool isDark, double topPadding) {
     final nameColor = isDark ? Colors.white : Colors.black87;
+    final iconColor = isDark ? Colors.white : Colors.black87;
 
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+    return Container(
+      color: isDark ? AppColors.appBarDarkBg : AppColors.appBarLightBg,
+      padding: EdgeInsets.fromLTRB(16.w, topPadding + 10.h, 16.w, 10.h),
       child: Row(
         children: [
-          GestureDetector(
+          CustomBackButton(
+            isDark: isDark,
+            iconColor: isDark ? Colors.white : Colors.black87,
             onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 38.r,
-              height: 38.r,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: iconBg),
-              child:
-                  Icon(Icons.arrow_back_ios_new, size: 16.sp, color: iconColor),
-            ),
           ),
           SizedBox(width: 12.w),
           Container(
@@ -262,10 +258,9 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
               ],
             ),
           ),
-          Container(
-            width: 38.r,
-            height: 38.r,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: iconBg),
+          CustomIconButton(
+            isDark: isDark,
+            size: 38,
             child: Icon(Icons.more_horiz, size: 20.sp, color: iconColor),
           ),
         ],

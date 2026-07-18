@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class LocationPickerPopup extends StatefulWidget {
@@ -54,28 +54,7 @@ class _LocationPickerPopupState extends State<LocationPickerPopup> {
 
   void _confirm() {
     Navigator.pop(context);
-    Get.snackbar(
-      '',
-      '',
-      titleText: Text(
-        'Location Set!',
-        style: GoogleFonts.inter(
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
-          fontSize: 14.sp,
-        ),
-      ),
-      messageText: Text(
-        'Exploring properties in $_selected',
-        style: GoogleFonts.inter(color: Colors.white70, fontSize: 13.sp),
-      ),
-      backgroundColor: AppColors.primaryDark,
-      snackPosition: SnackPosition.TOP,
-      borderRadius: 14,
-      margin: EdgeInsets.all(16.w),
-      icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
-      duration: const Duration(seconds: 3),
-    );
+    AppToast.topToast('Exploring properties in $_selected');
   }
 
   @override
@@ -187,7 +166,8 @@ class _LocationPickerPopupState extends State<LocationPickerPopup> {
                   color: Colors.black38,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.close_rounded, color: Colors.white, size: 16.sp),
+                child:
+                    Icon(Icons.close_rounded, color: Colors.white, size: 16.sp),
               ),
             ),
           ),

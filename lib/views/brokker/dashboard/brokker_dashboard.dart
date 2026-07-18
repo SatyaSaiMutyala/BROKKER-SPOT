@@ -7,7 +7,6 @@ import 'package:brokkerspot/views/brokker/brokker_account/brokker_profile_view.d
 import 'package:brokkerspot/views/brokker/dashboard/bottom_nav_controller.dart';
 import 'package:brokkerspot/views/brokker/home/brokker_home_view.dart';
 import 'package:brokkerspot/views/brokker/meeting/broker_meeting_view.dart';
-import 'package:brokkerspot/views/brokker/payments/broker_payments_view.dart';
 import 'package:brokkerspot/views/brokker/project/broker_projects_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/widgets/common/floating_pill_nav_bar.dart';
@@ -54,7 +53,9 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
         await Future.delayed(const Duration(milliseconds: 1800));
         if (mounted) {
           final result = await FirebaseMessaging.instance.requestPermission(
-            alert: true, badge: true, sound: true,
+            alert: true,
+            badge: true,
+            sound: true,
           );
           if (result.authorizationStatus == AuthorizationStatus.authorized ||
               result.authorizationStatus == AuthorizationStatus.provisional) {
@@ -87,9 +88,11 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     final isLoggedIn = LocalStorageService.isLoggedIn();
     if (isLoggedIn &&
         profileController.hasBrokerRole &&
-        profileController.profileData.value?['verificationStatus'] == 'rejected') {
+        profileController.profileData.value?['verificationStatus'] ==
+            'rejected') {
       _rejectedDialogShown = true;
-      final reason = profileController.profileData.value?['rejectionReason'] ?? 'Your account has been rejected.';
+      final reason = profileController.profileData.value?['rejectionReason'] ??
+          'Your account has been rejected.';
       showAccountRejectedDialog(context, reason);
     }
   }
@@ -98,7 +101,6 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     BrokerHomeView(),
     BrokerProjectsView(),
     BrokerMeetingView(),
-    BrokerPaymentsView(),
     BrokerProfileView(),
   ];
 
@@ -113,15 +115,12 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
         iconAsset: 'assets/images/meeting_icon.png',
         activeIconAsset: 'assets/images/meeting_active_icon.png'),
     PillNavItem(
-        iconAsset: 'assets/images/broker_payment_icon.png',
-        activeIconAsset: 'assets/images/broker_active_payment_icon.png'),
-    PillNavItem(
         iconAsset: 'assets/images/broker_profile_icon.png',
         activeIconAsset: 'assets/images/broker_active_profile_icon.png'),
   ];
 
-  // Tabs 1 (Projects), 2 (Meeting), 3 (Payments) require login.
-  static const _loginRequiredTabs = {1, 2, 3};
+  // Tabs 1 (Projects) and 2 (Meeting) require login.
+  static const _loginRequiredTabs = {1, 2};
 
   void _onCreateTap(BuildContext context) {
     if (!LocalStorageService.isLoggedIn()) {
@@ -168,9 +167,9 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     final verificationStatus =
         profileController.profileData.value?['verificationStatus'];
 
-    // Rejected: block tabs 1, 2, 3 only (allow Home=0 and Account=4).
+    // Rejected: block tabs 1, 2 only (allow Home=0 and Account=3).
     if (index != 0 &&
-        index != 4 &&
+        index != 3 &&
         isLoggedIn &&
         profileController.hasBrokerRole &&
         verificationStatus == 'rejected') {
@@ -213,7 +212,7 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     return Obx(
       () => Scaffold(
         extendBody: true,
-        body: (controller.currentIndex.value == 4 &&
+        body: (controller.currentIndex.value == 3 &&
                 !LocalStorageService.isLoggedIn())
             ? AccountMenuView()
             : pages[controller.currentIndex.value],

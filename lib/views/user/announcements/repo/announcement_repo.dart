@@ -3,6 +3,7 @@ import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/models/amenity_model.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/models/property_type_model.dart';
 
 class AnnouncementRepository {
   Future<AnnouncementModel> createAnnouncement(Map<String, dynamic> body) async {
@@ -149,6 +150,21 @@ class AnnouncementRepository {
           .toList();
     }
     throw json['message'] ?? 'Failed to fetch amenities';
+  }
+
+  Future<List<PropertyTypeModel>> fetchPropertyTypes() async {
+    final response = await api.getRequest(
+      endPoint:
+          '${api.baseUrl}${ApiEndpoints.fetchPropertyTypes}?page=1&perPage=100',
+      headers: api.buildHeaders(),
+    );
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['success'] == true) {
+      return (json['data'] as List)
+          .map((e) => PropertyTypeModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw json['message'] ?? 'Failed to fetch property types';
   }
 
   Future<AnnouncementModel> fetchAnnouncementDetail(String id) async {

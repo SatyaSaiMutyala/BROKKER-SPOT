@@ -12,6 +12,7 @@ import 'package:brokkerspot/views/user/announcements/chat/chat_events.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/widgets/common/terms_dialog.dart';
+import 'package:brokkerspot/widgets/common/custom_header.dart';
 
 /// Shown to a broker after both sides have signed the agreement
 /// (proposalStatus == 3). Reviews the property and, on confirm, emits
@@ -130,7 +131,8 @@ class _PublishAnnouncementViewState extends State<PublishAnnouncementView> {
     if (listingTypeCode == 1) {
       body['brokkerage_percent'] = a.brokkeragePercent;
     } else {
-      if (a.rentPeriod != null) body['rentPeriod'] = a.rentPeriod!.toLowerCase();
+      if (a.rentPeriod != null)
+        body['rentPeriod'] = a.rentPeriod!.toLowerCase();
       if (a.availableDate != null) body['availableDate'] = a.availableDate;
     }
     if (a.proposalsLimit != null) body['proposals_limit'] = a.proposalsLimit;
@@ -236,7 +238,8 @@ class _PublishAnnouncementViewState extends State<PublishAnnouncementView> {
         setState(() => _isPublishing = false);
         Get.snackbar(
           'Publish failed',
-          (map['message'] as String?) ?? 'Something went wrong. Please try again.',
+          (map['message'] as String?) ??
+              'Something went wrong. Please try again.',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red.shade600,
           colorText: Colors.white,
@@ -284,27 +287,28 @@ class _PublishAnnouncementViewState extends State<PublishAnnouncementView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Text(
-          'Publish Announcement',
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w600,
-          ),
+      backgroundColor: isDark ? const Color(0xFF090B11) : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            CustomHeader(
+              title: 'Publish Announcement',
+              showBackButton: true,
+            ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.primary))
+                  : _loadError != null
+                      ? _buildError()
+                      : _buildContent(_announcement!),
+            ),
+          ],
         ),
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary))
-          : _loadError != null
-              ? _buildError()
-              : _buildContent(_announcement!),
     );
   }
 
@@ -326,8 +330,8 @@ class _PublishAnnouncementViewState extends State<PublishAnnouncementView> {
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Colors.white70),
               ),
-              child: Text('Retry',
-                  style: GoogleFonts.inter(color: Colors.white)),
+              child:
+                  Text('Retry', style: GoogleFonts.inter(color: Colors.white)),
             ),
           ],
         ),
@@ -337,8 +341,8 @@ class _PublishAnnouncementViewState extends State<PublishAnnouncementView> {
 
   Widget _buildContent(AnnouncementModel a) {
     final images = a.imageUrls ?? const [];
-    final coverImage = a.propertyMedia?.thumbnail ??
-        (images.isNotEmpty ? images.first : null);
+    final coverImage =
+        a.propertyMedia?.thumbnail ?? (images.isNotEmpty ? images.first : null);
 
     return Column(
       children: [
@@ -409,8 +413,11 @@ class _PublishAnnouncementViewState extends State<PublishAnnouncementView> {
                   child: Column(
                     children: [
                       _summaryRow('Listing type', a.listingType ?? '—'),
-                      _summaryRow('Price',
-                          a.price != null ? '${a.currency ?? ''} ${a.price}' : '—'),
+                      _summaryRow(
+                          'Price',
+                          a.price != null
+                              ? '${a.currency ?? ''} ${a.price}'
+                              : '—'),
                       if (a.bedrooms != null)
                         _summaryRow('Bedrooms', '${a.bedrooms}'),
                       if (a.bathrooms != null)
