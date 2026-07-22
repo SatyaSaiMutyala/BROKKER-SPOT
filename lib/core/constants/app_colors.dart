@@ -53,4 +53,11 @@ class AppColors {
   // Back button circle — light theme
   static const Color backBtnLightBg = Color(0xFFF2F2F2);
   static const Color backBtnLightIcon = Color(0xDD000000);
+
+  // Bottom navigation bar
+  static const Color navActive = Color(0xFFC8A961);
+  static const Color navInactiveLight = Color(0xFF1C1C1E);
+  static const Color navInactiveDark = Color(0xFFE4E4E7);
+  static const Color navCenterButtonLight = Color(0xFFF7F2E9);
+  static const Color navCenterButtonDark = Color(0xFF1E212A);
 }

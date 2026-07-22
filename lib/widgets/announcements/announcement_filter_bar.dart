@@ -18,12 +18,16 @@ class AnnouncementFilterBar extends StatelessWidget {
   final ValueChanged<String?> onListingTypeChanged;
   final ValueChanged<String?> onPropertyTypeChanged;
 
+  /// Side inset, so a host screen can line the chips up with its own gutter.
+  final double? horizontalPadding;
+
   const AnnouncementFilterBar({
     super.key,
     required this.selectedListingType,
     required this.selectedPropertyType,
     required this.onListingTypeChanged,
     required this.onPropertyTypeChanged,
+    this.horizontalPadding,
   });
 
   @override
@@ -40,7 +44,7 @@ class AnnouncementFilterBar extends StatelessWidget {
       height: 39.h,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding ?? 16.w),
         children: [
           _listingChip(
             context: context,

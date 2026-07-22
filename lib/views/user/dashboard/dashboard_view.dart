@@ -1,16 +1,14 @@
-import 'dart:ui' show ImageFilter;
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
-import 'package:brokkerspot/views/user/announcements/announcements_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/home/home_view.dart';
 import 'package:brokkerspot/views/user/meeting/meeting_view.dart';
-import 'package:brokkerspot/widgets/common/floating_pill_nav_bar.dart';
+import 'package:brokkerspot/views/user/wishlist/wishlist_view.dart';
+import 'package:brokkerspot/widgets/common/bottom_nav/bottom_nav.dart';
 import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 class DashboardView extends StatefulWidget {
@@ -24,6 +22,13 @@ class DashboardView extends StatefulWidget {
 }
 
 class _DashboardViewState extends State<DashboardView> {
+  // Tab order: Home, Meetings, Wishlist, Account. The create button sits
+  // between Meetings and Wishlist but is an action, not a tab.
+  static const int _accountTab = 3;
+
+  /// Tabs a guest cannot open.
+  static const Set<int> _loginRequiredTabs = {1, 2};
+
   late int _currentIndex = widget.initialIndex;
   late final List<Widget> _screens;
 
@@ -31,9 +36,9 @@ class _DashboardViewState extends State<DashboardView> {
   void initState() {
     super.initState();
     _screens = [
-      HomeView(onAccountTap: () => _onNavTap(3)),
-      const AnnouncementsView(),
+      HomeView(onAccountTap: () => _onNavTap(_accountTab)),
       const MeetingView(),
+      const WishlistView(),
       const AccountView(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -60,8 +65,9 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   void _onNavTap(int index) {
-    // Meeting (2) requires login — guests see the login prompt.
-    if (index == 2 && !LocalStorageService.isLoggedIn()) {
+    // Meetings and Wishlist require login — guests see the login prompt.
+    if (_loginRequiredTabs.contains(index) &&
+        !LocalStorageService.isLoggedIn()) {
       showLoginRequiredDialog(context);
       return;
     }
@@ -79,68 +85,42 @@ class _DashboardViewState extends State<DashboardView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: _buildFloatingNav(),
-    );
-  }
-
-  static const _navItems = [
-    PillNavItem(
-        iconAsset: 'assets/images/home_icon.png',
-        activeIconAsset: 'assets/images/home_active.png'),
-    PillNavItem(
-        iconAsset: 'assets/images/announcement_icon.png',
-        activeIconAsset: 'assets/images/announcement_active_icon.png'),
-    PillNavItem(
-        iconAsset: 'assets/images/meeting_icon.png',
-        activeIconAsset: 'assets/images/meeting_active_icon.png'),
-    PillNavItem(
-        iconAsset: 'assets/images/account_icon.png',
-        activeIconAsset: 'assets/images/account_active_icon.png'),
-  ];
-
-  Widget _buildFloatingNav() {
-    return FloatingPillNavBar(
-      items: _navItems,
-      currentIndex: _currentIndex,
-      onTap: _onNavTap,
-      trailing: _buildCreateButton(),
-    );
-  }
-
-  Widget _buildCreateButton() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pillBg = isDark ? const Color(0x99000000) : const Color(0x99DBDBDB);
-    final iconColor =
-        isDark ? const Color(0xFFCCCCCC) : const Color(0xFF444444);
-
-    return GestureDetector(
-      onTap: _onCreateTap,
-      behavior: HitTestBehavior.opaque,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(34.r),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            width: 50.w,
-            height: 50.h,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: pillBg,
-              borderRadius: BorderRadius.circular(34.r),
-            ),
-            child: Icon(
-              Icons.add_rounded,
-              size: 32.sp,
-              color: iconColor,
-            ),
-          ),
+      bottomNavigationBar: AppBottomNavBar(
+        destinations: _navDestinations,
+        currentIndex: _currentIndex,
+        onDestinationSelected: _onNavTap,
+        centerAction: AppNavCenterAction(
+          onTap: _onCreateTap,
+          semanticLabel: 'Create announcement',
         ),
       ),
     );
   }
+
+  static const _navDestinations = [
+    AppNavDestination(
+      iconAsset: 'assets/images/home_icon.png',
+      activeIconAsset: 'assets/images/home_active.png',
+      semanticLabel: 'Home',
+    ),
+    AppNavDestination(
+      iconAsset: 'assets/images/meeting_icon.png',
+      activeIconAsset: 'assets/images/meeting_active_icon.png',
+      semanticLabel: 'Meetings',
+    ),
+    AppNavDestination(
+      iconAsset: 'assets/images/broker_wishlist_icon.png',
+      activeIconAsset: 'assets/images/broker_wishlist_icon1.png',
+      semanticLabel: 'Wishlist',
+    ),
+    AppNavDestination(
+      iconAsset: 'assets/images/account_icon.png',
+      activeIconAsset: 'assets/images/account_active_icon.png',
+      semanticLabel: 'Account',
+    ),
+  ];
 }

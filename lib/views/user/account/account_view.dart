@@ -1,6 +1,7 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/session_cleanup.dart';
+import 'package:brokkerspot/views/user/wishlist/wishlist_view.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:brokkerspot/views/auth/view/signup_view.dart';
@@ -91,7 +92,7 @@ class AccountView extends StatelessWidget {
                     iconAsset: 'broker_wishlist_icon.png',
                     enabled: !isGuest,
                     isDark: isDark,
-                    onTap: () {},
+                    onTap: () => Get.to(() => const WishlistView()),
                   ),
                   _tile(
                     title: 'Setting',

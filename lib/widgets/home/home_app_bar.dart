@@ -121,9 +121,10 @@ class HomeAppBar extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        // Notification + Search — single pill (#FAF7F1, 91×41, r:39)
+        // Notification pill (#FAF7F1, r:39). Was 91.w when it also held the
+        // search icon — restore that width if search comes back.
         Container(
-          width: 91.w,
+          width: 48.w,
           height: 42.h,
           decoration: BoxDecoration(
             color: theme.brightness == Brightness.dark
@@ -131,9 +132,10 @@ class HomeAppBar extends StatelessWidget {
                 : const Color(0xFFFAF7F1),
             borderRadius: BorderRadius.circular(39.r),
           ),
-          padding: EdgeInsets.symmetric(horizontal: 12.w),
+          // No side padding — the single icon is centred, and 12.w each side
+          // left less room than the 26.sp bell needs.
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Notification bell — outline, 1.5px stroke #343434
               GestureDetector(
@@ -172,17 +174,17 @@ class HomeAppBar extends StatelessWidget {
                   ],
                 ),
               ),
-              // Search icon — asset, 20×20
-              GestureDetector(
-                onTap: onSearchTap,
-                behavior: HitTestBehavior.opaque,
-                child: Image.asset(
-                  'assets/images/search_icon.png',
-                  width: 24.w,
-                  height: 24.w,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
+              // Search icon — parked; the home screen has its own search bar.
+              // GestureDetector(
+              //   onTap: onSearchTap,
+              //   behavior: HitTestBehavior.opaque,
+              //   child: Image.asset(
+              //     'assets/images/search_icon.png',
+              //     width: 24.w,
+              //     height: 24.w,
+              //     color: theme.colorScheme.onSurface,
+              //   ),
+              // ),
             ],
           ),
         ),
