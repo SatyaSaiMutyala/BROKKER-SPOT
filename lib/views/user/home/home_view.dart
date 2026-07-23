@@ -303,6 +303,45 @@ class _HomeViewState extends State<HomeView> {
 
   /// The feed portion of the scroll view: cards plus whichever state slot
   /// applies (first-load skeletons, error, empty, next-page skeleton).
+  /// Interleaves the promo banners into the announcement list: banner 1 after
+  /// the 5th card, banner 2 after the 10th. Guarded by `>` so a banner only
+  /// appears when there's a card after it — they stay in the middle of the
+  /// feed, never dangling at the end, and never repeat on later pages.
+  List<_FeedEntry> _buildFeedEntries(List<AnnouncementModel> items) {
+    final entries = <_FeedEntry>[];
+    for (var i = 0; i < items.length; i++) {
+      entries.add(_FeedEntry.card(items[i], i));
+      if (i == 4 && items.length > 5) {
+        entries.add(const _FeedEntry.banner('assets/images/home_banner1.png'));
+      }
+      if (i == 9 && items.length > 10) {
+        entries.add(const _FeedEntry.banner('assets/images/home_banner2.png'));
+      }
+    }
+    return entries;
+  }
+
+  Widget _buildFeedBanner(String asset) {
+    // Assets are 1408×465 (~3.03:1). Reserve that ratio so the row always has
+    // height, and show a placeholder rather than vanishing if it can't load.
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12.r),
+      child: AspectRatio(
+        aspectRatio: 1408 / 465,
+        child: Image.asset(
+          asset,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: const Color(0xFF20242C),
+            alignment: Alignment.center,
+            child: Icon(Icons.image_outlined,
+                size: 28.sp, color: Colors.grey.shade600),
+          ),
+        ),
+      ),
+    );
+  }
+
   List<Widget> _buildFeedSlivers() {
     final ctrl = _announcementCtrl;
 
@@ -322,20 +361,25 @@ class _HomeViewState extends State<HomeView> {
       return [SliverToBoxAdapter(child: _buildEmptyState())];
     }
 
+    final entries = _buildFeedEntries(items);
+
     return [
       SliverPadding(
         padding: EdgeInsets.symmetric(horizontal: _gutter),
         sliver: SliverList.separated(
-          itemCount: items.length,
+          itemCount: entries.length,
           separatorBuilder: (_, __) => SizedBox(height: 16.h),
           itemBuilder: (_, i) {
-            final a = items[i];
+            final entry = entries[i];
+            if (entry.banner != null) return _buildFeedBanner(entry.banner!);
+
+            final a = entry.announcement!;
             return RepaintBoundary(
               child: Material(
                 color: Colors.transparent,
                 child: HomeAnnouncementCard(
                   announcement: a,
-                  index: i,
+                  index: entry.index,
                   // Fill the gutter-to-gutter width instead of a fixed size, so
                   // cards stay flush with the header and filter rows.
                   cardWidth: double.infinity,
@@ -454,4 +498,19 @@ class _HomeViewState extends State<HomeView> {
       ),
     );
   }
+}
+
+/// One row in the home feed: either an announcement card or a promo banner.
+class _FeedEntry {
+  final AnnouncementModel? announcement;
+
+  /// Original position in the announcement list — passed to the card so its
+  /// per-index styling is unaffected by interleaved banners.
+  final int index;
+  final String? banner;
+
+  const _FeedEntry.card(this.announcement, this.index) : banner = null;
+  const _FeedEntry.banner(this.banner)
+      : announcement = null,
+        index = -1;
 }

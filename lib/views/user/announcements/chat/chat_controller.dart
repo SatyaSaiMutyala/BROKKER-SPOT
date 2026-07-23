@@ -69,6 +69,11 @@ class ChatController extends GetxController {
   final RxnInt proposalStatus = RxnInt();
   final RxnString agreementUrl = RxnString();
 
+  /// Sticky: true once the broker has published this announcement. The proposal
+  /// status may reset to null after publishing, but both sides should still be
+  /// able to reopen the agreement, so the "Information" banner keys off this.
+  final RxBool published = false.obs;
+
   Timer? _typingTimer;
   Timer? _historyTimeout;
 
@@ -92,8 +97,11 @@ class ChatController extends GetxController {
       ..on(ChatEvents.proposalStatusUpdateError, _onProposalIgnore)
       ..on(ChatEvents.proposalBrokerAccept, _onProposalStatus)
       ..on(ChatEvents.proposalBrokerAcceptError, _onProposalIgnore)
+      ..on(ChatEvents.announcementPublish, _onAnnouncementPublished)
       // Generic server-side error (e.g. "Invalid or expired token.").
       ..on('error', _onSocketError);
+    // Seed from a prior session so the "Information" banner survives reopen.
+    published.value = LocalStorageService.isAnnouncementPublished(announcementId);
     _requestHistory(page: 1);
     _loadProposal();
   }
@@ -328,6 +336,11 @@ class ChatController extends GetxController {
     });
   }
 
+  /// Re-request the proposal status. The agreement screen calls this on open so
+  /// a status change it may have missed while backgrounded (e.g. the broker
+  /// signing) is reflected immediately, not just via the live broadcast.
+  void refreshProposal() => _loadProposal();
+
   void _onProposalStatus(dynamic data) {
     if (data == null) {
       proposalStatus.value = null;
@@ -344,6 +357,17 @@ class ChatController extends GetxController {
 
   void _onProposalIgnore(dynamic data) {
     debugPrint('Proposal socket event: ${_msg(data)}');
+  }
+
+  /// The published announcement is broadcast to both parties when the broker
+  /// publishes. Once seen, keep the agreement reachable from the chat banner.
+  void _onAnnouncementPublished(dynamic data) {
+    if (data is! Map) return;
+    final id = (data['_id'] ?? data['announcement_id'])?.toString();
+    if (id == null || id == announcementId) {
+      published.value = true;
+      LocalStorageService.markAnnouncementPublished(announcementId);
+    }
   }
 
   void approveProposal() {

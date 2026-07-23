@@ -136,17 +136,20 @@ class HomeAnnouncementCard extends StatelessWidget {
                           : null,
                     ),
 
-                    // Gradient: rgba(39,39,39,0.05) at 55.32% → #000000 at 100%
+                    // Scrim for the overlaid text. Ramps to 70% black rather
+                    // than solid — a fully opaque stop reads as a black block
+                    // across the bottom of the photo.
                     const DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Color(0x0D272727), // rgba(39,39,39,0.05)
-                            Colors.black,
+                            Colors.transparent,
+                            Color(0x59000000), // 35%
+                            Color(0xB3000000), // 70%
                           ],
-                          stops: [0.5532, 1.0],
+                          stops: [0.35, 0.72, 1.0],
                         ),
                       ),
                     ),

@@ -5,6 +5,7 @@ import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/meeting/controller/meeting_controller.dart';
+import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.dart';
 import 'package:get/get.dart';
 
 /// Wipes every piece of user-scoped state so account A's data never leaks
@@ -25,6 +26,9 @@ Future<void> clearUserSession() async {
   }
   if (Get.isRegistered<MeetingController>()) {
     MeetingController.to.clearAll();
+  }
+  if (Get.isRegistered<WishlistController>()) {
+    WishlistController.to.clearAll();
   }
   if (Get.isRegistered<PresenceService>()) {
     PresenceService.to.reset();
@@ -57,6 +61,9 @@ Future<void> clearRoleScopedCache() async {
   }
   if (Get.isRegistered<MeetingController>()) {
     MeetingController.to.clearAll();
+  }
+  if (Get.isRegistered<WishlistController>()) {
+    WishlistController.to.clearAll();
   }
   await AnnouncementCache.clear();
 }

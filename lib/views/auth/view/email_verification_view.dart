@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:brokkerspot/views/auth/controller/email_verification_controller.dart';
 import 'package:brokkerspot/views/auth/controller/forget_password_controller.dart';
 import 'package:brokkerspot/views/auth/view/create_new_password.dart';
@@ -28,6 +30,12 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
   late final ForgetPasswordController forgetPasswordController;
   bool _isOtpValid = false;
 
+  /// Resend cooldown. The code is already sent on arrival, so the timer starts
+  /// at 60 and "GET CODE" stays disabled until it reaches 0.
+  static const int _resendCooldown = 60;
+  Timer? _resendTimer;
+  int _secondsLeft = _resendCooldown;
+
   @override
   void initState() {
     super.initState();
@@ -46,10 +54,44 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
         _isOtpValid = otpCtrl.text.trim().length == 6;
       });
     });
+
+    _startResendTimer();
+  }
+
+  void _startResendTimer() {
+    _resendTimer?.cancel();
+    setState(() => _secondsLeft = _resendCooldown);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_secondsLeft <= 1) {
+        timer.cancel();
+        if (mounted) setState(() => _secondsLeft = 0);
+      } else {
+        if (mounted) setState(() => _secondsLeft--);
+      }
+    });
+  }
+
+  /// mm:ss for the countdown label.
+  String get _timerLabel {
+    final m = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
+    final s = (_secondsLeft % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  Future<void> _onGetCode() async {
+    if (_secondsLeft > 0) return;
+    final success = widget.password == false
+        ? await controller.resendOtp(widget.email)
+        : await forgetPasswordController.forgetPassword(widget.email);
+    if (success) {
+      controller.otpController.clear();
+      _startResendTimer();
+    }
   }
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     Get.delete<EmailVerificationController>(tag: widget.email);
     Get.delete<ForgetPasswordController>(tag: widget.email);
     super.dispose();
@@ -196,23 +238,16 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
         filled: true,
         fillColor: Colors.transparent,
         suffixIcon: InkWell(
-          onTap: () async {
-            if (widget.password == false) {
-              bool success = await controller.resendOtp(widget.email);
-              if (success) controller.otpController.clear();
-            } else {
-              bool success =
-                  await forgetPasswordController.forgetPassword(widget.email);
-              if (success) controller.otpController.clear();
-            }
-          },
+          onTap: _secondsLeft > 0 ? null : _onGetCode,
           child: Padding(
             padding: EdgeInsets.only(top: 14.h),
             child: Text(
-              'GET CODE',
+              _secondsLeft > 0 ? _timerLabel : 'GET CODE',
               style: GoogleFonts.inter(
                 fontSize: 13.sp,
-                color: const Color(0xFFD9C27C),
+                color: _secondsLeft > 0
+                    ? (isDark ? Colors.grey.shade500 : Colors.grey)
+                    : const Color(0xFFD9C27C),
                 fontWeight: FontWeight.w500,
               ),
             ),

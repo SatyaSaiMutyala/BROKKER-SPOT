@@ -1,30 +1,56 @@
-import 'dart:math';
-
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/socket_service.dart';
+import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/announcements/chat/chat_events.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
-import 'package:brokkerspot/views/user/announcements/contract_accepted_view.dart';
+import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
+import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+/// The owner ⇄ broker agreement flow, shared by both sides.
+///
+/// Two pages behind one header:
+///  • **Sign** — the agreement summary with the signer's signature and an
+///    "I Accept" button. Shown while it's this user's turn to sign.
+///  • **Timeline** — three ordered steps (authorize → counter-sign → publish)
+///    that light up as the proposal advances. Shown once this user has signed,
+///    and it reacts live: an owner sitting on "awaiting broker" flips to the
+///    completed state the moment the broker signs.
+///
+/// Which side is signing is decided by [isOwner]; [onSign] is the matching
+/// socket call (`approveProposal` for the owner, `brokerAcceptProposal` for
+/// the broker). [proposalStatus]/[agreementUrl] are the chat controller's live
+/// observables: 0 = awaiting owner, 1 = owner signed, 2 = declined, 3 = both
+/// signed.
 class BrokerAgreementView extends StatefulWidget {
   final String announcementId;
-  final VoidCallback onAccept;
-  final String? propertyName;
-  final String? location;
-  final int? brokeragePercent;
-  final String? agreementUrl;
+  final bool isOwner;
+  final VoidCallback onSign;
+  final RxnInt proposalStatus;
+  final RxnString agreementUrl;
+  final String? counterpartyName;
+  final String? counterpartyAvatar;
+
+  /// Re-fetches the live proposal status when the screen opens.
+  final VoidCallback? onRefreshStatus;
 
   const BrokerAgreementView({
     super.key,
     required this.announcementId,
-    required this.onAccept,
-    this.propertyName,
-    this.location,
-    this.brokeragePercent,
-    this.agreementUrl,
+    required this.onSign,
+    required this.proposalStatus,
+    required this.agreementUrl,
+    this.isOwner = true,
+    this.counterpartyName,
+    this.counterpartyAvatar,
+    this.onRefreshStatus,
   });
 
   @override
@@ -32,38 +58,96 @@ class BrokerAgreementView extends StatefulWidget {
 }
 
 class _BrokerAgreementViewState extends State<BrokerAgreementView> {
-  int _step = 2;
-  bool _agreed = false;
-  bool _isLoading = false;
+  final _repo = AnnouncementRepository();
 
-  String get _userName {
+  bool _agreed = false;
+  bool _isSigning = false;
+
+  /// Set when the broker's publish broadcast lands for this announcement.
+  /// Publishing is distinct from signing, so this — not the proposal status —
+  /// is what lights up step 3 and the Live badge.
+  bool _published = false;
+
+  /// Flipped the instant this user taps "I Accept", before the socket echoes
+  /// the new status back — so the timeline appears without a round-trip wait.
+  bool _signedLocally = false;
+
+  AnnouncementModel? _announcement;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cold open after a publish: the live broadcast is long gone, so seed from
+    // the persisted flag to keep step 3 lit.
+    _published = LocalStorageService.isAnnouncementPublished(widget.announcementId);
+    _loadAnnouncement();
+    // Pull the current status so a broker signature that landed while this
+    // owner was away shows the completed timeline on open.
+    widget.onRefreshStatus?.call();
+    // Light up step 3 the moment the broker publishes, without reopening.
+    SocketService.to.on(ChatEvents.announcementPublish, _onPublished);
+  }
+
+  @override
+  void dispose() {
+    SocketService.to.off(ChatEvents.announcementPublish, _onPublished);
+    super.dispose();
+  }
+
+  Future<void> _loadAnnouncement() async {
+    try {
+      final a = await _repo.fetchAnnouncementDetail(widget.announcementId);
+      if (mounted) setState(() => _announcement = a);
+    } catch (_) {
+      // Card falls back to placeholders; the flow still works without it.
+    }
+  }
+
+  /// The published announcement is broadcast to the owner when the broker
+  /// publishes. Match on this announcement and flip [_published].
+  void _onPublished(dynamic data) {
+    if (data is! Map) return;
+    final id = (data['_id'] ?? data['announcement_id'])?.toString();
+    if (id == widget.announcementId && mounted) {
+      setState(() => _published = true);
+    }
+  }
+
+  // ── Derived state ───────────────────────────────────────────────────────────
+
+  int get _status => widget.proposalStatus.value ?? 0;
+
+  bool get _ownerSigned =>
+      _status >= 1 || (widget.isOwner && _signedLocally);
+
+  bool get _brokerSigned =>
+      _status >= 3 || (!widget.isOwner && _signedLocally);
+
+  /// Both parties have signed. Signing is NOT publishing — the property only
+  /// goes live once the broker actually publishes it (see [_isPublished]).
+  bool get _bothSigned => _brokerSigned;
+
+  /// The listing is live — the broker has published it. Driven by the publish
+  /// broadcast, deliberately NOT by the signing status: a signed-but-unpublished
+  /// property must keep step 3 grey until the broker actually publishes.
+  bool get _isPublished => _published;
+
+  /// Whether the current user has taken their signing action.
+  bool get _hasSigned => widget.isOwner ? _ownerSigned : _brokerSigned;
+
+  String get _counter => !_hasSigned ? '1/3' : (_bothSigned ? '3/3' : '2/3');
+
+  String get _signerName {
     if (Get.isRegistered<ProfileController>()) {
-      final name = Get.find<ProfileController>().userName.value;
+      final name = Get.find<ProfileController>().userName.value.trim();
       if (name.isNotEmpty) return name;
     }
     return 'Your Name';
   }
 
-  static const _stepLabels = ['Proposal\nAccepted', 'Agreement', 'Acceptance'];
+  // ── Actions ─────────────────────────────────────────────────────────────────
 
-  static const _terms = [
-    _TermItem(Icons.home_outlined, 'Property Details',
-        'Information about the property owner'),
-    _TermItem(Icons.local_offer_outlined, 'Brokerage & Commission',
-        'Your commission and payment terms'),
-    _TermItem(Icons.calendar_today_outlined, 'Payment Terms',
-        'When and how you will be paid'),
-    _TermItem(Icons.people_outline, 'Responsibilities',
-        'Duties of both parties'),
-    _TermItem(Icons.shield_outlined, 'Legal Terms',
-        'Governing law and dispute resolution'),
-  ];
-
-  Future<void> _onNextOrAccept() async {
-    if (_step == 2) {
-      setState(() => _step = 3);
-      return;
-    }
+  Future<void> _onAccept() async {
     if (!_agreed) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Please confirm that you agree to the terms.',
@@ -73,432 +157,606 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
       ));
       return;
     }
-    setState(() => _isLoading = true);
-    try {
-      widget.onAccept();
-      await Future.delayed(const Duration(milliseconds: 600));
-      if (!mounted) return;
-      final contractId =
-          'BRK-${DateTime.now().year}-${widget.announcementId.substring(0, min(6, widget.announcementId.length)).toUpperCase()}';
-      Get.off(() => ContractAcceptedView(
-            propertyName: widget.propertyName,
-            location: widget.location,
-            brokeragePercent: widget.brokeragePercent,
-            contractId: contractId,
-            announcementId: widget.announcementId,
-          ));
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+    setState(() => _isSigning = true);
+    widget.onSign();
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+    setState(() {
+      _isSigning = false;
+      _signedLocally = true;
+    });
+  }
+
+  Future<void> _openContract() async {
+    final url = widget.agreementUrl.value;
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Agreement document not available yet.')));
+      return;
+    }
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
+  void _openProperty() {
+    final a = _announcement;
+    if (a == null) return;
+    // The broker publishes from the detail page (Sign and Publish); the owner
+    // just views the live property.
+    Get.to(() => AnnouncementDetailView(
+          announcement: a,
+          isOwner: widget.isOwner,
+          publishMode: !widget.isOwner,
+        ));
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const bg = Color(0xFF0B0D12);
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
+      backgroundColor: bg,
       body: SafeArea(
-        child: Column(
+        child: Obx(() {
+          // Touch the observables so this rebuilds when the broker signs.
+          widget.proposalStatus.value;
+          final showTimeline = _hasSigned;
+          return Column(
+            children: [
+              CustomHeader(
+                title: 'Agreement',
+                showBackButton: true,
+                trailing: Text(
+                  _counter,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: showTimeline ? _buildTimeline() : _buildSignPage(),
+              ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  // ── Sign page ───────────────────────────────────────────────────────────────
+
+  Widget _buildSignPage() {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: 20.w),
+            child: Column(
+              children: [
+                SizedBox(height: 24.h),
+                _buildDocumentIcon(),
+                SizedBox(height: 20.h),
+                Text(
+                  'Owner and Broker Agreement Summary',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    height: 1.3,
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  'Please review the key terms of the agreement.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13.sp,
+                    color: Colors.grey.shade500,
+                    height: 1.3,
+                  ),
+                ),
+                SizedBox(height: 28.h),
+                _buildViewContractDetails(),
+                SizedBox(height: 28.h),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Your signature',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10.h),
+                _buildSignatureBox(),
+                SizedBox(height: 12.h),
+                _buildSecureNote(),
+                SizedBox(height: 18.h),
+                _buildConfirmCheckbox(),
+                SizedBox(height: 20.h),
+              ],
+            ),
+          ),
+        ),
+        _buildAcceptButton(),
+      ],
+    );
+  }
+
+  Widget _buildDocumentIcon() {
+    return Container(
+      width: 140.w,
+      height: 140.w,
+      decoration: const BoxDecoration(
+        color: Color(0x14FFFFFF),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(Icons.description_outlined, color: Colors.white, size: 56.sp),
+          Positioned(
+            right: -6.w,
+            bottom: 2.h,
+            child: Container(
+              width: 30.w,
+              height: 30.w,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF0B0D12), width: 2),
+              ),
+              child: Icon(Icons.verified_user,
+                  color: Colors.white, size: 16.sp),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewContractDetails() {
+    return GestureDetector(
+      onTap: _openContract,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 18.h),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161A21),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: const Color(0xFF2A2F38)),
+        ),
+        child: Row(
           children: [
-            CustomHeader(
-              title: 'Broker Agreement',
-              showBackButton: true,
-              trailing: Text(
-                '$_step/3',
+            Icon(Icons.description_outlined,
+                size: 22.sp, color: Colors.white),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Text(
+                'View Contract Details',
                 style: GoogleFonts.poppins(
                   fontSize: 15.sp,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                  height: 1.0,
+                  color: Colors.white,
                 ),
               ),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: 20.w),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    SizedBox(height: 8.h),
-                    _buildStepIndicator(isDark),
-                    SizedBox(height: 28.h),
-                    _buildCenterIcon(isDark),
-                    SizedBox(height: 16.h),
-                    Text(
-                      _step == 2 ? 'Broker Agreement Summary' : 'Almost There!',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-                        height: 1.2,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 6.h),
-                    Text(
-                      _step == 2
-                          ? 'Please review the key terms of the agreement.'
-                          : 'Please confirm your acceptance and sign.',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w400,
-                        color: Colors.grey.shade500,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 24.h),
-                    _step == 2 ? _buildStep2Content(isDark) : _buildStep3Content(isDark),
-                    SizedBox(height: 20.h),
-                    _buildInfoBanner(),
-                    SizedBox(height: 14.h),
-                    _buildViewContractButton(isDark),
-                    SizedBox(height: 28.h),
-                  ],
-                ),
-              ),
-            ),
-            _buildBottomButton(isDark),
+            Icon(Icons.chevron_right, size: 22.sp, color: Colors.grey.shade400),
           ],
         ),
       ),
     );
   }
 
-  // ── Step indicator ────────────────────────────────────────────────────────
-
-  Widget _buildStepIndicator(bool isDark) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _stepNode(n: 1, isDone: true, label: _stepLabels[0]),
-        Expanded(child: _stepConnector(isGold: true)),
-        _stepNode(n: 2, isDone: _step > 2, isCurrent: _step == 2, label: _stepLabels[1]),
-        Expanded(child: _stepConnector(isGold: _step > 2)),
-        _stepNode(n: 3, isDone: false, isCurrent: _step == 3, label: _stepLabels[2]),
-      ],
-    );
-  }
-
-  Widget _stepNode({
-    required int n,
-    bool isDone = false,
-    bool isCurrent = false,
-    required String label,
-  }) {
-    final isActive = isDone || isCurrent;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 36.w,
-          height: 36.w,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isActive ? AppColors.primary : Colors.transparent,
-            border: isActive
-                ? null
-                : Border.all(color: Colors.grey.shade600, width: 1.5),
-          ),
-          alignment: Alignment.center,
-          child: isDone
-              ? Icon(Icons.check_rounded,
-                  color: Colors.white, size: 18.sp)
-              : Text(
-                  '$n',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    color: isActive ? Colors.white : Colors.grey.shade500,
-                    height: 1.0,
-                  ),
-                ),
-        ),
-        SizedBox(height: 6.h),
-        SizedBox(
-          width: 70.w,
-          child: Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 10.sp,
-              color: Colors.grey.shade400,
-              height: 1.3,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _stepConnector({required bool isGold}) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 30.h),
-      child: Center(
-        child: Container(
-          height: 2,
-          color: isGold ? AppColors.primary : Colors.grey.shade700,
-        ),
-      ),
-    );
-  }
-
-  // ── Center icon ───────────────────────────────────────────────────────────
-
-  Widget _buildCenterIcon(bool isDark) {
-    final circleBg = isDark ? const Color(0xFF252525) : const Color(0xFF2A2A2A);
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 88.w,
-          height: 88.w,
-          decoration: BoxDecoration(color: circleBg, shape: BoxShape.circle),
-          alignment: Alignment.center,
-          child: Icon(Icons.description_outlined, color: Colors.white, size: 44.sp),
-        ),
-        if (_step == 2)
-          Positioned(
-            right: -4.w,
-            bottom: -4.h,
-            child: Container(
-              width: 28.w,
-              height: 28.w,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-                border: Border.all(color: circleBg, width: 2),
-              ),
-              child: Icon(Icons.shield_outlined,
-                  color: Colors.white, size: 16.sp),
-            ),
-          )
-        else
-          Positioned(
-            right: -4.w,
-            bottom: -4.h,
-            child: Container(
-              width: 28.w,
-              height: 28.w,
-              decoration: BoxDecoration(
-                color: const Color(0xFF4CAF50),
-                shape: BoxShape.circle,
-                border: Border.all(color: circleBg, width: 2),
-              ),
-              child: Icon(Icons.check_rounded,
-                  color: Colors.white, size: 16.sp),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // ── Step 2 content: term list ─────────────────────────────────────────────
-
-  Widget _buildStep2Content(bool isDark) {
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final border = isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
-    final titleColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
-    final subtitleColor = Colors.grey.shade500;
-
+  Widget _buildSignatureBox() {
     return Container(
       width: double.infinity,
+      height: 150.h,
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: border),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14.r),
       ),
-      child: Column(
-        children: _terms.asMap().entries.map((e) {
-          final i = e.key;
-          final item = e.value;
-          return Column(
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42.w,
-                      height: 42.w,
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF252525)
-                            : const Color(0xFFF0ECD5),
-                        borderRadius: BorderRadius.circular(10.r),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(item.icon,
-                          size: 20.sp, color: AppColors.primary),
-                    ),
-                    SizedBox(width: 14.w),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(item.title,
-                              style: GoogleFonts.poppins(
-                                  fontSize: 13.sp,
-                                  fontWeight: FontWeight.w600,
-                                  color: titleColor,
-                                  height: 1.2)),
-                          SizedBox(height: 2.h),
-                          Text(item.subtitle,
-                              style: GoogleFonts.inter(
-                                  fontSize: 11.sp,
-                                  color: subtitleColor,
-                                  height: 1.3)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (i < _terms.length - 1)
-                Divider(height: 1, thickness: 1, color: border),
-            ],
-          );
-        }).toList(),
+      alignment: Alignment.center,
+      child: Text(
+        _signerName,
+        style: GoogleFonts.pacifico(fontSize: 34.sp, color: Colors.black87),
       ),
     );
   }
 
-  // ── Step 3 content: checkbox + signature ──────────────────────────────────
-
-  Widget _buildStep3Content(bool isDark) {
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final border = isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
-    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSecureNote() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Checkbox card
-        GestureDetector(
-          onTap: () => setState(() => _agreed = !_agreed),
-          behavior: HitTestBehavior.opaque,
-          child: Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16.w),
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(14.r),
-              border: Border.all(
-                  color: _agreed ? AppColors.primary : border, width: 1.5),
+        Icon(Icons.lock_outline, size: 15.sp, color: Colors.grey.shade400),
+        SizedBox(width: 8.w),
+        Text(
+          'Your signature is secure and legally binding.',
+          style: GoogleFonts.inter(fontSize: 12.sp, color: Colors.grey.shade400),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfirmCheckbox() {
+    return GestureDetector(
+      onTap: () => setState(() => _agreed = !_agreed),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161A21),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(
+              color: _agreed ? AppColors.primary : const Color(0xFF2A2F38)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 22.w,
+              height: 22.w,
+              margin: EdgeInsets.only(top: 2.h),
+              decoration: BoxDecoration(
+                color: _agreed ? AppColors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(5.r),
+                border: Border.all(
+                  color: _agreed ? AppColors.primary : Colors.grey.shade500,
+                  width: 1.5,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: _agreed
+                  ? Icon(Icons.check_rounded, size: 14.sp, color: Colors.white)
+                  : null,
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Text(
+                'I confirm that i have read and understood the broker mandate '
+                'agreement and agree to the terms and conditions.',
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  color: Colors.white,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAcceptButton() {
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+    return Container(
+      color: const Color(0xFF0B0D12),
+      padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 12.h + bottomPad),
+      child: GestureDetector(
+        onTap: _isSigning ? null : _onAccept,
+        child: Container(
+          width: double.infinity,
+          height: 54.h,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(30.r),
+          ),
+          alignment: Alignment.center,
+          child: _isSigning
+              ? SizedBox(
                   width: 22.w,
                   height: 22.w,
-                  margin: EdgeInsets.only(top: 2.h),
-                  decoration: BoxDecoration(
-                    color: _agreed ? AppColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(5.r),
-                    border: Border.all(
-                      color: _agreed ? AppColors.primary : Colors.grey.shade500,
-                      width: 1.5,
-                    ),
+                  child: const CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2.5),
+                )
+              : Text(
+                  'I Accept',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
-                  alignment: Alignment.center,
-                  child: _agreed
-                      ? Icon(Icons.check_rounded,
-                          size: 14.sp, color: Colors.white)
-                      : null,
                 ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: Text(
-                    'I confirm that i have read and understood the broker mandate agreement and agree to the terms and conditions.',
-                    style: GoogleFonts.inter(
-                      fontSize: 13.sp,
-                      color: textColor,
-                      height: 1.5,
+        ),
+      ),
+    );
+  }
+
+  // ── Timeline page ───────────────────────────────────────────────────────────
+
+  Widget _buildTimeline() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildPropertyCard(),
+          Divider(height: 1, thickness: 1, color: Colors.white.withValues(alpha: 0.06)),
+          SizedBox(height: 20.h),
+          _buildTimelineSteps(),
+          SizedBox(height: 40.h),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPropertyCard() {
+    final a = _announcement;
+    final type = a?.propertyType ?? 'Property';
+    final isRent = (a?.listingType ?? 'Rent').toLowerCase() == 'rent';
+    final ownLabel = widget.isOwner ? 'OWN' : 'OWNER Property';
+    final forLabel = isRent ? ' For RENT' : ' For SELL';
+    final period = (a?.rentPeriod != null && a!.rentPeriod!.isNotEmpty)
+        ? ' ${a.rentPeriod}'
+        : '';
+    final thumb = a?.propertyMedia?.thumbnail ??
+        (a?.imageUrls?.isNotEmpty == true ? a!.imageUrls!.first : null);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
+      child: Row(
+        children: [
+          _circleImage(thumb, size: 56.w, fallbackIcon: Icons.home_outlined),
+          SizedBox(width: 14.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        type,
+                        style: GoogleFonts.poppins(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          height: 1.2,
+                        ),
+                      ),
                     ),
+                    if (_isPublished) ...[
+                      SizedBox(width: 8.w),
+                      _liveBadge(),
+                    ],
+                  ],
+                ),
+                SizedBox(height: 4.h),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: ownLabel,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      TextSpan(
+                        text: forLabel,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 4.h),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${a?.currency ?? 'AED'} ',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.sp,
+                          color: Colors.white,
+                        ),
+                      ),
+                      TextSpan(
+                        text: _formatPrice(a?.price ?? 0),
+                        style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      TextSpan(
+                        text: period,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.sp,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ),
-        SizedBox(height: 22.h),
-        // Signature section
-        Text(
-          'Your signature',
-          style: GoogleFonts.poppins(
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w500,
-            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-          ),
-        ),
-        SizedBox(height: 10.h),
-        Container(
-          width: double.infinity,
-          height: 130.h,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14.r),
-            border: Border.all(color: const Color(0xFFEEEEEE)),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            _userName,
-            style: GoogleFonts.pacifico(
-              fontSize: 32.sp,
-              color: Colors.black87,
-            ),
-          ),
-        ),
-        SizedBox(height: 10.h),
-        Row(
-          children: [
-            Icon(Icons.lock_outline, size: 13.sp, color: Colors.grey.shade500),
-            SizedBox(width: 6.w),
-            Expanded(
-              child: Text(
-                'Your signature is secure and legally binding.',
-                style: GoogleFonts.inter(
-                    fontSize: 11.sp, color: Colors.grey.shade500),
-              ),
-            ),
-          ],
-        ),
-      ],
+          SizedBox(width: 12.w),
+          _circleImage(widget.counterpartyAvatar,
+              size: 46.w, fallbackIcon: Icons.person_outline),
+        ],
+      ),
     );
   }
 
-  // ── Info banner ───────────────────────────────────────────────────────────
-
-  Widget _buildInfoBanner() {
-    const bannerBg = Color(0xFF0F2E13);
-    const bannerBorder = Color(0xFF2D6A34);
-
+  Widget _liveBadge() {
     return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(14.w),
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 3.h),
       decoration: BoxDecoration(
-        color: bannerBg,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: bannerBorder),
+        color: const Color(0xFF2E7D32),
+        borderRadius: BorderRadius.circular(20.r),
       ),
+      child: Text(
+        'Live',
+        style: GoogleFonts.poppins(
+          fontSize: 10.sp,
+          fontWeight: FontWeight.w500,
+          color: Colors.white,
+          height: 1.0,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimelineSteps() {
+    final step1Done = _ownerSigned;
+    final step2Done = _brokerSigned;
+    // Step 3 only completes on actual publish, not on signing.
+    final step3Done = _isPublished;
+    // The broker reaches the publish page once both sides have signed; the
+    // owner can open the live listing only after it's published.
+    final canOpenProperty = widget.isOwner ? _isPublished : _bothSigned;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _timelineStep(
+            number: 1,
+            done: step1Done,
+            connectorDone: step1Done,
+            isLast: false,
+            title: widget.isOwner
+                ? 'Authorize a broker to advertise your property.'
+                : 'Authorize a broker to advertise owner property.',
+            subtitle: widget.isOwner
+                ? 'Contract Signed by You'
+                : 'Contract Signed by Owner',
+          ),
+          _timelineStep(
+            number: 2,
+            done: step2Done,
+            connectorDone: step2Done,
+            isLast: false,
+            title: widget.isOwner
+                ? 'Broker Signed the contract with you'
+                : 'You Signed the contract with owner',
+            subtitle: widget.isOwner
+                ? 'Contract Signed by Broker'
+                : 'Contract Signed by You',
+            action: _timelineButton(
+              label: 'View Contract',
+              enabled: step2Done,
+              onTap: _openContract,
+            ),
+          ),
+          _timelineStep(
+            number: 3,
+            done: step3Done,
+            connectorDone: step3Done,
+            isLast: true,
+            title: 'Publish Property',
+            subtitle: widget.isOwner
+                ? 'Your Property Published by Broker successfully'
+                : 'Owner Property Published by You successfully.',
+            action: _timelineButton(
+              label: 'View Property',
+              enabled: canOpenProperty,
+              onTap: _openProperty,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _timelineStep({
+    required int number,
+    required bool done,
+    required bool connectorDone,
+    required bool isLast,
+    required String title,
+    required String subtitle,
+    Widget? action,
+  }) {
+    final titleColor = done ? Colors.white : Colors.grey.shade500;
+
+    return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline,
-              size: 16.sp, color: const Color(0xFF4CAF50)),
-          SizedBox(width: 10.w),
+          Column(
+            children: [
+              Container(
+                width: 30.w,
+                height: 30.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: done ? AppColors.primary : const Color(0xFF3A3F47),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$number',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 1.5,
+                    margin: EdgeInsets.symmetric(vertical: 4.h),
+                    color: connectorDone
+                        ? AppColors.primary
+                        : Colors.white.withValues(alpha: 0.35),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(width: 14.w),
           Expanded(
-            child: Text(
-              _step == 2
-                  ? 'By accepting you agree to the full broker mandate agreement.'
-                  : 'Your signed agreement will be securely stored and sent to the property owner.',
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                color: Colors.white,
-                height: 1.4,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 28.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: 3.h),
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w600,
+                      color: titleColor,
+                      height: 1.3,
+                    ),
+                  ),
+                  SizedBox(height: 3.h),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: Colors.grey.shade500,
+                      height: 1.3,
+                    ),
+                  ),
+                  if (action != null) ...[
+                    SizedBox(height: 10.h),
+                    action,
+                  ],
+                ],
               ),
             ),
           ),
@@ -507,96 +765,79 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     );
   }
 
-  // ── View Contract button ──────────────────────────────────────────────────
-
-  Widget _buildViewContractButton(bool isDark) {
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final border = isDark ? const Color(0xFF2E2E2E) : const Color(0xFFEDEDED);
-    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
-
+  Widget _timelineButton({
+    required String label,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
-      onTap: () {},
+      onTap: enabled ? onTap : null,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
         decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(14.r),
-          border: Border.all(color: border),
+          color: enabled ? AppColors.primary : const Color(0xFF3A3F47),
+          borderRadius: BorderRadius.circular(24.r),
         ),
-        child: Row(
-          children: [
-            Icon(Icons.receipt_long_outlined,
-                size: 22.sp, color: AppColors.primary),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Text(
-                'View Contract (PDF)',
-                style: GoogleFonts.poppins(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w500,
-                  color: textColor,
-                ),
-              ),
-            ),
-            Icon(Icons.chevron_right,
-                size: 22.sp, color: Colors.grey.shade500),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Bottom button ─────────────────────────────────────────────────────────
-
-  Widget _buildBottomButton(bool isDark) {
-    final bottomPad = MediaQuery.of(context).padding.bottom;
-    final label = _step == 2 ? 'NEXT' : 'I Accept';
-    final bg = isDark ? const Color(0xFF2A2A2A) : const Color(0xFF3A3A3A);
-
-    return Container(
-      color: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
-      padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 12.h + bottomPad),
-      child: SizedBox(
-        width: double.infinity,
-        height: 52.h,
-        child: GestureDetector(
-          onTap: _isLoading ? null : _onNextOrAccept,
-          child: Container(
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(28.r),
-            ),
-            alignment: Alignment.center,
-            child: _isLoading
-                ? SizedBox(
-                    width: 22.w,
-                    height: 22.w,
-                    child: const CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2.5),
-                  )
-                : Text(
-                    label,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
+        child: Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w500,
+            color: enabled ? Colors.white : Colors.grey.shade500,
+            height: 1.0,
           ),
         ),
       ),
     );
   }
-}
 
-// ── Data model ────────────────────────────────────────────────────────────────
+  // ── Shared bits ─────────────────────────────────────────────────────────────
 
-class _TermItem {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  const _TermItem(this.icon, this.title, this.subtitle);
+  Widget _circleImage(String? url, {required double size, required IconData fallbackIcon}) {
+    final fallback = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF20242C),
+        border: Border.all(color: AppColors.primary, width: 1),
+      ),
+      alignment: Alignment.center,
+      child: Icon(fallbackIcon, size: size * 0.4, color: Colors.grey.shade500),
+    );
+    if (url == null || url.isEmpty) return fallback;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.primary, width: 1),
+      ),
+      child: ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: url,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorWidget: (_, __, ___) => fallback,
+        ),
+      ),
+    );
+  }
+
+  String _formatPrice(double price) {
+    final str = price.toInt().toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count == 3 && i > 0) {
+        buffer.write(',');
+        count = 0;
+      }
+    }
+    return buffer.toString().split('').reversed.join();
+  }
 }

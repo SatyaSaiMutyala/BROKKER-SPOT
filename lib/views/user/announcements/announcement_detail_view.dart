@@ -3,6 +3,7 @@ import 'dart:ui' as ui show Gradient;
 import 'dart:ui' show ImageFilter;
 
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
+import 'package:brokkerspot/views/user/announcements/controller/publish_controller.dart';
 import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:flutter/material.dart';
@@ -23,15 +24,24 @@ import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_proposals_view.dart';
+import 'package:brokkerspot/views/user/account/account_view.dart'
+    show showLoginRequiredDialog;
+import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.dart';
 
 class AnnouncementDetailView extends StatefulWidget {
   final AnnouncementModel announcement;
   final bool isOwner;
 
+  /// Broker's post-signature publish screen: same detail layout, but the
+  /// bottom bar is a single "Sign and Publish" action instead of the usual
+  /// owner/broker controls.
+  final bool publishMode;
+
   const AnnouncementDetailView({
     super.key,
     required this.announcement,
     this.isOwner = true,
+    this.publishMode = false,
   });
 
   @override
@@ -43,12 +53,13 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   int _tabIndex = 0;
   bool _descExpanded = false;
   bool _isDeleting = false;
-  bool _isWishlisted = false;
 
   late AnnouncementModel _data;
   late final PageController _pageController;
   final _repo = AnnouncementRepository();
   final _amenityCtrl = AmenityController.to;
+  final _wishlistCtrl = WishlistController.to;
+  final _publishCtrl = PublishController.to;
 
   static const List<String> _fallbackImages = [
     'assets/images/rent1.png',
@@ -60,7 +71,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     super.initState();
     _pageController = PageController();
     _data = widget.announcement;
-    _isWishlisted = widget.announcement.isWishlisted ?? false;
+    _wishlistCtrl.seed(
+      widget.announcement.id ?? '',
+      isWishlisted: widget.announcement.isWishlisted ?? false,
+    );
     _fetchDetail();
     _amenityCtrl.loadAmenities();
   }
@@ -83,8 +97,26 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       final fresh = LocalStorageService.isLoggedIn()
           ? await _repo.fetchAnnouncementDetail(id)
           : await _repo.fetchGuestAnnouncementDetail(id);
-      if (mounted) setState(() => _data = fresh);
+      if (!mounted) return;
+      setState(() => _data = fresh);
+      _wishlistCtrl.seed(id, isWishlisted: fresh.isWishlisted ?? false);
     } catch (_) {}
+  }
+
+  Future<void> _onWishlistTap() async {
+    if (!LocalStorageService.isLoggedIn()) {
+      showLoginRequiredDialog(context);
+      return;
+    }
+    final id = _data.id;
+    if (id == null || id.isEmpty) return;
+
+    final wasWishlisted = _wishlistCtrl.isWishlisted(id);
+    final isWishlisted = await _wishlistCtrl.toggle(id);
+    if (isWishlisted == wasWishlisted) return; // request failed; toast already shown
+    AppToast.success(
+      isWishlisted ? 'Added to wishlist' : 'Removed from wishlist',
+    );
   }
 
   String _formatPrice(double price) {
@@ -620,21 +652,24 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // Heart / wishlist icon
-                        CustomIconButton(
-                          isDark: true,
-                          size: 35,
-                          onTap: () =>
-                              setState(() => _isWishlisted = !_isWishlisted),
-                          child: Icon(
-                            _isWishlisted
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            size: 26.sp,
-                            color: _isWishlisted
-                                ? Colors.red.shade400
-                                : Colors.white,
-                          ),
-                        ),
+                        Obx(() {
+                          final isWishlisted =
+                              _wishlistCtrl.isWishlisted(_data.id ?? '');
+                          return CustomIconButton(
+                            isDark: true,
+                            size: 35,
+                            onTap: _onWishlistTap,
+                            child: Icon(
+                              isWishlisted
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              size: 26.sp,
+                              color: isWishlisted
+                                  ? Colors.red.shade400
+                                  : Colors.white,
+                            ),
+                          );
+                        }),
                         SizedBox(height: 10.h),
                         GestureDetector(
                           onTap: (hasImages || hasVideo)
@@ -1480,6 +1515,55 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
   // ── Bottom bar ───────────────────────────────────────────────────────────────
 
+  Widget _buildSignAndPublishBar(
+      AnnouncementModel a, bool isDark, double bottomPad) {
+    final barBg = isDark ? const Color(0xFF0B0D12) : Colors.white;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 12.h + bottomPad),
+      decoration: BoxDecoration(
+        color: barBg,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Obx(
+        () => GestureDetector(
+          onTap: _publishCtrl.isPublishing.value
+              ? null
+              : () => _publishCtrl.publish(a),
+          child: Container(
+            width: double.infinity,
+            height: 54.h,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(30.r),
+            ),
+            alignment: Alignment.center,
+            child: _publishCtrl.isPublishing.value
+                ? SizedBox(
+                    width: 22.w,
+                    height: 22.w,
+                    child: const CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2.5),
+                  )
+                : Text(
+                    'Publish',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomBar(
       AnnouncementModel a, String status, bool isDark, double bottomPad) {
     final barBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
@@ -1490,6 +1574,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
         offset: const Offset(0, -4),
       ),
     ];
+
+    if (widget.publishMode) {
+      return _buildSignAndPublishBar(a, isDark, bottomPad);
+    }
 
     if (!widget.isOwner) {
       return Padding(

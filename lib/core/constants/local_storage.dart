@@ -63,6 +63,25 @@ class LocalStorageService {
 
   static bool getDarkMode() => _prefs?.getBool('dark_mode') ?? false;
 
+  // Announcements a broker has published, remembered so both parties can
+  // reopen the agreement/timeline from chat in a later session (the proposal
+  // status may no longer report the signed state once published).
+  static const String _publishedKey = 'published_announcements';
+
+  static Future<void> markAnnouncementPublished(String announcementId) async {
+    if (announcementId.isEmpty) return;
+    final ids = _prefs?.getStringList(_publishedKey) ?? <String>[];
+    if (!ids.contains(announcementId)) {
+      ids.add(announcementId);
+      await _prefs?.setStringList(_publishedKey, ids);
+    }
+  }
+
+  static bool isAnnouncementPublished(String announcementId) {
+    final ids = _prefs?.getStringList(_publishedKey) ?? const <String>[];
+    return ids.contains(announcementId);
+  }
+
   static Future<void> clearAll() async {
     // Preserve user preferences across logout.
     final lastSide = getLastSide();

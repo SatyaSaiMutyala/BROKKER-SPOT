@@ -92,7 +92,8 @@ class AccountView extends StatelessWidget {
                     iconAsset: 'broker_wishlist_icon.png',
                     enabled: !isGuest,
                     isDark: isDark,
-                    onTap: () => Get.to(() => const WishlistView()),
+                    onTap: () =>
+                        Get.to(() => const WishlistView(showBackButton: true)),
                   ),
                   _tile(
                     title: 'Setting',

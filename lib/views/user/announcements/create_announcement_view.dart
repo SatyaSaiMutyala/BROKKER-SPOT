@@ -31,7 +31,6 @@ class CreateAnnouncementView extends StatefulWidget {
 class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
   late final AnnouncementController _ctrl;
 
-  bool _brokerProposalsEnabled = false;
   String? _brokerProposalLimit;
   String? _propertyFor;
   bool _locationSaved = false;
@@ -42,7 +41,8 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
   bool _isSubmitting = false;
   bool _isSavingDraft = false;
 
-  // Steps 1-3 required; step 4 (broker proposals) is optional.
+  // All three steps are required. The broker-proposal limit is no longer a
+  // step — it's asked for on the Announce Now tap.
   bool get _allSectionsDone =>
       _informationSaved &&
       _videoImagesSaved &&
@@ -50,18 +50,19 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       _documentsSaved &&
       _priceSaved;
 
-  // 4-step flags.
+  // 3-step flags.
   List<bool> get _stepFlags => [
         _informationSaved && _videoImagesSaved,
         _locationSaved && _documentsSaved,
         _priceSaved,
-        _brokerProposalsEnabled,
       ];
+
+  int get _stepCount => _stepFlags.length;
 
   int get _completedCount => _stepFlags.where((b) => b).length;
 
-  // 1-indexed display step for "Step X of 4".
-  int get _currentStepDisplay => (_completedCount + 1).clamp(1, 4);
+  // 1-indexed display step for "Step X of 3".
+  int get _currentStepDisplay => (_completedCount + 1).clamp(1, _stepCount);
 
   // 0-indexed currently active step (first incomplete).
   int get _activeIndex {
@@ -84,7 +85,6 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       _propertyFor =
           (a.listingType ?? '').toLowerCase() == 'sell' ? 'Sell' : 'Rent';
       _brokerProposalLimit = a.proposalsLimit?.toString();
-      _brokerProposalsEnabled = _brokerProposalLimit != null;
       _locationSaved = _informationSaved =
           _videoImagesSaved = _priceSaved = _documentsSaved = true;
     } else {
@@ -98,7 +98,6 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
             _priceSaved = flags['priceSaved'] as bool? ?? false;
             _documentsSaved = flags['documentsSaved'] as bool? ?? false;
             _brokerProposalLimit = flags['brokerProposalLimit'] as String?;
-            _brokerProposalsEnabled = _brokerProposalLimit != null;
           });
         }
       });
@@ -134,9 +133,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
     final step1Done = _informationSaved && _videoImagesSaved;
     final step2Done = _locationSaved && _documentsSaved;
 
-    // All 3 main steps complete → create full announcement.
+    // All 3 main steps complete → create full announcement (asking for the
+    // proposal limit first, same as Announce Now).
     if (step1Done && step2Done && _priceSaved) {
-      _submit();
+      _onAnnounceTap();
       return;
     }
 
@@ -194,19 +194,33 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
 
   // ── Dialogs ──────────────────────────────────────────────────────────────────
 
-  void _showBrokerProposalLimitDialog() {
+  /// Label for the "don't cap proposals" row — selecting it sends no limit at
+  /// all, exactly like leaving the old toggle off did.
+  static const String _noProposalLimit = 'No limit';
+
+  /// Asks for the broker-proposal limit, then runs [onChosen].
+  ///
+  /// Dismissing without choosing leaves the current value alone and does not
+  /// continue, so a stray tap outside the dialog can't publish.
+  void _showBrokerProposalLimitDialog({VoidCallback? onChosen}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     _showPickerDialog(
       isDark: isDark,
-      options: ['10', '20', '50', '100', '500'],
+      options: [_noProposalLimit, '10', '20', '50', '100', '500'],
       onSelect: (option) {
+        final noLimit = option == _noProposalLimit;
         setState(() {
-          _brokerProposalLimit = option;
-          _brokerProposalsEnabled = true;
+          _brokerProposalLimit = noLimit ? null : option;
         });
         _saveLocally();
+        onChosen?.call();
       },
     );
+  }
+
+  /// Announce Now / Update: pick the proposal limit first, then submit.
+  void _onAnnounceTap() {
+    _showBrokerProposalLimitDialog(onChosen: _submit);
   }
 
   void _showPickerDialog({
@@ -408,18 +422,6 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                         }
                       },
                     ),
-                    FormSectionTile(
-                      stepNumber: 4,
-                      title: 'Limit Broker Proposals',
-                      subtitle: _brokerProposalLimit != null
-                          ? '$_brokerProposalLimit broker offers limit.'
-                          : '',
-                      icon: Icons.group_outlined,
-                      isComplete: _brokerProposalsEnabled,
-                      isEnabled: true,
-                      isCurrent: active == 3,
-                      trailingOverride: _buildBrokerToggle(),
-                    ),
                     SizedBox(height: 20.h),
                   ],
                 ),
@@ -452,7 +454,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Step $_currentStepDisplay of 4',
+            'Step $_currentStepDisplay of $_stepCount',
             style: GoogleFonts.poppins(
               fontSize: 12.sp,
               fontWeight: FontWeight.w500,
@@ -461,13 +463,13 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
             ),
           ),
           SizedBox(height: 8.h),
-          // 4 progress capsules
+          // One progress capsule per step
           Row(
-            children: List.generate(4, (i) {
+            children: List.generate(_stepCount, (i) {
               return Expanded(
                 child: Container(
                   height: 3.h,
-                  margin: EdgeInsets.only(right: i < 3 ? 4.w : 0),
+                  margin: EdgeInsets.only(right: i < _stepCount - 1 ? 4.w : 0),
                   decoration: BoxDecoration(
                     color: i < greenCount
                         ? const Color(0xFF149A35)
@@ -493,32 +495,6 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
     );
   }
 
-  // ── Broker proposals toggle ───────────────────────────────────────────────
-
-  Widget _buildBrokerToggle() {
-    return Switch(
-      value: _brokerProposalsEnabled,
-      onChanged: (value) {
-        if (value) {
-          _showBrokerProposalLimitDialog();
-        } else {
-          setState(() {
-            _brokerProposalsEnabled = false;
-            _brokerProposalLimit = null;
-          });
-          _saveLocally();
-        }
-      },
-      thumbColor: WidgetStateProperty.all(Colors.white),
-      trackColor: WidgetStateProperty.resolveWith((states) {
-        return states.contains(WidgetState.selected)
-            ? const Color(0xFF149A35)
-            : Colors.grey.shade300;
-      }),
-      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-    );
-  }
-
   // ── Bottom section: button + note ────────────────────────────────────────
 
   Widget _buildBottomSection() {
@@ -533,7 +509,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
         children: [
           Center(
             child: GestureDetector(
-              onTap: canSubmit ? _submit : null,
+              onTap: canSubmit ? _onAnnounceTap : null,
               child: Container(
                 width: 286.w,
                 height: 51.h,

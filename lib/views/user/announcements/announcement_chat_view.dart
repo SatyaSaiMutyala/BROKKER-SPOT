@@ -5,14 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/models/chat_message.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_controller.dart';
 import 'package:brokkerspot/views/user/announcements/broker_agreement_view.dart';
-import 'package:brokkerspot/views/user/announcements/publish_announcement_view.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
 
 class AnnouncementChatView extends StatefulWidget {
@@ -70,7 +68,6 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
   late final String _tag;
   Worker? _msgsWorker;
   Worker? _errorWorker;
-  bool _navigatingToPublish = false;
 
   @override
   void initState() {
@@ -300,7 +297,9 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
 
   Widget _buildProposalBanner(bool isDark) {
     final status = _chat.proposalStatus.value;
-    if (status == null) return const SizedBox.shrink();
+    final published = _chat.published.value;
+    // Nothing to show only when there's no proposal AND it was never published.
+    if (status == null && !published) return const SizedBox.shrink();
 
     final isOwner = (widget.userRole ?? 1) == 1;
     final dividerColor =
@@ -310,25 +309,32 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     String text;
     Widget? button;
 
-    if (isOwner) {
-      switch (status) {
+    if (published) {
+      // Published — both sides keep a persistent "Information" entry so they
+      // can reopen the agreement/timeline later.
+      text = 'Property published. You can review the agreement anytime.';
+      button = _bannerButton(
+        icon: Icons.fact_check_outlined,
+        label: 'Information',
+        onTap: () => _openAgreementFlow(isOwner: isOwner),
+        color: _agreementGreen,
+      );
+    } else if (isOwner) {
+      switch (status!) {
         case 0:
           text = 'Authorize a broker to advertise your property.';
           button = _bannerButton(
             icon: Icons.article_outlined,
             label: 'Sign Contract',
-            onTap: () => Get.to(() => BrokerAgreementView(
-                  announcementId: widget.announcementId,
-                  onAccept: _chat.approveProposal,
-                )),
+            onTap: () => _openAgreementFlow(isOwner: true),
             color: AppColors.primary,
           );
         case 1:
           text = 'Signed by you. Awaiting broker signature.';
           button = _bannerButton(
-            icon: Icons.article_outlined,
+            icon: Icons.hourglass_empty_rounded,
             label: 'Awaiting',
-            onTap: null,
+            onTap: () => _openAgreementFlow(isOwner: true),
             color: const Color(0xFF8B7530),
           );
         case 2:
@@ -337,38 +343,39 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
         case 3:
           text = 'Contract signed. The broker can now advertise your property.';
           button = _bannerButton(
-            icon: Icons.article_outlined,
+            icon: Icons.fact_check_outlined,
             label: 'Information',
-            onTap: _openAgreement,
-            color: Colors.green.shade600,
+            onTap: () => _openAgreementFlow(isOwner: true),
+            color: _agreementGreen,
           );
         default:
           return const SizedBox.shrink();
       }
     } else {
-      switch (status) {
+      switch (status!) {
         case 0:
           text = 'Awaiting owner approval of your proposal.';
           button = null;
+        case 1:
+          text = 'Owner signed. Sign the contract to advertise this property.';
+          button = _bannerButton(
+            icon: Icons.article_outlined,
+            label: 'Sign Contract',
+            onTap: () => _openAgreementFlow(isOwner: false),
+            color: AppColors.primary,
+          );
         case 2:
           text = 'Owner declined this proposal.';
           button = null;
-        case 1:
         case 3:
-          text = 'Contract signed. You can now advertise this property.';
+          // Both sides have signed; the broker still has to publish. Prompt
+          // that, not "View Agreement".
+          text = 'Contract signed. Publish to advertise this property.';
           button = _bannerButton(
-            icon: Icons.campaign_outlined,
+            icon: Icons.fact_check_outlined,
             label: 'Publish',
-            onTap: _navigatingToPublish
-                ? null
-                : () async {
-                    setState(() => _navigatingToPublish = true);
-                    await Get.to(() => PublishAnnouncementView(
-                          announcementId: widget.announcementId,
-                        ));
-                    if (mounted) setState(() => _navigatingToPublish = false);
-                  },
-            color: Colors.green.shade600,
+            onTap: () => _openAgreementFlow(isOwner: false),
+            color: _agreementGreen,
           );
         default:
           return const SizedBox.shrink();
@@ -401,6 +408,10 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
       ],
     );
   }
+
+  /// Agreement "signed" state green — design token #159D37 at 30% alpha
+  /// (CSS #159D374D → Flutter ARGB order).
+  static const Color _agreementGreen = Color(0x4D159D37);
 
   Widget _bannerButton({
     required IconData icon,
@@ -436,17 +447,18 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     );
   }
 
-  Future<void> _openAgreement() async {
-    final url = _chat.agreementUrl.value;
-    if (url == null || url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Agreement document not available yet.')));
-      return;
-    }
-    final uri = Uri.tryParse(url);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+  void _openAgreementFlow({required bool isOwner}) {
+    Get.to(() => BrokerAgreementView(
+          announcementId: widget.announcementId,
+          isOwner: isOwner,
+          onSign:
+              isOwner ? _chat.approveProposal : _chat.brokerAcceptProposal,
+          proposalStatus: _chat.proposalStatus,
+          agreementUrl: _chat.agreementUrl,
+          counterpartyName: widget.brokerName,
+          counterpartyAvatar: widget.brokerAvatar,
+          onRefreshStatus: _chat.refreshProposal,
+        ));
   }
 
   // ── Message list ──────────────────────────────────────────────────────────

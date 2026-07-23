@@ -136,6 +136,56 @@ class AnnouncementRepository {
     }
   }
 
+  /// Saves [announcementId] to the signed-in user's wishlist.
+  Future<void> addToWishlist(String announcementId) async {
+    final response = await api.postRequest(
+      '',
+      endPoint: ApiEndpoints.addToWishlist,
+      body: {'announcement_id': announcementId},
+      headers: api.buildHeaders(),
+    );
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['success'] != true) {
+      throw json['message'] ?? 'Failed to add to wishlist';
+    }
+  }
+
+  /// Drops [announcementId] from the signed-in user's wishlist.
+  Future<void> removeFromWishlist(String announcementId) async {
+    final response = await api.deleteRequest(
+      endPoint:
+          '${api.baseUrl}${ApiEndpoints.removeFromWishlist}/$announcementId',
+      headers: api.buildHeaders(),
+    );
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['success'] != true) {
+      throw json['message'] ?? 'Failed to remove from wishlist';
+    }
+  }
+
+  /// The signed-in user's wishlisted announcements, newest page first.
+  Future<({List<AnnouncementModel> items, List<Map<String, dynamic>> raw, int totalRecords, int totalPages, int page})>
+      fetchWishlist({int page = 1, int perPage = 10}) async {
+    final response = await api.getRequest(
+      endPoint:
+          '${api.baseUrl}${ApiEndpoints.fetchWishlist}?page=$page&perPage=$perPage',
+      headers: api.buildHeaders(),
+    );
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['success'] == true) {
+      final data = json['data'] as Map<String, dynamic>;
+      final raw = (data['data'] as List).cast<Map<String, dynamic>>();
+      return (
+        items: raw.map(AnnouncementModel.fromJson).toList(),
+        raw: raw,
+        totalRecords: data['totalRecords'] as int,
+        totalPages: data['totalPages'] as int,
+        page: data['page'] as int,
+      );
+    }
+    throw json['message'] ?? 'Failed to fetch wishlist';
+  }
+
   Future<List<AmenityModel>> fetchAmenities() async {
     final response = await api.getRequest(
       endPoint:

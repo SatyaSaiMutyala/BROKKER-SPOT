@@ -3,6 +3,7 @@ import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/home/home_view.dart';
 import 'package:brokkerspot/views/user/meeting/meeting_view.dart';
+import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.dart';
 import 'package:brokkerspot/views/user/wishlist/wishlist_view.dart';
 import 'package:brokkerspot/widgets/common/bottom_nav/bottom_nav.dart';
 import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
@@ -25,6 +26,7 @@ class _DashboardViewState extends State<DashboardView> {
   // Tab order: Home, Meetings, Wishlist, Account. The create button sits
   // between Meetings and Wishlist but is an action, not a tab.
   static const int _accountTab = 3;
+  static const int _wishlistTab = 2;
 
   /// Tabs a guest cannot open.
   static const Set<int> _loginRequiredTabs = {1, 2};
@@ -71,6 +73,10 @@ class _DashboardViewState extends State<DashboardView> {
       showLoginRequiredDialog(context);
       return;
     }
+    // Tabs live in an IndexedStack, so their initState runs once at startup
+    // and never again on switch — the wishlist has to be re-asked on every
+    // open, or it keeps showing whatever it fetched at launch.
+    if (index == _wishlistTab) WishlistController.to.reload();
     setState(() => _currentIndex = index);
   }
 

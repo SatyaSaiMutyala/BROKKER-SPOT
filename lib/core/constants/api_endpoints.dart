@@ -32,6 +32,10 @@ class ApiEndpoints {
   static const String fetchAnnouncementDetail = 'user/announcements/fetch';
   static const String fetchAllAnnouncements = 'user/announcements/fetch-all';
   static const String sendProposal = 'user/announcements/sent-proposal';
+  static const String addToWishlist = 'user/announcements/wishlist/add';
+  static const String fetchWishlist = 'user/announcements/wishlist/fetch';
+  static const String removeFromWishlist =
+      'user/announcements/wishlist/remove'; // + /{announcement_id}
   // Meeting (announcements grouped by the conversations on them).
   // Filters: ?own=true | ?listing_type=1 | ?listing_type=2 | (none = all).
   static const String fetchMeetings = 'user/announcements/fetch-meetings';

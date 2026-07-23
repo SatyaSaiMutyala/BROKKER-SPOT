@@ -54,15 +54,20 @@ class AppSearchBar extends StatelessWidget {
             GestureDetector(
               onTap: onFilterTap,
               behavior: HitTestBehavior.opaque,
-              child: SizedBox(
-                width: 45.w,
+              child: Container(
+                width: 46.w,
                 height: 45.h,
-                child: Center(
-                  child: Image.asset(
-                    'assets/images/filter_icon.png',
-                    width: 45.w,
-                    height: 45.w,
-                  ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(39.r),
+                  border: Border.all(color: AppColors.primary, width: 1),
+                ),
+                // The asset ships with square-ish corners, so clip it to the
+                // pill shape rather than letting them poke out.
+                clipBehavior: Clip.antiAlias,
+                child: Image.asset(
+                  'assets/images/filter_icon.png',
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
@@ -77,7 +82,7 @@ class AppSearchBar extends StatelessWidget {
       height: 45.h,
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(10.r),
+        borderRadius: BorderRadius.circular(32.r),
         border: Border.all(color: AppColors.primary, width: 1),
       ),
       child: Row(

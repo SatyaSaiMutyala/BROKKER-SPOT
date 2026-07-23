@@ -350,6 +350,10 @@ class AnnouncementModel {
       timeAgo: _timeAgoFromIso(json['created_at'] as String?),
       updatedAt: json['updated_at'],
       rejectionReason: json['rejection_reason'] as String?,
+      // Field was declared but never parsed; accept either casing so the
+      // heart reflects server state once the fetch payload carries it.
+      isWishlisted:
+          (json['is_wishlisted'] ?? json['isWishlisted']) as bool?,
       // derived display fields
       ownerName: ownerNameParsed,
       ownerAvatarUrl: ownerAvatarParsed,
