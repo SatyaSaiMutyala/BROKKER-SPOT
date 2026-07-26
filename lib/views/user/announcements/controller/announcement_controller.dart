@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
+import 'package:brokkerspot/views/user/announcements/controller/property_type_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,7 +24,15 @@ class AnnouncementController extends GetxController {
   String? country, city, area, address;
   double? latitude, longitude;
 
+  /// ObjectIds for the selected country / city / area, sent alongside the names.
+  ///
+  /// Empty rather than null when the user's pick came from the map and had no
+  /// match in the curated lists (see PropertyLocationView's synthetic entries) —
+  /// [_idOrNull] keeps those out of the payload.
+  String? countryId, cityId, areaId;
+
   String? propertyType, propertyName, description;
+  String? propertyTypeId;
   double? sqft, sqm;
   int? bedrooms, bathrooms, floor, totalFloors, propertyStatus;
   int isCommercialProperty = 0;
@@ -53,6 +63,9 @@ class AnnouncementController extends GetxController {
     required String city,
     required String area,
     required String address,
+    String? countryId,
+    String? cityId,
+    String? areaId,
     double? latitude,
     double? longitude,
   }) {
@@ -60,12 +73,16 @@ class AnnouncementController extends GetxController {
     this.city = city;
     this.area = area;
     this.address = address;
+    this.countryId = countryId;
+    this.cityId = cityId;
+    this.areaId = areaId;
     this.latitude = latitude;
     this.longitude = longitude;
   }
 
   void setInformation({
     required String propertyType,
+    String? propertyTypeId,
     String? propertyName,
     required double sqft,
     required double sqm,
@@ -80,6 +97,7 @@ class AnnouncementController extends GetxController {
     DateTime? completionDate,
   }) {
     this.propertyType = propertyType;
+    this.propertyTypeId = propertyTypeId;
     this.propertyName = propertyName;
     this.sqft = sqft;
     this.sqm = sqm;
@@ -137,6 +155,12 @@ class AnnouncementController extends GetxController {
     city = a.propertyCity;
     area = a.propertyArea;
     address = a.propertyAddress;
+    // The announcement GET returns names only, so there are no ids to restore.
+    // Clearing is not optional: leaving whatever the previous draft or edit put
+    // here would submit another announcement's ids against this one. They are
+    // re-derived in [_buildBody] from the names, or overwritten when the user
+    // passes back through the Location / Information steps.
+    countryId = cityId = areaId = propertyTypeId = null;
     propertyType = a.propertyType;
     propertyName = a.propertyName;
     sqft = a.propertySize?.sqft;
@@ -191,6 +215,10 @@ class AnnouncementController extends GetxController {
       if (country != null) 'country': country,
       if (city != null) 'city': city,
       if (area != null) 'area': area,
+      if (countryId != null) 'countryId': countryId,
+      if (cityId != null) 'cityId': cityId,
+      if (areaId != null) 'areaId': areaId,
+      if (propertyTypeId != null) 'propertyTypeId': propertyTypeId,
       if (address != null) 'address': address,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
@@ -241,6 +269,10 @@ class AnnouncementController extends GetxController {
     country = data['country'] as String?;
     city = data['city'] as String?;
     area = data['area'] as String?;
+    countryId = data['countryId'] as String?;
+    cityId = data['cityId'] as String?;
+    areaId = data['areaId'] as String?;
+    propertyTypeId = data['propertyTypeId'] as String?;
     address = data['address'] as String?;
     latitude = (data['latitude'] as num?)?.toDouble();
     longitude = (data['longitude'] as num?)?.toDouble();
@@ -285,6 +317,7 @@ class AnnouncementController extends GetxController {
   void resetDraft() {
     listingType = null;
     country = city = area = address = null;
+    countryId = cityId = areaId = propertyTypeId = null;
     propertyType = propertyName = description = null;
     sqft = sqm = price = null;
     bedrooms = bathrooms = floor = totalFloors = propertyStatus = null;
@@ -314,8 +347,32 @@ class AnnouncementController extends GetxController {
     return v == 2 ? 2 : 1;
   }
 
+  /// Normalises a stored id for the payload: null unless it is a real value.
+  /// Synthetic list entries carry `''`, and sending an empty string where the
+  /// backend expects an ObjectId is worse than omitting the key.
+  static String? _idOrNull(String? id) =>
+      (id == null || id.isEmpty) ? null : id;
+
+  /// Re-derives an id from its name against the globally cached lookup lists.
+  ///
+  /// Needed for edit: the announcement GET returns names only (no `*_id`
+  /// fields), so a user who edits, say, only the price never passes through the
+  /// Location or Information step and no id was ever set. Property type and
+  /// country resolve reliably because their full lists are loaded app-wide;
+  /// city and area only resolve if their parent list happens to be loaded, so
+  /// they stay best-effort.
+  String? _resolveMissingId(String? current, String? name, String? Function() lookup) {
+    final existing = _idOrNull(current);
+    if (existing != null) return existing;
+    if (name == null || name.isEmpty) return null;
+    return _idOrNull(lookup());
+  }
+
   // ── Body builder ───────────────────────────────────────────────────────────
-  Map<String, dynamic> _buildBody() {
+  /// [includeLookupIds] adds `property_type_id` / `property_country_id` /
+  /// `property_city_id` / `property_area_id`. Off for the status=0 draft save,
+  /// which submits names only.
+  Map<String, dynamic> _buildBody({bool includeLookupIds = true}) {
     final body = <String, dynamic>{
       'listing_type': listingType,
       'property_country': country,
@@ -349,6 +406,32 @@ class AnnouncementController extends GetxController {
       // updated locally on switch-role) so the right side is recorded.
       'status': _activeRoleStatus(),
     };
+
+    // Selected-entry ObjectIds, sent alongside the names above. Omitted when
+    // unknown — an absent key is unambiguous, `""` is not.
+    if (includeLookupIds) {
+      final resolvedTypeId = _resolveMissingId(propertyTypeId, propertyType,
+          () => PropertyTypeController.to.idForName(propertyType!));
+      final common = Get.isRegistered<CommonDataController>()
+          ? Get.find<CommonDataController>()
+          : null;
+      final resolvedCountryId = _resolveMissingId(
+          countryId,
+          country,
+          () =>
+              common?.countries.firstWhereOrNull((c) => c.name == country)?.id);
+      final resolvedCityId = _resolveMissingId(cityId, city,
+          () => common?.cities.firstWhereOrNull((c) => c.name == city)?.id);
+      final resolvedAreaId = _resolveMissingId(areaId, area,
+          () => common?.localities.firstWhereOrNull((l) => l.name == area)?.id);
+
+      if (resolvedTypeId != null) body['property_type_id'] = resolvedTypeId;
+      if (resolvedCountryId != null) {
+        body['property_country_id'] = resolvedCountryId;
+      }
+      if (resolvedCityId != null) body['property_city_id'] = resolvedCityId;
+      if (resolvedAreaId != null) body['property_area_id'] = resolvedAreaId;
+    }
 
     if (propertyName != null && propertyName!.isNotEmpty) {
       body['property_name'] = propertyName;
@@ -406,7 +489,7 @@ class AnnouncementController extends GetxController {
     try {
       isLoading.value = true;
       errorMessage.value = null;
-      final body = _buildBody();
+      final body = _buildBody(includeLookupIds: false);
       body['status'] = 0;
       await _repo.createAnnouncement(body);
       resetDraft();

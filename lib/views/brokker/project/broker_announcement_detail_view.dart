@@ -11,7 +11,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/core/common_widget/fullscreen_media_viewer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/account/account_view.dart'
+    show showLoginRequiredDialog;
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
@@ -79,7 +82,9 @@ class _BrokerAnnouncementDetailViewState
       return;
     }
     try {
-      final fresh = await _repo.fetchAnnouncementDetail(id);
+      final fresh = LocalStorageService.isLoggedIn()
+          ? await _repo.fetchAnnouncementDetail(id)
+          : await _repo.fetchGuestAnnouncementDetail(id);
       if (mounted) {
         setState(() {
           _data = fresh;
@@ -139,6 +144,10 @@ class _BrokerAnnouncementDetailViewState
   }
 
   void _showProposalSheet() async {
+    if (!LocalStorageService.isLoggedIn()) {
+      showLoginRequiredDialog(context);
+      return;
+    }
     final id = _data.id;
     if (id == null) return;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -159,6 +168,10 @@ class _BrokerAnnouncementDetailViewState
   }
 
   void _openChat() {
+    if (!LocalStorageService.isLoggedIn()) {
+      showLoginRequiredDialog(context);
+      return;
+    }
     final id = _data.id;
     final peerId = _data.userId;
     if (id == null || peerId == null) return;
@@ -434,8 +447,13 @@ class _BrokerAnnouncementDetailViewState
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         GestureDetector(
-                          onTap: () =>
-                              setState(() => _isWishlisted = !_isWishlisted),
+                          onTap: () {
+                            if (!LocalStorageService.isLoggedIn()) {
+                              showLoginRequiredDialog(context);
+                              return;
+                            }
+                            setState(() => _isWishlisted = !_isWishlisted);
+                          },
                           child: Container(
                             width: 35.w,
                             height: 35.w,

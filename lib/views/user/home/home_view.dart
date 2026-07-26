@@ -39,11 +39,25 @@ class _HomeViewState extends State<HomeView> {
   /// filters and cards all line up against it.
   double get _gutter => 10.w;
 
+  /// Breathing room between the status bar and the header.
+  ///
+  /// [SafeArea] only reserves the physical status-bar inset. On iOS that inset
+  /// is tall (notch / Dynamic Island) so the header already clears it
+  /// comfortably; Android's is roughly half as tall, leaving the header flush
+  /// against the clock. So top up whatever the inset is short of an iOS-like
+  /// total rather than hardcoding `Platform.isAndroid` — this also covers
+  /// Android devices with tall punch-hole insets, which need no extra gap.
+  ///
+  /// Raw logical pixels, not `.h`: it is compared against a device inset, which
+  /// ScreenUtil does not scale.
+  double get _headerTopGap =>
+      max(0.0, 44.0 - MediaQuery.viewPaddingOf(context).top);
+
   // Pinned-header heights. Built from the same tokens as the children they
   // wrap, since a persistent header can't measure its child.
   // HomeAppBar's tallest children are the 42.h action pill and the 41.w
   // avatar; .w and .h scale independently, so take whichever wins.
-  double get _appBarExtent => max(42.h, 41.w) + 12.h;
+  double get _appBarExtent => max(42.h, 41.w) + 12.h + _headerTopGap;
   double get _searchFilterExtent =>
       12.h + 45.h + 12.h + 39.h + 16.h; // gap + search + gap + chips + gap
 
@@ -113,7 +127,8 @@ class _HomeViewState extends State<HomeView> {
                     extent: _appBarExtent,
                     backgroundColor: bg,
                     child: Padding(
-                      padding: EdgeInsets.fromLTRB(_gutter, 0, _gutter, 12.h),
+                      padding: EdgeInsets.fromLTRB(
+                          _gutter, _headerTopGap, _gutter, 12.h),
                       child: _buildHeader(theme),
                     ),
                   ),
@@ -368,7 +383,7 @@ class _HomeViewState extends State<HomeView> {
         padding: EdgeInsets.symmetric(horizontal: _gutter),
         sliver: SliverList.separated(
           itemCount: entries.length,
-          separatorBuilder: (_, __) => SizedBox(height: 16.h),
+          separatorBuilder: (_, __) => SizedBox(height: 10.h),
           itemBuilder: (_, i) {
             final entry = entries[i];
             if (entry.banner != null) return _buildFeedBanner(entry.banner!);

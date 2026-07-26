@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/widgets/common/custom_back_button.dart';
+import 'package:flutter/foundation.dart' show Factory;
+import 'package:flutter/gestures.dart' show EagerGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
@@ -53,6 +57,27 @@ class _MapPickerViewState extends State<MapPickerView> {
   bool _searchLoading = false;
   bool _showSuggestions = false;
 
+  /// Surfaced under the search bar. Without this a denied API key looks
+  /// identical to "no places matched" — which is exactly how the legacy-API
+  /// rejection stayed invisible.
+  String? _searchError;
+
+  Timer? _debounce;
+
+  /// Set while [_selectSuggestion] writes the chosen place into the field.
+  /// Assigning `_searchCtrl.text` fires the listener, which would otherwise
+  /// kick off a fresh search and pop the suggestion list straight back open.
+  bool _suppressSearch = false;
+
+  MapType _mapType = MapType.normal;
+
+  /// True between `onCameraMoveStarted` and `onCameraIdle` — lifts the pin so a
+  /// drag visibly does something.
+  bool _isMapMoving = false;
+
+  /// True while resolving the device's GPS fix for the my-location button.
+  bool _locating = false;
+
   @override
   void initState() {
     super.initState();
@@ -63,74 +88,162 @@ class _MapPickerViewState extends State<MapPickerView> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchCtrl.dispose();
     _mapController?.dispose();
     super.dispose();
   }
 
   void _onSearchChanged() {
+    if (_suppressSearch) return;
     final q = _searchCtrl.text.trim();
+    _debounce?.cancel();
     if (q.length < 3) {
-      setState(() => _suggestions = []);
+      setState(() {
+        _suggestions = [];
+        _showSuggestions = false;
+        _searchError = null;
+      });
       return;
     }
-    _fetchSuggestions(q);
+    // Autocomplete is billed per request, so coalesce keystrokes instead of
+    // firing one call per character.
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) _fetchSuggestions(q);
+    });
   }
 
   Future<void> _fetchSuggestions(String input) async {
-    setState(() => _searchLoading = true);
+    setState(() {
+      _searchLoading = true;
+      _searchError = null;
+    });
     try {
-      final uri = Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
-        '?input=${Uri.encodeComponent(input)}&key=$_apiKey&types=geocode',
+      // Places API (New). The legacy `maps/api/place/autocomplete` endpoint
+      // answers REQUEST_DENIED on this project ("You're calling a legacy API,
+      // which is not enabled") while still returning HTTP 200 and an empty
+      // prediction list — which is why searching looked like it simply found
+      // nothing. Google no longer enables the legacy API for new projects.
+      final res = await http.post(
+        Uri.parse('https://places.googleapis.com/v1/places:autocomplete'),
+        headers: const {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': _apiKey,
+        },
+        body: jsonEncode({'input': input}),
       );
-      final res = await http.get(uri);
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final predictions = (data['predictions'] as List?) ?? [];
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode != 200) {
+        final message =
+            (data['error'] as Map<String, dynamic>?)?['message'] as String?;
+        if (mounted) {
+          setState(() {
+            _suggestions = [];
+            _showSuggestions = false;
+            _searchError = message ?? 'Search unavailable (${res.statusCode})';
+          });
+        }
+        return;
+      }
+
+      final suggestions = (data['suggestions'] as List?) ?? [];
+      final parsed = <_PlaceSuggestion>[];
+      for (final s in suggestions) {
+        final p = (s as Map<String, dynamic>)['placePrediction']
+            as Map<String, dynamic>?;
+        // Query predictions ("pizza near me") carry no placeId — skip them,
+        // there is nothing to resolve to coordinates.
+        if (p == null) continue;
+        final id = p['placeId'] as String?;
+        final text = (p['text'] as Map<String, dynamic>?)?['text'] as String?;
+        if (id == null || text == null) continue;
+        parsed.add(_PlaceSuggestion(placeId: id, description: text));
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _suggestions = parsed;
+        _showSuggestions = parsed.isNotEmpty;
+        _searchError = parsed.isEmpty ? 'No places found for "$input"' : null;
+      });
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _suggestions = predictions.map((p) {
-            return _PlaceSuggestion(
-              placeId: p['place_id'] as String,
-              description: p['description'] as String,
-            );
-          }).toList();
-          _showSuggestions = _suggestions.isNotEmpty;
+          _suggestions = [];
+          _showSuggestions = false;
+          _searchError = 'Could not reach the location service.';
         });
       }
-    } catch (_) {
     } finally {
       if (mounted) setState(() => _searchLoading = false);
     }
   }
 
   Future<void> _selectSuggestion(_PlaceSuggestion s) async {
+    _debounce?.cancel();
+    _suppressSearch = true;
     _searchCtrl.text = s.description;
+    _suppressSearch = false;
     setState(() {
       _showSuggestions = false;
       _suggestions = [];
+      _searchError = null;
     });
     FocusScope.of(context).unfocus();
     try {
-      final uri = Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/details/json'
-        '?place_id=${s.placeId}&fields=geometry&key=$_apiKey',
+      // Place Details (New) — the legacy `place/details` endpoint is denied on
+      // this project for the same reason as autocomplete. `X-Goog-FieldMask` is
+      // mandatory here; omitting it is a 400.
+      final res = await http.get(
+        Uri.parse('https://places.googleapis.com/v1/places/${s.placeId}'),
+        headers: const {
+          'X-Goog-Api-Key': _apiKey,
+          'X-Goog-FieldMask': 'location',
+        },
       );
-      final res = await http.get(uri);
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final loc =
-            data['result']?['geometry']?['location'] as Map<String, dynamic>?;
-        if (loc != null) {
-          final lat = (loc['lat'] as num).toDouble();
-          final lng = (loc['lng'] as num).toDouble();
-          final pos = LatLng(lat, lng);
-          _mapController?.animateCamera(CameraUpdate.newLatLngZoom(pos, 16));
-          setState(() => _center = pos);
-          await _reverseGeocode(pos);
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode != 200) {
+        if (mounted) {
+          setState(() => _searchError =
+              (data['error'] as Map<String, dynamic>?)?['message'] as String? ??
+                  'Could not open that place.');
         }
+        return;
       }
-    } catch (_) {}
+      final loc = data['location'] as Map<String, dynamic>?;
+      if (loc == null) return;
+      final pos = LatLng(
+        (loc['latitude'] as num).toDouble(),
+        (loc['longitude'] as num).toDouble(),
+      );
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(pos, 16));
+      if (!mounted) return;
+      setState(() => _center = pos);
+      await _reverseGeocode(pos);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _searchError = 'Could not reach the location service.');
+      }
+    }
+  }
+
+  /// Handles the keyboard's search/enter key. Previously the field had no
+  /// [TextField.onSubmitted], so pressing it only dismissed the keypad.
+  Future<void> _onSearchSubmitted(String value) async {
+    final q = value.trim();
+    if (q.length < 3) return;
+    _debounce?.cancel();
+    // Already have matches → take the top one, which is what the keyboard
+    // action implies.
+    if (_suggestions.isNotEmpty) {
+      await _selectSuggestion(_suggestions.first);
+      return;
+    }
+    await _fetchSuggestions(q);
+    if (mounted && _suggestions.isNotEmpty) {
+      await _selectSuggestion(_suggestions.first);
+    }
   }
 
   Future<void> _reverseGeocode(LatLng pos) async {
@@ -184,11 +297,83 @@ class _MapPickerViewState extends State<MapPickerView> {
   }
 
   void _onCameraMove(CameraPosition pos) {
+    // Deliberately no setState — this fires every frame of a drag.
     _center = pos.target;
   }
 
+  void _onCameraMoveStarted() {
+    if (!_isMapMoving) setState(() => _isMapMoving = true);
+  }
+
   void _onCameraIdle() {
+    if (_isMapMoving) setState(() => _isMapMoving = false);
+    // Not debounced on purpose: the Confirm button gates on `_isGeocoding`, so
+    // delaying the lookup would leave a window where a stale address looks
+    // ready to submit.
     _reverseGeocode(_center);
+  }
+
+  /// Tap (or long-press) anywhere to move the pin there. Recentres rather than
+  /// dropping a separate marker, so the pin the user reads and the coordinate
+  /// that gets submitted can never disagree.
+  void _onMapTap(LatLng pos) {
+    _mapController?.animateCamera(CameraUpdate.newLatLng(pos));
+    _center = pos;
+    // `animateCamera` ends in onCameraIdle, which does the reverse geocode.
+  }
+
+  Future<void> _zoomBy(double delta) async {
+    await _mapController?.animateCamera(CameraUpdate.zoomBy(delta));
+  }
+
+  void _cycleMapType() {
+    setState(() {
+      _mapType = switch (_mapType) {
+        MapType.normal => MapType.hybrid,
+        MapType.hybrid => MapType.terrain,
+        _ => MapType.normal,
+      };
+    });
+  }
+
+  /// Centres the map on the device's current position. Mirrors the permission
+  /// flow used by PropertyLocationView's "use current location".
+  Future<void> _goToMyLocation() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _showMapMessage('Location services are disabled');
+        return;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showMapMessage('Location permission denied');
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      final target = LatLng(pos.latitude, pos.longitude);
+      _center = target;
+      await _mapController
+          ?.animateCamera(CameraUpdate.newLatLngZoom(target, 16));
+    } catch (_) {
+      _showMapMessage('Could not get your location');
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  void _showMapMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _confirm() {
@@ -225,20 +410,55 @@ class _MapPickerViewState extends State<MapPickerView> {
               initialCameraPosition: CameraPosition(target: _center, zoom: 14),
               onMapCreated: (c) => _mapController = c,
               onCameraMove: _onCameraMove,
+              onCameraMoveStarted: _onCameraMoveStarted,
               onCameraIdle: _onCameraIdle,
+              onTap: _onMapTap,
+              onLongPress: _onMapTap,
+              mapType: _mapType,
               myLocationEnabled: true,
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
+              compassEnabled: true,
+              // The map is an Android/iOS platform view, so its touches have to
+              // win Flutter's gesture arena before they reach the native view.
+              // Claiming them eagerly is what makes panning and pinch-zoom work
+              // — without this the arena can hand the drag to an ancestor and
+              // the map reads as frozen.
+              gestureRecognizers: {
+                Factory<EagerGestureRecognizer>(
+                    () => EagerGestureRecognizer()),
+              },
             ),
 
             // ── Center pin ───────────────────────────────────────────────────
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.location_pin, color: Colors.red, size: 48.sp),
-                  SizedBox(height: 24.h),
-                ],
+            // IgnorePointer is load-bearing: this Center fills the whole Stack,
+            // so without it the pin sits between the user's finger and the map.
+            IgnorePointer(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Lifts while the map moves, so a drag has visible feedback.
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOut,
+                      transform: Matrix4.translationValues(
+                          0, _isMapMoving ? -10.h : 0, 0),
+                      child: Icon(Icons.location_pin,
+                          color: Colors.red, size: 48.sp),
+                    ),
+                    // Marks the exact coordinate the pin's tip refers to.
+                    Container(
+                      width: 6.w,
+                      height: 6.w,
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    SizedBox(height: 24.h),
+                  ],
+                ),
               ),
             ),
 
@@ -274,6 +494,8 @@ class _MapPickerViewState extends State<MapPickerView> {
                         Expanded(
                           child: TextField(
                             controller: _searchCtrl,
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: _onSearchSubmitted,
                             style: GoogleFonts.inter(
                                 fontSize: 14.sp, color: primaryText),
                             decoration: InputDecoration(
@@ -318,6 +540,37 @@ class _MapPickerViewState extends State<MapPickerView> {
                       ],
                     ),
                   ),
+                  if (_searchError != null)
+                    Container(
+                      margin: EdgeInsets.only(top: 4.h),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 14.w, vertical: 10.h),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(8.r),
+                        boxShadow: [
+                          BoxShadow(
+                            color: shadowColor,
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline,
+                              size: 16.sp, color: Colors.red.shade400),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Text(
+                              _searchError!,
+                              style: GoogleFonts.inter(
+                                  fontSize: 12.sp, color: primaryText),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   if (_showSuggestions && _suggestions.isNotEmpty)
                     Container(
                       margin: EdgeInsets.only(top: 4.h),
@@ -367,6 +620,54 @@ class _MapPickerViewState extends State<MapPickerView> {
                         },
                       ),
                     ),
+                ],
+              ),
+            ),
+
+            // ── Map controls ─────────────────────────────────────────────────
+            Positioned(
+              right: 16.w,
+              bottom: 210.h,
+              child: Column(
+                children: [
+                  _mapControlButton(
+                    icon: Icons.my_location_rounded,
+                    tooltip: 'My location',
+                    busy: _locating,
+                    cardBg: cardBg,
+                    iconColor: primaryText,
+                    shadowColor: shadowColor,
+                    onTap: _goToMyLocation,
+                  ),
+                  SizedBox(height: 10.h),
+                  _mapControlButton(
+                    icon: _mapType == MapType.normal
+                        ? Icons.layers_outlined
+                        : Icons.layers,
+                    tooltip: 'Map type',
+                    cardBg: cardBg,
+                    iconColor: primaryText,
+                    shadowColor: shadowColor,
+                    onTap: _cycleMapType,
+                  ),
+                  SizedBox(height: 10.h),
+                  _mapControlButton(
+                    icon: Icons.add,
+                    tooltip: 'Zoom in',
+                    cardBg: cardBg,
+                    iconColor: primaryText,
+                    shadowColor: shadowColor,
+                    onTap: () => _zoomBy(1),
+                  ),
+                  SizedBox(height: 10.h),
+                  _mapControlButton(
+                    icon: Icons.remove,
+                    tooltip: 'Zoom out',
+                    cardBg: cardBg,
+                    iconColor: primaryText,
+                    shadowColor: shadowColor,
+                    onTap: () => _zoomBy(-1),
+                  ),
                 ],
               ),
             ),
@@ -477,6 +778,46 @@ class _MapPickerViewState extends State<MapPickerView> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _mapControlButton({
+    required IconData icon,
+    required String tooltip,
+    required Color cardBg,
+    required Color iconColor,
+    required Color shadowColor,
+    required VoidCallback onTap,
+    bool busy = false,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 42.w,
+          height: 42.w,
+          decoration: BoxDecoration(
+            color: cardBg,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: shadowColor,
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: busy
+              ? Padding(
+                  padding: EdgeInsets.all(11.w),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.primary),
+                )
+              : Icon(icon, size: 20.sp, color: iconColor),
         ),
       ),
     );

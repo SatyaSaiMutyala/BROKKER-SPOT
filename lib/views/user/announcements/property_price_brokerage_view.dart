@@ -2,6 +2,7 @@ import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/widgets/common/floating_dropdown.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -30,6 +31,77 @@ class _PropertyPriceBrokerageViewState
     return _priceCtrl.text.trim().isNotEmpty &&
         _priceType != null &&
         _availableDate != null;
+  }
+
+  // ── Required-field reporting ──────────────────────────────────────────────
+  // Save stays visually disabled while incomplete but remains tappable, so a tap
+  // can point at what's missing instead of doing nothing. Only set once the user
+  // has tried to submit, so a fresh form isn't covered in red.
+  bool _showErrors = false;
+
+  final _priceKey = GlobalKey();
+  final _priceTypeKey = GlobalKey();
+  final _availableDateKey = GlobalKey();
+
+  /// Required fields in on-screen order, so the first one still missing is also
+  /// the one nearest the top. Sell only needs a price; the period and
+  /// availability date are Rent-only, matching [_isValid].
+  List<({GlobalKey key, String label, bool missing})> get _requiredFields => [
+        (
+          key: _priceKey,
+          label: _isSell ? 'the property price' : 'the rent price',
+          missing: _priceCtrl.text.trim().isEmpty
+        ),
+        if (!_isSell) ...[
+          (
+            key: _priceTypeKey,
+            label: 'Monthly or Yearly',
+            missing: _priceType == null
+          ),
+          (
+            key: _availableDateKey,
+            label: 'the date the property is available',
+            missing: _availableDate == null
+          ),
+        ],
+      ];
+
+  void _save() {
+    Get.find<AnnouncementController>().setPrice(
+      price: _price,
+      brokeragePercent: _brokeragePercent,
+      rentPeriod: _isSell ? null : _priceType,
+      availableDate: _isSell ? null : _availableDate,
+    );
+    Navigator.pop(context, true);
+  }
+
+  /// Save tap. Valid → save; invalid → turn on error borders and scroll the
+  /// first missing field into view rather than leaving a dead button.
+  void _onSaveTap() {
+    if (_isValid) {
+      _save();
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _showErrors = true);
+    final first = _requiredFields.where((f) => f.missing).firstOrNull;
+    if (first == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = first.key.currentContext;
+      if (!mounted || ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+        alignment: 0.2,
+      );
+    });
+    EasyLoading.showToast(
+      'Please add ${first.label}',
+      duration: const Duration(seconds: 2),
+      toastPosition: EasyLoadingToastPosition.bottom,
+    );
   }
 
   double get _price => double.tryParse(_priceCtrl.text.trim()) ?? 0;
@@ -105,17 +177,10 @@ class _PropertyPriceBrokerageViewState
             Padding(
               padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
               child: GestureDetector(
-                onTap: _isValid
-                    ? () {
-                        Get.find<AnnouncementController>().setPrice(
-                          price: _price,
-                          brokeragePercent: _brokeragePercent,
-                          rentPeriod: _isSell ? null : _priceType,
-                          availableDate: _isSell ? null : _availableDate,
-                        );
-                        Navigator.pop(context, true);
-                      }
-                    : null,
+                // Always tappable: an invalid tap reports what's missing instead
+                // of doing nothing. The colours below still key off _isValid, so
+                // it looks disabled exactly as before.
+                onTap: _onSaveTap,
                 child: Container(
                   width: double.infinity,
                   height: 52.h,
@@ -195,7 +260,7 @@ class _PropertyPriceBrokerageViewState
       children: [
         _label('Set Property Price', required: true, isDark: isDark),
         SizedBox(height: 8.h),
-        _priceField(isDark),
+        KeyedSubtree(key: _priceKey, child: _priceField(isDark)),
         SizedBox(height: 24.h),
         _label('Set Brokerage', isDark: isDark),
         SizedBox(height: 8.h),
@@ -233,7 +298,7 @@ class _PropertyPriceBrokerageViewState
                   _label('Set Property Rent Price',
                       required: true, isDark: isDark),
                   SizedBox(height: 8.h),
-                  _priceField(isDark),
+                  KeyedSubtree(key: _priceKey, child: _priceField(isDark)),
                 ],
               ),
             ),
@@ -245,6 +310,8 @@ class _PropertyPriceBrokerageViewState
                   _label('Monthly/Yearly', required: true, isDark: isDark),
                   SizedBox(height: 8.h),
                   FloatingDropdown(
+                    key: _priceTypeKey,
+                    hasError: _showErrors && _priceType == null,
                     hint: 'Select Now',
                     value: _priceType,
                     items: const ['Monthly', 'Yearly'],
@@ -260,7 +327,7 @@ class _PropertyPriceBrokerageViewState
         _label('Property is Available For Rent',
             required: true, isDark: isDark),
         SizedBox(height: 8.h),
-        _datePicker(isDark),
+        KeyedSubtree(key: _availableDateKey, child: _datePicker(isDark)),
         SizedBox(height: 24.h),
         Text(
           'Are You want to share brokerage with broker?',
@@ -306,11 +373,14 @@ class _PropertyPriceBrokerageViewState
   }
 
   Widget _priceField(bool isDark) {
+    final hasError = _showErrors && _priceCtrl.text.trim().isEmpty;
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
         border: Border.all(
-          color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+          color: hasError
+              ? Colors.red.shade400
+              : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300),
         ),
         borderRadius: BorderRadius.circular(6.r),
       ),
@@ -456,6 +526,7 @@ class _PropertyPriceBrokerageViewState
     final text = _availableDate != null
         ? '${_availableDate!.month.toString().padLeft(2, '0')}/${_availableDate!.day.toString().padLeft(2, '0')}/${_availableDate!.year}'
         : 'mm/dd/yyyy';
+    final hasError = _showErrors && _availableDate == null;
     return GestureDetector(
       onTap: () => _pickDate(isDark),
       child: Container(
@@ -463,7 +534,9 @@ class _PropertyPriceBrokerageViewState
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
           border: Border.all(
-            color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+            color: hasError
+                ? Colors.red.shade400
+                : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300),
           ),
           borderRadius: BorderRadius.circular(6.r),
         ),

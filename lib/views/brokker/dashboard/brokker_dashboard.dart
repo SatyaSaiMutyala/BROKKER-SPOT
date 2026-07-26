@@ -119,8 +119,14 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
         activeIconAsset: 'assets/images/broker_active_profile_icon.png'),
   ];
 
-  // Tabs 1 (Projects) and 2 (Meeting) require login.
+  // Tabs 1 (Projects) and 2 (Meeting) are gated for signed-in users that
+  // haven't finished broker onboarding (no broker role / pending verification).
   static const _loginRequiredTabs = {1, 2};
+
+  // Tabs a guest (no token) may browse read-only instead of being pushed into
+  // the login dialog. Tab 1 shows the public announcement feed capped at
+  // [kGuestAnnouncementLimit] items via the /guest/announcements endpoints.
+  static const _guestBrowsableTabs = {1};
 
   void _onCreateTap(BuildContext context) {
     if (!LocalStorageService.isLoggedIn()) {
@@ -180,22 +186,27 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     }
 
     if (_loginRequiredTabs.contains(index)) {
-      // Step 1: Not logged in
+      // Step 1: Not logged in. Guest-browsable tabs fall through to the tab
+      // itself (read-only, capped feed); everything else asks for login. The
+      // role/verification gates below are skipped either way — a guest has no
+      // profile to check them against.
       if (!isLoggedIn) {
-        showLoginRequiredDialog(context);
-        return;
-      }
+        if (!_guestBrowsableTabs.contains(index)) {
+          showLoginRequiredDialog(context);
+          return;
+        }
+      } else {
+        // Step 2: Logged in but not a broker yet → must complete profile
+        if (!profileController.hasBrokerRole) {
+          showCompleteProfileDialog(context);
+          return;
+        }
 
-      // Step 2: Logged in but not a broker yet → must complete profile
-      if (!profileController.hasBrokerRole) {
-        showCompleteProfileDialog(context);
-        return;
-      }
-
-      // Step 3: Broker, but verification still pending
-      if (profileController.hasBrokerRole && verificationStatus == 'pending') {
-        showPendingVerificationDialog(context);
-        return;
+        // Step 3: Broker, but verification still pending
+        if (verificationStatus == 'pending') {
+          showPendingVerificationDialog(context);
+          return;
+        }
       }
     }
 

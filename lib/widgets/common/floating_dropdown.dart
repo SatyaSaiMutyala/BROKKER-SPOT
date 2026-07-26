@@ -34,6 +34,9 @@ class FloatingDropdown extends StatefulWidget {
   final IconData? prefixIcon;
   final VoidCallback? onBeforeOpen;
 
+  /// Draws the border red to flag a required selection the user hasn't made.
+  final bool hasError;
+
   const FloatingDropdown({
     super.key,
     required this.hint,
@@ -45,6 +48,7 @@ class FloatingDropdown extends StatefulWidget {
     this.enabled = true,
     this.prefixIcon,
     this.onBeforeOpen,
+    this.hasError = false,
   });
 
   @override
@@ -168,9 +172,13 @@ class FloatingDropdownState extends State<FloatingDropdown> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
-    final borderColor = widget.enabled
-        ? (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300)
-        : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200);
+    // Error wins over the enabled/disabled pair — a required field the user must
+    // still fill matters more than showing it as inert.
+    final borderColor = widget.hasError
+        ? Colors.red.shade400
+        : widget.enabled
+            ? (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300)
+            : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200);
     final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
     final textColor = widget.enabled
         ? (isDark ? Colors.white : Colors.black87)

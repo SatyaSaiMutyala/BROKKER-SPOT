@@ -285,7 +285,16 @@ class AccountView extends StatelessWidget {
 
 // ── Dialogs (unchanged) ───────────────────────────────────────────────────────
 
-void showLoginRequiredDialog(BuildContext context) {
+/// Prompts a guest to log in or sign up.
+///
+/// [title] and [message] override the default copy so a caller can say what
+/// specifically needs an account — e.g. the guest announcement feed explaining
+/// that more listings sit behind login.
+void showLoginRequiredDialog(
+  BuildContext context, {
+  String title = 'Please Login.',
+  String message = 'Without login you cannot use all features in this app.',
+}) {
   showDialog(
     context: context,
     builder: (_) => Dialog(
@@ -299,7 +308,8 @@ void showLoginRequiredDialog(BuildContext context) {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Please Login.',
+              title,
+              textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.w600,
@@ -308,7 +318,7 @@ void showLoginRequiredDialog(BuildContext context) {
             ),
             SizedBox(height: 12.h),
             Text(
-              'Without login you cannot use all features in this app.',
+              message,
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 13.sp,

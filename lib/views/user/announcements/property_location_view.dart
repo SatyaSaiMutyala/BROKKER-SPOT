@@ -29,6 +29,11 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   late final CommonDataController _ctrl;
   final _addressCtrl = TextEditingController();
 
+  /// Watched so scrolling dismisses an open dropdown. Its overlay is pinned to
+  /// the screen offset captured when it opened, so left alone it would drift
+  /// away from the field it belongs to.
+  final _scrollCtrl = ScrollController();
+
   // ── Location ──────────────────────────────────────────────────────────────
   CountryModel? _selectedCountry;
   CityModel? _selectedCity;
@@ -96,11 +101,95 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   bool get _isValid =>
       _isUAE ? _isLocationValid && _isDocumentsValid : _isLocationValid;
 
+  // ── Required-field reporting ──────────────────────────────────────────────
+  // Save stays visually disabled while incomplete but remains tappable, so a
+  // tap can point at what's missing instead of doing nothing. Only set once the
+  // user has tried to submit, so a fresh form isn't covered in red.
+  bool _showErrors = false;
+
+  final _addressKey = GlobalKey();
+  final _idDocKey = GlobalKey();
+  final _deedDocKey = GlobalKey();
+
+  // Mirror the branches in [_isDocumentsValid] so the two can't disagree about
+  // which of the sell/rent file slots counts.
+  bool get _missingIdFront => _isSell
+      ? (_idFrontFile == null && _existingFrontUrl == null)
+      : (_rentIdFrontFile == null && _existingFrontUrl == null);
+  bool get _missingIdBack => _isSell
+      ? (_idBackFile == null && _existingBackUrl == null)
+      : (_rentIdBackFile == null && _existingBackUrl == null);
+  bool get _missingDeed => _isSell
+      ? (_deedFile == null && _existingDeedUrl == null)
+      : (_rentDeedFile == null && _existingDeedUrl == null);
+
+  /// Required fields in on-screen order, so the first one still missing is also
+  /// the one nearest the top. Documents only apply to UAE properties, matching
+  /// [_isValid].
+  List<({GlobalKey key, String label, bool missing})> get _requiredFields => [
+        (
+          key: _countryKey,
+          label: 'Country',
+          missing: _selectedCountry == null
+        ),
+        (key: _cityKey, label: 'City', missing: _selectedCity == null),
+        (key: _areaKey, label: 'Area', missing: _selectedLocality == null),
+        (
+          key: _addressKey,
+          label: 'the property address',
+          missing: _addressCtrl.text.trim().isEmpty
+        ),
+        if (_isUAE) ...[
+          (
+            key: _idDocKey,
+            label: 'both sides of your $_selectedIdType',
+            missing: _missingIdFront || _missingIdBack
+          ),
+          (
+            key: _deedDocKey,
+            label: 'the Title Deed document',
+            missing: _missingDeed
+          ),
+        ],
+      ];
+
+  /// Save tap. Valid → upload; invalid → turn on error borders and scroll the
+  /// first missing field into view rather than leaving a dead button.
+  void _onSaveTap() {
+    if (_isUploading) return;
+    if (_isValid) {
+      _uploadAndSave();
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    _closeAll();
+    setState(() => _showErrors = true);
+    final first = _requiredFields.where((f) => f.missing).firstOrNull;
+    if (first == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = first.key.currentContext;
+      if (!mounted || ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+        alignment: 0.2,
+      );
+    });
+    EasyLoading.showToast(
+      'Please add ${first.label}',
+      duration: const Duration(seconds: 2),
+      toastPosition: EasyLoadingToastPosition.bottom,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     _ctrl = CommonDataController.to;
     _addressCtrl.addListener(() => setState(() {}));
+    // Cheap: each close() early-returns unless that dropdown is actually open.
+    _scrollCtrl.addListener(_closeAll);
 
     final c = Get.find<AnnouncementController>();
     _latitude = c.latitude;
@@ -121,27 +210,192 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   }
 
   Future<void> _restoreSelections(AnnouncementController c) async {
-    if (c.country == null) return;
-    final country =
-        _ctrl.countries.where((x) => x.name == c.country).firstOrNull;
-    if (country == null) return;
-    setState(() => _selectedCountry = country);
+    await _applyLocationNames(
+      country: c.country,
+      city: c.city,
+      area: c.area,
+      latitude: c.latitude,
+      longitude: c.longitude,
+    );
+  }
 
-    await _ctrl.loadCities(country.id);
-    if (c.city == null) return;
-    final city = _ctrl.cities.where((x) => x.name == c.city).firstOrNull;
-    if (city == null) return;
-    setState(() => _selectedCity = city);
+  // ── Place-name reconciliation ─────────────────────────────────────────────
+  // Google's reverse geocode returns its own spellings, which rarely equal the
+  // backend's curated list verbatim. These helpers match loosely so a map pick
+  // can drive the Country / City / Area dropdowns.
 
-    await _ctrl.loadLocalities(cityId: city.id, countryId: country.id);
-    if (c.area == null) return;
-    final locality =
-        _ctrl.localities.where((x) => x.name == c.area).firstOrNull;
-    if (locality != null) setState(() => _selectedLocality = locality);
+  /// Lowercased, stripped of everything but letters and digits, so
+  /// "Dubai - United Arab Emirates" and "dubai united arab emirates" collapse
+  /// together.
+  static String _normalizeName(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+  /// Abbreviations Google hands back where the backend stores the long form.
+  static const _nameAliases = <String, String>{
+    'uae': 'unitedarabemirates',
+    'ae': 'unitedarabemirates',
+    'usa': 'unitedstatesofamerica',
+    'us': 'unitedstates',
+    'uk': 'unitedkingdom',
+  };
+
+  static String _canonicalName(String s) {
+    final n = _normalizeName(s);
+    return _nameAliases[n] ?? n;
+  }
+
+  /// Best entry in [items] for [target]: exact canonical hit first, then a
+  /// containment match in either direction ("Dubai" vs "Dubai Emirate").
+  static T? _matchByName<T>(
+    Iterable<T> items,
+    String? target,
+    String Function(T) nameOf,
+  ) {
+    if (target == null) return null;
+    final want = _canonicalName(target);
+    if (want.isEmpty) return null;
+    for (final item in items) {
+      if (_canonicalName(nameOf(item)) == want) return item;
+    }
+    for (final item in items) {
+      final have = _canonicalName(nameOf(item));
+      if (have.isEmpty) continue;
+      if (have.contains(want) || want.contains(have)) return item;
+    }
+    return null;
+  }
+
+  /// How far a locality may sit from the picked point and still be treated as
+  /// the one the user meant.
+  static const double _localityMatchRadiusMetres = 15000;
+
+  /// Nearest locality to [lat]/[lng] within [_localityMatchRadiusMetres].
+  ///
+  /// Neighbourhood names disagree far more often than country or city names, and
+  /// localities are the one list that carries coordinates — so when the name
+  /// lookup misses we can still resolve the area geometrically.
+  LocalityModel? _nearestLocality(double? lat, double? lng) {
+    if (lat == null || lng == null) return null;
+    LocalityModel? best;
+    var bestMetres = double.infinity;
+    for (final l in _ctrl.localities) {
+      if (l.latitude == null || l.longitude == null) continue;
+      final metres =
+          Geolocator.distanceBetween(lat, lng, l.latitude!, l.longitude!);
+      if (metres < bestMetres) {
+        bestMetres = metres;
+        best = l;
+      }
+    }
+    return bestMetres <= _localityMatchRadiusMetres ? best : null;
+  }
+
+  // ── Synthetic entries ─────────────────────────────────────────────────────
+  // When Google names a place the curated list doesn't contain (e.g. "Burj
+  // Khalifa" as an area), carry its name through as an entry with an empty id
+  // rather than leaving the field blank.
+  //
+  // This is only safe because the submitted payload sends place *names*, not
+  // ids — see AnnouncementController.setLocation. The empty id doubles as the
+  // signal that there is no dependent list to fetch for this entry.
+
+  static CountryModel? _syntheticCountry(String? name) {
+    final n = name?.trim() ?? '';
+    return n.isEmpty ? null : CountryModel(id: '', name: n);
+  }
+
+  static CityModel? _syntheticCity(String? name, String countryId) {
+    final n = name?.trim() ?? '';
+    return n.isEmpty ? null : CityModel(id: '', name: n, countryId: countryId);
+  }
+
+  static LocalityModel? _syntheticLocality(
+    String? name,
+    String cityId,
+    String countryId,
+    double? lat,
+    double? lng,
+  ) {
+    final n = name?.trim() ?? '';
+    return n.isEmpty
+        ? null
+        : LocalityModel(
+            id: '',
+            name: n,
+            cityId: cityId,
+            countryId: countryId,
+            latitude: lat,
+            longitude: lng,
+          );
+  }
+
+  /// Selects Country → City → Area from plain place names, loading each
+  /// dependent list in turn (cities need a country id, localities need a city
+  /// id).
+  ///
+  /// Resolution order per field, most trustworthy first: match the curated list,
+  /// then — for Area only — the nearest locality by coordinate, then fall back to
+  /// Google's raw name. The list comes first deliberately, so a real match is
+  /// never bypassed and the data doesn't drift into free text.
+  ///
+  /// Returns the labels that stayed empty because Google supplied no name for
+  /// them at all, so the caller can say what still needs picking by hand.
+  Future<List<String>> _applyLocationNames({
+    String? country,
+    String? city,
+    String? area,
+    double? latitude,
+    double? longitude,
+  }) async {
+    // ── Country ──
+    final matchedCountry =
+        _matchByName(_ctrl.countries, country, (c) => c.name) ??
+            _syntheticCountry(country);
+    if (matchedCountry == null) return const ['Country', 'City', 'Area'];
+    if (!mounted) return const [];
+    setState(() {
+      _selectedCountry = matchedCountry;
+      _selectedCity = null;
+      _selectedLocality = null;
+    });
+
+    // ── City ──
+    if (matchedCountry.id.isEmpty) {
+      // Unknown country → whatever is in `cities` belongs to a different one.
+      // Drop it so the dropdown can't offer mismatched options.
+      _ctrl.cities.clear();
+      _ctrl.localities.clear();
+    } else {
+      await _ctrl.loadCities(matchedCountry.id);
+      if (!mounted) return const [];
+    }
+    final matchedCity = _matchByName(_ctrl.cities, city, (c) => c.name) ??
+        _syntheticCity(city, matchedCountry.id);
+    if (matchedCity == null) return const ['City', 'Area'];
+    setState(() => _selectedCity = matchedCity);
+
+    // ── Area ──
+    if (matchedCity.id.isEmpty) {
+      _ctrl.localities.clear();
+    } else {
+      await _ctrl.loadLocalities(
+          cityId: matchedCity.id, countryId: matchedCountry.id);
+      if (!mounted) return const [];
+    }
+    final matchedLocality =
+        _matchByName(_ctrl.localities, area, (l) => l.name) ??
+            _nearestLocality(latitude, longitude) ??
+            _syntheticLocality(area, matchedCity.id, matchedCountry.id,
+                latitude, longitude);
+    if (matchedLocality == null) return const ['Area'];
+    setState(() => _selectedLocality = matchedLocality);
+    return const [];
   }
 
   @override
   void dispose() {
+    _scrollCtrl.removeListener(_closeAll);
+    _scrollCtrl.dispose();
     _addressCtrl.dispose();
     super.dispose();
   }
@@ -181,7 +435,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
               initialPosition: LatLng(pos.latitude, pos.longitude)),
         ),
       );
-      if (result != null) _applyMapResult(result);
+      if (result != null) await _applyMapResult(result);
     } catch (_) {
       EasyLoading.dismiss();
       EasyLoading.showError('Failed to get location');
@@ -198,16 +452,37 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       MaterialPageRoute(
           builder: (_) => MapPickerView(initialPosition: initial)),
     );
-    if (result != null) _applyMapResult(result);
+    if (result != null) await _applyMapResult(result);
   }
 
-  void _applyMapResult(LocationPickerResult r) {
+  Future<void> _applyMapResult(LocationPickerResult r) async {
     setState(() {
       _addressCtrl.text = r.address;
       _latitude = r.latitude;
       _longitude = r.longitude;
       _closeAll();
     });
+
+    // The country list has to be in memory before anything can be matched
+    // against it — a no-op if initState already loaded it.
+    await _ctrl.loadCountries();
+    final unresolved = await _applyLocationNames(
+      country: r.country,
+      city: r.city,
+      area: r.area,
+      latitude: r.latitude,
+      longitude: r.longitude,
+    );
+    if (!mounted || unresolved.isEmpty) return;
+    // Only fires when the map itself returned no name for these — an unmatched
+    // name is now carried through verbatim rather than dropped. Saying so beats
+    // a silently blank dropdown, which reads as "the map didn't work".
+    EasyLoading.showToast(
+      'The map gave no ${unresolved.join(' or ')} for this point. '
+      'Please choose manually.',
+      duration: const Duration(seconds: 3),
+      toastPosition: EasyLoadingToastPosition.bottom,
+    );
   }
 
   void _closeAll() {
@@ -227,11 +502,21 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   }
 
   Future<void> _uploadAndSave() async {
+    // Dismiss the keypad and any open dropdown before the upload overlay and
+    // progress UI take over the screen.
+    FocusScope.of(context).unfocus();
+    _closeAll();
+
     final c = Get.find<AnnouncementController>();
     c.setLocation(
       country: _selectedCountry!.name,
       city: _selectedCity!.name,
       area: _selectedLocality!.name,
+      // Empty for a synthetic entry the map supplied that isn't in the curated
+      // list; the controller drops empties rather than sending "".
+      countryId: _selectedCountry!.id,
+      cityId: _selectedCity!.id,
+      areaId: _selectedLocality!.id,
       address: _addressCtrl.text.trim(),
       latitude: _latitude,
       longitude: _longitude,
@@ -320,6 +605,11 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
+                    controller: _scrollCtrl,
+                    // Dragging the form puts the keypad away, matching the
+                    // dropdowns already closing via [_scrollCtrl]'s listener.
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,6 +646,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                               key: _countryKey,
                               hint: 'Select Now',
                               value: _selectedCountry?.name,
+                              hasError: _showErrors && _selectedCountry == null,
                               prefixIcon: Icons.apartment_outlined,
                               items:
                                   _ctrl.countries.map((c) => c.name).toList(),
@@ -392,6 +683,8 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                                         key: _cityKey,
                                         hint: 'Select Now',
                                         value: _selectedCity?.name,
+                                        hasError: _showErrors &&
+                                            _selectedCity == null,
                                         prefixIcon: Icons.home_outlined,
                                         items: _ctrl.cities
                                             .map((c) => c.name)
@@ -433,6 +726,8 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                                         key: _areaKey,
                                         hint: 'Select Now',
                                         value: _selectedLocality?.name,
+                                        hasError: _showErrors &&
+                                            _selectedLocality == null,
                                         prefixIcon: Icons.home_outlined,
                                         items: _ctrl.localities
                                             .map((l) => l.name)
@@ -463,7 +758,14 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                         _label('Your Property Full Address',
                             required: true, isDark: isDark),
                         SizedBox(height: 8.h),
-                        _addressArea(isDark: isDark),
+                        KeyedSubtree(
+                          key: _addressKey,
+                          child: _addressArea(
+                            isDark: isDark,
+                            hasError: _showErrors &&
+                                _addressCtrl.text.trim().isEmpty,
+                          ),
+                        ),
                         SizedBox(height: 24.h),
 
                         if (_isUAE) ...[
@@ -485,7 +787,10 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                 Padding(
                   padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
                   child: GestureDetector(
-                    onTap: _isValid && !_isUploading ? _uploadAndSave : null,
+                    // Always tappable (unless mid-upload): an invalid tap reports
+                    // what's missing instead of doing nothing. The colours below
+                    // still key off _isValid, so it looks disabled as before.
+                    onTap: _isUploading ? null : _onSaveTap,
                     child: Container(
                       width: double.infinity,
                       height: 52.h,
@@ -654,12 +959,14 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       ),
       SizedBox(height: 12.h),
       Row(
+        key: _idDocKey,
         children: [
           Expanded(
             child: _uploadBox(
               isDark: isDark,
               label: 'Front Side',
               isUploaded: _idFrontFile != null || _existingFrontUrl != null,
+              hasError: _showErrors && _missingIdFront,
               onTap: () async {
                 final f = await _pickFile();
                 if (f != null) setState(() => _idFrontFile = f);
@@ -672,6 +979,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
               isDark: isDark,
               label: 'Back Side',
               isUploaded: _idBackFile != null || _existingBackUrl != null,
+              hasError: _showErrors && _missingIdBack,
               onTap: () async {
                 final f = await _pickFile();
                 if (f != null) setState(() => _idBackFile = f);
@@ -686,14 +994,18 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       _docSectionLabel('Upload Title Deed Doc',
           required: true, color: labelColor),
       SizedBox(height: 12.h),
-      _uploadBox(
-        isDark: isDark,
-        label: 'Upload',
-        isUploaded: _deedFile != null || _existingDeedUrl != null,
-        onTap: () async {
-          final f = await _pickFile();
-          if (f != null) setState(() => _deedFile = f);
-        },
+      KeyedSubtree(
+        key: _deedDocKey,
+        child: _uploadBox(
+          isDark: isDark,
+          label: 'Upload',
+          isUploaded: _deedFile != null || _existingDeedUrl != null,
+          hasError: _showErrors && _missingDeed,
+          onTap: () async {
+            final f = await _pickFile();
+            if (f != null) setState(() => _deedFile = f);
+          },
+        ),
       ),
       if (_selectedIdType == 'UAE ID') ...[
         SizedBox(height: 24.h),
@@ -735,12 +1047,14 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       ),
       SizedBox(height: 12.h),
       Row(
+        key: _idDocKey,
         children: [
           Expanded(
             child: _uploadBox(
               isDark: isDark,
               label: 'Front Side',
               isUploaded: _rentIdFrontFile != null || _existingFrontUrl != null,
+              hasError: _showErrors && _missingIdFront,
               onTap: () async {
                 final f = await _pickFile();
                 if (f != null) setState(() => _rentIdFrontFile = f);
@@ -753,6 +1067,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
               isDark: isDark,
               label: 'Back Side',
               isUploaded: _rentIdBackFile != null || _existingBackUrl != null,
+              hasError: _showErrors && _missingIdBack,
               onTap: () async {
                 final f = await _pickFile();
                 if (f != null) setState(() => _rentIdBackFile = f);
@@ -767,14 +1082,18 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       _docSectionLabel('Upload Title Deed Doc',
           required: true, color: labelColor),
       SizedBox(height: 12.h),
-      _uploadBox(
-        isDark: isDark,
-        label: 'Upload',
-        isUploaded: _rentDeedFile != null || _existingDeedUrl != null,
-        onTap: () async {
-          final f = await _pickFile();
-          if (f != null) setState(() => _rentDeedFile = f);
-        },
+      KeyedSubtree(
+        key: _deedDocKey,
+        child: _uploadBox(
+          isDark: isDark,
+          label: 'Upload',
+          isUploaded: _rentDeedFile != null || _existingDeedUrl != null,
+          hasError: _showErrors && _missingDeed,
+          onTap: () async {
+            final f = await _pickFile();
+            if (f != null) setState(() => _rentDeedFile = f);
+          },
+        ),
       ),
     ];
   }
@@ -960,8 +1279,10 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
     );
   }
 
-  Widget _addressArea({required bool isDark}) {
-    final borderColor = isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
+  Widget _addressArea({required bool isDark, bool hasError = false}) {
+    final borderColor = hasError
+        ? Colors.red.shade400
+        : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300);
     final charCount = _addressCtrl.text.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -1035,6 +1356,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
     required bool isDark,
     required String label,
     bool isUploaded = false,
+    bool hasError = false,
     VoidCallback? onTap,
   }) {
     if (isUploaded) {
@@ -1043,7 +1365,10 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
         child: Container(
           height: 36.h,
           decoration: BoxDecoration(
-            color: const Color.fromARGB(87, 80, 239, 85),
+            // Solid dark green. The old value was 34%-opacity bright green,
+            // which is why it washed out; at full opacity this holds the white
+            // label and check icon legibly.
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(41.r),
           ),
           child: Row(
@@ -1070,7 +1395,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       onTap: onTap,
       child: CustomPaint(
         painter: _DashedBorderPainter(
-          color: const Color(0xFFD9D9D9),
+          color: hasError ? Colors.red.shade400 : const Color(0xFFD9D9D9),
           borderRadius: 41.r,
         ),
         child: SizedBox(
@@ -1108,6 +1433,9 @@ class _FloatingDropdown extends StatefulWidget {
   final IconData? prefixIcon;
   final VoidCallback? onBeforeOpen;
 
+  /// Draws the border red to flag a required selection the user hasn't made.
+  final bool hasError;
+
   const _FloatingDropdown({
     super.key,
     required this.hint,
@@ -1119,6 +1447,7 @@ class _FloatingDropdown extends StatefulWidget {
     this.enabled = true,
     this.prefixIcon,
     this.onBeforeOpen,
+    this.hasError = false,
   });
 
   @override
@@ -1168,11 +1497,31 @@ class _FloatingDropdownState extends State<_FloatingDropdown> {
     final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
 
     _overlay = OverlayEntry(
-      builder: (ctx) => Positioned(
-        left: _triggerOffset.dx,
-        top: _triggerOffset.dy + _triggerSize.height,
-        width: _triggerSize.width,
-        child: Material(
+      builder: (ctx) => Stack(
+        children: [
+          // Dismiss on any tap outside the list — the address field, a
+          // different control, bare background.
+          //
+          // A Listener, not a GestureDetector: it never enters the gesture
+          // arena, so the tap still reaches whatever was actually tapped.
+          // Tapping the address field therefore closes this *and* focuses the
+          // field in one go, instead of the first tap being swallowed.
+          //
+          // Sits below the list in the Stack, so a tap inside the list stops
+          // there and never reaches this — otherwise closing on pointer-down
+          // would tear the overlay down before the item's onTap could fire.
+          Positioned.fill(
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) => close(),
+              child: const SizedBox.expand(),
+            ),
+          ),
+          Positioned(
+            left: _triggerOffset.dx,
+            top: _triggerOffset.dy + _triggerSize.height,
+            width: _triggerSize.width,
+            child: Material(
           color: Colors.transparent,
           child: Container(
             constraints: BoxConstraints(maxHeight: 200.h),
@@ -1218,7 +1567,9 @@ class _FloatingDropdownState extends State<_FloatingDropdown> {
               ),
             ),
           ),
-        ),
+            ),
+          ),
+        ],
       ),
     );
 
@@ -1228,6 +1579,10 @@ class _FloatingDropdownState extends State<_FloatingDropdown> {
 
   void _toggle() {
     if (!widget.enabled) return;
+    // Put the keyboard away first. The trigger is a GestureDetector, so its tap
+    // never reaches the unfocus handler on the screen body — leaving the keypad
+    // covering the very list we are about to open.
+    FocusScope.of(context).unfocus();
     if (_isOpen) {
       close();
     } else {
@@ -1238,9 +1593,13 @@ class _FloatingDropdownState extends State<_FloatingDropdown> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
-    final borderColor = widget.enabled
-        ? (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300)
-        : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200);
+    // Error wins over the enabled/disabled pair — a required field the user
+    // must still fill matters more than showing it as inert.
+    final borderColor = widget.hasError
+        ? Colors.red.shade400
+        : widget.enabled
+            ? (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300)
+            : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200);
     final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
     final textColor = widget.enabled
         ? (isDark ? Colors.white : Colors.black87)

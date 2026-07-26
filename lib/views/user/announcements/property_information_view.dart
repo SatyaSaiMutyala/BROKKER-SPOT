@@ -34,8 +34,22 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   String? _totalFloor;
   String? _isProperty;
   final _nameCtrl = TextEditingController();
-  final _sqftCtrl = TextEditingController();
-  final _spmCtrl = TextEditingController();
+  /// One size input; [_sizeUnit] decides which unit it means.
+  final _sizeCtrl = TextEditingController();
+  String _sizeUnit = _unitSqft;
+
+  static const _unitSqft = 'Sqft';
+  static const _unitSqm = 'Sqm';
+  static const _sizeUnits = [_unitSqft, _unitSqm];
+  static const double _sqftPerSqm = 10.7639104;
+
+  double get _sizeValue => double.tryParse(_sizeCtrl.text.trim()) ?? 0;
+  bool get _isSqft => _sizeUnit == _unitSqft;
+
+  // The payload carries both units and the detail screens render each one, so
+  // the unit the user didn't pick is derived rather than left at 0.
+  double get _sqftValue => _isSqft ? _sizeValue : _sizeValue * _sqftPerSqm;
+  double get _sqmValue => _isSqft ? _sizeValue / _sqftPerSqm : _sizeValue;
   final _descCtrl = TextEditingController();
   final Set<String> _selectedAmenityIds = {};
   final _amenityCtrl = AmenityController.to;
@@ -68,11 +82,113 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   double get _uploadProgress =>
       _totalToUpload == 0 ? 0 : _uploadedCount / _totalToUpload;
 
+  // ── Required-field reporting ──────────────────────────────────────────────
+  // The Save button stays visually disabled while the form is incomplete, but
+  // remains tappable so a tap can point at what's missing instead of doing
+  // nothing. Set once the user has tried to submit — errors aren't shown before
+  // that, so a fresh form isn't covered in red.
+  bool _showErrors = false;
+
+  final _propertyForKey = GlobalKey();
+  final _propertyTypeKey = GlobalKey();
+  final _sizeKey = GlobalKey();
+  final _bedroomKey = GlobalKey();
+  final _bathroomKey = GlobalKey();
+  final _floorKey = GlobalKey();
+  final _totalFloorKey = GlobalKey();
+  final _isPropertyKey = GlobalKey();
+  final _completionDateKey = GlobalKey();
+  final _descriptionKey = GlobalKey();
+
+  /// Required fields in the order they appear on screen, so the first entry
+  /// still missing is also the one nearest the top of the form.
+  ///
+  /// The conditional entries mirror the same rules as [_isValid] — "Is Property"
+  /// is hidden for Rent, and the completion date only exists for Off Plan — so
+  /// the two can't disagree about what counts as complete.
+  List<({GlobalKey key, String label, bool missing})> get _requiredFields => [
+        (
+          key: _propertyForKey,
+          label: 'Property For',
+          missing: _propertyFor == null
+        ),
+        (
+          key: _propertyTypeKey,
+          label: 'Property Type',
+          missing: _propertyType == null
+        ),
+        (
+          key: _sizeKey,
+          label: 'Property Size',
+          missing: _sizeCtrl.text.trim().isEmpty
+        ),
+        (key: _bedroomKey, label: 'Bedroom', missing: _bedroom == null),
+        (key: _bathroomKey, label: 'Bathroom', missing: _bathroom == null),
+        (key: _floorKey, label: 'Floor', missing: _floor == null),
+        (
+          key: _totalFloorKey,
+          label: 'Total Floor',
+          missing: _totalFloor == null
+        ),
+        if (_propertyFor != 'Rent')
+          (
+            key: _isPropertyKey,
+            label: 'Is Property',
+            missing: _isProperty == null
+          ),
+        if (_propertyFor != 'Rent' && _isProperty == 'Off Plan')
+          (
+            key: _completionDateKey,
+            label: 'Completion Date',
+            missing: _completionDate == null
+          ),
+        (
+          key: _imageSectionKey,
+          label: 'at least 8 property images',
+          missing: _filledSlotCount < 8
+        ),
+        (
+          key: _descriptionKey,
+          label: 'Property Description',
+          missing: _descCtrl.text.trim().isEmpty
+        ),
+      ];
+
+  /// Save tap. Valid → proceed; invalid → turn on error borders and bring the
+  /// first missing field into view rather than leaving a dead button.
+  void _onSaveTap() {
+    if (_isUploading) return;
+    if (_isValid) {
+      _saveAndNext();
+      return;
+    }
+    setState(() => _showErrors = true);
+    final first =
+        _requiredFields.where((f) => f.missing).firstOrNull;
+    if (first == null) return;
+    // Next frame: the red borders we just triggered change some heights, so
+    // measure after that layout has landed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = first.key.currentContext;
+      if (!mounted || ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+        alignment: 0.2,
+      );
+    });
+    EasyLoading.showToast(
+      'Please add ${first.label}',
+      duration: const Duration(seconds: 2),
+      toastPosition: EasyLoadingToastPosition.bottom,
+    );
+  }
+
   bool get _isValid =>
       _propertyFor != null &&
       _propertyType != null &&
-      _sqftCtrl.text.trim().isNotEmpty &&
-      _spmCtrl.text.trim().isNotEmpty &&
+      _sizeCtrl.text.trim().isNotEmpty &&
       _bedroom != null &&
       _bathroom != null &&
       _floor != null &&
@@ -93,8 +209,16 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
             : null;
     _propertyType = c.propertyType;
     if (c.propertyName != null) _nameCtrl.text = c.propertyName!;
-    if (c.sqft != null) _sqftCtrl.text = c.sqft!.toStringAsFixed(0);
-    if (c.sqm != null) _spmCtrl.text = c.sqm!.toStringAsFixed(0);
+    // Restore into whichever unit actually has a value, preferring sqft since
+    // that's the default. Both are stored, so an existing announcement will
+    // normally have both and shows as sqft.
+    if ((c.sqft ?? 0) > 0) {
+      _sizeUnit = _unitSqft;
+      _sizeCtrl.text = c.sqft!.toStringAsFixed(0);
+    } else if ((c.sqm ?? 0) > 0) {
+      _sizeUnit = _unitSqm;
+      _sizeCtrl.text = c.sqm!.toStringAsFixed(0);
+    }
     _bedroom = _intToCountStr(c.bedrooms);
     _bathroom = _intToCountStr(c.bathrooms);
     _floor = _intToFloorStr(c.floor);
@@ -112,15 +236,13 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
       _existingImageUrls[i] = c.imageUrls[i];
     }
     _descCtrl.addListener(() => setState(() {}));
-    _sqftCtrl.addListener(() => setState(() {}));
-    _spmCtrl.addListener(() => setState(() {}));
+    _sizeCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _sqftCtrl.dispose();
-    _spmCtrl.dispose();
+    _sizeCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
@@ -235,6 +357,31 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
 
   // ── Media pickers ─────────────────────────────────────────────────────────
 
+  // Anchors for scrolling a fresh selection back into view once a picker
+  // returns — see [_revealSection].
+  final _videoSectionKey = GlobalKey();
+  final _imageSectionKey = GlobalKey();
+
+  /// Scrolls the section behind [key] back into view after a pick.
+  ///
+  /// Picking pushes the app to the background and back; on return the form can
+  /// sit at a different offset, leaving the thumbnail the user just chose below
+  /// the fold. Deferred to the next frame so the rebuilt (and now taller)
+  /// section has been laid out before we measure it.
+  void _revealSection(GlobalKey key) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = key.currentContext;
+      if (!mounted || ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+        // Park it near the top — the image grid is far too tall to fit whole.
+        alignment: 0.1,
+      );
+    });
+  }
+
   void _pickVideo(ImageSource source) async {
     final ok = await _ensurePermissions(source: source, needsMicrophone: true);
     if (!ok) return;
@@ -252,6 +399,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
         return;
       }
       setState(() => _videoFile = file);
+      _revealSection(_videoSectionKey);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -284,6 +432,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
               source: ImageSource.camera, imageQuality: 80);
           if (picked != null) {
             setState(() => _imageFiles[index] = File(picked.path));
+            _revealSection(_imageSectionKey);
           }
         } catch (e) {
           if (mounted) {
@@ -311,6 +460,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                 slot++;
               }
             });
+            _revealSection(_imageSectionKey);
           }
         } catch (e) {
           if (mounted) {
@@ -327,6 +477,12 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     required VoidCallback onCamera,
     required VoidCallback onGallery,
   }) {
+    // Drop focus before the sheet opens. The tap that got us here was consumed
+    // by the placeholder's own GestureDetector, so it never reached the unfocus
+    // handler wrapping the body — and a still-focused field makes the keyboard
+    // flash back when the picker hands the activity over, which shifts the
+    // scroll position out from under the user.
+    FocusScope.of(context).unfocus();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
@@ -401,10 +557,11 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
       c.setListingType(_propertyFor == 'Sell' ? 1 : 2);
       c.setInformation(
         propertyType: _propertyType!,
+        propertyTypeId: _propertyTypeCtrl.idForName(_propertyType!),
         propertyName:
             _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
-        sqft: double.tryParse(_sqftCtrl.text.trim()) ?? 0,
-        sqm: double.tryParse(_spmCtrl.text.trim()) ?? 0,
+        sqft: _sqftValue,
+        sqm: _sqmValue,
         bedrooms: int.tryParse(_bedroom!) ?? 0,
         bathrooms: int.tryParse(_bathroom!) ?? 0,
         floor: _parseFloor(_floor),
@@ -459,6 +616,10 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                   ),
                   Expanded(
                     child: SingleChildScrollView(
+                      // Dragging the form closes the keyboard, so the user isn't
+                      // scrolling a half-height viewport with the keypad in the way.
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
                       padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -499,6 +660,8 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                               required: true, isDark: isDark),
                           SizedBox(height: 8.h),
                           OverlayDropdownField(
+                            key: _propertyForKey,
+                            hasError: _showErrors && _propertyFor == null,
                             hint: 'Rent or Sell',
                             value: _propertyFor,
                             items: const ['Rent', 'Sell'],
@@ -518,6 +681,9 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                               required: true, isDark: isDark),
                           SizedBox(height: 8.h),
                           Obx(() => OverlayDropdownField(
+                                key: _propertyTypeKey,
+                                hasError:
+                                    _showErrors && _propertyType == null,
                                 hint: _propertyTypeCtrl.isLoading.value
                                     ? 'Loading...'
                                     : 'Select Now',
@@ -544,23 +710,31 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                               required: true, isDark: isDark),
                           SizedBox(height: 8.h),
                           Row(
+                            key: _sizeKey,
                             children: [
                               Expanded(
-                                child: _textFieldSuffix(
-                                    controller: _sqftCtrl,
-                                    hint: '0',
-                                    suffix: 'Sqft',
-                                    isDark: isDark,
-                                    prefixIcon: Icons.square_foot),
+                                child: _textField(
+                                  controller: _sizeCtrl,
+                                  hint: '0',
+                                  isDark: isDark,
+                                  prefixIcon: Icons.square_foot,
+                                  keyboardType: TextInputType.number,
+                                  hasError: _showErrors &&
+                                      _sizeCtrl.text.trim().isEmpty,
+                                ),
                               ),
                               SizedBox(width: 12.w),
-                              Expanded(
-                                child: _textFieldSuffix(
-                                    controller: _spmCtrl,
-                                    hint: '0',
-                                    suffix: 'Sqm',
-                                    isDark: isDark,
-                                    prefixIcon: Icons.square_foot),
+                              // Fixed width: the unit label is short and never
+                              // needs half the row.
+                              SizedBox(
+                                width: 108.w,
+                                child: OverlayDropdownField(
+                                  hint: _unitSqft,
+                                  value: _sizeUnit,
+                                  items: _sizeUnits,
+                                  onSelect: (v) =>
+                                      setState(() => _sizeUnit = v),
+                                ),
                               ),
                             ],
                           ),
@@ -578,6 +752,9 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                                         required: true, isDark: isDark),
                                     SizedBox(height: 8.h),
                                     OverlayDropdownField(
+                                      key: _bedroomKey,
+                                      hasError:
+                                          _showErrors && _bedroom == null,
                                       hint: '0',
                                       value: _bedroom,
                                       items: _bedroomBathroomCounts,
@@ -597,6 +774,9 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                                         required: true, isDark: isDark),
                                     SizedBox(height: 8.h),
                                     OverlayDropdownField(
+                                      key: _bathroomKey,
+                                      hasError:
+                                          _showErrors && _bathroom == null,
                                       hint: '0',
                                       value: _bathroom,
                                       items: _bedroomBathroomCounts,
@@ -623,6 +803,8 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                                         required: true, isDark: isDark),
                                     SizedBox(height: 8.h),
                                     OverlayDropdownField(
+                                      key: _floorKey,
+                                      hasError: _showErrors && _floor == null,
                                       hint: 'Select Floor',
                                       value: _floor,
                                       items: _floorCounts,
@@ -642,6 +824,9 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                                         required: true, isDark: isDark),
                                     SizedBox(height: 8.h),
                                     OverlayDropdownField(
+                                      key: _totalFloorKey,
+                                      hasError:
+                                          _showErrors && _totalFloor == null,
                                       hint: 'Select Floor',
                                       value: _totalFloor,
                                       items: _floorCounts,
@@ -662,6 +847,8 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                                 required: true, isDark: isDark),
                             SizedBox(height: 8.h),
                             OverlayDropdownField(
+                              key: _isPropertyKey,
+                              hasError: _showErrors && _isProperty == null,
                               hint: 'Select Now',
                               value: _isProperty,
                               items: _isPropertyOptions,
@@ -676,7 +863,14 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                               _label('Completion Date of Property',
                                   required: true, isDark: isDark),
                               SizedBox(height: 8.h),
-                              _datePicker(isDark: isDark),
+                              KeyedSubtree(
+                                key: _completionDateKey,
+                                child: _datePicker(
+                                  isDark: isDark,
+                                  hasError:
+                                      _showErrors && _completionDate == null,
+                                ),
+                              ),
                             ],
                             SizedBox(height: 20.h),
                           ],
@@ -706,6 +900,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                           ),
                           SizedBox(height: 12.h),
                           Stack(
+                            key: _videoSectionKey,
                             children: [
                               GestureDetector(
                                 onTap: _showVideoPicker,
@@ -753,21 +948,37 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                           ),
                           SizedBox(height: 4.h),
                           Text(
-                            '$_filledSlotCount/12 selected',
+                            // No border to redden here — the grid is 12 separate
+                            // tiles — so the count carries the error instead.
+                            _showErrors && _filledSlotCount < 8
+                                ? '$_filledSlotCount/12 selected — add at least 8'
+                                : '$_filledSlotCount/12 selected',
                             style: GoogleFonts.inter(
                               fontSize: 11.sp,
-                              color: Colors.grey.shade500,
+                              color: _showErrors && _filledSlotCount < 8
+                                  ? Colors.red.shade400
+                                  : Colors.grey.shade500,
                             ),
                           ),
                           SizedBox(height: 12.h),
-                          _imageGrid(isDark),
+                          KeyedSubtree(
+                            key: _imageSectionKey,
+                            child: _imageGrid(isDark),
+                          ),
                           SizedBox(height: 24.h),
 
                           // ── Property Description ───────────────────────────────
                           _label('Property Description',
                               required: true, isDark: isDark),
                           SizedBox(height: 8.h),
-                          _descriptionField(isDark: isDark),
+                          KeyedSubtree(
+                            key: _descriptionKey,
+                            child: _descriptionField(
+                              isDark: isDark,
+                              hasError: _showErrors &&
+                                  _descCtrl.text.trim().isEmpty,
+                            ),
+                          ),
                           SizedBox(height: 32.h),
                         ],
                       ),
@@ -778,7 +989,11 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                   Padding(
                     padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
                     child: GestureDetector(
-                      onTap: _isValid && !_isUploading ? _saveAndNext : null,
+                      // Always tappable (unless mid-upload): an invalid tap
+                      // reports what's missing instead of doing nothing. The
+                      // colours below still key off _isValid, so it looks
+                      // disabled exactly as before.
+                      onTap: _isUploading ? null : _onSaveTap,
                       child: Container(
                         width: double.infinity,
                         height: 52.h,
@@ -1045,12 +1260,16 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     required String hint,
     required bool isDark,
     IconData? prefixIcon,
+    TextInputType? keyboardType,
+    bool hasError = false,
   }) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
         border: Border.all(
-          color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+          color: hasError
+              ? Colors.red.shade400
+              : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300),
         ),
         borderRadius: BorderRadius.circular(6.r),
       ),
@@ -1063,6 +1282,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
           Expanded(
             child: TextField(
               controller: controller,
+              keyboardType: keyboardType,
               style: GoogleFonts.inter(
                 fontSize: 13.sp,
                 color: isDark ? Colors.white : Colors.black87,
@@ -1088,72 +1308,14 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     );
   }
 
-  Widget _textFieldSuffix({
-    required TextEditingController controller,
-    required String hint,
-    required String suffix,
-    required bool isDark,
-    IconData? prefixIcon,
-  }) {
+  Widget _descriptionField({required bool isDark, bool hasError = false}) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
         border: Border.all(
-          color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
-        ),
-        borderRadius: BorderRadius.circular(6.r),
-      ),
-      child: Row(
-        children: [
-          if (prefixIcon != null) ...[
-            SizedBox(width: 10.w),
-            Icon(prefixIcon, size: 20.sp, color: AppColors.primary),
-          ],
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              style: GoogleFonts.inter(
-                fontSize: 13.sp,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: GoogleFonts.inter(
-                  fontSize: 13.sp,
-                  color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
-                ),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: true,
-                fillColor: Colors.transparent,
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.only(right: 10.w),
-            child: Text(
-              suffix,
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                color: Colors.grey.shade500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _descriptionField({required bool isDark}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-        border: Border.all(
-          color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+          color: hasError
+              ? Colors.red.shade400
+              : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300),
         ),
         borderRadius: BorderRadius.circular(6.r),
       ),
@@ -1213,7 +1375,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     );
   }
 
-  Widget _datePicker({required bool isDark}) {
+  Widget _datePicker({required bool isDark, bool hasError = false}) {
     return GestureDetector(
       onTap: () async {
         final picked = await showDatePicker(
@@ -1245,7 +1407,9 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
           border: Border.all(
-            color: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+            color: hasError
+                ? Colors.red.shade400
+                : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300),
           ),
           borderRadius: BorderRadius.circular(6.r),
         ),

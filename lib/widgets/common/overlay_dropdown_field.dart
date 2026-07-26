@@ -14,6 +14,10 @@ class OverlayDropdownField extends StatefulWidget {
   final IconData? prefixIcon;
   final double maxPanelHeight;
 
+  /// Draws the field's border red — used to flag a required selection the user
+  /// hasn't made after they've attempted to submit.
+  final bool hasError;
+
   const OverlayDropdownField({
     super.key,
     required this.hint,
@@ -22,6 +26,7 @@ class OverlayDropdownField extends StatefulWidget {
     required this.onSelect,
     this.prefixIcon,
     this.maxPanelHeight = 220,
+    this.hasError = false,
   });
 
   @override
@@ -144,8 +149,9 @@ class _OverlayDropdownFieldState extends State<OverlayDropdownField> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final value = widget.value;
     final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
-    final borderColor =
-        isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
+    final borderColor = widget.hasError
+        ? Colors.red.shade400
+        : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300);
     final textColor = isDark ? Colors.white : Colors.black87;
     final hintColor = isDark ? Colors.grey.shade600 : Colors.grey.shade400;
     final chevronColor = isDark ? Colors.grey.shade500 : Colors.grey.shade500;
