@@ -353,7 +353,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                     SizedBox(height: 8.h),
                     FormSectionTile(
                       stepNumber: 1,
-                      title: 'Property For',
+                      title: 'Property Info',
                       subtitle: _step1Subtitle,
                       icon: Icons.home_outlined,
                       isComplete: _informationSaved && _videoImagesSaved,

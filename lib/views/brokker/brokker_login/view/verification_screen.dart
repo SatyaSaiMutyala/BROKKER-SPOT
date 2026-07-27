@@ -36,8 +36,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
     });
   }
 
-  /// Continue → the announcement list. Same destinations this screen used to
-  /// jump to on its own.
   void _goToMyAnnouncements() {
     if (widget.fromBroker) {
       // Broker dashboard's Announcement tab.
@@ -48,8 +46,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       );
       return;
     }
-    // Clear the stack, seat DashboardView(Account tab) at the bottom, then push
-    // the list on top — so Back from the list lands on Account, not here.
+
     Get.offAll(
       () => const DashboardView(initialIndex: 3),
       transition: Transition.noTransition,
@@ -60,24 +57,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
     });
   }
 
-  /// Back to Home → bottom-nav index 0 on whichever side the user came from.
-  void _goHome() {
-    Get.offAll(
-      () => widget.fromBroker
-          ? BrokerDashBoardView(initialIndex: 0)
-          : const DashboardView(initialIndex: 0),
-      transition: Transition.noTransition,
-      duration: Duration.zero,
-    );
-  }
-
-  /// Back icon / system back → start a brand-new announcement.
-  ///
-  /// The stack is cleared first because the CreateAnnouncementView we arrived
-  /// from still holds its completed step state; returning to it would show a
-  /// finished form for an announcement already submitted. Home is seated
-  /// underneath so Back from the new form has somewhere to go instead of
-  /// leaving the app.
   void _startNewAnnouncement() {
     Get.offAll(
       () => widget.fromBroker
@@ -130,31 +109,29 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   ),
                   SizedBox(height: 16.h),
                   if (widget.isAnnouncement)
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: GoogleFonts.inter(
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w500,
-                          color: textColor,
-                          height: 1.6,
+                    Column(
+                      children: [
+                        Text(
+                          'Congratulations!',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            fontSize: 22.sp,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFB8963E),
+                            height: 1.2,
+                          ),
                         ),
-                        children: [
-                          const TextSpan(text: 'In Process to be live on '),
-                          TextSpan(
-                            text: 'broker platform',
-                            style: GoogleFonts.inter(
-                              fontSize: 15.sp,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFFB8963E),
-                            ),
-                          ),
-                          const TextSpan(
-                            text:
-                                ' shortly, please wait for a few minutes while we are verifying your announcement.',
-                          ),
-                        ],
-                      ),
+                        SizedBox(height: 16.h),
+                        _bulletPoint(
+                          '1. Your announcement is now visible to the Brokker Community.',
+                          textColor,
+                        ),
+                        SizedBox(height: 10.h),
+                        _bulletPoint(
+                          '2. Interested brokers may contact you for approval to share your announcement with their clients.',
+                          textColor,
+                        ),
+                      ],
                     )
                   else
                     Text(
@@ -173,12 +150,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       label: 'Continue',
                       filled: true,
                       onTap: _goToMyAnnouncements,
-                    ),
-                    SizedBox(height: 12.h),
-                    _actionButton(
-                      label: 'Back to Home',
-                      filled: false,
-                      onTap: _goHome,
                     ),
                   ],
                 ],
@@ -213,6 +184,19 @@ class _VerificationScreenState extends State<VerificationScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _bulletPoint(String text, Color textColor) {
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      style: GoogleFonts.inter(
+        fontSize: 14.sp,
+        fontWeight: FontWeight.w400,
+        color: textColor,
+        height: 1.6,
       ),
     );
   }

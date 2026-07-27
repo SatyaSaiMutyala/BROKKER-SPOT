@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
@@ -412,25 +411,7 @@ class AnnouncementController extends GetxController {
     if (includeLookupIds) {
       final resolvedTypeId = _resolveMissingId(propertyTypeId, propertyType,
           () => PropertyTypeController.to.idForName(propertyType!));
-      final common = Get.isRegistered<CommonDataController>()
-          ? Get.find<CommonDataController>()
-          : null;
-      final resolvedCountryId = _resolveMissingId(
-          countryId,
-          country,
-          () =>
-              common?.countries.firstWhereOrNull((c) => c.name == country)?.id);
-      final resolvedCityId = _resolveMissingId(cityId, city,
-          () => common?.cities.firstWhereOrNull((c) => c.name == city)?.id);
-      final resolvedAreaId = _resolveMissingId(areaId, area,
-          () => common?.localities.firstWhereOrNull((l) => l.name == area)?.id);
-
       if (resolvedTypeId != null) body['property_type_id'] = resolvedTypeId;
-      if (resolvedCountryId != null) {
-        body['property_country_id'] = resolvedCountryId;
-      }
-      if (resolvedCityId != null) body['property_city_id'] = resolvedCityId;
-      if (resolvedAreaId != null) body['property_area_id'] = resolvedAreaId;
     }
 
     if (propertyName != null && propertyName!.isNotEmpty) {

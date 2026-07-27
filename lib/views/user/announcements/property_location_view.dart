@@ -2,10 +2,6 @@ import 'dart:io';
 
 import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
 import 'package:brokkerspot/core/constants/app_colors.dart';
-import 'package:brokkerspot/core/controllers/common_data_controller.dart';
-import 'package:brokkerspot/models/city_model.dart';
-import 'package:brokkerspot/models/country_model.dart';
-import 'package:brokkerspot/models/locality_model.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/views/user/announcements/map_picker_view.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
@@ -26,23 +22,13 @@ class PropertyLocationView extends StatefulWidget {
 }
 
 class _PropertyLocationViewState extends State<PropertyLocationView> {
-  late final CommonDataController _ctrl;
   final _addressCtrl = TextEditingController();
-
-  /// Watched so scrolling dismisses an open dropdown. Its overlay is pinned to
-  /// the screen offset captured when it opened, so left alone it would drift
-  /// away from the field it belongs to.
   final _scrollCtrl = ScrollController();
 
-  // ── Location ──────────────────────────────────────────────────────────────
-  CountryModel? _selectedCountry;
-  CityModel? _selectedCity;
-  LocalityModel? _selectedLocality;
-
-  final _countryKey = GlobalKey<_FloatingDropdownState>();
-  final _cityKey = GlobalKey<_FloatingDropdownState>();
-  final _areaKey = GlobalKey<_FloatingDropdownState>();
-
+  // ── Location (populated from Google Map only) ──────────────────────────────
+  String? _country;
+  String? _city;
+  String? _area;
   double? _latitude;
   double? _longitude;
 
@@ -75,9 +61,11 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
 
   // ── Validation ────────────────────────────────────────────────────────────
   bool get _isLocationValid =>
-      _selectedCountry != null &&
-      _selectedCity != null &&
-      _selectedLocality != null &&
+      _latitude != null &&
+      _longitude != null &&
+      _country != null &&
+      _city != null &&
+      _area != null &&
       _addressCtrl.text.trim().isNotEmpty;
 
   bool get _isDocumentsValid {
@@ -92,7 +80,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   }
 
   bool get _isUAE {
-    final name = (_selectedCountry?.name ?? '').toLowerCase();
+    final name = (_country ?? '').toLowerCase();
     return name.contains('uae') ||
         name.contains('united arab emirates') ||
         name.contains('u.a.e');
@@ -107,6 +95,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   // user has tried to submit, so a fresh form isn't covered in red.
   bool _showErrors = false;
 
+  final _locationKey = GlobalKey();
   final _addressKey = GlobalKey();
   final _idDocKey = GlobalKey();
   final _deedDocKey = GlobalKey();
@@ -128,12 +117,11 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   /// [_isValid].
   List<({GlobalKey key, String label, bool missing})> get _requiredFields => [
         (
-          key: _countryKey,
-          label: 'Country',
-          missing: _selectedCountry == null
+          key: _locationKey,
+          label: 'the property location (select on map)',
+          missing: _country == null || _city == null || _area == null ||
+              _latitude == null || _longitude == null
         ),
-        (key: _cityKey, label: 'City', missing: _selectedCity == null),
-        (key: _areaKey, label: 'Area', missing: _selectedLocality == null),
         (
           key: _addressKey,
           label: 'the property address',
@@ -162,7 +150,6 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       return;
     }
     FocusScope.of(context).unfocus();
-    _closeAll();
     setState(() => _showErrors = true);
     final first = _requiredFields.where((f) => f.missing).firstOrNull;
     if (first == null) return;
@@ -186,14 +173,14 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   @override
   void initState() {
     super.initState();
-    _ctrl = CommonDataController.to;
     _addressCtrl.addListener(() => setState(() {}));
-    // Cheap: each close() early-returns unless that dropdown is actually open.
-    _scrollCtrl.addListener(_closeAll);
 
     final c = Get.find<AnnouncementController>();
     _latitude = c.latitude;
     _longitude = c.longitude;
+    _country = c.country;
+    _city = c.city;
+    _area = c.area;
     if (c.address != null) _addressCtrl.text = c.address!;
 
     _propertyFor = c.listingType == 1
@@ -205,196 +192,10 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
     _existingBackUrl = c.passportBackUrl;
     _existingDeedUrl = c.titleDeedUrl;
     _existingNocUrl = c.nocUrl;
-
-    _ctrl.loadCountries().then((_) => _restoreSelections(c));
-  }
-
-  Future<void> _restoreSelections(AnnouncementController c) async {
-    await _applyLocationNames(
-      country: c.country,
-      city: c.city,
-      area: c.area,
-      latitude: c.latitude,
-      longitude: c.longitude,
-    );
-  }
-
-  // ── Place-name reconciliation ─────────────────────────────────────────────
-  // Google's reverse geocode returns its own spellings, which rarely equal the
-  // backend's curated list verbatim. These helpers match loosely so a map pick
-  // can drive the Country / City / Area dropdowns.
-
-  /// Lowercased, stripped of everything but letters and digits, so
-  /// "Dubai - United Arab Emirates" and "dubai united arab emirates" collapse
-  /// together.
-  static String _normalizeName(String s) =>
-      s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-
-  /// Abbreviations Google hands back where the backend stores the long form.
-  static const _nameAliases = <String, String>{
-    'uae': 'unitedarabemirates',
-    'ae': 'unitedarabemirates',
-    'usa': 'unitedstatesofamerica',
-    'us': 'unitedstates',
-    'uk': 'unitedkingdom',
-  };
-
-  static String _canonicalName(String s) {
-    final n = _normalizeName(s);
-    return _nameAliases[n] ?? n;
-  }
-
-  /// Best entry in [items] for [target]: exact canonical hit first, then a
-  /// containment match in either direction ("Dubai" vs "Dubai Emirate").
-  static T? _matchByName<T>(
-    Iterable<T> items,
-    String? target,
-    String Function(T) nameOf,
-  ) {
-    if (target == null) return null;
-    final want = _canonicalName(target);
-    if (want.isEmpty) return null;
-    for (final item in items) {
-      if (_canonicalName(nameOf(item)) == want) return item;
-    }
-    for (final item in items) {
-      final have = _canonicalName(nameOf(item));
-      if (have.isEmpty) continue;
-      if (have.contains(want) || want.contains(have)) return item;
-    }
-    return null;
-  }
-
-  /// How far a locality may sit from the picked point and still be treated as
-  /// the one the user meant.
-  static const double _localityMatchRadiusMetres = 15000;
-
-  /// Nearest locality to [lat]/[lng] within [_localityMatchRadiusMetres].
-  ///
-  /// Neighbourhood names disagree far more often than country or city names, and
-  /// localities are the one list that carries coordinates — so when the name
-  /// lookup misses we can still resolve the area geometrically.
-  LocalityModel? _nearestLocality(double? lat, double? lng) {
-    if (lat == null || lng == null) return null;
-    LocalityModel? best;
-    var bestMetres = double.infinity;
-    for (final l in _ctrl.localities) {
-      if (l.latitude == null || l.longitude == null) continue;
-      final metres =
-          Geolocator.distanceBetween(lat, lng, l.latitude!, l.longitude!);
-      if (metres < bestMetres) {
-        bestMetres = metres;
-        best = l;
-      }
-    }
-    return bestMetres <= _localityMatchRadiusMetres ? best : null;
-  }
-
-  // ── Synthetic entries ─────────────────────────────────────────────────────
-  // When Google names a place the curated list doesn't contain (e.g. "Burj
-  // Khalifa" as an area), carry its name through as an entry with an empty id
-  // rather than leaving the field blank.
-  //
-  // This is only safe because the submitted payload sends place *names*, not
-  // ids — see AnnouncementController.setLocation. The empty id doubles as the
-  // signal that there is no dependent list to fetch for this entry.
-
-  static CountryModel? _syntheticCountry(String? name) {
-    final n = name?.trim() ?? '';
-    return n.isEmpty ? null : CountryModel(id: '', name: n);
-  }
-
-  static CityModel? _syntheticCity(String? name, String countryId) {
-    final n = name?.trim() ?? '';
-    return n.isEmpty ? null : CityModel(id: '', name: n, countryId: countryId);
-  }
-
-  static LocalityModel? _syntheticLocality(
-    String? name,
-    String cityId,
-    String countryId,
-    double? lat,
-    double? lng,
-  ) {
-    final n = name?.trim() ?? '';
-    return n.isEmpty
-        ? null
-        : LocalityModel(
-            id: '',
-            name: n,
-            cityId: cityId,
-            countryId: countryId,
-            latitude: lat,
-            longitude: lng,
-          );
-  }
-
-  /// Selects Country → City → Area from plain place names, loading each
-  /// dependent list in turn (cities need a country id, localities need a city
-  /// id).
-  ///
-  /// Resolution order per field, most trustworthy first: match the curated list,
-  /// then — for Area only — the nearest locality by coordinate, then fall back to
-  /// Google's raw name. The list comes first deliberately, so a real match is
-  /// never bypassed and the data doesn't drift into free text.
-  ///
-  /// Returns the labels that stayed empty because Google supplied no name for
-  /// them at all, so the caller can say what still needs picking by hand.
-  Future<List<String>> _applyLocationNames({
-    String? country,
-    String? city,
-    String? area,
-    double? latitude,
-    double? longitude,
-  }) async {
-    // ── Country ──
-    final matchedCountry =
-        _matchByName(_ctrl.countries, country, (c) => c.name) ??
-            _syntheticCountry(country);
-    if (matchedCountry == null) return const ['Country', 'City', 'Area'];
-    if (!mounted) return const [];
-    setState(() {
-      _selectedCountry = matchedCountry;
-      _selectedCity = null;
-      _selectedLocality = null;
-    });
-
-    // ── City ──
-    if (matchedCountry.id.isEmpty) {
-      // Unknown country → whatever is in `cities` belongs to a different one.
-      // Drop it so the dropdown can't offer mismatched options.
-      _ctrl.cities.clear();
-      _ctrl.localities.clear();
-    } else {
-      await _ctrl.loadCities(matchedCountry.id);
-      if (!mounted) return const [];
-    }
-    final matchedCity = _matchByName(_ctrl.cities, city, (c) => c.name) ??
-        _syntheticCity(city, matchedCountry.id);
-    if (matchedCity == null) return const ['City', 'Area'];
-    setState(() => _selectedCity = matchedCity);
-
-    // ── Area ──
-    if (matchedCity.id.isEmpty) {
-      _ctrl.localities.clear();
-    } else {
-      await _ctrl.loadLocalities(
-          cityId: matchedCity.id, countryId: matchedCountry.id);
-      if (!mounted) return const [];
-    }
-    final matchedLocality =
-        _matchByName(_ctrl.localities, area, (l) => l.name) ??
-            _nearestLocality(latitude, longitude) ??
-            _syntheticLocality(area, matchedCity.id, matchedCountry.id,
-                latitude, longitude);
-    if (matchedLocality == null) return const ['Area'];
-    setState(() => _selectedLocality = matchedLocality);
-    return const [];
   }
 
   @override
   void dispose() {
-    _scrollCtrl.removeListener(_closeAll);
     _scrollCtrl.dispose();
     _addressCtrl.dispose();
     super.dispose();
@@ -435,7 +236,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
               initialPosition: LatLng(pos.latitude, pos.longitude)),
         ),
       );
-      if (result != null) await _applyMapResult(result);
+      if (result != null) _applyMapResult(result);
     } catch (_) {
       EasyLoading.dismiss();
       EasyLoading.showError('Failed to get location');
@@ -452,43 +253,18 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       MaterialPageRoute(
           builder: (_) => MapPickerView(initialPosition: initial)),
     );
-    if (result != null) await _applyMapResult(result);
+    if (result != null) _applyMapResult(result);
   }
 
-  Future<void> _applyMapResult(LocationPickerResult r) async {
+  void _applyMapResult(LocationPickerResult r) {
     setState(() {
-      _addressCtrl.text = r.address;
+      _country = r.country;
+      _city = r.city;
+      _area = r.area;
       _latitude = r.latitude;
       _longitude = r.longitude;
-      _closeAll();
+      _addressCtrl.text = r.address;
     });
-
-    // The country list has to be in memory before anything can be matched
-    // against it — a no-op if initState already loaded it.
-    await _ctrl.loadCountries();
-    final unresolved = await _applyLocationNames(
-      country: r.country,
-      city: r.city,
-      area: r.area,
-      latitude: r.latitude,
-      longitude: r.longitude,
-    );
-    if (!mounted || unresolved.isEmpty) return;
-    // Only fires when the map itself returned no name for these — an unmatched
-    // name is now carried through verbatim rather than dropped. Saying so beats
-    // a silently blank dropdown, which reads as "the map didn't work".
-    EasyLoading.showToast(
-      'The map gave no ${unresolved.join(' or ')} for this point. '
-      'Please choose manually.',
-      duration: const Duration(seconds: 3),
-      toastPosition: EasyLoadingToastPosition.bottom,
-    );
-  }
-
-  void _closeAll() {
-    _countryKey.currentState?.close();
-    _cityKey.currentState?.close();
-    _areaKey.currentState?.close();
   }
 
   // ── Documents ─────────────────────────────────────────────────────────────
@@ -502,21 +278,13 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   }
 
   Future<void> _uploadAndSave() async {
-    // Dismiss the keypad and any open dropdown before the upload overlay and
-    // progress UI take over the screen.
     FocusScope.of(context).unfocus();
-    _closeAll();
 
     final c = Get.find<AnnouncementController>();
     c.setLocation(
-      country: _selectedCountry!.name,
-      city: _selectedCity!.name,
-      area: _selectedLocality!.name,
-      // Empty for a synthetic entry the map supplied that isn't in the curated
-      // list; the controller drops empties rather than sending "".
-      countryId: _selectedCountry!.id,
-      cityId: _selectedCity!.id,
-      areaId: _selectedLocality!.id,
+      country: _country!,
+      city: _city!,
+      area: _area!,
       address: _addressCtrl.text.trim(),
       latitude: _latitude,
       longitude: _longitude,
@@ -638,35 +406,22 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                         ),
                         SizedBox(height: 20.h),
 
-                        // ── Country ──────────────────────────────────────────
+                        // ── Country (read-only, from map) ─────────────────────
                         _label('Country Where Property Exist',
                             required: true, isDark: isDark),
                         SizedBox(height: 8.h),
-                        Obx(() => _FloatingDropdown(
-                              key: _countryKey,
-                              hint: 'Select Now',
-                              value: _selectedCountry?.name,
-                              hasError: _showErrors && _selectedCountry == null,
-                              prefixIcon: Icons.apartment_outlined,
-                              items:
-                                  _ctrl.countries.map((c) => c.name).toList(),
-                              isLoading: _ctrl.isLoadingCountries.value,
-                              isDark: isDark,
-                              onBeforeOpen: _closeAll,
-                              onSelect: (name) {
-                                final country = _ctrl.countries
-                                    .where((c) => c.name == name)
-                                    .firstOrNull;
-                                if (country == null) return;
-                                setState(() {
-                                  _selectedCountry = country;
-                                  _selectedCity = null;
-                                  _selectedLocality = null;
-                                });
-                                _ctrl.loadCities(country.id);
-                              },
-                            )),
-                        SizedBox(height: 20.h),
+                        KeyedSubtree(
+                          key: _locationKey,
+                          child: _readOnlyField(
+                            icon: Icons.apartment_outlined,
+                            value: _country,
+                            hint: 'Select from map',
+                            isDark: isDark,
+                            hasError: _showErrors && _country == null,
+                            onTap: _chooseFromMap,
+                          ),
+                        ),
+                        SizedBox(height: 16.h),
 
                         // ── City + Area side by side ──────────────────────────
                         Row(
@@ -676,41 +431,16 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _label('City Where Property Exist',
-                                      required: true, isDark: isDark),
+                                  _label('City', required: true, isDark: isDark),
                                   SizedBox(height: 8.h),
-                                  Obx(() => _FloatingDropdown(
-                                        key: _cityKey,
-                                        hint: 'Select Now',
-                                        value: _selectedCity?.name,
-                                        hasError: _showErrors &&
-                                            _selectedCity == null,
-                                        prefixIcon: Icons.home_outlined,
-                                        items: _ctrl.cities
-                                            .map((c) => c.name)
-                                            .toList(),
-                                        isLoading: _ctrl.isLoadingCities.value,
-                                        enabled: _selectedCountry != null,
-                                        isDark: isDark,
-                                        onBeforeOpen: _closeAll,
-                                        onSelect: (name) {
-                                          final city = _ctrl.cities
-                                              .where((c) => c.name == name)
-                                              .firstOrNull;
-                                          if (city == null ||
-                                              _selectedCountry == null) {
-                                            return;
-                                          }
-                                          setState(() {
-                                            _selectedCity = city;
-                                            _selectedLocality = null;
-                                          });
-                                          _ctrl.loadLocalities(
-                                            cityId: city.id,
-                                            countryId: _selectedCountry!.id,
-                                          );
-                                        },
-                                      )),
+                                  _readOnlyField(
+                                    icon: Icons.location_city_outlined,
+                                    value: _city,
+                                    hint: 'From map',
+                                    isDark: isDark,
+                                    hasError: _showErrors && _city == null,
+                                    onTap: _chooseFromMap,
+                                  ),
                                 ],
                               ),
                             ),
@@ -719,40 +449,22 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _label('Area Where Property Exist',
-                                      required: true, isDark: isDark),
+                                  _label('Area', required: true, isDark: isDark),
                                   SizedBox(height: 8.h),
-                                  Obx(() => _FloatingDropdown(
-                                        key: _areaKey,
-                                        hint: 'Select Now',
-                                        value: _selectedLocality?.name,
-                                        hasError: _showErrors &&
-                                            _selectedLocality == null,
-                                        prefixIcon: Icons.home_outlined,
-                                        items: _ctrl.localities
-                                            .map((l) => l.name)
-                                            .toList(),
-                                        isLoading:
-                                            _ctrl.isLoadingLocalities.value,
-                                        enabled: _selectedCity != null,
-                                        isDark: isDark,
-                                        onBeforeOpen: _closeAll,
-                                        onSelect: (name) {
-                                          final locality = _ctrl.localities
-                                              .where((l) => l.name == name)
-                                              .firstOrNull;
-                                          if (locality == null) return;
-                                          setState(() {
-                                            _selectedLocality = locality;
-                                          });
-                                        },
-                                      )),
+                                  _readOnlyField(
+                                    icon: Icons.map_outlined,
+                                    value: _area,
+                                    hint: 'From map',
+                                    isDark: isDark,
+                                    hasError: _showErrors && _area == null,
+                                    onTap: _chooseFromMap,
+                                  ),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(height: 20.h),
+                        SizedBox(height: 16.h),
 
                         // ── Address ──────────────────────────────────────────
                         _label('Your Property Full Address',
@@ -1261,6 +973,49 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
     );
   }
 
+  Widget _readOnlyField({
+    required IconData icon,
+    required String? value,
+    required String hint,
+    required bool isDark,
+    required VoidCallback onTap,
+    bool hasError = false,
+  }) {
+    final borderColor = hasError
+        ? Colors.red.shade400
+        : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300);
+    final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? Colors.grey.shade600 : Colors.grey.shade400;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
+        decoration: BoxDecoration(
+          color: bgColor,
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(8.r),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18.sp, color: AppColors.primary),
+            SizedBox(width: 8.w),
+            Expanded(
+              child: Text(
+                value ?? hint,
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  color: value != null ? textColor : hintColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _label(String text, {bool required = false, required bool isDark}) {
     return RichText(
       text: TextSpan(
@@ -1416,239 +1171,6 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FloatingDropdown extends StatefulWidget {
-  final String hint;
-  final String? value;
-  final List<String> items;
-  final bool isDark;
-  final ValueChanged<String> onSelect;
-  final bool isLoading;
-  final bool enabled;
-  final IconData? prefixIcon;
-  final VoidCallback? onBeforeOpen;
-
-  /// Draws the border red to flag a required selection the user hasn't made.
-  final bool hasError;
-
-  const _FloatingDropdown({
-    super.key,
-    required this.hint,
-    required this.value,
-    required this.items,
-    required this.isDark,
-    required this.onSelect,
-    this.isLoading = false,
-    this.enabled = true,
-    this.prefixIcon,
-    this.onBeforeOpen,
-    this.hasError = false,
-  });
-
-  @override
-  State<_FloatingDropdown> createState() => _FloatingDropdownState();
-}
-
-class _FloatingDropdownState extends State<_FloatingDropdown> {
-  bool _isOpen = false;
-  OverlayEntry? _overlay;
-  Offset _triggerOffset = Offset.zero;
-  Size _triggerSize = Size.zero;
-
-  @override
-  void didUpdateWidget(_FloatingDropdown old) {
-    super.didUpdateWidget(old);
-    if (_isOpen) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _isOpen) _overlay?.markNeedsBuild();
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _overlay?.remove();
-    _overlay = null;
-    super.dispose();
-  }
-
-  void close() {
-    if (!_isOpen) return;
-    _overlay?.remove();
-    _overlay = null;
-    if (mounted) setState(() => _isOpen = false);
-  }
-
-  void _open() {
-    widget.onBeforeOpen?.call();
-
-    // Capture exact screen-space bounds of the trigger at the moment of tap.
-    final box = context.findRenderObject() as RenderBox;
-    _triggerOffset = box.localToGlobal(Offset.zero);
-    _triggerSize = box.size;
-
-    final isDark = widget.isDark;
-    final borderColor = isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
-    final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
-
-    _overlay = OverlayEntry(
-      builder: (ctx) => Stack(
-        children: [
-          // Dismiss on any tap outside the list — the address field, a
-          // different control, bare background.
-          //
-          // A Listener, not a GestureDetector: it never enters the gesture
-          // arena, so the tap still reaches whatever was actually tapped.
-          // Tapping the address field therefore closes this *and* focuses the
-          // field in one go, instead of the first tap being swallowed.
-          //
-          // Sits below the list in the Stack, so a tap inside the list stops
-          // there and never reaches this — otherwise closing on pointer-down
-          // would tear the overlay down before the item's onTap could fire.
-          Positioned.fill(
-            child: Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (_) => close(),
-              child: const SizedBox.expand(),
-            ),
-          ),
-          Positioned(
-            left: _triggerOffset.dx,
-            top: _triggerOffset.dy + _triggerSize.height,
-            width: _triggerSize.width,
-            child: Material(
-          color: Colors.transparent,
-          child: Container(
-            constraints: BoxConstraints(maxHeight: 200.h),
-            decoration: BoxDecoration(
-              color: bgColor,
-              border: Border(
-                left: BorderSide(color: borderColor),
-                right: BorderSide(color: borderColor),
-                bottom: BorderSide(color: borderColor),
-              ),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(6.r)),
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: widget.items.map((item) {
-                  final sel = widget.value == item;
-                  return InkWell(
-                    onTap: () {
-                      close();
-                      widget.onSelect(item);
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 14.w, vertical: 13.h),
-                      color: sel
-                          ? AppColors.primary.withValues(alpha: 0.12)
-                          : null,
-                      child: Text(
-                        item,
-                        style: GoogleFonts.inter(
-                          fontSize: 14.sp,
-                          fontWeight: sel ? FontWeight.w600 : FontWeight.w400,
-                          color: sel
-                              ? AppColors.primary
-                              : (isDark ? Colors.white70 : Colors.black87),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    Overlay.of(context).insert(_overlay!);
-    setState(() => _isOpen = true);
-  }
-
-  void _toggle() {
-    if (!widget.enabled) return;
-    // Put the keyboard away first. The trigger is a GestureDetector, so its tap
-    // never reaches the unfocus handler on the screen body — leaving the keypad
-    // covering the very list we are about to open.
-    FocusScope.of(context).unfocus();
-    if (_isOpen) {
-      close();
-    } else {
-      _open();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = widget.isDark;
-    // Error wins over the enabled/disabled pair — a required field the user
-    // must still fill matters more than showing it as inert.
-    final borderColor = widget.hasError
-        ? Colors.red.shade400
-        : widget.enabled
-            ? (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300)
-            : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200);
-    final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
-    final textColor = widget.enabled
-        ? (isDark ? Colors.white : Colors.black87)
-        : (isDark ? Colors.grey.shade600 : Colors.grey.shade400);
-    final hintColor = isDark ? Colors.grey.shade600 : Colors.grey.shade400;
-    final chevronColor = Colors.grey.shade500;
-
-    return GestureDetector(
-      onTap: _toggle,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
-        decoration: BoxDecoration(
-          color: bgColor,
-          border: Border.all(color: borderColor),
-          borderRadius: _isOpen
-              ? BorderRadius.vertical(top: Radius.circular(6.r))
-              : BorderRadius.circular(6.r),
-        ),
-        child: Row(
-          children: [
-            if (widget.prefixIcon != null) ...[
-              Icon(widget.prefixIcon, size: 18.sp, color: AppColors.primary),
-              SizedBox(width: 8.w),
-            ],
-            Expanded(
-              child: Text(
-                widget.value ?? widget.hint,
-                style: GoogleFonts.inter(
-                  fontSize: 14.sp,
-                  color: widget.value != null ? textColor : hintColor,
-                ),
-              ),
-            ),
-            if (widget.isLoading)
-              SizedBox(
-                width: 16.sp,
-                height: 16.sp,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.primary,
-                ),
-              )
-            else
-              Icon(
-                _isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                color: chevronColor,
-                size: 20.sp,
-              ),
-          ],
         ),
       ),
     );

@@ -228,7 +228,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          SizedBox(height: 1.h),
+                          SizedBox(height: 8.h),
                           // Price row — gold price + optional rent period suffix
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -239,7 +239,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                                   fontSize: 27.sp,
                                   fontWeight: FontWeight.w700,
                                   color: const Color(0xFFDBC483),
-                                  height: 1.0,
+                                  height: 0.5,
                                   letterSpacing: 0,
                                 ),
                               ),
@@ -259,7 +259,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                                       fontSize: 15.sp,
                                       fontWeight: FontWeight.w400,
                                       color: Colors.white70,
-                                      height: 1.0,
+                                      height: 0.5,
                                     ),
                                   ),
                                 ),
@@ -268,7 +268,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                           ),
                           // Type row: "For Sell • Apartment" left | pill + circle right
                           Transform.translate(
-                            offset: Offset(0, -7.h),
+                            offset: Offset(0, -0.h),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
@@ -286,7 +286,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                                               fontSize: 17.sp,
                                               fontWeight: FontWeight.w300,
                                               color: const Color(0xFFC8C8C8),
-                                              height: 1.0,
+                                              height: 0.9,
                                               letterSpacing: 0,
                                             ),
                                           ),
@@ -297,7 +297,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                                               fontSize: 17.sp,
                                               fontWeight: FontWeight.w300,
                                               color: Colors.white,
-                                              height: 1.0,
+                                              height: 0.9,
                                               letterSpacing: 0,
                                             ),
                                           ),
@@ -321,7 +321,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                           // Location
                           if (a.location != null)
                             Transform.translate(
-                              offset: Offset(0, -18.h),
+                              offset: Offset(0, -5.h),
                               child: Row(
                                 children: [
                                   Icon(Icons.location_on_rounded,
