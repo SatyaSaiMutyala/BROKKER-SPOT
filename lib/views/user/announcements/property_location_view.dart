@@ -32,6 +32,10 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   double? _latitude;
   double? _longitude;
 
+  // Default map centre — Dubai. Camera animates to the picked point on select.
+  static const _defaultCenter = LatLng(25.2048, 55.2708);
+  GoogleMapController? _mapController;
+
   // ── Documents ─────────────────────────────────────────────────────────────
   String? _propertyFor;
   bool get _isSell => _propertyFor == 'Sell';
@@ -65,8 +69,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       _longitude != null &&
       _country != null &&
       _city != null &&
-      _area != null &&
-      _addressCtrl.text.trim().isNotEmpty;
+      _area != null;
 
   bool get _isDocumentsValid {
     if (_isSell) {
@@ -96,7 +99,6 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   bool _showErrors = false;
 
   final _locationKey = GlobalKey();
-  final _addressKey = GlobalKey();
   final _idDocKey = GlobalKey();
   final _deedDocKey = GlobalKey();
 
@@ -121,11 +123,6 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
           label: 'the property location (select on map)',
           missing: _country == null || _city == null || _area == null ||
               _latitude == null || _longitude == null
-        ),
-        (
-          key: _addressKey,
-          label: 'the property address',
-          missing: _addressCtrl.text.trim().isEmpty
         ),
         if (_isUAE) ...[
           (
@@ -265,6 +262,9 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       _longitude = r.longitude;
       _addressCtrl.text = r.address;
     });
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(r.latitude, r.longitude), 15),
+    );
   }
 
   // ── Documents ─────────────────────────────────────────────────────────────
@@ -406,77 +406,10 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
                         ),
                         SizedBox(height: 20.h),
 
-                        // ── Country (read-only, from map) ─────────────────────
-                        _label('Country Where Property Exist',
-                            required: true, isDark: isDark),
-                        SizedBox(height: 8.h),
+                        // ── Your Location card ────────────────────────────────
                         KeyedSubtree(
                           key: _locationKey,
-                          child: _readOnlyField(
-                            icon: Icons.apartment_outlined,
-                            value: _country,
-                            hint: 'Select from map',
-                            isDark: isDark,
-                            hasError: _showErrors && _country == null,
-                            onTap: _chooseFromMap,
-                          ),
-                        ),
-                        SizedBox(height: 16.h),
-
-                        // ── City + Area side by side ──────────────────────────
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _label('City', required: true, isDark: isDark),
-                                  SizedBox(height: 8.h),
-                                  _readOnlyField(
-                                    icon: Icons.location_city_outlined,
-                                    value: _city,
-                                    hint: 'From map',
-                                    isDark: isDark,
-                                    hasError: _showErrors && _city == null,
-                                    onTap: _chooseFromMap,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(width: 12.w),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _label('Area', required: true, isDark: isDark),
-                                  SizedBox(height: 8.h),
-                                  _readOnlyField(
-                                    icon: Icons.map_outlined,
-                                    value: _area,
-                                    hint: 'From map',
-                                    isDark: isDark,
-                                    hasError: _showErrors && _area == null,
-                                    onTap: _chooseFromMap,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-
-                        // ── Address ──────────────────────────────────────────
-                        _label('Your Property Full Address',
-                            required: true, isDark: isDark),
-                        SizedBox(height: 8.h),
-                        KeyedSubtree(
-                          key: _addressKey,
-                          child: _addressArea(
-                            isDark: isDark,
-                            hasError: _showErrors &&
-                                _addressCtrl.text.trim().isEmpty,
-                          ),
+                          child: _locationCard(isDark),
                         ),
                         SizedBox(height: 24.h),
 
@@ -973,137 +906,136 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
     );
   }
 
-  Widget _readOnlyField({
-    required IconData icon,
-    required String? value,
-    required String hint,
-    required bool isDark,
-    required VoidCallback onTap,
-    bool hasError = false,
-  }) {
+  Widget _locationCard(bool isDark) {
+    final hasLocation = _latitude != null && _longitude != null;
+    final hasError = _showErrors && !hasLocation;
     final borderColor = hasError
         ? Colors.red.shade400
         : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300);
-    final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final hintColor = isDark ? Colors.grey.shade600 : Colors.grey.shade400;
+    final cardBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final labelColor = isDark ? Colors.white : Colors.black87;
+    final addressColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: _chooseFromMap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
         decoration: BoxDecoration(
-          color: bgColor,
+          color: cardBg,
           border: Border.all(color: borderColor),
-          borderRadius: BorderRadius.circular(8.r),
+          borderRadius: BorderRadius.circular(12.r),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 18.sp, color: AppColors.primary),
-            SizedBox(width: 8.w),
-            Expanded(
-              child: Text(
-                value ?? hint,
-                style: GoogleFonts.inter(
-                  fontSize: 13.sp,
-                  color: value != null ? textColor : hintColor,
-                ),
+            // ── Header ──────────────────────────────────────────────────────
+            Padding(
+              padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 10.h),
+              child: Row(
+                children: [
+                  Container(
+                    width: 3.w,
+                    height: 16.h,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Text(
+                    'Your Location',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w500,
+                      color: labelColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Map preview (always visible) ─────────────────────────────────
+            SizedBox(
+              height: 160.h,
+              child: Stack(
+                children: [
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: hasLocation
+                          ? LatLng(_latitude!, _longitude!)
+                          : _defaultCenter,
+                      zoom: hasLocation ? 15 : 10,
+                    ),
+                    onMapCreated: (c) => _mapController = c,
+                    markers: hasLocation
+                        ? {
+                            Marker(
+                              markerId: const MarkerId('selected'),
+                              position: LatLng(_latitude!, _longitude!),
+                            ),
+                          }
+                        : {},
+                    zoomControlsEnabled: false,
+                    zoomGesturesEnabled: false,
+                    scrollGesturesEnabled: false,
+                    rotateGesturesEnabled: false,
+                    tiltGesturesEnabled: false,
+                    myLocationButtonEnabled: false,
+                    liteModeEnabled: true,
+                  ),
+                  // Transparent overlay so tapping the map opens the picker
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: _chooseFromMap,
+                      behavior: HitTestBehavior.translucent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Address text (always visible) ─────────────────────────────────
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(top: 1.h),
+                    child: Icon(
+                      Icons.location_on_rounded,
+                      size: 14.sp,
+                      color: hasLocation
+                          ? AppColors.primary
+                          : Colors.grey.shade400,
+                    ),
+                  ),
+                  SizedBox(width: 6.w),
+                  Expanded(
+                    child: Text(
+                      hasLocation
+                          ? (_addressCtrl.text.isNotEmpty
+                              ? _addressCtrl.text
+                              : [_area, _city, _country]
+                                  .whereType<String>()
+                                  .join(', '))
+                          : 'Use the buttons above to select your location',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        color: hasLocation
+                            ? addressColor
+                            : Colors.grey.shade400,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _label(String text, {bool required = false, required bool isDark}) {
-    return RichText(
-      text: TextSpan(
-        text: text,
-        style: GoogleFonts.inter(
-          fontSize: 13.sp,
-          color: isDark ? Colors.grey.shade300 : Colors.black87,
-        ),
-        children: required
-            ? [
-                TextSpan(
-                    text: ' *', style: GoogleFonts.inter(color: Colors.red))
-              ]
-            : null,
-      ),
-    );
-  }
-
-  Widget _addressArea({required bool isDark, bool hasError = false}) {
-    final borderColor = hasError
-        ? Colors.red.shade400
-        : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300);
-    final charCount = _addressCtrl.text.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-            border: Border.all(color: borderColor),
-            borderRadius: BorderRadius.circular(6.r),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: EdgeInsets.only(left: 12.w, top: 14.h),
-                child: Icon(
-                  Icons.description_outlined,
-                  size: 18.sp,
-                  color: AppColors.primary,
-                ),
-              ),
-              SizedBox(width: 6.w),
-              Expanded(
-                child: TextField(
-                  controller: _addressCtrl,
-                  maxLines: 5,
-                  maxLength: 300,
-                  buildCounter: (_,
-                          {required currentLength,
-                          required isFocused,
-                          maxLength}) =>
-                      null,
-                  style: GoogleFonts.inter(
-                    fontSize: 14.sp,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Write Here...',
-                    hintStyle: GoogleFonts.inter(
-                      fontSize: 14.sp,
-                      color:
-                          isDark ? Colors.grey.shade600 : Colors.grey.shade400,
-                    ),
-                    contentPadding:
-                        EdgeInsets.symmetric(vertical: 14.h, horizontal: 0),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: true,
-                    fillColor: Colors.transparent,
-                  ),
-                ),
-              ),
-              SizedBox(width: 12.w),
-            ],
-          ),
-        ),
-        SizedBox(height: 4.h),
-        Text(
-          '$charCount/300',
-          style: GoogleFonts.inter(
-            fontSize: 11.sp,
-            color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
-          ),
-        ),
-      ],
     );
   }
 

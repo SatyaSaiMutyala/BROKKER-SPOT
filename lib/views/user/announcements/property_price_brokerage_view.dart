@@ -109,7 +109,6 @@ class _PropertyPriceBrokerageViewState
   double get _receiveAmount => _price - _brokerageAmount;
 
   double get _oneMonthRent => _priceType == 'Yearly' ? _price / 12 : _price;
-  double get _rentBrokerageAmount => _oneMonthRent * _brokeragePercent / 100;
 
   @override
   void initState() {
@@ -329,22 +328,15 @@ class _PropertyPriceBrokerageViewState
         SizedBox(height: 8.h),
         KeyedSubtree(key: _availableDateKey, child: _datePicker(isDark)),
         SizedBox(height: 24.h),
-        Text(
-          'Are You want to share brokerage with broker?',
-          style: GoogleFonts.inter(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w500,
-            color: isDark ? Colors.white70 : Colors.black87,
-          ),
-        ),
-        SizedBox(height: 14.h),
-        _label('Set Brokerage', isDark: isDark),
-        SizedBox(height: 8.h),
-        _brokerageStepperRow(isDark),
-        SizedBox(height: 20.h),
         _readOnlyAmountField(
-          label: 'You will receive one Month Brokerage',
-          amount: _rentBrokerageAmount,
+          label: 'You will receive',
+          amount: _oneMonthRent,
+          isDark: isDark,
+        ),
+        SizedBox(height: 16.h),
+        _readOnlyAmountField(
+          label: 'You have to pay commission',
+          amount: _oneMonthRent,
           isDark: isDark,
         ),
         SizedBox(height: 32.h),

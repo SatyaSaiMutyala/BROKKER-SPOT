@@ -98,7 +98,18 @@ class FloatingDropdownState extends State<FloatingDropdown> {
     final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
 
     _overlay = OverlayEntry(
-      builder: (ctx) => Positioned(
+      builder: (ctx) => Stack(
+        children: [
+          // Full-screen dismiss layer — translucent so the tap still reaches
+          // whatever was actually tapped (date picker, another field, etc.).
+          Positioned.fill(
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) => close(),
+              child: const SizedBox.expand(),
+            ),
+          ),
+          Positioned(
         left: _triggerOffset.dx,
         top: _triggerOffset.dy + _triggerSize.height,
         width: _triggerSize.width,
@@ -153,6 +164,8 @@ class FloatingDropdownState extends State<FloatingDropdown> {
             ),
           ),
         ),
+          ),
+        ],
       ),
     );
 

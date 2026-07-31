@@ -74,6 +74,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
 
   AnnouncementModel? _announcement;
 
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+
   @override
   void initState() {
     super.initState();
@@ -161,6 +163,22 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     widget.onSign();
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
+
+    // Broker: navigate directly to publish before touching _signedLocally so
+    // the timeline never flashes on screen.
+    if (!widget.isOwner) {
+      setState(() => _isSigning = false);
+      final a = _announcement;
+      if (a != null) {
+        Get.to(() => AnnouncementDetailView(
+              announcement: a,
+              isOwner: false,
+              publishMode: true,
+            ));
+        return;
+      }
+    }
+
     setState(() {
       _isSigning = false;
       _signedLocally = true;
@@ -196,9 +214,9 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0B0D12);
+    final bgColor = _isDark ? const Color(0xFF0B0D12) : Colors.white;
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Obx(() {
           // Touch the observables so this rebuilds when the broker signs.
@@ -232,6 +250,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   // ── Sign page ───────────────────────────────────────────────────────────────
 
   Widget _buildSignPage() {
+    final isDark = _isDark;
+    final primaryText = isDark ? Colors.white : Colors.black87;
     return Column(
       children: [
         Expanded(
@@ -248,7 +268,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                   style: GoogleFonts.poppins(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: primaryText,
                     height: 1.3,
                   ),
                 ),
@@ -272,7 +292,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                     style: GoogleFonts.poppins(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w500,
-                      color: Colors.white,
+                      color: primaryText,
                     ),
                   ),
                 ),
@@ -293,18 +313,20 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   }
 
   Widget _buildDocumentIcon() {
+    final iconBg = _isDark ? const Color(0x14FFFFFF) : const Color(0x14000000);
+    final iconColor = _isDark ? Colors.white : Colors.black87;
     return Container(
       width: 140.w,
       height: 140.w,
-      decoration: const BoxDecoration(
-        color: Color(0x14FFFFFF),
+      decoration: BoxDecoration(
+        color: iconBg,
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Icon(Icons.description_outlined, color: Colors.white, size: 56.sp),
+          Icon(Icons.description_outlined, color: iconColor, size: 56.sp),
           Positioned(
             right: -6.w,
             bottom: 2.h,
@@ -314,7 +336,10 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
               decoration: BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF0B0D12), width: 2),
+                border: Border.all(
+                  color: _isDark ? const Color(0xFF0B0D12) : Colors.white,
+                  width: 2,
+                ),
               ),
               child: Icon(Icons.verified_user,
                   color: Colors.white, size: 16.sp),
@@ -326,6 +351,11 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   }
 
   Widget _buildViewContractDetails() {
+    final isDark = _isDark;
+    final cardBg = isDark ? const Color(0xFF161A21) : const Color(0xFFF5F5F5);
+    final borderColor = isDark ? const Color(0xFF2A2F38) : Colors.grey.shade200;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final iconColor = isDark ? Colors.white : Colors.black54;
     return GestureDetector(
       onTap: _openContract,
       behavior: HitTestBehavior.opaque,
@@ -333,14 +363,14 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
         width: double.infinity,
         padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 18.h),
         decoration: BoxDecoration(
-          color: const Color(0xFF161A21),
+          color: cardBg,
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: const Color(0xFF2A2F38)),
+          border: Border.all(color: borderColor),
         ),
         child: Row(
           children: [
             Icon(Icons.description_outlined,
-                size: 22.sp, color: Colors.white),
+                size: 22.sp, color: iconColor),
             SizedBox(width: 12.w),
             Expanded(
               child: Text(
@@ -348,7 +378,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                 style: GoogleFonts.poppins(
                   fontSize: 15.sp,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: textColor,
                 ),
               ),
             ),
@@ -390,6 +420,10 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   }
 
   Widget _buildConfirmCheckbox() {
+    final isDark = _isDark;
+    final cardBg = isDark ? const Color(0xFF161A21) : const Color(0xFFF5F5F5);
+    final borderColor = isDark ? const Color(0xFF2A2F38) : Colors.grey.shade200;
+    final textColor = isDark ? Colors.white : Colors.black87;
     return GestureDetector(
       onTap: () => setState(() => _agreed = !_agreed),
       behavior: HitTestBehavior.opaque,
@@ -397,10 +431,10 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
         width: double.infinity,
         padding: EdgeInsets.all(16.w),
         decoration: BoxDecoration(
-          color: const Color(0xFF161A21),
+          color: cardBg,
           borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
-              color: _agreed ? AppColors.primary : const Color(0xFF2A2F38)),
+              color: _agreed ? AppColors.primary : borderColor),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,7 +464,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                 'agreement and agree to the terms and conditions.',
                 style: GoogleFonts.inter(
                   fontSize: 13.sp,
-                  color: Colors.white,
+                  color: textColor,
                   height: 1.5,
                 ),
               ),
@@ -442,9 +476,11 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   }
 
   Widget _buildAcceptButton() {
+    final isDark = _isDark;
     final bottomPad = MediaQuery.of(context).padding.bottom;
+    final containerBg = isDark ? const Color(0xFF0B0D12) : Colors.white;
     return Container(
-      color: const Color(0xFF0B0D12),
+      color: containerBg,
       padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 12.h + bottomPad),
       child: GestureDetector(
         onTap: _isSigning ? null : _onAccept,
@@ -479,12 +515,15 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   // ── Timeline page ───────────────────────────────────────────────────────────
 
   Widget _buildTimeline() {
+    final dividerColor = _isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.grey.shade200;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildPropertyCard(),
-          Divider(height: 1, thickness: 1, color: Colors.white.withValues(alpha: 0.06)),
+          Divider(height: 1, thickness: 1, color: dividerColor),
           SizedBox(height: 20.h),
           _buildTimelineSteps(),
           SizedBox(height: 40.h),
@@ -494,6 +533,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   }
 
   Widget _buildPropertyCard() {
+    final isDark = _isDark;
+    final primaryText = isDark ? Colors.white : Colors.black87;
     final a = _announcement;
     final type = a?.propertyType ?? 'Property';
     final isRent = (a?.listingType ?? 'Rent').toLowerCase() == 'rent';
@@ -523,7 +564,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                         style: GoogleFonts.poppins(
                           fontSize: 16.sp,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: primaryText,
                           height: 1.2,
                         ),
                       ),
@@ -551,7 +592,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                         style: GoogleFonts.poppins(
                           fontSize: 13.sp,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white,
+                          color: primaryText,
                         ),
                       ),
                     ],
@@ -565,7 +606,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                         text: '${a?.currency ?? 'AED'} ',
                         style: GoogleFonts.poppins(
                           fontSize: 13.sp,
-                          color: Colors.white,
+                          color: primaryText,
                         ),
                       ),
                       TextSpan(
@@ -580,7 +621,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                         text: period,
                         style: GoogleFonts.poppins(
                           fontSize: 13.sp,
-                          color: Colors.white,
+                          color: primaryText,
                         ),
                       ),
                     ],
@@ -688,7 +729,14 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     required String subtitle,
     Widget? action,
   }) {
-    final titleColor = done ? Colors.white : Colors.grey.shade500;
+    final isDark = _isDark;
+    final titleColor = done
+        ? (isDark ? Colors.white : Colors.black87)
+        : Colors.grey.shade500;
+    final inactiveCircle = isDark ? const Color(0xFF3A3F47) : Colors.grey.shade300;
+    final inactiveConnector = isDark
+        ? Colors.white.withValues(alpha: 0.35)
+        : Colors.grey.shade300;
 
     return IntrinsicHeight(
       child: Row(
@@ -701,7 +749,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                 height: 30.w,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: done ? AppColors.primary : const Color(0xFF3A3F47),
+                  color: done ? AppColors.primary : inactiveCircle,
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -721,7 +769,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                     margin: EdgeInsets.symmetric(vertical: 4.h),
                     color: connectorDone
                         ? AppColors.primary
-                        : Colors.white.withValues(alpha: 0.35),
+                        : inactiveConnector,
                   ),
                 ),
             ],
@@ -770,13 +818,15 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     required bool enabled,
     required VoidCallback onTap,
   }) {
+    final isDark = _isDark;
+    final disabledBg = isDark ? const Color(0xFF3A3F47) : Colors.grey.shade200;
     return GestureDetector(
       onTap: enabled ? onTap : null,
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
         decoration: BoxDecoration(
-          color: enabled ? AppColors.primary : const Color(0xFF3A3F47),
+          color: enabled ? AppColors.primary : disabledBg,
           borderRadius: BorderRadius.circular(24.r),
         ),
         child: Text(
@@ -795,12 +845,14 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   // ── Shared bits ─────────────────────────────────────────────────────────────
 
   Widget _circleImage(String? url, {required double size, required IconData fallbackIcon}) {
+    final isDark = _isDark;
+    final fallbackBg = isDark ? const Color(0xFF20242C) : Colors.grey.shade100;
     final fallback = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF20242C),
+        color: fallbackBg,
         border: Border.all(color: AppColors.primary, width: 1),
       ),
       alignment: Alignment.center,
