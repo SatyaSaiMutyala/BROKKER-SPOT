@@ -23,6 +23,10 @@ class AppSearchBar extends StatelessWidget {
   /// Hides the trailing filter button when a screen has no filters to open.
   final bool showFilterButton;
 
+  /// Number of active filter facets — drives the badge on the filter button.
+  /// 0 hides the badge.
+  final int filterBadgeCount;
+
   /// Side inset, so a host screen can line the bar up with its own gutter.
   final double? horizontalPadding;
 
@@ -36,6 +40,7 @@ class AppSearchBar extends StatelessWidget {
     this.readOnly = false,
     this.onFilterTap,
     this.showFilterButton = true,
+    this.filterBadgeCount = 0,
     this.horizontalPadding,
   });
 
@@ -54,21 +59,51 @@ class AppSearchBar extends StatelessWidget {
             GestureDetector(
               onTap: onFilterTap,
               behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: 46.w,
-                height: 45.h,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(39.r),
-                  border: Border.all(color: AppColors.primary, width: 1),
-                ),
-                // The asset ships with square-ish corners, so clip it to the
-                // pill shape rather than letting them poke out.
-                clipBehavior: Clip.antiAlias,
-                child: Image.asset(
-                  'assets/images/filter_icon.png',
-                  fit: BoxFit.cover,
-                ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 46.w,
+                    height: 45.h,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(39.r),
+                      border: Border.all(color: AppColors.primary, width: 1),
+                    ),
+                    // The asset ships with square-ish corners, so clip it to
+                    // the pill shape rather than letting them poke out.
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset(
+                      'assets/images/filter_icon.png',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  if (filterBadgeCount > 0)
+                    Positioned(
+                      right: -4.w,
+                      top: -4.h,
+                      child: Container(
+                        constraints: BoxConstraints(minWidth: 18.w),
+                        height: 18.h,
+                        padding: EdgeInsets.symmetric(horizontal: 4.w),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(9.r),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: Text(
+                          '$filterBadgeCount',
+                          style: GoogleFonts.poppins(
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ],

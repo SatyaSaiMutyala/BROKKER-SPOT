@@ -3,6 +3,7 @@ import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/models/amenity_model.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/models/property_filter_model.dart';
 import 'package:brokkerspot/models/property_type_model.dart';
 
 class AnnouncementRepository {
@@ -72,11 +73,12 @@ class AnnouncementRepository {
   }
 
   Future<({List<AnnouncementModel> items, List<Map<String, dynamic>> raw, int totalRecords, int totalPages, int page})>
-      fetchAllAnnouncements({int page = 1, int perPage = 10, int? userRole}) async {
+      fetchAllAnnouncements({int page = 1, int perPage = 10, int? userRole, PropertyFilter? filter}) async {
     final roleQuery = userRole != null ? '&user_role=$userRole' : '';
+    final filterQuery = filter?.toQueryString() ?? '';
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.fetchAllAnnouncements}?page=$page&perPage=$perPage$roleQuery',
+          '${api.baseUrl}${ApiEndpoints.fetchAllAnnouncements}?page=$page&perPage=$perPage$roleQuery$filterQuery',
       headers: api.buildHeaders(),
     );
     final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -98,10 +100,11 @@ class AnnouncementRepository {
   /// Fetches announcements for unauthenticated (guest) users.
   /// Uses the public `/guest/announcements/fetch-all` endpoint — no auth header.
   Future<({List<AnnouncementModel> items, List<Map<String, dynamic>> raw, int totalRecords, int totalPages, int page})>
-      fetchGuestAnnouncements({int page = 1, int perPage = 10, int userRole = 1}) async {
+      fetchGuestAnnouncements({int page = 1, int perPage = 10, int userRole = 1, PropertyFilter? filter}) async {
+    final filterQuery = filter?.toQueryString() ?? '';
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.guestFetchAllAnnouncements}?page=$page&perPage=$perPage&user_role=$userRole',
+          '${api.baseUrl}${ApiEndpoints.guestFetchAllAnnouncements}?page=$page&perPage=$perPage&user_role=$userRole$filterQuery',
       headers: api.buildHeader(),
     );
     final json = jsonDecode(response.body) as Map<String, dynamic>;

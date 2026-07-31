@@ -148,7 +148,8 @@ class _HomeViewState extends State<HomeView> {
                           readOnly: true,
                           horizontalPadding: _gutter,
                           onTap: () => Get.to(() => const SearchView()),
-                          onFilterTap: () => Get.to(() => const SearchView()),
+                          onFilterTap: () => Get.to(
+                              () => const SearchView(openFilterOnLoad: true)),
                         ),
                         SizedBox(height: 12.h),
                         _buildFilterBar(),

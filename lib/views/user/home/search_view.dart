@@ -1,67 +1,68 @@
-import 'package:brokkerspot/models/announcement_model.dart';
-import 'package:brokkerspot/widgets/announcements/announcement_filter_bar.dart';
+import 'package:brokkerspot/models/property_filter_model.dart';
+import 'package:brokkerspot/views/user/home/controller/property_search_controller.dart';
+import 'package:brokkerspot/views/user/home/filter_view.dart';
 import 'package:brokkerspot/widgets/common/app_search_bar.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
-import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 
+/// Server-driven property search. The search bar feeds the `search` query
+/// param; the filter button opens [FilterView] and its returned facets are
+/// applied via [PropertySearchController.applyFacets]. Results, paging and
+/// loading state all live in the controller — this screen only renders them.
 class SearchView extends StatefulWidget {
-  const SearchView({super.key});
+  /// When true (e.g. entered via Home's filter icon), the Filter screen is
+  /// pushed automatically once results have started loading.
+  final bool openFilterOnLoad;
+
+  const SearchView({super.key, this.openFilterOnLoad = false});
 
   @override
   State<SearchView> createState() => _SearchViewState();
 }
 
 class _SearchViewState extends State<SearchView> {
+  final _ctrl = PropertySearchController.to;
   final _searchCtrl = TextEditingController();
-  final _announcementCtrl = AnnouncementListController.to;
-
-  String? _selectedListingType; // null=all, 'Sell'=Buy, 'Rent'=Rent
-  String? _selectedPropertyType;
+  final _scrollCtrl = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    // Reflect any search text already applied (e.g. re-entering the screen).
+    _searchCtrl.text = _ctrl.filter.value.search ?? '';
+    _scrollCtrl.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _announcementCtrl.allAnnouncements.isEmpty) {
-        _announcementCtrl.loadAll();
-      }
+      if (!mounted) return;
+      _ctrl.ensureLoaded();
+      if (widget.openFilterOnLoad) _openFilter();
     });
-    _searchCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
 
-  List<AnnouncementModel> _filtered(List<AnnouncementModel> all) {
-    var list = all;
-    final q = _searchCtrl.text.trim().toLowerCase();
-    if (q.isNotEmpty) {
-      list = list.where((a) {
-        return (a.location?.toLowerCase().contains(q) ?? false) ||
-            (a.propertyName?.toLowerCase().contains(q) ?? false) ||
-            (a.propertyType?.toLowerCase().contains(q) ?? false);
-      }).toList();
+  void _onScroll() {
+    if (_scrollCtrl.position.pixels >=
+        _scrollCtrl.position.maxScrollExtent - 300) {
+      _ctrl.loadMore();
     }
-    if (_selectedListingType != null) {
-      list = list.where((a) => a.listingType == _selectedListingType).toList();
-    }
-    if (_selectedPropertyType != null) {
-      list = list
-          .where((a) =>
-              a.propertyType?.toLowerCase() ==
-              _selectedPropertyType!.toLowerCase())
-          .toList();
-    }
-    return list;
+  }
+
+  Future<void> _openFilter() async {
+    final result = await Get.to<PropertyFilter>(
+      () => FilterView(initial: _ctrl.filter.value),
+    );
+    if (result != null) _ctrl.applyFacets(result);
   }
 
   @override
@@ -76,7 +77,6 @@ class _SearchViewState extends State<SearchView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header ─────────────────────────────────────────────────────
             const CustomHeader(title: 'Search', showBackButton: true),
             SizedBox(height: 14.h),
 
@@ -100,22 +100,16 @@ class _SearchViewState extends State<SearchView> {
             ),
             SizedBox(height: 14.h),
 
-            // ── Search bar + filter button ──────────────────────────────────
-            AppSearchBar(controller: _searchCtrl),
-            SizedBox(height: 12.h),
+            // ── Search bar + filter button (with active-facet badge) ────────
+            Obx(() => AppSearchBar(
+                  controller: _searchCtrl,
+                  onChanged: _ctrl.onSearchChanged,
+                  onFilterTap: _openFilter,
+                  filterBadgeCount: _ctrl.filter.value.activeCount,
+                )),
+            SizedBox(height: 14.h),
 
-            // ── Filter chips ────────────────────────────────────────────────
-            AnnouncementFilterBar(
-              selectedListingType: _selectedListingType,
-              selectedPropertyType: _selectedPropertyType,
-              onListingTypeChanged: (val) =>
-                  setState(() => _selectedListingType = val),
-              onPropertyTypeChanged: (type) =>
-                  setState(() => _selectedPropertyType = type),
-            ),
-            SizedBox(height: 12.h),
-
-            // ── Results list ────────────────────────────────────────────────
+            // ── Results ─────────────────────────────────────────────────────
             Expanded(child: _buildResults(isDark)),
           ],
         ),
@@ -125,42 +119,128 @@ class _SearchViewState extends State<SearchView> {
 
   Widget _buildResults(bool isDark) {
     return Obx(() {
-      final all = _announcementCtrl.allAnnouncements.toList();
-      if (_announcementCtrl.isLoadingAll.value && all.isEmpty) {
+      final items = _ctrl.results.toList();
+
+      if (_ctrl.isLoading.value && items.isEmpty) {
         return _buildShimmer(isDark);
       }
-      final items = _filtered(all);
-      if (items.isEmpty) {
-        return Center(
-          child: Text(
-            'No results found',
-            style: GoogleFonts.poppins(
-                fontSize: 14.sp, color: Colors.grey.shade400),
-          ),
+
+      if (_ctrl.error.value != null && items.isEmpty) {
+        return _buildEmpty(
+          isDark,
+          title: 'Something went wrong',
+          subtitle: _ctrl.error.value!,
+          onRetry: _ctrl.refreshResults,
         );
       }
-      return ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => SizedBox(height: 16.h),
-        itemBuilder: (_, i) {
-          final a = items[i];
-          return RepaintBoundary(
-            child: HomeAnnouncementCard(
-              announcement: a,
-              index: i,
-              cardWidth: 344.w,
-              cardHeight: 263.h,
-              onTap: () => Get.to(() => AnnouncementDetailView(
-                    announcement: a,
-                    isOwner: false,
-                  )),
-            ),
-          );
-        },
+
+      if (items.isEmpty) {
+        return _buildEmpty(
+          isDark,
+          title: 'No results found',
+          subtitle: 'Try adjusting your search or filters.',
+        );
+      }
+
+      return RefreshIndicator(
+        onRefresh: _ctrl.refreshResults,
+        color: Theme.of(context).colorScheme.primary,
+        child: ListView.separated(
+          controller: _scrollCtrl,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),
+          itemCount: items.length + (_ctrl.isLoadingMore.value ? 1 : 0),
+          separatorBuilder: (_, __) => SizedBox(height: 16.h),
+          itemBuilder: (_, i) {
+            if (i >= items.length) {
+              return Padding(
+                padding: EdgeInsets.symmetric(vertical: 16.h),
+                child: Center(
+                  child: SizedBox(
+                    width: 22.w,
+                    height: 22.w,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              );
+            }
+            final a = items[i];
+            return RepaintBoundary(
+              child: HomeAnnouncementCard(
+                announcement: a,
+                index: i,
+                cardWidth: 344.w,
+                cardHeight: 263.h,
+                onTap: () => Get.to(() => AnnouncementDetailView(
+                      announcement: a,
+                      isOwner: false,
+                    )),
+              ),
+            );
+          },
+        ),
       );
     });
+  }
+
+  Widget _buildEmpty(
+    bool isDark, {
+    required String title,
+    required String subtitle,
+    VoidCallback? onRetry,
+  }) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: 120.h),
+        Center(
+          child: Column(
+            children: [
+              Icon(Icons.search_off_rounded,
+                  size: 48.sp, color: Colors.grey.shade400),
+              SizedBox(height: 12.h),
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+              SizedBox(height: 6.h),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 40.w),
+                child: Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12.sp,
+                    color: Colors.grey.shade400,
+                  ),
+                ),
+              ),
+              if (onRetry != null) ...[
+                SizedBox(height: 14.h),
+                TextButton(
+                  onPressed: onRetry,
+                  child: Text(
+                    'Retry',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildShimmer(bool isDark) {
