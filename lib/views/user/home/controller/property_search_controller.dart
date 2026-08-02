@@ -115,7 +115,7 @@ class PropertySearchController extends GetxController {
     final f = filter.value;
     return LocalStorageService.isLoggedIn()
         ? _repo.fetchAllAnnouncements(
-            page: page, perPage: _perPage, userRole: 1, filter: f)
+            page: page, perPage: _perPage, filter: f)
         : _repo.fetchGuestAnnouncements(
             page: page, perPage: _perPage, filter: f);
   }

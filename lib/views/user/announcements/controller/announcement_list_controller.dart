@@ -115,7 +115,7 @@ class AnnouncementListController extends GetxController {
       isLoadingAll.value = true;
       allError.value = null;
       final result = LocalStorageService.isLoggedIn()
-          ? await _repo.fetchAllAnnouncements(page: 1, perPage: _allPerPage, userRole: 1)
+          ? await _repo.fetchAllAnnouncements(page: 1, perPage: _allPerPage)
           : await _repo.fetchGuestAnnouncements(page: 1, perPage: _allPerPage);
       allAnnouncements.assignAll(result.items);
       _allPage = result.page;
@@ -140,7 +140,7 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingMoreAll.value = true;
       final result = LocalStorageService.isLoggedIn()
-          ? await _repo.fetchAllAnnouncements(page: next, perPage: _allPerPage, userRole: 1)
+          ? await _repo.fetchAllAnnouncements(page: next, perPage: _allPerPage)
           : await _repo.fetchGuestAnnouncements(page: next, perPage: _allPerPage);
       allAnnouncements.addAll(result.items);
       _allPage = result.page;
@@ -159,7 +159,7 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingBroker.value = true;
       brokerError.value = null;
-      final result = await _repo.fetchAllAnnouncements(userRole: 2);
+      final result = await _repo.fetchAllAnnouncements();
       brokerAnnouncements.assignAll(result.items);
       _brokerLoaded = true;
     } catch (e) {
@@ -198,7 +198,7 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingMine.value = true;
       myError.value = null;
-      final result = await _repo.fetchAnnouncements(status: status, userRole: 1);
+      final result = await _repo.fetchAnnouncements(status: status);
       _mineCache[status] = result.items;
       _mineLoaded = true;
       AnnouncementCache.saveList(AnnouncementCache.keyMine(status), result.raw);
@@ -230,7 +230,7 @@ class AnnouncementListController extends GetxController {
       isLoadingHome.value = true;
       homeError.value = null;
       final result = LocalStorageService.isLoggedIn()
-          ? await _repo.fetchAllAnnouncements(page: 1, perPage: 5, userRole: 1)
+          ? await _repo.fetchAllAnnouncements(page: 1, perPage: 5)
           : await _repo.fetchGuestAnnouncements(page: 1, perPage: 5);
       homeAnnouncements.assignAll(result.items);
       AnnouncementCache.saveList(AnnouncementCache.keyHome, result.raw);
