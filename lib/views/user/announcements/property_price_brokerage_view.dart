@@ -19,7 +19,7 @@ class PropertyPriceBrokerageView extends StatefulWidget {
 class _PropertyPriceBrokerageViewState
     extends State<PropertyPriceBrokerageView> {
   final _priceCtrl = TextEditingController();
-  int _brokeragePercent = 2;
+  int _brokeragePercent = 0;
 
   String? _priceType;
   DateTime? _availableDate;
@@ -38,6 +38,7 @@ class _PropertyPriceBrokerageViewState
   // can point at what's missing instead of doing nothing. Only set once the user
   // has tried to submit, so a fresh form isn't covered in red.
   bool _showErrors = false;
+  bool _commissionEnabled = false;
 
   final _priceKey = GlobalKey();
   final _priceTypeKey = GlobalKey();
@@ -109,6 +110,7 @@ class _PropertyPriceBrokerageViewState
   double get _receiveAmount => _price - _brokerageAmount;
 
   double get _oneMonthRent => _priceType == 'Yearly' ? _price / 12 : _price;
+
 
   @override
   void initState() {
@@ -261,21 +263,25 @@ class _PropertyPriceBrokerageViewState
         SizedBox(height: 8.h),
         KeyedSubtree(key: _priceKey, child: _priceField(isDark)),
         SizedBox(height: 24.h),
-        _label('Set Brokerage', isDark: isDark),
-        SizedBox(height: 8.h),
-        _brokerageStepperRow(isDark),
-        SizedBox(height: 20.h),
-        _readOnlyAmountField(
-          label: 'You will receive Brokerage',
-          amount: _brokerageAmount,
-          isDark: isDark,
-        ),
-        SizedBox(height: 16.h),
-        _readOnlyAmountField(
-          label: 'You have to pay owner',
-          amount: _receiveAmount,
-          isDark: isDark,
-        ),
+        _commissionToggleRow(isDark),
+        if (_commissionEnabled) ...[
+          SizedBox(height: 20.h),
+          _label('Set Brokerage', isDark: isDark),
+          SizedBox(height: 8.h),
+          _brokerageStepperRow(isDark),
+          SizedBox(height: 20.h),
+          _readOnlyAmountField(
+            label: 'You will receive',
+            amount: _receiveAmount,
+            isDark: isDark,
+          ),
+          SizedBox(height: 16.h),
+          _readOnlyAmountField(
+            label: 'You have to pay commission',
+            amount: _brokerageAmount,
+            isDark: isDark,
+          ),
+        ],
         SizedBox(height: 32.h),
       ],
     );
@@ -328,17 +334,21 @@ class _PropertyPriceBrokerageViewState
         SizedBox(height: 8.h),
         KeyedSubtree(key: _availableDateKey, child: _datePicker(isDark)),
         SizedBox(height: 24.h),
+        _commissionToggleRow(isDark),
+        SizedBox(height: 16.h),
         _readOnlyAmountField(
           label: 'You will receive',
           amount: _oneMonthRent,
           isDark: isDark,
         ),
-        SizedBox(height: 16.h),
-        _readOnlyAmountField(
-          label: 'You have to pay commission',
-          amount: _oneMonthRent,
-          isDark: isDark,
-        ),
+        if (_commissionEnabled) ...[
+          SizedBox(height: 16.h),
+          _readOnlyAmountField(
+            label: 'You have to pay commission',
+            amount: _oneMonthRent,
+            isDark: isDark,
+          ),
+        ],
         SizedBox(height: 32.h),
       ],
     );
@@ -473,6 +483,63 @@ class _PropertyPriceBrokerageViewState
           color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
         ),
         child: Icon(icon, color: AppColors.primary, size: 18.sp),
+      ),
+    );
+  }
+
+  Widget _commissionToggleRow(bool isDark) {
+    final borderColor =
+        isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
+    final textColor = isDark ? Colors.grey.shade300 : Colors.black87;
+    final subColor = isDark ? Colors.grey.shade500 : Colors.grey.shade600;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Broker Commission',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                    height: 1.2,
+                  ),
+                ),
+                SizedBox(height: 3.h),
+                Text(
+                  'Enable to include broker commission in the price breakdown.',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    color: subColor,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Transform.scale(
+            scale: 0.85,
+            child: Switch(
+              value: _commissionEnabled,
+              onChanged: (v) => setState(() {
+                _commissionEnabled = v;
+                if (!v) _brokeragePercent = 0;
+              }),
+              activeThumbColor: AppColors.primary,
+              activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
+            ),
+          ),
+        ],
       ),
     );
   }

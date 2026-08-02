@@ -37,11 +37,19 @@ class AnnouncementDetailView extends StatefulWidget {
   /// owner/broker controls.
   final bool publishMode;
 
+  /// Broker's pre-agreement preview: shows the property with a "Next" button.
+  /// Tapping Next calls [onPreviewNext] — the caller navigates to the
+  /// agreement screen from there.
+  final bool previewMode;
+  final VoidCallback? onPreviewNext;
+
   const AnnouncementDetailView({
     super.key,
     required this.announcement,
     this.isOwner = true,
     this.publishMode = false,
+    this.previewMode = false,
+    this.onPreviewNext,
   });
 
   @override
@@ -53,6 +61,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   int _tabIndex = 0;
   bool _descExpanded = false;
   bool _isDeleting = false;
+  bool _commissionEnabled = false;
 
   late AnnouncementModel _data;
   late final PageController _pageController;
@@ -651,25 +660,26 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Heart / wishlist icon
-                        Obx(() {
-                          final isWishlisted =
-                              _wishlistCtrl.isWishlisted(_data.id ?? '');
-                          return CustomIconButton(
-                            isDark: true,
-                            size: 35,
-                            onTap: _onWishlistTap,
-                            child: Icon(
-                              isWishlisted
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              size: 26.sp,
-                              color: isWishlisted
-                                  ? Colors.red.shade400
-                                  : Colors.white,
-                            ),
-                          );
-                        }),
+                        // Heart / wishlist icon — hidden on own announcements
+                        if (!widget.isOwner)
+                          Obx(() {
+                            final isWishlisted =
+                                _wishlistCtrl.isWishlisted(_data.id ?? '');
+                            return CustomIconButton(
+                              isDark: true,
+                              size: 35,
+                              onTap: _onWishlistTap,
+                              child: Icon(
+                                isWishlisted
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                size: 26.sp,
+                                color: isWishlisted
+                                    ? Colors.red.shade400
+                                    : Colors.white,
+                              ),
+                            );
+                          }),
                         SizedBox(height: 10.h),
                         GestureDetector(
                           onTap: (hasImages || hasVideo)
@@ -1028,6 +1038,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
           SizedBox(height: 10.h),
         ],
         _buildPropertyDetailsSection(a, isDark),
+        if (a.brokkeragePercent != null && (a.brokkeragePercent ?? 0) > 0) ...[
+          SizedBox(height: 10.h),
+          _buildCommissionCard(a, isDark),
+        ],
         if ((a.amenities ?? []).isNotEmpty) ...[
           SizedBox(height: 10.h),
           Obx(() {
@@ -1305,6 +1319,147 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
   // ── Amenities section ────────────────────────────────────────────────────────
 
+  Widget _buildCommissionCard(AnnouncementModel a, bool isDark) {
+    final percent = (a.brokkeragePercent ?? 0).toDouble();
+    final price = a.price ?? 0;
+    final commission = (price * percent) / 100;
+    final receive = price - commission;
+    final currency = a.currency ?? 'AED';
+
+    final borderColor = isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
+    final cardBg = isDark ? const Color(0xFF0E1118) : Colors.white;
+    final primaryText = isDark ? Colors.white : const Color(0xFF252525);
+    final subText = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row: title + toggle
+          Row(
+            children: [
+              Container(
+                width: 3.w,
+                height: 21.h,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Text(
+                  'Broker Commission',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w500,
+                    color: primaryText,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+              Transform.scale(
+                scale: 0.85,
+                child: Switch(
+                  value: _commissionEnabled,
+                  onChanged: (v) => setState(() => _commissionEnabled = v),
+                  activeThumbColor: AppColors.primary,
+                  activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            'Toggle to see a breakdown of the ${percent.toStringAsFixed(0)}% broker commission on this property.',
+            style: GoogleFonts.inter(
+              fontSize: 12.sp,
+              color: subText,
+              height: 1.4,
+            ),
+          ),
+          if (_commissionEnabled) ...[
+            SizedBox(height: 14.h),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: borderColor,
+            ),
+            SizedBox(height: 14.h),
+            // You will receive row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.account_balance_wallet_outlined,
+                        size: 16.sp, color: AppColors.primary),
+                    SizedBox(width: 8.w),
+                    Text(
+                      'You will receive',
+                      style: GoogleFonts.inter(
+                        fontSize: 13.sp,
+                        color: subText,
+                        height: 1.0,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '$currency ${_formatPrice(receive)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF2E7D32),
+                    height: 1.0,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12.h),
+            // Commission row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.payments_outlined,
+                        size: 16.sp, color: Colors.orange.shade600),
+                    SizedBox(width: 8.w),
+                    Text(
+                      'You have to pay commission',
+                      style: GoogleFonts.inter(
+                        fontSize: 13.sp,
+                        color: subText,
+                        height: 1.0,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '$currency ${_formatPrice(commission)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.orange.shade700,
+                    height: 1.0,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildAmenitiesSection(List<String> amenities, bool isDark) {
     final borderColor =
         isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
@@ -1515,6 +1670,43 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
   // ── Bottom bar ───────────────────────────────────────────────────────────────
 
+  Widget _buildPreviewNextBar(bool isDark, double bottomPad) {
+    final barBg = isDark ? const Color(0xFF0B0D12) : Colors.white;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 12.h + bottomPad),
+      decoration: BoxDecoration(
+        color: barBg,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: GestureDetector(
+        onTap: widget.onPreviewNext,
+        child: Container(
+          width: double.infinity,
+          height: 54.h,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(30.r),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            'Next',
+            style: GoogleFonts.poppins(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSignAndPublishBar(
       AnnouncementModel a, bool isDark, double bottomPad) {
     final barBg = isDark ? const Color(0xFF0B0D12) : Colors.white;
@@ -1575,6 +1767,9 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       ),
     ];
 
+    if (widget.previewMode) {
+      return _buildPreviewNextBar(isDark, bottomPad);
+    }
     if (widget.publishMode) {
       return _buildSignAndPublishBar(a, isDark, bottomPad);
     }

@@ -11,6 +11,9 @@ import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/models/chat_message.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_controller.dart';
 import 'package:brokkerspot/views/user/announcements/broker_agreement_view.dart';
+import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
+import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
+import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
 
 class AnnouncementChatView extends StatefulWidget {
@@ -360,8 +363,8 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           text = 'Owner signed. Sign the contract to advertise this property.';
           button = _bannerButton(
             icon: Icons.article_outlined,
-            label: 'Sign Contract',
-            onTap: () => _openAgreementFlow(isOwner: false),
+            label: 'Sign & Publish',
+            onTap: () => _openBrokerPreviewFlow(),
             color: AppColors.primary,
           );
         case 2:
@@ -447,17 +450,37 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     );
   }
 
-  void _openAgreementFlow({required bool isOwner}) {
+  Future<void> _openBrokerPreviewFlow() async {
+    AnnouncementModel? announcement;
+    try {
+      announcement = await AnnouncementRepository()
+          .fetchAnnouncementDetail(widget.announcementId);
+    } catch (_) {
+      Get.snackbar('Error', 'Could not load announcement preview.',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    Get.to(() => AnnouncementDetailView(
+          announcement: announcement!,
+          isOwner: false,
+          previewMode: true,
+          onPreviewNext: () =>
+              _openAgreementFlow(isOwner: false, acceptAndPublish: true),
+        ));
+  }
+
+  void _openAgreementFlow(
+      {required bool isOwner, bool acceptAndPublish = false}) {
     Get.to(() => BrokerAgreementView(
           announcementId: widget.announcementId,
           isOwner: isOwner,
-          onSign:
-              isOwner ? _chat.approveProposal : _chat.brokerAcceptProposal,
+          onSign: isOwner ? _chat.approveProposal : _chat.brokerAcceptProposal,
           proposalStatus: _chat.proposalStatus,
           agreementUrl: _chat.agreementUrl,
           counterpartyName: widget.brokerName,
           counterpartyAvatar: widget.brokerAvatar,
           onRefreshStatus: _chat.refreshProposal,
+          acceptAndPublish: acceptAndPublish,
         ));
   }
 

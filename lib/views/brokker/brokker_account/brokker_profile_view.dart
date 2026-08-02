@@ -175,7 +175,8 @@ class BrokerProfileView extends StatelessWidget {
                           theme,
                           'assets/images/broker_announcement.png',
                           'My Announcements',
-                          () => Get.to(() => const BrokerProjectsView(showMineOnly: true)),
+                          () => Get.to(() =>
+                              const BrokerProjectsView(showMineOnly: true)),
                         ),
                         // _menuItem(
                         //   theme,

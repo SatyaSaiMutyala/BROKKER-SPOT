@@ -44,7 +44,7 @@ class AnnouncementController extends GetxController {
 
   double? price;
   String currency = 'AED';
-  int brokeragePercent = 2;
+  int brokeragePercent = 0;
   String? rentPeriod;
   DateTime? availableDate;
 
@@ -180,7 +180,7 @@ class AnnouncementController extends GetxController {
     thumbnailUrl = a.propertyMedia?.thumbnail;
     price = a.price;
     currency = a.currency ?? 'AED';
-    brokeragePercent = a.brokkeragePercent ?? 2;
+    brokeragePercent = a.brokkeragePercent ?? 0;
     rentPeriod = a.rentPeriod;
     availableDate =
         a.availableDate != null ? DateTime.tryParse(a.availableDate!) : null;
@@ -295,7 +295,7 @@ class AnnouncementController extends GetxController {
     thumbnailUrl = data['thumbnailUrl'] as String?;
     price = (data['price'] as num?)?.toDouble();
     currency = (data['currency'] as String?) ?? 'AED';
-    brokeragePercent = (data['brokeragePercent'] as int?) ?? 2;
+    brokeragePercent = (data['brokeragePercent'] as int?) ?? 0;
     rentPeriod = data['rentPeriod'] as String?;
     availableDate = data['availableDate'] != null
         ? DateTime.tryParse(data['availableDate'] as String)
@@ -324,7 +324,7 @@ class AnnouncementController extends GetxController {
     imageUrls = [];
     videoUrl = thumbnailUrl = null;
     currency = 'AED';
-    brokeragePercent = 2;
+    brokeragePercent = 0;
     rentPeriod = null;
     availableDate = null;
     completionDate = null;

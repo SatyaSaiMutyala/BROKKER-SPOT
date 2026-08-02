@@ -4,8 +4,11 @@ import 'package:brokkerspot/views/notifications/controller/notification_controll
 import 'package:brokkerspot/views/notifications/notifications_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
+import 'package:brokkerspot/models/property_filter_model.dart';
+import 'package:brokkerspot/views/user/home/controller/property_search_controller.dart';
+import 'package:brokkerspot/views/user/home/filter_view.dart';
 import 'package:brokkerspot/views/user/home/more_property_view.dart'; // ignore: unused_import — used by the parked carousels
-import 'package:brokkerspot/widgets/announcements/announcement_filter_bar.dart';
+import 'package:brokkerspot/widgets/announcements/home_filter_bar.dart';
 import 'package:brokkerspot/widgets/common/app_search_bar.dart';
 import 'package:brokkerspot/widgets/common/pinned_header_delegate.dart';
 import 'package:flutter/material.dart';
@@ -32,8 +35,10 @@ class HomeView extends StatefulWidget {
 class _HomeViewState extends State<HomeView> {
   final _profileCtrl = Get.put(ProfileController());
   final _announcementCtrl = AnnouncementListController.to;
+  final _searchCtrl = PropertySearchController.to;
   final _notificationCtrl = NotificationListController.to;
   final _scrollController = ScrollController();
+  final _searchTextCtrl = TextEditingController();
 
   /// Side gutter for every row on this screen — header, stories, search,
   /// filters and cards all line up against it.
@@ -61,9 +66,6 @@ class _HomeViewState extends State<HomeView> {
   double get _searchFilterExtent =>
       12.h + 45.h + 12.h + 39.h + 16.h; // gap + search + gap + chips + gap
 
-  String? _selectedListingType; // null = all, 'Sell' = Buy, 'Rent' = Rent
-  String? _selectedPropertyType; // null = all
-
   static const _stories = [
     {'name': 'Brokkerspot', 'image': 'assets/images/brocker-icon.png'},
     {'name': 'Rachid', 'image': 'assets/images/story1.png'},
@@ -84,10 +86,15 @@ class _HomeViewState extends State<HomeView> {
     _notificationCtrl.load();
   }
 
+  /// True when the user has typed a search query or applied filter facets.
+  /// Drives which data source the feed shows.
+  bool get _isFiltering => !_searchCtrl.filter.value.isEmpty;
+
   @override
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _searchTextCtrl.dispose();
     super.dispose();
   }
 
@@ -95,8 +102,12 @@ class _HomeViewState extends State<HomeView> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
-    if (pos.pixels >= pos.maxScrollExtent - 400 && _announcementCtrl.hasMoreAll) {
-      _announcementCtrl.loadMoreAll();
+    if (pos.pixels >= pos.maxScrollExtent - 400) {
+      if (_isFiltering) {
+        _searchCtrl.loadMore();
+      } else if (_announcementCtrl.hasMoreAll) {
+        _announcementCtrl.loadMoreAll();
+      }
     }
   }
 
@@ -145,11 +156,20 @@ class _HomeViewState extends State<HomeView> {
                       children: [
                         SizedBox(height: 12.h),
                         AppSearchBar(
-                          readOnly: true,
+                          controller: _searchTextCtrl,
                           horizontalPadding: _gutter,
-                          onTap: () => Get.to(() => const SearchView()),
-                          onFilterTap: () => Get.to(
-                              () => const SearchView(openFilterOnLoad: true)),
+                          filterBadgeCount: _searchCtrl.filter.value.activeCount,
+                          onChanged: _searchCtrl.onSearchChanged,
+                          onFilterTap: () async {
+                            final result = await Get.to<PropertyFilter>(
+                              () => FilterView(
+                                initial: _searchCtrl.filter.value,
+                              ),
+                            );
+                            if (result != null) {
+                              _searchCtrl.applyFacets(result);
+                            }
+                          },
                         ),
                         SizedBox(height: 12.h),
                         _buildFilterBar(),
@@ -290,32 +310,66 @@ class _HomeViewState extends State<HomeView> {
   // ── Filter bar ───────────────────────────────────────────────────────────────
 
   Widget _buildFilterBar() {
-    return AnnouncementFilterBar(
+    return HomeFilterBar(
       horizontalPadding: _gutter,
-      selectedListingType: _selectedListingType,
-      selectedPropertyType: _selectedPropertyType,
-      onListingTypeChanged: (val) => setState(() => _selectedListingType = val),
-      onPropertyTypeChanged: (type) =>
-          setState(() => _selectedPropertyType = type),
+      filter: _searchCtrl.filter.value,
+      onFilterChanged: _searchCtrl.applyFacets,
     );
   }
 
-  List<AnnouncementModel> _filtered(List<AnnouncementModel> all) {
-    var list = all;
-    if (_selectedListingType != null) {
-      list = list.where((a) => a.listingType == _selectedListingType).toList();
-    }
-    if (_selectedPropertyType != null) {
-      list = list
-          .where((a) =>
-              a.propertyType?.toLowerCase() ==
-              _selectedPropertyType!.toLowerCase())
-          .toList();
-    }
-    return list;
-  }
-
   // ── Announcements feed ──────────────────────────────────────────────────────
+
+  List<Widget> _buildSearchFeedSlivers() {
+    final ctrl = _searchCtrl;
+    if (ctrl.isLoading.value && ctrl.results.isEmpty) {
+      return [_skeletonSliver(count: 3)];
+    }
+    if (ctrl.error.value != null && ctrl.results.isEmpty) {
+      return [
+        SliverToBoxAdapter(
+          child: _buildErrorState(onRetry: ctrl.refreshResults),
+        ),
+      ];
+    }
+    final items = ctrl.results.toList();
+    if (items.isEmpty) {
+      return [SliverToBoxAdapter(child: _buildEmptyState())];
+    }
+    return [
+      SliverPadding(
+        padding: EdgeInsets.symmetric(horizontal: _gutter),
+        sliver: SliverList.separated(
+          itemCount: items.length,
+          separatorBuilder: (_, __) => SizedBox(height: 10.h),
+          itemBuilder: (_, i) {
+            final a = items[i];
+            return RepaintBoundary(
+              child: Material(
+                color: Colors.transparent,
+                child: HomeAnnouncementCard(
+                  announcement: a,
+                  index: i,
+                  cardWidth: double.infinity,
+                  cardHeight: 263.h,
+                  onTap: () => Get.to(() => AnnouncementDetailView(
+                        announcement: a,
+                        isOwner: false,
+                      )),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      if (ctrl.isLoadingMore.value)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.only(top: 16.h),
+            child: _skeletonCard(),
+          ),
+        ),
+    ];
+  }
 
   /// The feed portion of the scroll view: cards plus whichever state slot
   /// applies (first-load skeletons, error, empty, next-page skeleton).
@@ -359,6 +413,8 @@ class _HomeViewState extends State<HomeView> {
   }
 
   List<Widget> _buildFeedSlivers() {
+    if (_isFiltering) return _buildSearchFeedSlivers();
+
     final ctrl = _announcementCtrl;
 
     if (ctrl.isLoadingAll.value && ctrl.allAnnouncements.isEmpty) {
@@ -372,7 +428,7 @@ class _HomeViewState extends State<HomeView> {
       ];
     }
 
-    final items = _filtered(ctrl.allAnnouncements.toList());
+    final items = ctrl.allAnnouncements.toList();
     if (items.isEmpty) {
       return [SliverToBoxAdapter(child: _buildEmptyState())];
     }

@@ -5,6 +5,7 @@ import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_events.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
+import 'package:brokkerspot/views/user/announcements/controller/publish_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -41,6 +42,10 @@ class BrokerAgreementView extends StatefulWidget {
   /// Re-fetches the live proposal status when the screen opens.
   final VoidCallback? onRefreshStatus;
 
+  /// When true the button reads "Accept & Publish" and signing immediately
+  /// triggers publish — no separate publish screen.
+  final bool acceptAndPublish;
+
   const BrokerAgreementView({
     super.key,
     required this.announcementId,
@@ -51,6 +56,7 @@ class BrokerAgreementView extends StatefulWidget {
     this.counterpartyName,
     this.counterpartyAvatar,
     this.onRefreshStatus,
+    this.acceptAndPublish = false,
   });
 
   @override
@@ -61,6 +67,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   final _repo = AnnouncementRepository();
 
   bool _agreed = false;
+  bool _highlightCheckbox = false;
   bool _isSigning = false;
 
   /// Set when the broker's publish broadcast lands for this announcement.
@@ -151,12 +158,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
 
   Future<void> _onAccept() async {
     if (!_agreed) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Please confirm that you agree to the terms.',
-            style: GoogleFonts.inter(fontSize: 13.sp)),
-        backgroundColor: Colors.red.shade700,
-        behavior: SnackBarBehavior.floating,
-      ));
+      setState(() => _highlightCheckbox = true);
       return;
     }
     setState(() => _isSigning = true);
@@ -164,19 +166,26 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
 
-    // Broker: navigate directly to publish before touching _signedLocally so
-    // the timeline never flashes on screen.
+    // Broker flow — no timeline; sign then publish immediately.
     if (!widget.isOwner) {
-      setState(() => _isSigning = false);
       final a = _announcement;
-      if (a != null) {
+      if (a == null) {
+        // Announcement still loading — show spinner and retry once it arrives.
+        setState(() => _isSigning = false);
+        return;
+      }
+      setState(() => _isSigning = false);
+      if (widget.acceptAndPublish) {
+        // Accept & Publish: sign + publish in one step, no extra screen.
+        PublishController.to.publish(a);
+      } else {
         Get.to(() => AnnouncementDetailView(
               announcement: a,
               isOwner: false,
               publishMode: true,
             ));
-        return;
       }
+      return;
     }
 
     setState(() {
@@ -425,7 +434,10 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     final borderColor = isDark ? const Color(0xFF2A2F38) : Colors.grey.shade200;
     final textColor = isDark ? Colors.white : Colors.black87;
     return GestureDetector(
-      onTap: () => setState(() => _agreed = !_agreed),
+      onTap: () => setState(() {
+        _agreed = !_agreed;
+        _highlightCheckbox = false;
+      }),
       behavior: HitTestBehavior.opaque,
       child: Container(
         width: double.infinity,
@@ -448,7 +460,11 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                 color: _agreed ? AppColors.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(5.r),
                 border: Border.all(
-                  color: _agreed ? AppColors.primary : Colors.grey.shade500,
+                  color: _agreed
+                      ? AppColors.primary
+                      : _highlightCheckbox
+                          ? Colors.red.shade400
+                          : Colors.grey.shade500,
                   width: 1.5,
                 ),
               ),
@@ -488,7 +504,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
           width: double.infinity,
           height: 54.h,
           decoration: BoxDecoration(
-            color: AppColors.primary,
+            color: _agreed ? AppColors.primary : Colors.grey.shade400,
             borderRadius: BorderRadius.circular(30.r),
           ),
           alignment: Alignment.center,
@@ -500,7 +516,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                       color: Colors.white, strokeWidth: 2.5),
                 )
               : Text(
-                  'I Accept',
+                  widget.acceptAndPublish ? 'Accept & Publish' : 'I Accept',
                   style: GoogleFonts.poppins(
                     fontSize: 16.sp,
                     fontWeight: FontWeight.w600,
