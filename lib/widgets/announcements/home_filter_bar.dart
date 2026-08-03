@@ -193,6 +193,9 @@ class HomeFilterBar extends StatelessWidget {
   /// control — matching the Bayut filter-bar design.
   Widget _statusGroup(bool isDark) {
     final status = filter.propertyStatus; // null=All, 1=Ready, 2=Off Plan
+    // "Off Plan" is a sale concept — a rental is always ready — so hide it
+    // when the listing type is Rent, leaving just the Ready toggle.
+    final isRent = filter.listingType == 2;
 
     Widget seg(String label, bool isActive, VoidCallback onTap) {
       return GestureDetector(
@@ -243,15 +246,16 @@ class HomeFilterBar extends StatelessWidget {
                   : filter.copyWith(propertyStatus: 1),
             ),
           ),
-          seg(
-            'Off Plan',
-            status == 2,
-            () => onFilterChanged(
-              status == 2
-                  ? filter.cleared(propertyStatus: true)
-                  : filter.copyWith(propertyStatus: 2),
+          if (!isRent)
+            seg(
+              'Off Plan',
+              status == 2,
+              () => onFilterChanged(
+                status == 2
+                    ? filter.cleared(propertyStatus: true)
+                    : filter.copyWith(propertyStatus: 2),
+              ),
             ),
-          ),
         ],
       ),
     );

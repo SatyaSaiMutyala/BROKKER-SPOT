@@ -1,6 +1,8 @@
+import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/session_cleanup.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:brokkerspot/views/user/wishlist/wishlist_view.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/auth/view/login_view.dart';
@@ -170,11 +172,15 @@ class AccountView extends StatelessWidget {
               width: 95.w,
               height: 95.w,
               child: imgUrl.isNotEmpty
-                  ? Image.network(
-                      imgUrl,
+                  ? CachedNetworkImage(
+                      imageUrl: imgUrl,
                       key: ValueKey(imgUrl),
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _avatarPlaceholder(isDark),
+                      // Cached after the first load, so returning to this
+                      // screen renders instantly instead of re-downloading.
+                      placeholder: (_, __) =>
+                          ShimmerBox(width: 95.w, height: 95.w),
+                      errorWidget: (_, __, ___) => _avatarPlaceholder(isDark),
                     )
                   : _avatarPlaceholder(isDark),
             ),
