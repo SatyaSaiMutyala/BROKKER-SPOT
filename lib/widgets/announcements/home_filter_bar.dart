@@ -690,11 +690,17 @@ class HomeFilterBar extends StatelessWidget {
                 SizedBox(height: 12.h),
                 _applyBtn(() {
                   var f = filter.cleared(price: true);
-                  if (price.start > _priceFloor) {
-                    f = f.copyWith(minPrice: price.start);
-                  }
-                  if (price.end < _priceCeil) {
-                    f = f.copyWith(maxPrice: price.end);
+                  // The price filter is "engaged" once either handle moves off
+                  // the full-range extremes. When it is, send BOTH bounds
+                  // explicitly — including min_price=0 (a real lower bound the
+                  // user picked, not the same as "no minimum").
+                  final priceEngaged =
+                      price.start > _priceFloor || price.end < _priceCeil;
+                  if (priceEngaged) {
+                    f = f.copyWith(
+                      minPrice: price.start,
+                      maxPrice: price.end,
+                    );
                   }
                   onFilterChanged(f);
                   Navigator.of(ctx).pop();
