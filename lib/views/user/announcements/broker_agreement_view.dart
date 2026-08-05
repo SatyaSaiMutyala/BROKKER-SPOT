@@ -166,7 +166,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
 
-    // Broker flow — no timeline; sign then publish immediately.
+    // Broker flow — sign then publish.
     if (!widget.isOwner) {
       final a = _announcement;
       if (a == null) {
@@ -174,11 +174,19 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
         setState(() => _isSigning = false);
         return;
       }
-      setState(() => _isSigning = false);
       if (widget.acceptAndPublish) {
-        // Accept & Publish: sign + publish in one step, no extra screen.
-        PublishController.to.publish(a);
+        // Accept & Publish: sign + publish in one step. Flip to the timeline
+        // (2nd page) immediately and stay on it — step 3 lights up once the
+        // publish succeeds, instead of bouncing to the announcements tab.
+        setState(() {
+          _isSigning = false;
+          _signedLocally = true;
+        });
+        PublishController.to.publish(a, onSuccess: () {
+          if (mounted) setState(() => _published = true);
+        });
       } else {
+        setState(() => _isSigning = false);
         Get.to(() => AnnouncementDetailView(
               announcement: a,
               isOwner: false,

@@ -26,7 +26,7 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
   late TabController _tabController;
   final _controller = AnnouncementListController.to;
 
-  final _tabs = ['All', 'Pending', 'Active', 'Rejected', 'Draft'];
+  final _tabs = ['All', 'Pending', 'Active', 'Rejected', 'Draft', 'Live'];
 
   int? _statusForTab(int i) {
     switch (i) {
@@ -38,6 +38,8 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
         return 3;
       case 4:
         return 0;
+      case 5:
+        return 4; // Live — published announcements
       default:
         return null;
     }
@@ -274,6 +276,8 @@ class _CardWithStatusBadge extends StatelessWidget {
       case 'approved':
       case 'active':
         return Colors.green.shade500;
+      case 'live':
+        return AppColors.primary;
       case 'rejected':
         return Colors.red.shade500;
       case 'submitted':

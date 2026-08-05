@@ -189,13 +189,13 @@ class HomeFilterBar extends StatelessWidget {
     );
   }
 
-  /// Single bordered pill containing All / Ready / Off Plan as a segmented
-  /// control — matching the Bayut filter-bar design.
+  /// Contextual segmented pill:
+  ///  • Buy / All → Ready | Off Plan   (drives `propertyStatus`: 1 / 2)
+  ///  • Rent       → Yearly | Monthly  (drives `rentPeriod`)
   Widget _statusGroup(bool isDark) {
     final status = filter.propertyStatus; // null=All, 1=Ready, 2=Off Plan
-    // "Off Plan" is a sale concept — a rental is always ready — so hide it
-    // when the listing type is Rent, leaving just the Ready toggle.
     final isRent = filter.listingType == 2;
+    final rentPeriod = filter.rentPeriod; // 'Yearly' | 'Monthly' | null
 
     Widget seg(String label, bool isActive, VoidCallback onTap) {
       return GestureDetector(
@@ -236,27 +236,49 @@ class HomeFilterBar extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          seg(
-            'Ready',
-            status == 1,
-            () => onFilterChanged(
-              status == 1
-                  ? filter.cleared(propertyStatus: true)
-                  : filter.copyWith(propertyStatus: 1),
-            ),
-          ),
-          if (!isRent)
-            seg(
-              'Off Plan',
-              status == 2,
-              () => onFilterChanged(
-                status == 2
-                    ? filter.cleared(propertyStatus: true)
-                    : filter.copyWith(propertyStatus: 2),
-              ),
-            ),
-        ],
+        children: isRent
+            ? [
+                // Rent → Yearly | Monthly (drives rentPeriod).
+                seg(
+                  'Yearly',
+                  rentPeriod == 'Yearly',
+                  () => onFilterChanged(
+                    rentPeriod == 'Yearly'
+                        ? filter.cleared(rentPeriod: true)
+                        : filter.copyWith(rentPeriod: 'Yearly'),
+                  ),
+                ),
+                seg(
+                  'Monthly',
+                  rentPeriod == 'Monthly',
+                  () => onFilterChanged(
+                    rentPeriod == 'Monthly'
+                        ? filter.cleared(rentPeriod: true)
+                        : filter.copyWith(rentPeriod: 'Monthly'),
+                  ),
+                ),
+              ]
+            : [
+                // Buy / All → Ready | Off Plan (drives propertyStatus).
+                seg(
+                  'Ready',
+                  status == 1,
+                  () => onFilterChanged(
+                    status == 1
+                        ? filter.cleared(propertyStatus: true)
+                        : filter.copyWith(propertyStatus: 1),
+                  ),
+                ),
+                seg(
+                  'Off Plan',
+                  status == 2,
+                  () => onFilterChanged(
+                    status == 2
+                        ? filter.cleared(propertyStatus: true)
+                        : filter.copyWith(propertyStatus: 2),
+                  ),
+                ),
+              ],
       ),
     );
   }
@@ -264,6 +286,7 @@ class HomeFilterBar extends StatelessWidget {
   // ── Bottom sheets ──────────────────────────────────────────────────────────
 
   void _showListingTypeSheet(BuildContext context, bool isDark) {
+    FocusScope.of(context).unfocus(); // no filter needs the keyboard
     showModalBottomSheet(
       context: context,
       backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
@@ -329,6 +352,7 @@ class HomeFilterBar extends StatelessWidget {
   }
 
   void _showPropertyTypeSheet(BuildContext context, bool isDark) {
+    FocusScope.of(context).unfocus(); // no filter needs the keyboard
     final common = CommonDataController.to;
     common.loadPropertyTypes();
 
@@ -431,6 +455,7 @@ class HomeFilterBar extends StatelessWidget {
   }
 
   void _showBedsSheet(BuildContext context, bool isDark) {
+    FocusScope.of(context).unfocus(); // no filter needs the keyboard
     const opts = ['1', '2', '3', '4', '5', '6', '7', '8+'];
     int? sel = filter.bedrooms;
 
@@ -483,6 +508,8 @@ class HomeFilterBar extends StatelessWidget {
   }
 
   void _showPriceSheet(BuildContext context, bool isDark) {
+    // Dismiss any lingering keyboard; the min/max fields only focus on tap.
+    FocusScope.of(context).unfocus();
     var price = RangeValues(
       (filter.minPrice ?? _priceFloor).clamp(_priceFloor, _priceCeil),
       (filter.maxPrice ?? _priceCeil).clamp(_priceFloor, _priceCeil),
@@ -715,6 +742,7 @@ class HomeFilterBar extends StatelessWidget {
   }
 
   void _showBathsSheet(BuildContext context, bool isDark) {
+    FocusScope.of(context).unfocus(); // no filter needs the keyboard
     const opts = ['1', '2', '3', '4', '5', '6+'];
     int? sel = filter.bathrooms;
 

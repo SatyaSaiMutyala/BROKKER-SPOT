@@ -148,6 +148,7 @@ class AnnouncementModel {
   final String? propertyAddress;
   final PropertyLocation? propertyLocation;
   final String? propertyType;
+  final String? propertyTypeId;
   final String? propertyName;
   final PropertySize? propertySize;
   final int? bedrooms;
@@ -207,6 +208,7 @@ class AnnouncementModel {
     this.propertyAddress,
     this.propertyLocation,
     this.propertyType,
+    this.propertyTypeId,
     this.propertyName,
     this.propertySize,
     this.bedrooms,
@@ -272,6 +274,8 @@ class AnnouncementModel {
         return 'Active';
       case 3:
         return 'Rejected';
+      case 4:
+        return 'Live';
       default:
         return null;
     }
@@ -318,6 +322,11 @@ class AnnouncementModel {
               json['property_location'] as Map<String, dynamic>)
           : null,
       propertyType: json['property_type'],
+      // Populated one of two ways: a plain id string, or a populated object
+      // ({_id, name, ...}) — normalize both to the id string.
+      propertyTypeId: json['property_type_id'] is Map
+          ? (json['property_type_id']['_id']?.toString())
+          : json['property_type_id']?.toString(),
       propertyName: json['property_name'],
       propertySize: size,
       bedrooms: json['bedrooms'],
@@ -387,6 +396,7 @@ class AnnouncementModel {
         if (propertyAddress != null) 'property_address': propertyAddress,
         if (propertyLocation != null) 'property_location': propertyLocation!.toJson(),
         if (propertyType != null) 'property_type': propertyType,
+        if (propertyTypeId != null) 'property_type_id': propertyTypeId,
         if (propertyName != null) 'property_name': propertyName,
         if (propertySize != null) 'property_size': propertySize!.toJson(),
         if (bedrooms != null) 'bedrooms': bedrooms,

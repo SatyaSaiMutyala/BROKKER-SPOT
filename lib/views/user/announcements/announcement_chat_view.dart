@@ -358,7 +358,12 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
       switch (status!) {
         case 0:
           text = 'Awaiting owner approval of your proposal.';
-          button = null;
+          button = _bannerButton(
+            icon: Icons.fact_check_outlined,
+            label: 'Awaiting',
+            onTap: null,
+            color: const Color(0xFFC9BA49),
+          );
         case 1:
           text = 'Owner signed. Sign the contract to advertise this property.';
           button = _bannerButton(
@@ -371,12 +376,13 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           text = 'Owner declined this proposal.';
           button = null;
         case 3:
-          // Both sides have signed; the broker still has to publish. Prompt
-          // that, not "View Agreement".
-          text = 'Contract signed. Publish to advertise this property.';
+          // Sign & Publish (case 1) already published the property, so there's
+          // no second publish step — just confirm and let the broker review
+          // the agreement anytime.
+          text = 'Property published. You can review the agreement anytime.';
           button = _bannerButton(
             icon: Icons.fact_check_outlined,
-            label: 'Publish',
+            label: 'Information',
             onTap: () => _openAgreementFlow(isOwner: false),
             color: _agreementGreen,
           );

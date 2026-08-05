@@ -55,12 +55,13 @@ class _FilterViewState extends State<FilterView> {
 
     // Warm the reference lists (each is a no-op if already cached this session).
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _common.loadCountries();
       _common.loadPropertyTypes();
-      if (_countryId != null) _common.loadCities(_countryId!);
-      if (_cityId != null && _countryId != null) {
-        _common.loadLocalities(cityId: _cityId!, countryId: _countryId!);
-      }
+      // Country / City / Area loading — hidden for now (not needed).
+      // _common.loadCountries();
+      // if (_countryId != null) _common.loadCities(_countryId!);
+      // if (_cityId != null && _countryId != null) {
+      //   _common.loadLocalities(cityId: _cityId!, countryId: _countryId!);
+      // }
     });
   }
 
@@ -97,6 +98,10 @@ class _FilterViewState extends State<FilterView> {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
+  /// True once either price handle has moved off the full-range extremes.
+  bool get _priceEngaged =>
+      _price.start > _priceFloor || _price.end < _priceCeil;
+
   void _reset() {
     setState(() => _hydrateFromFilter(PropertyFilter.empty));
   }
@@ -126,8 +131,11 @@ class _FilterViewState extends State<FilterView> {
       areaName: _areaName,
       bedrooms: _bedrooms,
       bathrooms: _bathrooms,
-      minPrice: _price.start > _priceFloor ? _price.start : null,
-      maxPrice: _price.end < _priceCeil ? _price.end : null,
+      // Once the price filter is engaged (either handle moved off the extremes)
+      // send BOTH bounds — so a max-only selection still sends min_price=0
+      // rather than omitting it.
+      minPrice: _priceEngaged ? _price.start : null,
+      maxPrice: _priceEngaged ? _price.end : null,
     );
     Get.back(result: result);
   }
@@ -141,6 +149,8 @@ class _FilterViewState extends State<FilterView> {
     });
   }
 
+  // Country / City / Area handlers — hidden for now (see commented UI above).
+  /*
   void _onCountryChanged(String name) {
     final country = _common.countries.firstWhereOrNull((c) => c.name == name);
     if (country == null) return;
@@ -175,6 +185,7 @@ class _FilterViewState extends State<FilterView> {
       _areaName = area.name;
     });
   }
+  */
 
   int? _parseCount(String v) => v == '5+' ? 5 : int.tryParse(v);
   String? _countLabel(int? v) =>
@@ -240,6 +251,8 @@ class _FilterViewState extends State<FilterView> {
                     _section('Property Type'),
                     _propertyTypeChips(isDark),
 
+                    // ── Country / City / Area — hidden for now (not needed) ──
+                    /*
                     _divider(isDark),
                     _section('Country'),
                     Obx(() => OverlayDropdownField(
@@ -296,6 +309,7 @@ class _FilterViewState extends State<FilterView> {
                         ),
                       ],
                     ),
+                    */
 
                     _divider(isDark),
                     Row(

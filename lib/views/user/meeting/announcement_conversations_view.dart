@@ -86,8 +86,9 @@ class _AnnouncementConversationsViewState
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
+      // Match CustomHeader's light background (white) so the header and body
+      // read as one surface, consistent with the rest of the app.
+      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
       body: SafeArea(
         child: Column(
           children: [

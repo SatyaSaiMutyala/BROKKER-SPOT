@@ -24,9 +24,12 @@ class PublishController extends GetxController {
       ? Get.find<PublishController>()
       : Get.put(PublishController());
 
-  /// Emits the publish event and, on success, refreshes the lists and lands on
-  /// the broker dashboard's Announcement tab — publishing ends this flow.
-  void publish(AnnouncementModel a) {
+  /// Emits the publish event and, on success, refreshes the lists.
+  ///
+  /// By default this ends the flow by landing on the broker dashboard's
+  /// Announcement tab. Pass [onSuccess] to override that — e.g. the agreement
+  /// screen keeps the user on its timeline (2nd page) instead of navigating.
+  void publish(AnnouncementModel a, {VoidCallback? onSuccess}) {
     if (isPublishing.value) return;
     isPublishing.value = true;
 
@@ -57,7 +60,11 @@ class PublishController extends GetxController {
       // Remember it so the agreement stays reachable from chat later.
       if (a.id != null) LocalStorageService.markAnnouncementPublished(a.id!);
       AnnouncementListController.to.refreshAfterMutation();
-      Get.offAll(() => BrokerDashBoardView(initialIndex: 1));
+      if (onSuccess != null) {
+        onSuccess();
+      } else {
+        Get.offAll(() => BrokerDashBoardView(initialIndex: 1));
+      }
       Get.snackbar(
         'Published',
         'Your announcement has been published.',
@@ -118,6 +125,7 @@ class PublishController extends GetxController {
             coords != null && coords.length == 2 ? coords : [0.0, 0.0],
       },
       'property_type': a.propertyType,
+      'property_type_id': a.propertyTypeId,
       'property_size': {
         'sqft': a.propertySize?.sqft,
         'sqm': a.propertySize?.sqm,
