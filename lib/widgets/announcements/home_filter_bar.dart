@@ -384,7 +384,7 @@ class HomeFilterBar extends StatelessWidget {
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 24.h),
                       child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppColors.primary),
+                          strokeWidth: 2, color: AppColors.primary),
                     ),
                   );
                 }
@@ -529,214 +529,223 @@ class HomeFilterBar extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) {
-          void syncFromSlider(RangeValues v) {
-            setSheet(() => price = v);
-            minCtrl.text =
-                v.start > _priceFloor ? v.start.round().toString() : '';
-            maxCtrl.text =
-                v.end < _priceCeil ? v.end.round().toString() : '';
-          }
+      // The min/max fields summon the keyboard, and this is the only filter
+      // sheet that has one. viewInsets.bottom lifts the sheet clear of the
+      // keyboard; the scroll view keeps the content reachable on short screens
+      // where the keyboard leaves too little room for the whole sheet.
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: SingleChildScrollView(
+          child: StatefulBuilder(
+            builder: (ctx, setSheet) {
+              void syncFromSlider(RangeValues v) {
+                setSheet(() => price = v);
+                minCtrl.text =
+                    v.start > _priceFloor ? v.start.round().toString() : '';
+                maxCtrl.text =
+                    v.end < _priceCeil ? v.end.round().toString() : '';
+              }
 
-          void syncFromMin(String val) {
-            final n = double.tryParse(val.replaceAll(',', ''));
-            if (n == null) return;
-            final clamped = n.clamp(_priceFloor, price.end);
-            setSheet(() => price = RangeValues(clamped, price.end));
-          }
+              void syncFromMin(String val) {
+                final n = double.tryParse(val.replaceAll(',', ''));
+                if (n == null) return;
+                final clamped = n.clamp(_priceFloor, price.end);
+                setSheet(() => price = RangeValues(clamped, price.end));
+              }
 
-          void syncFromMax(String val) {
-            final n = double.tryParse(val.replaceAll(',', ''));
-            if (n == null) return;
-            final clamped = n.clamp(price.start, _priceCeil);
-            setSheet(() => price = RangeValues(price.start, clamped));
-          }
+              void syncFromMax(String val) {
+                final n = double.tryParse(val.replaceAll(',', ''));
+                if (n == null) return;
+                final clamped = n.clamp(price.start, _priceCeil);
+                setSheet(() => price = RangeValues(price.start, clamped));
+              }
 
-          final borderColor =
-              isDark ? Colors.grey.shade700 : Colors.grey.shade300;
-          final labelStyle = GoogleFonts.poppins(
-            fontSize: 12.sp,
-            color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
-          );
-          final fieldStyle = GoogleFonts.poppins(
-            fontSize: 14.sp,
-            color: isDark ? Colors.white : Colors.black87,
-          );
+              final borderColor =
+                  isDark ? Colors.grey.shade700 : Colors.grey.shade300;
+              final labelStyle = GoogleFonts.poppins(
+                fontSize: 12.sp,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+              );
+              final fieldStyle = GoogleFonts.poppins(
+                fontSize: 14.sp,
+                color: isDark ? Colors.white : Colors.black87,
+              );
 
-          return Padding(
-            padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _handle(isDark),
-                SizedBox(height: 20.h),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return Padding(
+                padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _title('Price Range (AED)', isDark),
-                    GestureDetector(
-                      onTap: () => setSheet(() {
-                        price = RangeValues(_priceFloor, _priceCeil);
-                        minCtrl.clear();
-                        maxCtrl.clear();
-                      }),
-                      child: Text(
-                        'Reset',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 20.h),
-                // ── Min / Max text fields ──────────────────────────────
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            height: 52.h,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: borderColor),
-                              borderRadius: BorderRadius.circular(10.r),
-                              color: Colors.transparent,
-                            ),
-                            padding: EdgeInsets.symmetric(horizontal: 14.w),
-                            alignment: Alignment.centerLeft,
-                            child: TextField(
-                              controller: minCtrl,
-                              keyboardType: TextInputType.number,
-                              style: fieldStyle,
-                              decoration: InputDecoration(
-                                hintText: '0',
-                                hintStyle: GoogleFonts.poppins(
-                                  fontSize: 14.sp,
-                                  color: isDark
-                                      ? Colors.grey.shade600
-                                      : Colors.grey.shade400,
-                                ),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                filled: true,
-                                fillColor: Colors.transparent,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              onChanged: syncFromMin,
-                            ),
-                          ),
-                          SizedBox(height: 4.h),
-                          Text('Minimum', style: labelStyle),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.only(bottom: 20.h),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10.w),
-                        child: Text('to',
+                    _handle(isDark),
+                    SizedBox(height: 20.h),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _title('Price Range (AED)', isDark),
+                        GestureDetector(
+                          onTap: () => setSheet(() {
+                            price = RangeValues(_priceFloor, _priceCeil);
+                            minCtrl.clear();
+                            maxCtrl.clear();
+                          }),
+                          child: Text(
+                            'Reset',
                             style: GoogleFonts.poppins(
                               fontSize: 14.sp,
-                              color:
-                                  isDark ? Colors.white70 : Colors.black54,
-                            )),
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            height: 52.h,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: borderColor),
-                              borderRadius: BorderRadius.circular(10.r),
-                              color: Colors.transparent,
-                            ),
-                            padding: EdgeInsets.symmetric(horizontal: 14.w),
-                            alignment: Alignment.centerLeft,
-                            child: TextField(
-                              controller: maxCtrl,
-                              keyboardType: TextInputType.number,
-                              style: fieldStyle,
-                              decoration: InputDecoration(
-                                hintText: 'Any',
-                                hintStyle: GoogleFonts.poppins(
-                                  fontSize: 14.sp,
-                                  color: isDark
-                                      ? Colors.grey.shade600
-                                      : Colors.grey.shade400,
-                                ),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                filled: true,
-                                fillColor: Colors.transparent,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              onChanged: syncFromMax,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.primary,
                             ),
                           ),
-                          SizedBox(height: 4.h),
-                          Text('Maximum', style: labelStyle),
-                        ],
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 20.h),
+                    // ── Min / Max text fields ──────────────────────────────
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                height: 52.h,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: borderColor),
+                                  borderRadius: BorderRadius.circular(10.r),
+                                  color: Colors.transparent,
+                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 14.w),
+                                alignment: Alignment.centerLeft,
+                                child: TextField(
+                                  controller: minCtrl,
+                                  keyboardType: TextInputType.number,
+                                  style: fieldStyle,
+                                  decoration: InputDecoration(
+                                    hintText: '0',
+                                    hintStyle: GoogleFonts.poppins(
+                                      fontSize: 14.sp,
+                                      color: isDark
+                                          ? Colors.grey.shade600
+                                          : Colors.grey.shade400,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    filled: true,
+                                    fillColor: Colors.transparent,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  onChanged: syncFromMin,
+                                ),
+                              ),
+                              SizedBox(height: 4.h),
+                              Text('Minimum', style: labelStyle),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 20.h),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10.w),
+                            child: Text('to',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14.sp,
+                                  color:
+                                      isDark ? Colors.white70 : Colors.black54,
+                                )),
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                height: 52.h,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: borderColor),
+                                  borderRadius: BorderRadius.circular(10.r),
+                                  color: Colors.transparent,
+                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 14.w),
+                                alignment: Alignment.centerLeft,
+                                child: TextField(
+                                  controller: maxCtrl,
+                                  keyboardType: TextInputType.number,
+                                  style: fieldStyle,
+                                  decoration: InputDecoration(
+                                    hintText: 'Any',
+                                    hintStyle: GoogleFonts.poppins(
+                                      fontSize: 14.sp,
+                                      color: isDark
+                                          ? Colors.grey.shade600
+                                          : Colors.grey.shade400,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    filled: true,
+                                    fillColor: Colors.transparent,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  onChanged: syncFromMax,
+                                ),
+                              ),
+                              SizedBox(height: 4.h),
+                              Text('Maximum', style: labelStyle),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16.h),
+                    // ── Range slider ───────────────────────────────────────
+                    SliderTheme(
+                      data: SliderThemeData(
+                        trackHeight: 3.h,
+                        activeTrackColor: AppColors.primary,
+                        inactiveTrackColor: isDark
+                            ? const Color(0xFF3A3A3A)
+                            : const Color(0xFFDDDDDD),
+                        thumbColor: AppColors.primary,
+                        overlayColor: AppColors.primary.withValues(alpha: 0.15),
+                        rangeThumbShape:
+                            RoundRangeSliderThumbShape(enabledThumbRadius: 9.r),
+                      ),
+                      child: RangeSlider(
+                        values: price,
+                        min: _priceFloor,
+                        max: _priceCeil,
+                        divisions: 100,
+                        onChanged: syncFromSlider,
                       ),
                     ),
+                    SizedBox(height: 12.h),
+                    _applyBtn(() {
+                      var f = filter.cleared(price: true);
+                      // The price filter is "engaged" once either handle moves off
+                      // the full-range extremes. When it is, send BOTH bounds
+                      // explicitly — including min_price=0 (a real lower bound the
+                      // user picked, not the same as "no minimum").
+                      final priceEngaged =
+                          price.start > _priceFloor || price.end < _priceCeil;
+                      if (priceEngaged) {
+                        f = f.copyWith(
+                          minPrice: price.start,
+                          maxPrice: price.end,
+                        );
+                      }
+                      onFilterChanged(f);
+                      Navigator.of(ctx).pop();
+                    }, isDark),
+                    SizedBox(height: 20.h),
                   ],
                 ),
-                SizedBox(height: 16.h),
-                // ── Range slider ───────────────────────────────────────
-                SliderTheme(
-                  data: SliderThemeData(
-                    trackHeight: 3.h,
-                    activeTrackColor: AppColors.primary,
-                    inactiveTrackColor: isDark
-                        ? const Color(0xFF3A3A3A)
-                        : const Color(0xFFDDDDDD),
-                    thumbColor: AppColors.primary,
-                    overlayColor: AppColors.primary.withValues(alpha: 0.15),
-                    rangeThumbShape:
-                        RoundRangeSliderThumbShape(enabledThumbRadius: 9.r),
-                  ),
-                  child: RangeSlider(
-                    values: price,
-                    min: _priceFloor,
-                    max: _priceCeil,
-                    divisions: 100,
-                    onChanged: syncFromSlider,
-                  ),
-                ),
-                SizedBox(height: 12.h),
-                _applyBtn(() {
-                  var f = filter.cleared(price: true);
-                  // The price filter is "engaged" once either handle moves off
-                  // the full-range extremes. When it is, send BOTH bounds
-                  // explicitly — including min_price=0 (a real lower bound the
-                  // user picked, not the same as "no minimum").
-                  final priceEngaged =
-                      price.start > _priceFloor || price.end < _priceCeil;
-                  if (priceEngaged) {
-                    f = f.copyWith(
-                      minPrice: price.start,
-                      maxPrice: price.end,
-                    );
-                  }
-                  onFilterChanged(f);
-                  Navigator.of(ctx).pop();
-                }, isDark),
-                SizedBox(height: 20.h),
-              ],
-            ),
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }
