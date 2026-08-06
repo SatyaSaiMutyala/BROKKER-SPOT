@@ -456,7 +456,7 @@ class HomeFilterBar extends StatelessWidget {
 
   void _showBedsSheet(BuildContext context, bool isDark) {
     FocusScope.of(context).unfocus(); // no filter needs the keyboard
-    const opts = ['1', '2', '3', '4', '5', '6', '7', '8+'];
+    const opts = ['1', '2', '3', '4', '5+'];
     int? sel = filter.bedrooms;
 
     showModalBottomSheet(
@@ -480,7 +480,7 @@ class HomeFilterBar extends StatelessWidget {
                 spacing: 10.w,
                 runSpacing: 10.h,
                 children: opts.map((opt) {
-                  final val = opt == '8+' ? 8 : int.parse(opt);
+                  final val = opt == '5+' ? 5 : int.parse(opt);
                   final isSel = sel == val;
                   return _countChip(
                     opt,
@@ -752,7 +752,7 @@ class HomeFilterBar extends StatelessWidget {
 
   void _showBathsSheet(BuildContext context, bool isDark) {
     FocusScope.of(context).unfocus(); // no filter needs the keyboard
-    const opts = ['1', '2', '3', '4', '5', '6+'];
+    const opts = ['1', '2', '3', '4', '5+'];
     int? sel = filter.bathrooms;
 
     showModalBottomSheet(
@@ -776,7 +776,7 @@ class HomeFilterBar extends StatelessWidget {
                 spacing: 10.w,
                 runSpacing: 10.h,
                 children: opts.map((opt) {
-                  final val = opt == '6+' ? 6 : int.parse(opt);
+                  final val = opt == '5+' ? 5 : int.parse(opt);
                   final isSel = sel == val;
                   return _countChip(
                     opt,

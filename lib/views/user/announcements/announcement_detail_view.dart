@@ -1867,9 +1867,12 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                   GestureDetector(
                     onTap: () => AnnouncementChatView.open(
                       announcementId: a.id ?? '',
-                      brokerName: a.ownerName ?? 'Owner',
-                      brokerAvatar: a.ownerAvatarUrl,
-                      peerUserId: a.userId,
+                      brokerName: a.ownerName ??
+                          widget.announcement.ownerName ??
+                          'Owner',
+                      brokerAvatar: a.ownerAvatarUrl ??
+                          widget.announcement.ownerAvatarUrl,
+                      peerUserId: a.userId ?? widget.announcement.userId,
                     ),
                     child: Container(
                       width: 42.w,

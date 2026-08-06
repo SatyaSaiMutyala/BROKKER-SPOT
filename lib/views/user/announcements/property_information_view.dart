@@ -249,6 +249,12 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
+  int _parseCount(String? val) {
+    if (val == null) return 0;
+    if (val == '5+') return 5;
+    return int.tryParse(val) ?? 0;
+  }
+
   int _parseFloor(String? val) {
     if (val == null) return 0;
     if (val == 'G') return 0;
@@ -562,8 +568,8 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
             _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
         sqft: _sqftValue,
         sqm: _sqmValue,
-        bedrooms: int.tryParse(_bedroom!) ?? 0,
-        bathrooms: int.tryParse(_bathroom!) ?? 0,
+        bedrooms: _parseCount(_bedroom),
+        bathrooms: _parseCount(_bathroom),
         floor: _parseFloor(_floor),
         totalFloors: _parseFloor(_totalFloor),
         description: _descCtrl.text.trim(),
