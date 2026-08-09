@@ -12,12 +12,18 @@ import 'package:google_fonts/google_fonts.dart';
 class HomeFilterBar extends StatelessWidget {
   final PropertyFilter filter;
   final ValueChanged<PropertyFilter> onFilterChanged;
+
+  /// Called when the user taps "Reset All Filters". If provided, the parent
+  /// is responsible for also clearing the search text field. Falls back to
+  /// [onFilterChanged(PropertyFilter.empty)] when null.
+  final VoidCallback? onResetAll;
   final double? horizontalPadding;
 
   const HomeFilterBar({
     super.key,
     required this.filter,
     required this.onFilterChanged,
+    this.onResetAll,
     this.horizontalPadding,
   });
 
@@ -101,7 +107,7 @@ class HomeFilterBar extends StatelessWidget {
     if (!filter.hasNoFacets) {
       chips.add(SizedBox(width: 12.w));
       chips.add(GestureDetector(
-        onTap: () => onFilterChanged(PropertyFilter.empty),
+        onTap: onResetAll ?? () => onFilterChanged(PropertyFilter.empty),
         child: Center(
           child: Text(
             'Reset All Filters',
@@ -116,7 +122,7 @@ class HomeFilterBar extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 39.h,
+      height: 33.h,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding ?? 16.w),
@@ -138,7 +144,7 @@ class HomeFilterBar extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 38.h,
+        height: 32.h,
         padding: EdgeInsets.symmetric(horizontal: 14.w),
         alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -201,7 +207,7 @@ class HomeFilterBar extends StatelessWidget {
       return GestureDetector(
         onTap: onTap,
         child: Container(
-          height: 38.h,
+          height: 32.h,
           padding: EdgeInsets.symmetric(horizontal: 14.w),
           alignment: Alignment.center,
           decoration: BoxDecoration(
@@ -227,7 +233,7 @@ class HomeFilterBar extends StatelessWidget {
     }
 
     return Container(
-      height: 38.h,
+      height: 32.h,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(25.r),
         border: Border.all(
@@ -538,26 +544,47 @@ class HomeFilterBar extends StatelessWidget {
         child: SingleChildScrollView(
           child: StatefulBuilder(
             builder: (ctx, setSheet) {
+              // Round to nearest AED 5,000 for clean slider steps.
+              double snap(double v) => (v / 5000).round() * 5000;
+              var priceError = false;
+
               void syncFromSlider(RangeValues v) {
-                setSheet(() => price = v);
-                minCtrl.text =
-                    v.start > _priceFloor ? v.start.round().toString() : '';
-                maxCtrl.text =
-                    v.end < _priceCeil ? v.end.round().toString() : '';
+                final snapped = RangeValues(snap(v.start), snap(v.end));
+                setSheet(() {
+                  price = snapped;
+                  priceError = false;
+                });
+                minCtrl.text = snapped.start > _priceFloor
+                    ? snapped.start.round().toString()
+                    : '';
+                maxCtrl.text = snapped.end < _priceCeil
+                    ? snapped.end.round().toString()
+                    : '';
               }
 
               void syncFromMin(String val) {
-                final n = double.tryParse(val.replaceAll(',', ''));
+                final trimmed = val.replaceAll(',', '').trim();
+                final n =
+                    trimmed.isEmpty ? _priceFloor : double.tryParse(trimmed);
                 if (n == null) return;
                 final clamped = n.clamp(_priceFloor, price.end);
-                setSheet(() => price = RangeValues(clamped, price.end));
+                setSheet(() {
+                  price = RangeValues(clamped, price.end);
+                  priceError = false;
+                });
               }
 
               void syncFromMax(String val) {
-                final n = double.tryParse(val.replaceAll(',', ''));
+                final trimmed = val.replaceAll(',', '').trim();
+                final n =
+                    trimmed.isEmpty ? _priceCeil : double.tryParse(trimmed);
                 if (n == null) return;
+                final hasError = trimmed.isNotEmpty && n < price.start;
                 final clamped = n.clamp(price.start, _priceCeil);
-                setSheet(() => price = RangeValues(price.start, clamped));
+                setSheet(() {
+                  price = RangeValues(price.start, clamped);
+                  priceError = hasError;
+                });
               }
 
               final borderColor =
@@ -712,15 +739,27 @@ class HomeFilterBar extends StatelessWidget {
                         overlayColor: AppColors.primary.withValues(alpha: 0.15),
                         rangeThumbShape:
                             RoundRangeSliderThumbShape(enabledThumbRadius: 9.r),
+                        // Allow thumbs to overlap so the max can reach very low
+                        // values (e.g. 5,000) even when min is at 0.
+                        minThumbSeparation: 0,
                       ),
                       child: RangeSlider(
                         values: price,
                         min: _priceFloor,
                         max: _priceCeil,
-                        divisions: 100,
                         onChanged: syncFromSlider,
                       ),
                     ),
+                    if (priceError) ...[
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Maximum price must be greater than minimum price',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11.sp,
+                          color: Colors.red.shade400,
+                        ),
+                      ),
+                    ],
                     SizedBox(height: 12.h),
                     _applyBtn(() {
                       var f = filter.cleared(price: true);

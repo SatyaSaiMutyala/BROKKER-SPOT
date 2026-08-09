@@ -351,6 +351,14 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
             onTap: () => _openAgreementFlow(isOwner: true),
             color: _agreementGreen,
           );
+        case 4:
+          text = 'Property published. You can review the agreement anytime.';
+          button = _bannerButton(
+            icon: Icons.fact_check_outlined,
+            label: 'Information',
+            onTap: () => _openAgreementFlow(isOwner: true),
+            color: _agreementGreen,
+          );
         default:
           return const SizedBox.shrink();
       }
@@ -379,6 +387,14 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           // Sign & Publish (case 1) already published the property, so there's
           // no second publish step — just confirm and let the broker review
           // the agreement anytime.
+          text = 'Property published. You can review the agreement anytime.';
+          button = _bannerButton(
+            icon: Icons.fact_check_outlined,
+            label: 'Information',
+            onTap: () => _openAgreementFlow(isOwner: false),
+            color: _agreementGreen,
+          );
+        case 4:
           text = 'Property published. You can review the agreement anytime.';
           button = _bannerButton(
             icon: Icons.fact_check_outlined,

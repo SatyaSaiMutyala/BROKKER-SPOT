@@ -110,7 +110,7 @@ class PropertyFilter {
     add('search', search);
     add('listing_type', listingType);
     add('propertyStatus', propertyStatus);
-    add('rentPeriod', rentPeriod);
+    add('rentPeriod', rentPeriod?.toLowerCase());
     add('property_type_id', propertyTypeId);
     // Location is filtered by NAME, not id: the backend stores `country_id`/
     // `city_id`/`area_id` as null on announcements and only honors the value-

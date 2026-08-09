@@ -178,10 +178,6 @@ class _PropertyThumb extends StatelessWidget {
             ? CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                memCacheWidth: 195,
-                memCacheHeight: 195,
-                maxWidthDiskCache: 390,
-                maxHeightDiskCache: 390,
                 fadeInDuration: Duration.zero,
                 placeholderFadeInDuration: Duration.zero,
                 placeholder: (_, __) => _placeholder(isDark),
@@ -214,6 +210,11 @@ class _AvatarCluster extends StatelessWidget {
     required this.count,
   });
 
+  // User-side meetings always have brokers in chat_profiles — always show
+  // the broker profile photo.
+  String? _imgUrl(ChatProfileSummary? p) =>
+      p?.brokerProfileImageUrl ?? p?.profileImageUrl;
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -228,12 +229,12 @@ class _AvatarCluster extends StatelessWidget {
             Positioned(
               bottom: 0,
               right: 0,
-              child: _circle(second?.profileImageUrl, isDark),
+              child: _circle(_imgUrl(second), isDark),
             ),
           Positioned(
             bottom: 0,
             left: 0,
-            child: _circle(first?.profileImageUrl, isDark),
+            child: _circle(_imgUrl(first), isDark),
           ),
           if (count > 0)
             Positioned(
@@ -276,8 +277,6 @@ class _AvatarCluster extends StatelessWidget {
             ? CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                memCacheWidth: 108,
-                memCacheHeight: 108,
                 fadeInDuration: Duration.zero,
                 placeholderFadeInDuration: Duration.zero,
                 placeholder: (_, __) => _fallback(isDark),

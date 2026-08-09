@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/models/property_filter_model.dart';
+import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/overlay_dropdown_field.dart';
 import 'package:brokkerspot/widgets/search/filter_pill_group.dart';
@@ -48,14 +50,31 @@ class _FilterViewState extends State<FilterView> {
   int? _bedrooms, _bathrooms;
   late RangeValues _price;
 
+  // Price text-field controllers — nullable so _hydrateFromFilter is safe to
+  // call before they're initialised (first call from initState).
+  TextEditingController? _minPriceCtrl;
+  TextEditingController? _maxPriceCtrl;
+
+  // True when the user has typed a max price below the current min.
+  bool _priceRangeError = false;
+
+  // Live result count shown on the Apply button.
+  int? _resultCount;
+  bool _isCountLoading = false;
+  Timer? _countDebounce;
+  final _repo = AnnouncementRepository();
+
   @override
   void initState() {
     super.initState();
+    _minPriceCtrl = TextEditingController();
+    _maxPriceCtrl = TextEditingController();
     _hydrateFromFilter(widget.initial);
 
-    // Warm the reference lists (each is a no-op if already cached this session).
+    // Warm the reference lists and fetch the initial result count.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _common.loadPropertyTypes();
+      _fetchCount();
       // Country / City / Area loading — hidden for now (not needed).
       // _common.loadCountries();
       // if (_countryId != null) _common.loadCities(_countryId!);
@@ -94,20 +113,57 @@ class _FilterViewState extends State<FilterView> {
       (f.minPrice ?? _priceFloor).clamp(_priceFloor, _priceCeil).toDouble(),
       (f.maxPrice ?? _priceCeil).clamp(_priceFloor, _priceCeil).toDouble(),
     );
+    // Sync text fields (null-safe: controllers may not exist on the very first
+    // call from initState, before they're assigned above).
+    _minPriceCtrl?.text =
+        _price.start > _priceFloor ? _price.start.round().toString() : '';
+    _maxPriceCtrl?.text =
+        _price.end < _priceCeil ? _price.end.round().toString() : '';
   }
 
-  // ── Actions ────────────────────────────────────────────────────────────────
-
-  /// True once either price handle has moved off the full-range extremes.
-  bool get _priceEngaged =>
-      _price.start > _priceFloor || _price.end < _priceCeil;
-
-  void _reset() {
-    setState(() => _hydrateFromFilter(PropertyFilter.empty));
+  @override
+  void dispose() {
+    _minPriceCtrl?.dispose();
+    _maxPriceCtrl?.dispose();
+    _countDebounce?.cancel();
+    super.dispose();
   }
 
-  void _apply() {
-    final result = PropertyFilter(
+  // ── Count helpers ──────────────────────────────────────────────────────────
+
+  /// setState + schedule a debounced count refresh. Use instead of bare setState
+  /// for every filter change so the Apply button stays in sync.
+  void _updateAndCount(VoidCallback fn) {
+    setState(fn);
+    _scheduleCountFetch();
+  }
+
+  void _scheduleCountFetch() {
+    _countDebounce?.cancel();
+    _countDebounce = Timer(const Duration(milliseconds: 600), _fetchCount);
+  }
+
+  Future<void> _fetchCount() async {
+    if (!mounted) return;
+    setState(() => _isCountLoading = true);
+    try {
+      final count =
+          await _repo.fetchAnnouncementCount(filter: _buildCurrentFilter());
+      if (mounted) {
+        setState(() {
+          _resultCount = count;
+          _isCountLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isCountLoading = false);
+    }
+  }
+
+  /// Builds the [PropertyFilter] from current state — shared by [_apply] and
+  /// [_fetchCount] so they always reflect the same selection.
+  PropertyFilter _buildCurrentFilter() {
+    return PropertyFilter(
       listingType: _propertyFor == 'Buy'
           ? 1
           : _propertyFor == 'Rent'
@@ -131,19 +187,30 @@ class _FilterViewState extends State<FilterView> {
       areaName: _areaName,
       bedrooms: _bedrooms,
       bathrooms: _bathrooms,
-      // Once the price filter is engaged (either handle moved off the extremes)
-      // send BOTH bounds — so a max-only selection still sends min_price=0
-      // rather than omitting it.
       minPrice: _priceEngaged ? _price.start : null,
       maxPrice: _priceEngaged ? _price.end : null,
     );
-    Get.back(result: result);
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  /// True once either price handle has moved off the full-range extremes.
+  bool get _priceEngaged =>
+      _price.start > _priceFloor || _price.end < _priceCeil;
+
+  void _reset() {
+    setState(() => _hydrateFromFilter(PropertyFilter.empty));
+    _scheduleCountFetch();
+  }
+
+  void _apply() {
+    Get.back(result: _buildCurrentFilter());
   }
 
   // ── Selection handlers ───────────────────────────────────────────────────────
 
   void _onPropertyForChanged(String value) {
-    setState(() {
+    _updateAndCount(() {
       _propertyFor = value;
       _propertySub = null; // sub-toggle is contextual; reset on switch
     });
@@ -243,7 +310,8 @@ class _FilterViewState extends State<FilterView> {
                             ? _buyStatusOptions
                             : _rentPeriodOptions,
                         selected: _propertySub,
-                        onSelect: (v) => setState(() => _propertySub = v),
+                        onSelect: (v) =>
+                            _updateAndCount(() => _propertySub = v),
                       ),
                     ],
 
@@ -324,7 +392,7 @@ class _FilterViewState extends State<FilterView> {
                                 hint: '0',
                                 value: _countLabel(_bedrooms),
                                 items: _countOptions,
-                                onSelect: (v) => setState(
+                                onSelect: (v) => _updateAndCount(
                                     () => _bedrooms = _parseCount(v)),
                                 prefixIcon: Icons.bed_outlined,
                               ),
@@ -341,7 +409,7 @@ class _FilterViewState extends State<FilterView> {
                                 hint: '0',
                                 value: _countLabel(_bathrooms),
                                 items: _countOptions,
-                                onSelect: (v) => setState(
+                                onSelect: (v) => _updateAndCount(
                                     () => _bathrooms = _parseCount(v)),
                                 prefixIcon: Icons.bathtub_outlined,
                               ),
@@ -376,14 +444,25 @@ class _FilterViewState extends State<FilterView> {
                         borderRadius: BorderRadius.circular(30.r),
                       ),
                     ),
-                    child: Text(
-                      'Apply',
-                      style: GoogleFonts.poppins(
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: _isCountLoading
+                        ? SizedBox(
+                            width: 22.w,
+                            height: 22.w,
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            _resultCount != null
+                                ? 'Show ${_fmtCount(_resultCount!)} properties'
+                                : 'Apply',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -429,7 +508,7 @@ class _FilterViewState extends State<FilterView> {
               width: 20.w,
               height: 20.w,
               child: CircularProgressIndicator(
-                strokeWidth: 2, color: AppColors.primary),
+                  strokeWidth: 2, color: AppColors.primary),
             ),
           ),
         );
@@ -445,7 +524,7 @@ class _FilterViewState extends State<FilterView> {
             final t = types[i];
             final isSelected = _propertyTypeId == t.id;
             return GestureDetector(
-              onTap: () => setState(() {
+              onTap: () => _updateAndCount(() {
                 if (isSelected) {
                   _propertyTypeId = null;
                   _propertyTypeName = null;
@@ -486,8 +565,141 @@ class _FilterViewState extends State<FilterView> {
   }
 
   Widget _priceRange(bool isDark) {
+    final borderColor = isDark ? Colors.grey.shade700 : Colors.grey.shade300;
+    final labelStyle = GoogleFonts.poppins(
+      fontSize: 12.sp,
+      color: Colors.grey.shade500,
+    );
+    final fieldStyle = GoogleFonts.poppins(
+      fontSize: 14.sp,
+      color: isDark ? Colors.white : Colors.black87,
+    );
+
+    // Snap to nearest AED 5,000 — keeps the slider smooth but lands on clean values.
+    double snap(double v) => (v / 5000).round() * 5000;
+
+    void syncFromSlider(RangeValues v) {
+      final snapped = RangeValues(snap(v.start), snap(v.end));
+      setState(() {
+        _price = snapped;
+        _priceRangeError = false;
+      });
+      _minPriceCtrl?.text =
+          snapped.start > _priceFloor ? snapped.start.round().toString() : '';
+      _maxPriceCtrl?.text =
+          snapped.end < _priceCeil ? snapped.end.round().toString() : '';
+      _scheduleCountFetch();
+    }
+
+    void syncFromMin(String val) {
+      final trimmed = val.replaceAll(',', '').trim();
+      final n = trimmed.isEmpty ? _priceFloor : double.tryParse(trimmed);
+      if (n == null) return;
+      final clamped = n.clamp(_priceFloor, _price.end);
+      setState(() {
+        _price = RangeValues(clamped, _price.end);
+        _priceRangeError = false;
+      });
+      _scheduleCountFetch();
+    }
+
+    void syncFromMax(String val) {
+      final trimmed = val.replaceAll(',', '').trim();
+      final n = trimmed.isEmpty ? _priceCeil : double.tryParse(trimmed);
+      if (n == null) return;
+      final hasError = trimmed.isNotEmpty && n < _price.start;
+      final clamped = n.clamp(_price.start, _priceCeil);
+      setState(() {
+        _price = RangeValues(_price.start, clamped);
+        _priceRangeError = hasError;
+      });
+      _scheduleCountFetch();
+    }
+
+    InputDecoration fieldDec(String hint) => InputDecoration(
+          hintText: hint,
+          hintStyle: GoogleFonts.poppins(
+            fontSize: 14.sp,
+            color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+          ),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          filled: true,
+          fillColor: Colors.transparent,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+        );
+
     return Column(
       children: [
+        // ── Min / Max text fields ────────────────────────────────────────────
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 52.h,
+                    padding: EdgeInsets.symmetric(horizontal: 14.w),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: borderColor),
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    alignment: Alignment.centerLeft,
+                    child: TextField(
+                      controller: _minPriceCtrl,
+                      keyboardType: TextInputType.number,
+                      style: fieldStyle,
+                      decoration: fieldDec('0'),
+                      onChanged: syncFromMin,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text('Minimum', style: labelStyle),
+                ],
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.only(bottom: 20.h, left: 10.w, right: 10.w),
+              child: Text(
+                'to',
+                style: GoogleFonts.poppins(
+                  fontSize: 14.sp,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 52.h,
+                    padding: EdgeInsets.symmetric(horizontal: 14.w),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: borderColor),
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    alignment: Alignment.centerLeft,
+                    child: TextField(
+                      controller: _maxPriceCtrl,
+                      keyboardType: TextInputType.number,
+                      style: fieldStyle,
+                      decoration: fieldDec('Any'),
+                      onChanged: syncFromMax,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text('Maximum', style: labelStyle),
+                ],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12.h),
+        // ── Range slider ─────────────────────────────────────────────────────
         SliderTheme(
           data: SliderThemeData(
             trackHeight: 3.h,
@@ -498,47 +710,35 @@ class _FilterViewState extends State<FilterView> {
             overlayColor: AppColors.primary.withValues(alpha: 0.15),
             rangeThumbShape:
                 RoundRangeSliderThumbShape(enabledThumbRadius: 9.r),
+            // Allow thumbs to overlap so the max can reach very low
+            // values (e.g. 5,000) even when min is at 0.
+            minThumbSeparation: 0,
           ),
           child: RangeSlider(
             values: _price,
             min: _priceFloor,
             max: _priceCeil,
-            divisions: 100,
-            onChanged: (v) => setState(() => _price = v),
+            onChanged: syncFromSlider,
           ),
         ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8.w),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Min ${_fmtPrice(_price.start)}',
-                style: GoogleFonts.poppins(
-                  fontSize: 13.sp,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              Text(
-                'Max ${_fmtPrice(_price.end)}',
-                style: GoogleFonts.poppins(
-                  fontSize: 13.sp,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ],
+        if (_priceRangeError) ...[
+          SizedBox(height: 4.h),
+          Text(
+            'Maximum price must be greater than minimum price',
+            style: GoogleFonts.poppins(
+              fontSize: 11.sp,
+              color: Colors.red.shade400,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
 
-  String _fmtPrice(double v) {
-    if (v >= 1000000) {
-      final m = v / 1000000;
-      return '${m == m.roundToDouble() ? m.toStringAsFixed(0) : m.toStringAsFixed(1)}M';
-    }
-    if (v >= 1000) return '${(v / 1000).round()}K';
-    return v.round().toString();
+  /// Formats a count for the Apply button: 75346 → "75.3K", 1200000 → "1.2M".
+  String _fmtCount(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return n.toString();
   }
 }

@@ -5,7 +5,11 @@ import 'package:brokkerspot/models/announcement_model.dart';
 class ChatProfileSummary {
   final String? id;
   final String? name;
+  /// User (owner-side) profile photo.
   final String? profileImageUrl;
+  /// Broker-side profile photo — shown when the viewer is the property owner
+  /// and the chat_profiles list contains brokers.
+  final String? brokerProfileImageUrl;
   final int? role;
   final int? currentRole;
 
@@ -13,6 +17,7 @@ class ChatProfileSummary {
     this.id,
     this.name,
     this.profileImageUrl,
+    this.brokerProfileImageUrl,
     this.role,
     this.currentRole,
   });
@@ -22,6 +27,7 @@ class ChatProfileSummary {
         id: json['_id']?.toString(),
         name: json['name']?.toString(),
         profileImageUrl: json['userProfileImage']?.toString(),
+        brokerProfileImageUrl: json['brokerProfileImage']?.toString(),
         role: (json['role'] as num?)?.toInt(),
         currentRole: (json['currentRole'] as num?)?.toInt(),
       );

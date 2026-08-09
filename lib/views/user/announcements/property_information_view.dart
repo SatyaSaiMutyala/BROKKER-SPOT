@@ -34,6 +34,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   String? _totalFloor;
   String? _isProperty;
   final _nameCtrl = TextEditingController();
+
   /// One size input; [_sizeUnit] decides which unit it means.
   final _sizeCtrl = TextEditingController();
   String _sizeUnit = _unitSqft;
@@ -158,13 +159,15 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   /// first missing field into view rather than leaving a dead button.
   void _onSaveTap() {
     if (_isUploading) return;
+    // Dismiss the keyboard immediately so it doesn't stay open during the
+    // save progress or on the way back to the previous screen.
+    FocusScope.of(context).unfocus();
     if (_isValid) {
       _saveAndNext();
       return;
     }
     setState(() => _showErrors = true);
-    final first =
-        _requiredFields.where((f) => f.missing).firstOrNull;
+    final first = _requiredFields.where((f) => f.missing).firstOrNull;
     if (first == null) return;
     // Next frame: the red borders we just triggered change some heights, so
     // measure after that layout has landed.
@@ -688,8 +691,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                           SizedBox(height: 8.h),
                           Obx(() => OverlayDropdownField(
                                 key: _propertyTypeKey,
-                                hasError:
-                                    _showErrors && _propertyType == null,
+                                hasError: _showErrors && _propertyType == null,
                                 hint: _propertyTypeCtrl.isLoading.value
                                     ? 'Loading...'
                                     : 'Select Now',
@@ -759,8 +761,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                                     SizedBox(height: 8.h),
                                     OverlayDropdownField(
                                       key: _bedroomKey,
-                                      hasError:
-                                          _showErrors && _bedroom == null,
+                                      hasError: _showErrors && _bedroom == null,
                                       hint: '0',
                                       value: _bedroom,
                                       items: _bedroomBathroomCounts,
@@ -817,6 +818,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                                       onSelect: (v) =>
                                           setState(() => _floor = v),
                                       prefixIcon: Icons.layers_outlined,
+                                      maxPanelHeight: 264,
                                     ),
                                   ],
                                 ),
@@ -839,6 +841,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                                       onSelect: (v) =>
                                           setState(() => _totalFloor = v),
                                       prefixIcon: Icons.layers_outlined,
+                                      maxPanelHeight: 264,
                                     ),
                                   ],
                                 ),
@@ -981,8 +984,8 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                             key: _descriptionKey,
                             child: _descriptionField(
                               isDark: isDark,
-                              hasError: _showErrors &&
-                                  _descCtrl.text.trim().isEmpty,
+                              hasError:
+                                  _showErrors && _descCtrl.text.trim().isEmpty,
                             ),
                           ),
                           SizedBox(height: 32.h),
@@ -1030,7 +1033,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                 ],
               ),
             ),
-            if (_isUploading) _buildUploadOverlay(),
+            if (_isUploading) _buildUploadOverlay(isDark),
           ],
         ),
       ),
@@ -1039,9 +1042,14 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
 
   // ── Upload overlay ────────────────────────────────────────────────────────
 
-  Widget _buildUploadOverlay() {
+  Widget _buildUploadOverlay(bool isDark) {
     final percent = (_uploadProgress * 100).toInt();
     final isDone = _uploadedCount >= _totalToUpload && _totalToUpload > 0;
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.white70 : Colors.black54;
+    final trackColor = isDark
+        ? Colors.white.withValues(alpha: 0.1)
+        : Colors.black.withValues(alpha: 0.08);
     return Positioned.fill(
       child: AbsorbPointer(
         child: Container(
@@ -1051,7 +1059,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
               width: 200.w,
               padding: EdgeInsets.symmetric(vertical: 28.h, horizontal: 24.w),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
+                color: cardBg,
                 borderRadius: BorderRadius.circular(20.r),
               ),
               child: Column(
@@ -1070,8 +1078,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                             value: _uploadProgress,
                             strokeWidth: 7,
                             strokeCap: StrokeCap.round,
-                            backgroundColor:
-                                Colors.white.withValues(alpha: 0.1),
+                            backgroundColor: trackColor,
                             valueColor: AlwaysStoppedAnimation<Color>(
                                 AppColors.primary),
                           ),
@@ -1095,7 +1102,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                     style: GoogleFonts.inter(
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w500,
-                      color: Colors.white70,
+                      color: textColor,
                     ),
                     textAlign: TextAlign.center,
                   ),

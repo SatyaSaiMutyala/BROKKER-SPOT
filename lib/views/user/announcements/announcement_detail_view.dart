@@ -43,6 +43,12 @@ class AnnouncementDetailView extends StatefulWidget {
   final bool previewMode;
   final VoidCallback? onPreviewNext;
 
+  /// Optional fallback owner name/avatar — used when the API didn't populate
+  /// the `user_id` field (i.e. the broker is viewing and the server returns
+  /// user_id as a plain ID string rather than a nested user object).
+  final String? ownerName;
+  final String? ownerAvatarUrl;
+
   const AnnouncementDetailView({
     super.key,
     required this.announcement,
@@ -50,6 +56,8 @@ class AnnouncementDetailView extends StatefulWidget {
     this.publishMode = false,
     this.previewMode = false,
     this.onPreviewNext,
+    this.ownerName,
+    this.ownerAvatarUrl,
   });
 
   @override
@@ -1806,14 +1814,17 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                     ),
                     child: ClipOval(
                       child: (a.ownerAvatarUrl ??
-                                      widget.announcement.ownerAvatarUrl) !=
+                                      widget.announcement.ownerAvatarUrl ??
+                                      widget.ownerAvatarUrl) !=
                                   null &&
                               (a.ownerAvatarUrl ??
-                                      widget.announcement.ownerAvatarUrl)!
+                                      widget.announcement.ownerAvatarUrl ??
+                                      widget.ownerAvatarUrl)!
                                   .isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl: (a.ownerAvatarUrl ??
-                                  widget.announcement.ownerAvatarUrl)!,
+                                  widget.announcement.ownerAvatarUrl ??
+                                  widget.ownerAvatarUrl)!,
                               fit: BoxFit.cover,
                               errorWidget: (_, __, ___) => Container(
                                 color: const Color(0xFF2A2A2A),
@@ -1838,6 +1849,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                         Text(
                           a.ownerName ??
                               widget.announcement.ownerName ??
+                              widget.ownerName ??
                               'Owner',
                           style: GoogleFonts.poppins(
                             fontSize: 14.sp,
@@ -1869,9 +1881,11 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                       announcementId: a.id ?? '',
                       brokerName: a.ownerName ??
                           widget.announcement.ownerName ??
+                          widget.ownerName ??
                           'Owner',
                       brokerAvatar: a.ownerAvatarUrl ??
-                          widget.announcement.ownerAvatarUrl,
+                          widget.announcement.ownerAvatarUrl ??
+                          widget.ownerAvatarUrl,
                       peerUserId: a.userId ?? widget.announcement.userId,
                     ),
                     child: Container(

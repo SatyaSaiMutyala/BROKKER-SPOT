@@ -55,7 +55,12 @@ class _MeetingViewState extends State<MeetingView> {
     final myId = LocalStorageService.getUserIdFromToken() ??
         LocalStorageService.getUser()?.data?.id ??
         '';
-    final isOwner = myId.isNotEmpty && m.announcement.userId == myId;
+    // isOwner only when the logged-in user created the announcement AS an owner
+    // (user_role == 1). If they posted as a broker (user_role == 2) they are
+    // the userId but NOT the property owner, and should go to direct chat.
+    final isOwner = myId.isNotEmpty &&
+        m.announcement.userId == myId &&
+        (m.announcement.userRole ?? 1) == 1;
 
     if (isOwner) {
       await Get.to(() => AnnouncementConversationsView(meeting: m));
@@ -70,7 +75,7 @@ class _MeetingViewState extends State<MeetingView> {
       await AnnouncementChatView.open(
         announcementId: m.announcementId,
         brokerName: peer?.name ?? m.announcement.ownerName ?? 'User',
-        brokerAvatar: peer?.profileImageUrl ?? m.announcement.ownerAvatarUrl,
+        brokerAvatar: peer?.brokerProfileImageUrl ?? peer?.profileImageUrl ?? m.announcement.ownerAvatarUrl,
         peerUserId: ownerId,
         userRole: 3 - annRole,
       );
@@ -210,7 +215,9 @@ class _MeetingViewState extends State<MeetingView> {
           ),
           itemBuilder: (_, i) {
             final m = _ctrl.meetings[i];
-            final isOwn = myId != null && m.announcement.userId == myId;
+            final isOwn = myId != null &&
+                m.announcement.userId == myId &&
+                (m.announcement.userRole ?? 1) == 1;
             return MeetingCard(
               meeting: m,
               isOwn: isOwn,

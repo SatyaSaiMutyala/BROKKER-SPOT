@@ -112,7 +112,11 @@ class BrokerMeetingCard extends StatelessWidget {
             ),
             SizedBox(width: 8.w),
             _ClientAvatar(
-              imageUrl: peer?.profileImageUrl,
+              // Owner viewing → chat_profiles are brokers → show brokerProfileImage.
+              // Broker viewing → chat_profiles are owners → show userProfileImage.
+              imageUrl: isOwn
+                  ? (peer?.brokerProfileImageUrl ?? peer?.profileImageUrl)
+                  : peer?.profileImageUrl,
               fallbackInitial:
                   ((peer?.name?.isNotEmpty == true ? peer!.name![0] : 'U'))
                       .toUpperCase(),

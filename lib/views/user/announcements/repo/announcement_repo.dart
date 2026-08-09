@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/amenity_model.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/models/property_filter_model.dart';
@@ -121,6 +122,28 @@ class AnnouncementRepository {
       );
     }
     throw json['message'] ?? 'Failed to fetch announcements';
+  }
+
+  /// Fetches only the total count of matching announcements (`countOnly=true`).
+  /// Uses the authenticated or guest endpoint depending on login state.
+  Future<int> fetchAnnouncementCount({PropertyFilter? filter}) async {
+    final filterQuery = filter?.toQueryString() ?? '';
+    final isLoggedIn = LocalStorageService.isLoggedIn();
+    final endpoint = isLoggedIn
+        ? ApiEndpoints.fetchAllAnnouncements
+        : ApiEndpoints.guestFetchAllAnnouncements;
+    final headers = isLoggedIn ? api.buildHeaders() : api.buildHeader();
+    final response = await api.getRequest(
+      endPoint:
+          '${api.baseUrl}$endpoint?page=1&perPage=1&countOnly=true$filterQuery',
+      headers: headers,
+    );
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['success'] == true) {
+      final data = json['data'] as Map<String, dynamic>;
+      return (data['totalRecords'] as num?)?.toInt() ?? 0;
+    }
+    throw json['message'] ?? 'Failed to fetch count';
   }
 
   Future<void> sendProposal(String announcementId, {required String message}) async {

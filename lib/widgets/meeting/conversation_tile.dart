@@ -20,10 +20,10 @@ class ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = conversation.user;
-    final url = user.profileImageUrl ?? '';
+    // User-side conversations always show the broker's profile photo.
+    final url = (user.brokerProfileImageUrl ?? user.profileImageUrl) ?? '';
     final nameColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
-    final msgColor =
-        isDark ? const Color(0xFF9E9E9E) : Colors.grey.shade600;
+    final msgColor = isDark ? const Color(0xFF9E9E9E) : Colors.grey.shade600;
     final timeColor = Colors.grey.shade500;
     final hasUnread = conversation.unseenCount > 0;
 
@@ -46,13 +46,7 @@ class ConversationTile extends StatelessWidget {
                 child: url.isNotEmpty
                     ? CachedNetworkImage(
                         imageUrl: url,
-                        width: 54.w,
-                        height: 54.w,
                         fit: BoxFit.cover,
-                        memCacheWidth: 162,
-                        memCacheHeight: 162,
-                        maxWidthDiskCache: 300,
-                        maxHeightDiskCache: 300,
                         fadeInDuration: Duration.zero,
                         placeholderFadeInDuration: Duration.zero,
                         errorWidget: (_, __, ___) => _avatarFallback(isDark),
@@ -82,9 +76,7 @@ class ConversationTile extends StatelessWidget {
                         : 'Tap to start a chat',
                     style: GoogleFonts.inter(
                       fontSize: 12.sp,
-                      fontWeight: hasUnread
-                          ? FontWeight.w500
-                          : FontWeight.w400,
+                      fontWeight: hasUnread ? FontWeight.w500 : FontWeight.w400,
                       color: hasUnread
                           ? (isDark
                               ? Colors.white.withValues(alpha: 0.85)

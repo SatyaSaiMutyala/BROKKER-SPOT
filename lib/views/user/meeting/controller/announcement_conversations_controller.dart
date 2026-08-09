@@ -46,7 +46,11 @@ class AnnouncementConversationsController extends GetxController {
       ..on(ChatEvents.message, _onIncomingMessage)
       // Generic auth/socket-level errors — same defensive listener as
       // ChatController so an expired token doesn't spin the loader forever.
-      ..on('error', _onGenericError);
+      ..on('error', _onGenericError)
+      // Re-request after a disconnect/reconnect cycle — the response from the
+      // initial emit is lost when the transport drops, so we re-send once the
+      // socket is back up (only when we're still waiting or had an error).
+      ..on('connect', _onSocketReconnect);
     _request();
   }
 
@@ -57,7 +61,8 @@ class AnnouncementConversationsController extends GetxController {
       ..off(ChatEvents.announcementConversations, _onResponse)
       ..off(ChatEvents.announcementConversationsError, _onError)
       ..off(ChatEvents.message, _onIncomingMessage)
-      ..off('error', _onGenericError);
+      ..off('error', _onGenericError)
+      ..off('connect', _onSocketReconnect);
     super.onClose();
   }
 
@@ -145,6 +150,14 @@ class AnnouncementConversationsController extends GetxController {
     list[idx] = updated;
     _sortByLatest(list);
     conversations.assignAll(list);
+  }
+
+  /// Called when the socket reconnects after a transport drop. Re-emits the
+  /// request if the response was lost during the disconnect window.
+  void _onSocketReconnect(dynamic _) {
+    if (isLoading.value || error.value != null || conversations.isEmpty) {
+      _request();
+    }
   }
 
   /// Public hook for pull-to-refresh.
@@ -270,6 +283,10 @@ class AnnouncementConversationsController extends GetxController {
       profileImageUrl: (socketUser.profileImageUrl?.isNotEmpty == true)
           ? socketUser.profileImageUrl
           : match.profileImageUrl,
+      brokerProfileImageUrl:
+          (socketUser.brokerProfileImageUrl?.isNotEmpty == true)
+              ? socketUser.brokerProfileImageUrl
+              : match.brokerProfileImageUrl,
       role: socketUser.role ?? match.role,
       currentRole: socketUser.currentRole ?? match.currentRole,
     );
@@ -278,6 +295,7 @@ class AnnouncementConversationsController extends GetxController {
       lastMessage: c.lastMessage,
       lastMessageAt: c.lastMessageAt,
       unseenCount: c.unseenCount,
+      lastMessageUserRole: c.lastMessageUserRole,
     );
   }
 

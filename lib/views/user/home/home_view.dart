@@ -64,7 +64,7 @@ class _HomeViewState extends State<HomeView> {
   // avatar; .w and .h scale independently, so take whichever wins.
   double get _appBarExtent => max(42.h, 41.w) + 12.h + _headerTopGap;
   double get _searchFilterExtent =>
-      12.h + 45.h + 12.h + 39.h + 16.h; // gap + search + gap + chips + gap
+      12.h + 45.h + 12.h + 33.h + 10.h; // gap + search + gap + chips + gap
 
   static const _stories = [
     {'name': 'Brokkerspot', 'image': 'assets/images/brocker-icon.png'},
@@ -173,7 +173,7 @@ class _HomeViewState extends State<HomeView> {
                         ),
                         SizedBox(height: 12.h),
                         _buildFilterBar(),
-                        SizedBox(height: 16.h),
+                        SizedBox(height: 10.h),
                       ],
                     ),
                   ),
@@ -314,6 +314,10 @@ class _HomeViewState extends State<HomeView> {
       horizontalPadding: _gutter,
       filter: _searchCtrl.filter.value,
       onFilterChanged: _searchCtrl.applyFacets,
+      onResetAll: () {
+        _searchTextCtrl.clear();
+        _searchCtrl.resetAll();
+      },
     );
   }
 

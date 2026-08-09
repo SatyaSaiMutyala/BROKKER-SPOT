@@ -26,7 +26,14 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
   late TabController _tabController;
   final _controller = AnnouncementListController.to;
 
-  final _tabs = ['All', 'Pending', 'Active', 'Rejected', 'Draft', 'Live'];
+  final _tabs = [
+    'All',
+    'Pending',
+    'Shared Broker',
+    'Rejected',
+    'Draft',
+    'Live'
+  ];
 
   int? _statusForTab(int i) {
     switch (i) {
@@ -161,33 +168,36 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
               ),
             ),
 
-            // ── Tab bar ──────────────────────────────────────────────────────
+            // ── Tab bar (horizontally scrollable) ────────────────────────────
             Container(
               color: tabBarBg,
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-              child: Row(
-                children: List.generate(_tabs.length, (i) {
-                  final isSelected = _tabController.index == i;
-                  return Expanded(
-                    child: GestureDetector(
+              padding: EdgeInsets.symmetric(vertical: 6.h),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
+                child: Row(
+                  children: List.generate(_tabs.length, (i) {
+                    final isSelected = _tabController.index == i;
+                    return GestureDetector(
                       onTap: () => _onTabSelected(i),
                       child: Container(
-                        margin: EdgeInsets.symmetric(horizontal: 3.w),
-                        padding: EdgeInsets.symmetric(vertical: 5.h),
+                        margin: EdgeInsets.only(right: 8.w),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 16.w, vertical: 6.h),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? AppColors.primary
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(20.r),
-                          border: isSelected
-                              ? null
-                              : Border.all(color: AppColors.primary, width: 1),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.primary,
+                            width: 1,
+                          ),
                         ),
-                        alignment: Alignment.center,
                         child: Text(
                           _tabs[i],
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
                             fontSize: 13.sp,
                             fontWeight: FontWeight.w600,
@@ -195,9 +205,9 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
+                ),
               ),
             ),
 

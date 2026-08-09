@@ -81,8 +81,8 @@ class _WishlistViewState extends State<WishlistView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    // Header keeps the surface colour; the grid sits on a tinted panel.
-    final bodyBg = isDark ? const Color(0xFF0F1115) : const Color(0xFFF5F5F5);
+    // Match the CustomHeader background so header and body share one colour.
+    final bodyBg = isDark ? const Color(0xFF0F1115) : Colors.white;
 
     return Scaffold(
       backgroundColor: bodyBg,

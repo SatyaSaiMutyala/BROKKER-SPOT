@@ -49,6 +49,14 @@ class PropertySearchController extends GetxController {
     await _fetchFirstPage();
   }
 
+  /// Resets ALL filters **including** the free-text search, then re-fetches.
+  /// Called by the "Reset All Filters" chip so the search bar is also cleared.
+  Future<void> resetAll() async {
+    _debounce?.cancel();
+    filter.value = PropertyFilter.empty;
+    await _fetchFirstPage();
+  }
+
   /// Debounced free-text search. Merges [query] into the active filter and
   /// re-fetches once the user pauses typing.
   void onSearchChanged(String query) {

@@ -57,13 +57,14 @@ class _AnnouncementConversationsViewState
     // Warm avatars we already know about (from the meetings response) right
     // away — by the time the socket replies the images are ready to paint.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _precacheAvatars(
-          widget.meeting.chatProfiles.map((p) => p.profileImageUrl));
+      _precacheAvatars(widget.meeting.chatProfiles
+          .map((p) => p.brokerProfileImageUrl ?? p.profileImageUrl));
     });
     // And any new ones the socket surfaces (e.g. a brand-new conversation
     // arriving live).
     _precacheWorker = ever(_ctrl.conversations, (_) {
-      _precacheAvatars(_ctrl.conversations.map((c) => c.user.profileImageUrl));
+      _precacheAvatars(_ctrl.conversations
+          .map((c) => c.user.brokerProfileImageUrl ?? c.user.profileImageUrl));
     });
   }
 
@@ -201,7 +202,9 @@ class _AnnouncementConversationsViewState
     // Use the user_role stored on the last_message if the server gave us one
     // — that's the exact value chat:history needs for a first-attempt hit.
     // Fall back to computing from the announcement role.
-    final isOwner = myId.isNotEmpty && widget.meeting.announcement.userId == myId;
+    final isOwner = myId.isNotEmpty &&
+        widget.meeting.announcement.userId == myId &&
+        (widget.meeting.announcement.userRole ?? 1) == 1;
     final annRole = widget.meeting.announcement.userRole ?? 2;
     final computedRole = isOwner ? annRole : (3 - annRole);
     final chatUserRole = c.lastMessageUserRole ?? computedRole;
@@ -211,7 +214,7 @@ class _AnnouncementConversationsViewState
     await AnnouncementChatView.open(
       announcementId: widget.meeting.announcementId,
       brokerName: peer.name ?? 'User',
-      brokerAvatar: peer.profileImageUrl,
+      brokerAvatar: peer.brokerProfileImageUrl ?? peer.profileImageUrl,
       peerUserId: peerId,
       userRole: chatUserRole,
     );

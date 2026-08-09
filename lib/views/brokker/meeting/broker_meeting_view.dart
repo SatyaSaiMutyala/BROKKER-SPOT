@@ -77,18 +77,25 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
     final myId = LocalStorageService.getUserIdFromToken() ??
         LocalStorageService.getUser()?.data?.id ??
         '';
-    return myId.isNotEmpty && m.announcement.userId == myId;
+    // True only when the user created this as an OWNER (user_role == 1).
+    // A broker-posted announcement (user_role == 2) has userId == myId but
+    // the logged-in user is the broker, not the owner.
+    return myId.isNotEmpty &&
+        m.announcement.userId == myId &&
+        (m.announcement.userRole ?? 1) == 1;
   }
 
   Future<void> _onTap(MeetingItem m) async {
     final myId = LocalStorageService.getUserIdFromToken() ??
         LocalStorageService.getUser()?.data?.id ??
         '';
-    final isOwner = myId.isNotEmpty && m.announcement.userId == myId;
+    final isOwner = myId.isNotEmpty &&
+        m.announcement.userId == myId &&
+        (m.announcement.userRole ?? 1) == 1;
 
     debugPrint('📋 [BrokerMeeting] tap ann=${m.announcementId}');
     debugPrint(
-        '📋 [BrokerMeeting]   myId=$myId  ann.userId=${m.announcement.userId}  isOwner=$isOwner');
+        '📋 [BrokerMeeting]   myId=$myId  ann.userId=${m.announcement.userId}  userRole=${m.announcement.userRole}  isOwner=$isOwner');
     debugPrint(
         '📋 [BrokerMeeting]   chatProfiles=[${m.chatProfiles.map((p) => "${p.name}(${p.id})").join(", ")}]');
 

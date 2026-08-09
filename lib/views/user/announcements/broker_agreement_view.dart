@@ -137,9 +137,10 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   bool get _bothSigned => _brokerSigned;
 
   /// The listing is live — the broker has published it. Driven by the publish
-  /// broadcast, deliberately NOT by the signing status: a signed-but-unpublished
-  /// property must keep step 3 grey until the broker actually publishes.
-  bool get _isPublished => _published;
+  /// broadcast OR by the proposal status already being 4 (published) when the
+  /// screen opens after the fact — covers cold-open after a publish where the
+  /// live socket event is long gone but the server still returns status == 4.
+  bool get _isPublished => _published || widget.proposalStatus.value == 4;
 
   /// Whether the current user has taken their signing action.
   bool get _hasSigned => widget.isOwner ? _ownerSigned : _brokerSigned;
@@ -218,12 +219,17 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   void _openProperty() {
     final a = _announcement;
     if (a == null) return;
-    // The broker publishes from the detail page (Sign and Publish); the owner
-    // just views the live property.
+    // Broker gets publishMode only when the property hasn't been published yet;
+    // once published (_isPublished == true) they just view the live listing.
+    // When the broker is viewing (!isOwner), counterpartyName/Avatar is the owner's
+    // info — pass it so the detail screen shows the owner's name and photo even
+    // though the API returns user_id as a plain string for non-owner requests.
     Get.to(() => AnnouncementDetailView(
           announcement: a,
           isOwner: widget.isOwner,
-          publishMode: !widget.isOwner,
+          publishMode: !widget.isOwner && !_isPublished,
+          ownerName: !widget.isOwner ? widget.counterpartyName : null,
+          ownerAvatarUrl: !widget.isOwner ? widget.counterpartyAvatar : null,
         ));
   }
 
