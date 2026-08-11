@@ -300,14 +300,17 @@ class AnnouncementModel {
     final String? userId;
     final String? ownerNameParsed;
     final String? ownerAvatarParsed;
+    final String? brokerAvatarParsed;
     if (userIdRaw is Map<String, dynamic>) {
       userId = userIdRaw['_id'] as String?;
       ownerNameParsed = userIdRaw['name'] as String?;
       ownerAvatarParsed = userIdRaw['userProfileImage'] as String?;
+      brokerAvatarParsed = userIdRaw['brokerProfileImage'] as String?;
     } else {
       userId = userIdRaw as String?;
       ownerNameParsed = null;
       ownerAvatarParsed = null;
+      brokerAvatarParsed = null;
     }
 
     return AnnouncementModel(
@@ -366,6 +369,7 @@ class AnnouncementModel {
       // derived display fields
       ownerName: ownerNameParsed,
       ownerAvatarUrl: ownerAvatarParsed,
+      brokerAvatarUrl: brokerAvatarParsed,
       listingType: listingTypeCode == 1
           ? 'Sell'
           : listingTypeCode == 2

@@ -40,18 +40,8 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.onWishlistTap,
   });
 
-  static const _brokerageRowHeight = 57.0;
-  // The strip's top 20px sits over the image's own bottom edge (per the
-  // Figma spec: card height 263, strip top at 243) instead of the card
-  // growing by the strip's full height — only the un-overlapped remainder
-  // adds new space below the photo.
-  static const _brokerageOverlap = 20.0;
-
-  static const _fallbackAvatars = [
-    'assets/images/announcement_proffile_icon.png',
-    'assets/images/story1.png',
-    'assets/images/story2.png',
-  ];
+  // Strip sits flush below the image card — no overlap.
+  static const _brokerageRowHeight = 40.0;
 
   String get _listingBadge {
     if (announcement.listingType == 'Sell') return 'FOR SELL';
@@ -64,20 +54,20 @@ class HomeAnnouncementCard extends StatelessWidget {
     final a = announcement;
     final imgCount = a.imageUrls?.length ?? 0;
 
-    final brokerageExtra =
-        showBrokerageRow ? (_brokerageRowHeight - _brokerageOverlap).h : 0.0;
     final imageCardHeight = cardHeight ?? 263.h;
+    final stripExtra = showBrokerageRow ? _brokerageRowHeight.h : 0.0;
 
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
         width: cardWidth ?? 329.w,
-        height: imageCardHeight + brokerageExtra,
+        height: imageCardHeight + stripExtra,
         child: Stack(
           children: [
-            // Brokerage strip sits behind the photo card, bottom-anchored,
-            // so it peeks out from under the photo's own rounded corners.
-            if (showBrokerageRow && a.brokkeragePercent != null)
+            // ── Brokerage strip ───────────────────────────────────────────────
+            // Sits behind the photo card; its top 20 px slides under the card
+            // (Figma: strip top = 243, image height = 263 → 20 px overlap).
+            if (showBrokerageRow)
               Positioned(
                 left: 0,
                 right: 0,
@@ -95,13 +85,16 @@ class HomeAnnouncementCard extends StatelessWidget {
                       end: Alignment.centerRight,
                       colors: [
                         Color(0xFFB29C61),
-                        Color(0x7A756846), // rgba(117,104,70,0.48)
+                        Color(0x7A756846),
                       ],
                     ),
                   ),
                   child: Text(
-                    'Brokerage ${a.brokkeragePercent}% ~ ${a.currency ?? 'AED'} '
-                    '${_formatPrice((a.price ?? 0) * a.brokkeragePercent! / 100)}',
+                    a.brokkeragePercent != null
+                        ? 'Brokerage ${a.brokkeragePercent}% ~ '
+                            '${a.currency ?? 'AED'} '
+                            '${_formatPrice((a.price ?? 0) * a.brokkeragePercent! / 100)}'
+                        : 'No Seller Brokerage',
                     style: GoogleFonts.poppins(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w400,
@@ -112,9 +105,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                 ),
               ),
 
-            // Photo card — its own fully-rounded rect (drawn on top), so its
-            // bottom corners cut away to reveal the brokerage strip behind
-            // it instead of running flush into it.
+            // ── Photo card (drawn on top of the strip) ────────────────────────
             Positioned(
               top: 0,
               left: 0,
@@ -123,7 +114,14 @@ class HomeAnnouncementCard extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(20.r),
+                  // When the brokerage strip is shown it sits flush below, so
+                  // remove the bottom radius to avoid a visible rounded gap.
+                  borderRadius: showBrokerageRow
+                      ? BorderRadius.only(
+                          topLeft: Radius.circular(20.r),
+                          topRight: Radius.circular(20.r),
+                        )
+                      : BorderRadius.circular(20.r),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Stack(
@@ -319,7 +317,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                             ),
                           ),
                           // Location
-                          if (a.location != null)
+                          if (_resolveLocation(a).isNotEmpty)
                             Transform.translate(
                               offset: Offset(0, -5.h),
                               child: Row(
@@ -329,7 +327,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                                   SizedBox(width: 4.w),
                                   Expanded(
                                     child: Text(
-                                      a.location!,
+                                      _resolveLocation(a),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: GoogleFonts.poppins(
@@ -347,13 +345,13 @@ class HomeAnnouncementCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+                  ], // inner Stack children
+                ), // inner Stack
+              ), // Container (photo card)
+            ), // Positioned (photo card)
+          ], // outer Stack children
+        ), // outer Stack
+      ), // SizedBox
     );
   }
 
@@ -397,10 +395,36 @@ class HomeAnnouncementCard extends StatelessWidget {
     );
   }
 
+  /// Same priority as `_shortLocation` in AnnouncementDetailView:
+  /// 1. city + country (both present)
+  /// 2. city missing  → area + country
+  /// 3. country missing → area + city
+  /// 4. all three missing → address
+  static String _resolveLocation(AnnouncementModel a) {
+    final area = a.propertyArea?.trim() ?? '';
+    final city = a.propertyCity?.trim() ?? '';
+    final country = a.propertyCountry?.trim() ?? '';
+    final address = a.propertyAddress?.trim() ?? '';
+
+    if (city.isNotEmpty && country.isNotEmpty) return '$city, $country';
+    if (city.isEmpty && country.isNotEmpty) {
+      return [area, country].where((s) => s.isNotEmpty).join(', ');
+    }
+    if (country.isEmpty && city.isNotEmpty) {
+      return [area, city].where((s) => s.isNotEmpty).join(', ');
+    }
+    return address;
+  }
+
   Widget _buildAvatar(AnnouncementModel a) {
-    if (a.ownerAvatarUrl != null && a.ownerAvatarUrl!.isNotEmpty) {
+    // User-side home feed always shows broker announcements → show brokerProfileImage.
+    // Fall back to userProfileImage if broker photo absent, then placeholder.
+    final url = (a.brokerAvatarUrl?.isNotEmpty == true)
+        ? a.brokerAvatarUrl!
+        : (a.ownerAvatarUrl?.isNotEmpty == true ? a.ownerAvatarUrl! : null);
+    if (url != null) {
       return CachedNetworkImage(
-        imageUrl: a.ownerAvatarUrl!,
+        imageUrl: url,
         fit: BoxFit.cover,
         errorWidget: (_, __, ___) => _fallbackAvatar(),
       );
@@ -409,13 +433,9 @@ class HomeAnnouncementCard extends StatelessWidget {
   }
 
   Widget _fallbackAvatar() {
-    return Image.asset(
-      _fallbackAvatars[index % _fallbackAvatars.length],
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        color: Colors.grey.shade700,
-        child: Icon(Icons.person, size: 20.sp, color: Colors.white54),
-      ),
+    return Container(
+      color: const Color(0xFF3A3A3A),
+      child: Icon(Icons.person, size: 20.sp, color: Colors.white54),
     );
   }
 

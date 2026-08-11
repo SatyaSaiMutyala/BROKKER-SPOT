@@ -255,7 +255,8 @@ class _BrokerAnnouncementDetailViewState
   List<MediaGalleryItem> _mediaItems(
       List<String> images, bool hasImages, bool hasVideo, AnnouncementModel a) {
     return [
-      if (hasVideo) MediaGalleryItem(url: a.propertyMedia!.videos!, isVideo: true),
+      if (hasVideo)
+        MediaGalleryItem(url: a.propertyMedia!.videos!, isVideo: true),
       if (hasImages)
         ...images.map((url) => MediaGalleryItem(url: url, isVideo: false)),
     ];
@@ -1416,28 +1417,117 @@ class _BrokerAnnouncementDetailViewState
     final Widget button;
 
     if (chatReady) {
+      final ownerName = _data.ownerName?.isNotEmpty == true
+          ? _data.ownerName!
+          : widget.announcement.ownerName ?? 'User';
+      final ownerAvatar = _data.ownerAvatarUrl?.isNotEmpty == true
+          ? _data.ownerAvatarUrl
+          : widget.announcement.ownerAvatarUrl;
+
       button = GestureDetector(
         onTap: _openChat,
-        child: Container(
-          height: 50.h,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(26.r),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.chat_bubble_outline, size: 18.sp, color: Colors.white),
-              SizedBox(width: 8.w),
-              Text('Chat Now',
-                  style: GoogleFonts.poppins(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white)),
-            ],
-          ),
-        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(90.r),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                // Figma: #E1E1E1 at 50% opacity (0x80 = alpha, E1E1E1 = grey)
+                color: const Color(0x80E1E1E1),
+                borderRadius: BorderRadius.circular(90.r),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+              child: Row(
+                children: [
+                  // ── Profile pill ──────────────────────────────────────────
+                  Container(
+                    padding: EdgeInsets.only(right: 10.w),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Avatar
+                        Container(
+                          width: 54.r,
+                          height: 54.r,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xABDBC483),
+                              width: 1,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: ownerAvatar != null && ownerAvatar.isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: ownerAvatar,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => const Icon(
+                                        Icons.person,
+                                        color: Colors.white54),
+                                  )
+                                : const Icon(Icons.person,
+                                    color: Colors.white54),
+                          ),
+                        ),
+                        SizedBox(width: 14.w),
+                        // Name + subtitle
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ownerName,
+                              style: GoogleFonts.poppins(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w500,
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF292929),
+                                height: 1.0,
+                              ),
+                            ),
+                            SizedBox(height: 3.h),
+                            Text(
+                              'Property Owner',
+                              style: GoogleFonts.poppins(
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.w400,
+                                color: const Color(0xFF6C6C6C),
+                                height: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  // ── Chat icon circle ──────────────────────────────────────
+                  Container(
+                    width: 42.w,
+                    height: 42.w,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFDBC483),
+                        width: 2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Image.asset(
+                      'assets/images/chat_icon.png',
+                      width: 16.w,
+                      height: 16.w,
+                      color: const Color(0xFFDBC483),
+                    ),
+                  ),
+                ],
+              ), // Row
+            ), // Container
+          ), // BackdropFilter
+        ), // ClipRRect
       );
     } else if (alreadySent) {
       button = Container(

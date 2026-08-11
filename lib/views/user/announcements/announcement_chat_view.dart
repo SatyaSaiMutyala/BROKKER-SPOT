@@ -268,11 +268,14 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     );
   }
 
-  Widget _fallbackAvatar() => Image.asset(
-        'assets/images/story1.png',
+  Widget _fallbackAvatar() => Container(
         width: 44.w,
         height: 44.w,
-        fit: BoxFit.cover,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFF3A3A3A),
+        ),
+        child: Icon(Icons.person, size: 22.sp, color: Colors.white54),
       );
 
   Widget _headerAvatar() {

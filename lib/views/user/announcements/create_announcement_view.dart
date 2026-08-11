@@ -319,27 +319,34 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                   : 'Create Announcement',
               showBackButton: true,
               onBack: () => Get.back(),
-              trailing: GestureDetector(
-                onTap: (_isSavingDraft || _isSubmitting) ? null : _saveDraft,
-                child: _isSavingDraft
-                    ? SizedBox(
-                        width: 14.sp,
-                        height: 14.sp,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.primary,
+              trailing: Builder(builder: (ctx) {
+                // Save Draft is only available once step 1 is complete.
+                final step1Done = _stepFlags[0];
+                final enabled = step1Done && !_isSavingDraft && !_isSubmitting;
+                return GestureDetector(
+                  onTap: enabled ? _saveDraft : null,
+                  child: _isSavingDraft
+                      ? SizedBox(
+                          width: 14.sp,
+                          height: 14.sp,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : Text(
+                          'Save Draft',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w500,
+                            color: enabled
+                                ? AppColors.primary
+                                : Colors.grey.shade400,
+                            height: 1.0,
+                          ),
                         ),
-                      )
-                    : Text(
-                        'Save Draft',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.primary,
-                          height: 1.0,
-                        ),
-                      ),
-              ),
+                );
+              }),
             ),
 
             // ── Step progress ─────────────────────────────────────────────────

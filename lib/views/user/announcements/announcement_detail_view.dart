@@ -130,7 +130,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
     final wasWishlisted = _wishlistCtrl.isWishlisted(id);
     final isWishlisted = await _wishlistCtrl.toggle(id);
-    if (isWishlisted == wasWishlisted) return; // request failed; toast already shown
+    if (isWishlisted == wasWishlisted)
+      return; // request failed; toast already shown
     AppToast.success(
       isWishlisted ? 'Added to wishlist' : 'Removed from wishlist',
     );
@@ -161,10 +162,23 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   }
 
   String _shortLocation(AnnouncementModel a) {
-    return [
-      a.propertyCity,
-      a.propertyCountry,
-    ].whereType<String>().where((s) => s.isNotEmpty).join(', ');
+    final area = a.propertyArea?.trim() ?? '';
+    final city = a.propertyCity?.trim() ?? '';
+    final country = a.propertyCountry?.trim() ?? '';
+    final address = a.propertyAddress?.trim() ?? '';
+
+    // 1st priority: city + country (both present).
+    if (city.isNotEmpty && country.isNotEmpty) return '$city, $country';
+    // City missing → area + country.
+    if (city.isEmpty && country.isNotEmpty) {
+      return [area, country].where((s) => s.isNotEmpty).join(', ');
+    }
+    // Country missing → area + city.
+    if (country.isEmpty && city.isNotEmpty) {
+      return [area, city].where((s) => s.isNotEmpty).join(', ');
+    }
+    // All three missing → full address.
+    return address;
   }
 
   // ── Three-dot popup menu ────────────────────────────────────────────────────
@@ -1334,7 +1348,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     final receive = price - commission;
     final currency = a.currency ?? 'AED';
 
-    final borderColor = isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
+    final borderColor =
+        isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
     final cardBg = isDark ? const Color(0xFF0E1118) : Colors.white;
     final primaryText = isDark ? Colors.white : const Color(0xFF252525);
     final subText = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
@@ -1813,30 +1828,35 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                       border: Border.all(color: AppColors.primary, width: 1.5),
                     ),
                     child: ClipOval(
-                      child: (a.ownerAvatarUrl ??
-                                      widget.announcement.ownerAvatarUrl ??
-                                      widget.ownerAvatarUrl) !=
-                                  null &&
-                              (a.ownerAvatarUrl ??
-                                      widget.announcement.ownerAvatarUrl ??
-                                      widget.ownerAvatarUrl)!
-                                  .isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: (a.ownerAvatarUrl ??
-                                  widget.announcement.ownerAvatarUrl ??
-                                  widget.ownerAvatarUrl)!,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => Container(
-                                color: const Color(0xFF2A2A2A),
-                                child: Icon(Icons.person,
-                                    size: 22.sp, color: Colors.white54),
-                              ),
-                            )
-                          : Container(
+                      child: Builder(builder: (_) {
+                        // Broker profile image takes priority; detail API
+                        // returns user_id as a plain string so brokerAvatarUrl
+                        // is only populated from the list-navigation payload.
+                        final url =
+                            a.brokerAvatarUrl?.isNotEmpty == true
+                                ? a.brokerAvatarUrl
+                                : widget.announcement.brokerAvatarUrl
+                                        ?.isNotEmpty ==
+                                    true
+                                ? widget.announcement.brokerAvatarUrl
+                                : null;
+                        if (url != null) {
+                          return CachedNetworkImage(
+                            imageUrl: url,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Container(
                               color: const Color(0xFF2A2A2A),
                               child: Icon(Icons.person,
                                   size: 22.sp, color: Colors.white54),
                             ),
+                          );
+                        }
+                        return Container(
+                          color: const Color(0xFF2A2A2A),
+                          child: Icon(Icons.person,
+                              size: 22.sp, color: Colors.white54),
+                        );
+                      }),
                     ),
                   ),
                   SizedBox(width: 12.w),
@@ -1883,9 +1903,14 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                           widget.announcement.ownerName ??
                           widget.ownerName ??
                           'Owner',
-                      brokerAvatar: a.ownerAvatarUrl ??
-                          widget.announcement.ownerAvatarUrl ??
-                          widget.ownerAvatarUrl,
+                      brokerAvatar: (a.brokerAvatarUrl?.isNotEmpty == true
+                              ? a.brokerAvatarUrl
+                              : widget.announcement.brokerAvatarUrl
+                                          ?.isNotEmpty ==
+                                      true
+                                  ? widget.announcement.brokerAvatarUrl
+                                  : null) ??
+                          '',
                       peerUserId: a.userId ?? widget.announcement.userId,
                     ),
                     child: Container(
