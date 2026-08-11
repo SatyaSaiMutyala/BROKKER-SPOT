@@ -79,6 +79,21 @@ class ChatController extends GetxController {
 
   String? get _currentUserId => LocalStorageService.getUser()?.data?.id;
 
+  /// The broker's user-id in this conversation.
+  /// • owner side (userRole == 1, or null when opened without explicit role):
+  ///   the peer IS the broker → recipientId
+  /// • broker side (userRole == 2): the current user IS the broker → _currentUserId
+  ///
+  /// IMPORTANT: treat null as 1 (owner) so that when the proposals view opens
+  /// a chat without passing userRole the scoped published-key is still keyed on
+  /// the recipient (the specific broker), not on the owner's own id.  Using
+  /// the owner's id as brokerId caused every broker's chat for the same
+  /// announcement to share one "published" flag — any broker publishing the
+  /// property would bleed the "Information" banner into another broker's chat
+  /// where the proposal was still at status 0.
+  String get _brokerId =>
+      ((userRole ?? 1) == 1) ? recipientId : (_currentUserId ?? '');
+
   @override
   void onInit() {
     super.onInit();
@@ -101,7 +116,10 @@ class ChatController extends GetxController {
       // Generic server-side error (e.g. "Invalid or expired token.").
       ..on('error', _onSocketError);
     // Seed from a prior session so the "Information" banner survives reopen.
-    published.value = LocalStorageService.isAnnouncementPublished(announcementId);
+    // Key is scoped to the broker so a different broker's publication doesn't
+    // bleed into this chat's banner.
+    published.value = LocalStorageService.isAnnouncementPublished(
+        announcementId, brokerId: _brokerId);
     _requestHistory(page: 1);
     _loadProposal();
   }
@@ -366,7 +384,8 @@ class ChatController extends GetxController {
     final id = (data['_id'] ?? data['announcement_id'])?.toString();
     if (id == null || id == announcementId) {
       published.value = true;
-      LocalStorageService.markAnnouncementPublished(announcementId);
+      LocalStorageService.markAnnouncementPublished(announcementId,
+          brokerId: _brokerId);
     }
   }
 

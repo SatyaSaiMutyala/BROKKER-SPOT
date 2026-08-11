@@ -46,6 +46,11 @@ class BrokerAgreementView extends StatefulWidget {
   /// triggers publish — no separate publish screen.
   final bool acceptAndPublish;
 
+  /// The broker's user-id in this agreement. Used to scope the persisted
+  /// "published" flag so it doesn't bleed into other brokers' chats for the
+  /// same announcement. Leave empty for callers that don't have the broker id.
+  final String brokerId;
+
   const BrokerAgreementView({
     super.key,
     required this.announcementId,
@@ -57,6 +62,7 @@ class BrokerAgreementView extends StatefulWidget {
     this.counterpartyAvatar,
     this.onRefreshStatus,
     this.acceptAndPublish = false,
+    this.brokerId = '',
   });
 
   @override
@@ -87,8 +93,10 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   void initState() {
     super.initState();
     // Cold open after a publish: the live broadcast is long gone, so seed from
-    // the persisted flag to keep step 3 lit.
-    _published = LocalStorageService.isAnnouncementPublished(widget.announcementId);
+    // the persisted flag to keep step 3 lit.  Use the broker-scoped key so a
+    // different broker's publication doesn't light up step 3 incorrectly.
+    _published = LocalStorageService.isAnnouncementPublished(
+        widget.announcementId, brokerId: widget.brokerId);
     _loadAnnouncement();
     // Pull the current status so a broker signature that landed while this
     // owner was away shows the completed timeline on open.
@@ -106,7 +114,26 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   Future<void> _loadAnnouncement() async {
     try {
       final a = await _repo.fetchAnnouncementDetail(widget.announcementId);
-      if (mounted) setState(() => _announcement = a);
+      if (!mounted) return;
+
+      // The socket's proposal-status event only reflects signing (status ≤ 3);
+      // the published state (status == 4) is sent once as a live broadcast and
+      // is not re-sent on reconnect. If we missed that broadcast, seed
+      // _published from the REST API instead — it always has the latest status.
+      if (!_published && widget.brokerId.isNotEmpty &&
+          a.latestProposals != null) {
+        final brokerPublished = a.latestProposals!.any(
+          (p) => p.brokerId == widget.brokerId && (p.status ?? 0) >= 4,
+        );
+        if (brokerPublished) {
+          _published = true;
+          // Write the scoped key so future opens skip this fetch.
+          LocalStorageService.markAnnouncementPublished(
+              widget.announcementId, brokerId: widget.brokerId);
+        }
+      }
+
+      setState(() => _announcement = a);
     } catch (_) {
       // Card falls back to placeholders; the flow still works without it.
     }
@@ -126,11 +153,9 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
 
   int get _status => widget.proposalStatus.value ?? 0;
 
-  bool get _ownerSigned =>
-      _status >= 1 || (widget.isOwner && _signedLocally);
+  bool get _ownerSigned => _status >= 1 || (widget.isOwner && _signedLocally);
 
-  bool get _brokerSigned =>
-      _status >= 3 || (!widget.isOwner && _signedLocally);
+  bool get _brokerSigned => _status >= 3 || (!widget.isOwner && _signedLocally);
 
   /// Both parties have signed. Signing is NOT publishing — the property only
   /// goes live once the broker actually publishes it (see [_isPublished]).
@@ -206,66 +231,113 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   Future<void> _openContract() async {
     final url = widget.agreementUrl.value;
     if (url == null || url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Agreement document not available yet.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Agreement document not available yet.')));
+      }
       return;
     }
     final uri = Uri.tryParse(url);
-    if (uri != null && await canLaunchUrl(uri)) {
+    if (uri == null) return;
+    try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // Fall back to in-app browser if the external app isn't available
+      try {
+        await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Could not open contract. Please try again.')),
+          );
+        }
+      }
     }
   }
 
   void _openProperty() {
     final a = _announcement;
     if (a == null) return;
-    // Broker gets publishMode only when the property hasn't been published yet;
-    // once published (_isPublished == true) they just view the live listing.
-    // When the broker is viewing (!isOwner), counterpartyName/Avatar is the owner's
-    // info — pass it so the detail screen shows the owner's name and photo even
-    // though the API returns user_id as a plain string for non-owner requests.
-    Get.to(() => AnnouncementDetailView(
-          announcement: a,
-          isOwner: widget.isOwner,
-          publishMode: !widget.isOwner && !_isPublished,
-          ownerName: !widget.isOwner ? widget.counterpartyName : null,
-          ownerAvatarUrl: !widget.isOwner ? widget.counterpartyAvatar : null,
-        ));
+
+    final detail = AnnouncementDetailView(
+      announcement: a,
+      isOwner: widget.isOwner,
+      publishMode: !widget.isOwner && !_isPublished,
+      ownerName: !widget.isOwner ? widget.counterpartyName : null,
+      ownerAvatarUrl: !widget.isOwner ? widget.counterpartyAvatar : null,
+      backOnChat: !widget.isOwner,
+    );
+
+    if (widget.acceptAndPublish) {
+      // The "Sign & Publish" path stacks: Chat → Preview(previewMode) → Agreement.
+      // Get.off() would only replace Agreement, leaving the preview detail below,
+      // so the chat icon's Get.back() would land on the preview screen instead of
+      // the chat screen. Close both Agreement + Preview in one step, then push the
+      // live detail — result: Chat → AnnouncementDetailView(backOnChat:true).
+      Get.close(2);
+      Get.to(() => detail);
+    } else {
+      // Normal path: Chat → Agreement (no preview below).
+      // Replace Agreement with detail: Chat → AnnouncementDetailView(backOnChat:true).
+      Get.off(() => detail);
+    }
   }
 
   // ── Build ───────────────────────────────────────────────────────────────────
 
+  /// Decides how many routes to pop when the user taps back.
+  ///
+  /// Normal path  →  pop 1 (this screen only).
+  /// acceptAndPublish + _published  →  pop 2 (this screen + the preview-detail
+  ///   screen that was pushed before us), landing back on the chat screen.
+  void _handleBack() {
+    if (widget.acceptAndPublish && _published) {
+      // Close both the Agreement screen and the AnnouncementDetailView(previewMode)
+      // that was stacked underneath it, so the user returns directly to chat.
+      Get.close(2);
+    } else {
+      Get.back();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bgColor = _isDark ? const Color(0xFF0B0D12) : Colors.white;
-    return Scaffold(
-      backgroundColor: bgColor,
-      body: SafeArea(
-        child: Obx(() {
-          // Touch the observables so this rebuilds when the broker signs.
-          widget.proposalStatus.value;
-          final showTimeline = _hasSigned;
-          return Column(
-            children: [
-              CustomHeader(
-                title: 'Agreement',
-                showBackButton: true,
-                trailing: Text(
-                  _counter,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                    height: 1.0,
+    return PopScope(
+      canPop: false, // always route through _handleBack
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: bgColor,
+        body: SafeArea(
+          child: Obx(() {
+            // Touch the observables so this rebuilds when the broker signs.
+            widget.proposalStatus.value;
+            final showTimeline = _hasSigned;
+            return Column(
+              children: [
+                CustomHeader(
+                  title: 'Agreement',
+                  showBackButton: true,
+                  trailing: Text(
+                    _counter,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                      height: 1.0,
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: showTimeline ? _buildTimeline() : _buildSignPage(),
-              ),
-            ],
-          );
-        }),
+                Expanded(
+                  child: showTimeline ? _buildTimeline() : _buildSignPage(),
+                ),
+              ],
+            );
+          }),
+        ),
       ),
     );
   }
@@ -364,8 +436,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                   width: 2,
                 ),
               ),
-              child: Icon(Icons.verified_user,
-                  color: Colors.white, size: 16.sp),
+              child:
+                  Icon(Icons.verified_user, color: Colors.white, size: 16.sp),
             ),
           ),
         ],
@@ -392,8 +464,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
         ),
         child: Row(
           children: [
-            Icon(Icons.description_outlined,
-                size: 22.sp, color: iconColor),
+            Icon(Icons.description_outlined, size: 22.sp, color: iconColor),
             SizedBox(width: 12.w),
             Expanded(
               child: Text(
@@ -436,7 +507,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
         SizedBox(width: 8.w),
         Text(
           'Your signature is secure and legally binding.',
-          style: GoogleFonts.inter(fontSize: 12.sp, color: Colors.grey.shade400),
+          style:
+              GoogleFonts.inter(fontSize: 12.sp, color: Colors.grey.shade400),
         ),
       ],
     );
@@ -459,8 +531,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-              color: _agreed ? AppColors.primary : borderColor),
+          border: Border.all(color: _agreed ? AppColors.primary : borderColor),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,9 +616,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   // ── Timeline page ───────────────────────────────────────────────────────────
 
   Widget _buildTimeline() {
-    final dividerColor = _isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.grey.shade200;
+    final dividerColor =
+        _isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade200;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -760,13 +830,12 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     Widget? action,
   }) {
     final isDark = _isDark;
-    final titleColor = done
-        ? (isDark ? Colors.white : Colors.black87)
-        : Colors.grey.shade500;
-    final inactiveCircle = isDark ? const Color(0xFF3A3F47) : Colors.grey.shade300;
-    final inactiveConnector = isDark
-        ? Colors.white.withValues(alpha: 0.35)
-        : Colors.grey.shade300;
+    final titleColor =
+        done ? (isDark ? Colors.white : Colors.black87) : Colors.grey.shade500;
+    final inactiveCircle =
+        isDark ? const Color(0xFF3A3F47) : Colors.grey.shade300;
+    final inactiveConnector =
+        isDark ? Colors.white.withValues(alpha: 0.35) : Colors.grey.shade300;
 
     return IntrinsicHeight(
       child: Row(
@@ -797,9 +866,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                   child: Container(
                     width: 1.5,
                     margin: EdgeInsets.symmetric(vertical: 4.h),
-                    color: connectorDone
-                        ? AppColors.primary
-                        : inactiveConnector,
+                    color:
+                        connectorDone ? AppColors.primary : inactiveConnector,
                   ),
                 ),
             ],
@@ -874,7 +942,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
 
   // ── Shared bits ─────────────────────────────────────────────────────────────
 
-  Widget _circleImage(String? url, {required double size, required IconData fallbackIcon}) {
+  Widget _circleImage(String? url,
+      {required double size, required IconData fallbackIcon}) {
     final isDark = _isDark;
     final fallbackBg = isDark ? const Color(0xFF20242C) : Colors.grey.shade100;
     final fallback = Container(

@@ -58,7 +58,16 @@ class PublishController extends GetxController {
 
       isPublishing.value = false;
       // Remember it so the agreement stays reachable from chat later.
-      if (a.id != null) LocalStorageService.markAnnouncementPublished(a.id!);
+      // The current user IS the broker when publishing, so scope the key to
+      // them so the flag doesn't bleed into other brokers' chats.
+      if (a.id != null) {
+        LocalStorageService.markAnnouncementPublished(
+          a.id!,
+          brokerId: LocalStorageService.getUserIdFromToken() ??
+              LocalStorageService.getUser()?.data?.id ??
+              '',
+        );
+      }
       AnnouncementListController.to.refreshAfterMutation();
       if (onSuccess != null) {
         onSuccess();

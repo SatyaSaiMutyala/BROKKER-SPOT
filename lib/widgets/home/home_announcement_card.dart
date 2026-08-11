@@ -24,6 +24,16 @@ class HomeAnnouncementCard extends StatelessWidget {
   /// price. Off by default so the Home/user-side card is unaffected.
   final bool showBrokerageRow;
 
+  /// When true, the avatar shows the owner's personal profile image
+  /// ([AnnouncementModel.ownerAvatarUrl] / userProfileImage).
+  /// Use this on broker-side feeds where the card represents the broker's
+  /// own announcement — the broker is the owner, so show their personal photo.
+  ///
+  /// When false (default), shows the broker profile image
+  /// ([AnnouncementModel.brokerAvatarUrl]) — correct for user-side feeds
+  /// where the card belongs to a different broker.
+  final bool showOwnerAvatar;
+
   final bool isWishlisted;
   final VoidCallback? onWishlistTap;
 
@@ -36,6 +46,7 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.cardWidth,
     this.cardHeight,
     this.showBrokerageRow = false,
+    this.showOwnerAvatar = false,
     this.isWishlisted = false,
     this.onWishlistTap,
   });
@@ -417,11 +428,13 @@ class HomeAnnouncementCard extends StatelessWidget {
   }
 
   Widget _buildAvatar(AnnouncementModel a) {
-    // User-side home feed always shows broker announcements → show brokerProfileImage.
-    // Fall back to userProfileImage if broker photo absent, then placeholder.
-    final url = (a.brokerAvatarUrl?.isNotEmpty == true)
-        ? a.brokerAvatarUrl!
-        : (a.ownerAvatarUrl?.isNotEmpty == true ? a.ownerAvatarUrl! : null);
+    // Broker-side cards (showOwnerAvatar: true): the broker IS the owner, so
+    // show their personal/user profile image.
+    // User-side cards (default): show the broker profile image — never fall
+    // back to the personal photo; use placeholder if brokerAvatarUrl is absent.
+    final url = showOwnerAvatar
+        ? (a.ownerAvatarUrl?.isNotEmpty == true ? a.ownerAvatarUrl! : null)
+        : (a.brokerAvatarUrl?.isNotEmpty == true ? a.brokerAvatarUrl! : null);
     if (url != null) {
       return CachedNetworkImage(
         imageUrl: url,

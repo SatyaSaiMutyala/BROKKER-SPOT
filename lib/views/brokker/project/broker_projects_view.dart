@@ -376,6 +376,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
                       cardWidth: 344.w,
                       cardHeight: 263.h,
                       showBrokerageRow: true,
+                      showOwnerAvatar: true,
                       onTap: () => Get.to(
                           () => BrokerAnnouncementDetailView(announcement: a)),
                     ),

@@ -496,9 +496,15 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
 
   void _openAgreementFlow(
       {required bool isOwner, bool acceptAndPublish = false}) {
+    // Broker id: when the owner opens the agreement the peer IS the broker;
+    // when the broker opens it they ARE the current user.
+    final brokerId = isOwner
+        ? (widget.peerUserId ?? '')
+        : (LocalStorageService.getUser()?.data?.id ?? '');
     Get.to(() => BrokerAgreementView(
           announcementId: widget.announcementId,
           isOwner: isOwner,
+          brokerId: brokerId,
           onSign: isOwner ? _chat.approveProposal : _chat.brokerAcceptProposal,
           proposalStatus: _chat.proposalStatus,
           agreementUrl: _chat.agreementUrl,

@@ -111,6 +111,12 @@ class ProposalBroker {
   final String? brokerProfileImage;
   final String? message;
   final String? createdAt;
+  /// Proposal workflow status:
+  /// 0 = awaiting owner, 1 = owner signed, 2 = declined,
+  /// 3 = both signed, 4 = published.
+  final int? status;
+  /// Set when the broker has published the announcement (status == 4).
+  final String? publishedAt;
 
   ProposalBroker({
     this.id,
@@ -119,6 +125,8 @@ class ProposalBroker {
     this.brokerProfileImage,
     this.message,
     this.createdAt,
+    this.status,
+    this.publishedAt,
   });
 
   factory ProposalBroker.fromJson(Map<String, dynamic> json) {
@@ -134,6 +142,8 @@ class ProposalBroker {
           n['userProfileImage'],
       message: json['message']?.toString(),
       createdAt: json['created_at']?.toString(),
+      status: (json['status'] as num?)?.toInt(),
+      publishedAt: json['published_at']?.toString(),
     );
   }
 }

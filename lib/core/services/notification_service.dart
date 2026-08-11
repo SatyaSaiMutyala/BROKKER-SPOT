@@ -11,6 +11,8 @@ import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
+import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
+import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 
@@ -230,11 +232,28 @@ class NotificationService {
         await _openAnnouncementDetail(announcementId, true);
         break;
 
-      // Broadcast feed item — no ownership/role to enforce, just present it
-      // using whichever side is currently active.
+      // Broadcast feed item — always open on broker side (the notification is
+      // sent to brokers to browse new listings), unless the current user is the
+      // owner of the announcement (in that case open on user side).
       case 'new_announcement':
         if (announcementId == null || announcementId.isEmpty) return;
-        await _openAnnouncementDetail(announcementId, _isBrokerSide);
+        try {
+          final a = await AnnouncementRepository().fetchAnnouncementDetail(announcementId);
+          final isOwner = a.isOwner ?? false;
+          if (isOwner) {
+            // This user posted this announcement → open on user/owner side.
+            await _ensureSide(wantBroker: false);
+            _navigateToAnnouncementDetailModel(a, false);
+          } else {
+            // A "new listing available" push is always for brokers to browse.
+            // Switch to broker side regardless of the current active side so
+            // BrokerAnnouncementDetailView opens with the correct context.
+            await _ensureSide(wantBroker: true);
+            _navigateToAnnouncementDetailModel(a, true);
+          }
+        } catch (e) {
+          debugPrint('⚠️ Failed to open new_announcement $announcementId from notification: $e');
+        }
         break;
 
       // Account-level broker verification outcome — land on the broker
@@ -259,9 +278,27 @@ class NotificationService {
   static Future<void> _openChatFromNotification(
       String announcementId, Map<String, dynamic> data) async {
     bool? isOwnerHere;
+    String? peerAvatar;
+    String? peerName;
+
+    final peerUserId = data['sender_user_id']?.toString();
+
     try {
       final a = await AnnouncementRepository().fetchAnnouncementDetail(announcementId);
       isOwnerHere = a.isOwner;
+
+      // Pull the counterparty's profile image from the proposal list.
+      // When the viewer is the owner, the peer is the broker — their
+      // brokerProfileImage sits on the matching proposal entry.
+      if (peerUserId != null && a.latestProposals != null) {
+        final match = a.latestProposals!
+            .where((p) => p.brokerId == peerUserId)
+            .firstOrNull;
+        if (match != null) {
+          peerAvatar = match.brokerProfileImage;
+          peerName = match.name;
+        }
+      }
     } catch (e) {
       debugPrint('⚠️ Could not resolve role for chat notification: $e');
     }
@@ -270,11 +307,13 @@ class NotificationService {
       await _ensureSide(wantBroker: !isOwnerHere);
     }
 
-    final senderName = _extractChatSenderName(data['_title']?.toString());
+    final senderName = peerName ??
+        _extractChatSenderName(data['_title']?.toString()) ?? '';
     await AnnouncementChatView.open(
       announcementId: announcementId,
-      brokerName: senderName ?? '',
-      peerUserId: data['sender_user_id']?.toString(),
+      brokerName: senderName,
+      brokerAvatar: peerAvatar,
+      peerUserId: peerUserId,
       userRole: isOwnerHere == null
           ? (_isBrokerSide ? 2 : 1)
           : (isOwnerHere ? 1 : 2),
@@ -288,20 +327,101 @@ class NotificationService {
       String announcementId, bool isBroker) async {
     try {
       final a = await AnnouncementRepository().fetchAnnouncementDetail(announcementId);
-      if (isBroker) {
-        Get.to(() => BrokerAnnouncementDetailView(announcement: a));
-      } else {
-        // a.isOwner comes straight from the backend's `is_owner` flag — using
-        // it (instead of hardcoding false) is what makes the "interested
-        // brokers" row show up; that section is gated behind `isOwner` (see
-        // AnnouncementDetailView line ~935).
-        Get.to(() => AnnouncementDetailView(
-              announcement: a,
-              isOwner: a.isOwner ?? false,
-            ));
-      }
+      _navigateToAnnouncementDetailModel(a, isBroker);
     } catch (e) {
       debugPrint('⚠️ Failed to open announcement $announcementId from notification: $e');
+    }
+  }
+
+  /// Core navigation — given an already-fetched [AnnouncementModel] decide
+  /// which detail screen to open.  Extracted from [_openAnnouncementDetail]
+  /// so callers that already have the model (e.g. the [new_announcement]
+  /// handler) can reuse it without a second network round-trip.
+  static void _navigateToAnnouncementDetailModel(
+      AnnouncementModel a, bool isBroker) {
+    if (isBroker) {
+      // The detail endpoint returns user_id as a plain string, so ownerName
+      // and avatar are null. Supplement from the list-controller cache where
+      // user_id IS a fully populated object (loaded from the list endpoint).
+      //
+      // The announcement owner is a regular user, so prefer their personal
+      // profile image (ownerAvatarUrl / userProfileImage) over brokerProfileImage.
+      String? ownerName = a.ownerName;
+      String? ownerAvatarUrl = a.ownerAvatarUrl ?? a.brokerAvatarUrl;
+
+      if ((ownerName == null || ownerName.isEmpty || ownerAvatarUrl == null) &&
+          Get.isRegistered<AnnouncementListController>()) {
+        final ctrl = Get.find<AnnouncementListController>();
+        final allCached = [
+          ...ctrl.allAnnouncements,
+          ...ctrl.homeAnnouncements,
+          ...ctrl.brokerAnnouncements,
+        ];
+        // Exact id match first.
+        AnnouncementModel? cached =
+            allCached.firstWhereOrNull((x) => x.id == a.id);
+        // Brand-new announcement not yet in cache — fall back to any
+        // announcement by the same owner (their name/avatar are the same).
+        cached ??= allCached.firstWhereOrNull((x) =>
+            x.userId == a.userId &&
+            (x.ownerAvatarUrl?.isNotEmpty == true ||
+                x.ownerName?.isNotEmpty == true));
+        if (cached != null) {
+          ownerName ??= cached.ownerName;
+          ownerAvatarUrl ??= cached.ownerAvatarUrl ?? cached.brokerAvatarUrl;
+        }
+      }
+
+      Get.to(() => BrokerAnnouncementDetailView(
+            announcement: a,
+            ownerName: ownerName,
+            ownerAvatarUrl: ownerAvatarUrl,
+          ));
+    } else {
+      // a.isOwner comes straight from the backend's `is_owner` flag — using
+      // it (instead of hardcoding false) is what makes the "interested
+      // brokers" row show up; that section is gated behind `isOwner`.
+      //
+      // The detail endpoint returns user_id as a plain string, so broker name
+      // and avatar are null. Supplement from the list-controller cache where
+      // user_id IS populated (loaded from the list endpoint).
+      final isOwner = a.isOwner ?? false;
+      String? brokerName = a.ownerName;
+      String? brokerAvatar = a.brokerAvatarUrl; // broker profile image
+
+      if (!isOwner &&
+          (brokerName == null || brokerName.isEmpty || brokerAvatar == null) &&
+          Get.isRegistered<AnnouncementListController>()) {
+        final ctrl = Get.find<AnnouncementListController>();
+        final allCached = [
+          ...ctrl.allAnnouncements,
+          ...ctrl.homeAnnouncements,
+          ...ctrl.brokerAnnouncements,
+        ];
+        // First try exact announcement match.
+        AnnouncementModel? cached =
+            allCached.firstWhereOrNull((x) => x.id == a.id);
+        // If the announcement is brand-new (not yet in cache), fall back to
+        // ANY announcement by the same broker — their name and brokerProfileImage
+        // are identical across all their listings.
+        cached ??= allCached.firstWhereOrNull((x) =>
+            x.userId == a.userId &&
+            (x.brokerAvatarUrl?.isNotEmpty == true ||
+                x.ownerName?.isNotEmpty == true));
+        if (cached != null) {
+          brokerName ??= cached.ownerName;
+          brokerAvatar ??= cached.brokerAvatarUrl;
+        }
+      }
+
+      Get.to(() => AnnouncementDetailView(
+            announcement: a,
+            isOwner: isOwner,
+            // ownerName / ownerAvatarUrl are repurposed here as the broker's
+            // display name and broker profile image for the !isOwner bottom bar.
+            ownerName: brokerName,
+            ownerAvatarUrl: brokerAvatar,
+          ));
     }
   }
 }

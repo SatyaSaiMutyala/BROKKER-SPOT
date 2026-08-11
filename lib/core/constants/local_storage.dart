@@ -66,20 +66,30 @@ class LocalStorageService {
   // Announcements a broker has published, remembered so both parties can
   // reopen the agreement/timeline from chat in a later session (the proposal
   // status may no longer report the signed state once published).
+  //
+  // Keys are stored as "<announcementId>:<brokerId>" so that publishing with
+  // one broker does not bleed the "published" banner into a different broker's
+  // chat for the same announcement.
   static const String _publishedKey = 'published_announcements';
 
-  static Future<void> markAnnouncementPublished(String announcementId) async {
+  static String _publishedEntryKey(String announcementId, String brokerId) =>
+      brokerId.isEmpty ? announcementId : '$announcementId:$brokerId';
+
+  static Future<void> markAnnouncementPublished(String announcementId,
+      {String brokerId = ''}) async {
     if (announcementId.isEmpty) return;
+    final key = _publishedEntryKey(announcementId, brokerId);
     final ids = _prefs?.getStringList(_publishedKey) ?? <String>[];
-    if (!ids.contains(announcementId)) {
-      ids.add(announcementId);
+    if (!ids.contains(key)) {
+      ids.add(key);
       await _prefs?.setStringList(_publishedKey, ids);
     }
   }
 
-  static bool isAnnouncementPublished(String announcementId) {
+  static bool isAnnouncementPublished(String announcementId,
+      {String brokerId = ''}) {
     final ids = _prefs?.getStringList(_publishedKey) ?? const <String>[];
-    return ids.contains(announcementId);
+    return ids.contains(_publishedEntryKey(announcementId, brokerId));
   }
 
   static Future<void> clearAll() async {
