@@ -40,6 +40,19 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
     return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
   }
 
+  /// Opens the 1:1 chat with [broker] on this announcement.
+  ///
+  /// Shared by the dialog's START CHAT button and the row's "Chat" pill so
+  /// both land in exactly the same conversation.
+  void _openChat(ProposalBroker broker) {
+    AnnouncementChatView.open(
+      announcementId: widget.announcementId ?? '',
+      brokerName: broker.name ?? 'Broker',
+      brokerAvatar: broker.brokerProfileImage,
+      peerUserId: broker.brokerId,
+    );
+  }
+
   void _showProposalDialog(BuildContext context, ProposalBroker broker) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dialogBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
@@ -123,12 +136,7 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
                 child: GestureDetector(
                   onTap: () {
                     Navigator.pop(context);
-                    AnnouncementChatView.open(
-                      announcementId: widget.announcementId ?? '',
-                      brokerName: broker.name ?? 'Broker',
-                      brokerAvatar: broker.brokerProfileImage,
-                      peerUserId: broker.brokerId,
-                    );
+                    _openChat(broker);
                   },
                   child: Container(
                     width: double.infinity,
@@ -268,6 +276,13 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
                           Divider(height: 1, color: dividerColor),
                       itemBuilder: (ctx, i) {
                         final b = _brokers[i];
+                        // status 0 = proposal still pending, so the owner reads
+                        // it first via the dialog (which carries its own START
+                        // CHAT). Any other status means the conversation has
+                        // already been opened with this broker, so the pill
+                        // goes straight to that chat instead of re-showing the
+                        // proposal. A missing status is treated as pending.
+                        final isPending = (b.status ?? 0) == 0;
                         return Padding(
                           padding: EdgeInsets.symmetric(
                               horizontal: 20.w, vertical: 14.h),
@@ -300,9 +315,11 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
                                   ],
                                 ),
                               ),
-                              // Proposal pill button
+                              // Proposal / Chat pill button
                               GestureDetector(
-                                onTap: () => _showProposalDialog(ctx, b),
+                                onTap: () => isPending
+                                    ? _showProposalDialog(ctx, b)
+                                    : _openChat(b),
                                 child: Container(
                                   padding: EdgeInsets.symmetric(
                                       horizontal: 18.w, vertical: 8.h),
@@ -311,7 +328,7 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
                                     borderRadius: BorderRadius.circular(20.r),
                                   ),
                                   child: Text(
-                                    'Proposal',
+                                    isPending ? 'Proposal' : 'Chat',
                                     style: GoogleFonts.inter(
                                       fontSize: 12.sp,
                                       fontWeight: FontWeight.w600,

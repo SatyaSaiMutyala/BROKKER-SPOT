@@ -55,9 +55,51 @@ class NotificationService {
     };
   }
 
-  static bool get _isBrokerSide =>
-      Get.isRegistered<ProfileController>() &&
-      Get.find<ProfileController>().isOnBrokerSide;
+  /// Whether the app is currently on the broker side.
+  ///
+  /// [ProfileController.currentRole] starts at 0 and is only filled in once
+  /// its async getProfile() call returns — and 0 reads as "user side" through
+  /// isOnBrokerSide. On a cold start (app launched by tapping a push) that
+  /// would report "user side" even when SplashView had just opened the BROKER
+  /// dashboard from the persisted last side, so [_ensureSide] would conclude
+  /// no switch was needed and silently leave the wrong side active — opening
+  /// the user-side screen on top of the broker dashboard while the backend
+  /// still had currentRole = 2.
+  ///
+  /// So: trust the controller only once it holds a real role, and until then
+  /// fall back to the same persisted value SplashView used to pick the
+  /// dashboard, which is by definition the side currently on screen.
+  static bool get _isBrokerSide {
+    if (Get.isRegistered<ProfileController>()) {
+      final role = Get.find<ProfileController>().currentRole.value;
+      if (role != 0) return role == 2;
+    }
+    return LocalStorageService.getLastSide() == 'broker';
+  }
+
+  /// Which side of THIS account a notification about [a] concerns —
+  /// 1 = user side, 2 = broker side.
+  ///
+  /// An announcement records the side it was posted from in `user_role`
+  /// (1 = posted from the user side, 2 = posted from the broker side). The
+  /// owner therefore belongs on that same side, and the counterparty — the
+  /// broker browsing the broadcast, or whoever replies in chat — belongs on
+  /// the opposite one.
+  ///
+  /// Deriving it this way (instead of assuming "owner ⇒ user side") is what
+  /// makes a broker-posted announcement route correctly: the broker owns it,
+  /// so the broker stays on the broker side while the recipient lands on the
+  /// user side.
+  ///
+  /// Returns null when the announcement carries no usable `user_role`, so
+  /// callers can fall back rather than guess wrong.
+  static int? _sideForViewer(AnnouncementModel a) {
+    final creatorSide = a.userRole;
+    if (creatorSide != 1 && creatorSide != 2) return null;
+    final isOwner = a.isOwner ?? false;
+    if (isOwner) return creatorSide;
+    return creatorSide == 1 ? 2 : 1;
+  }
 
   /// Some notification types only ever concern one side of the account (e.g.
   /// "announcement_approved" is always about the owner side) regardless of
@@ -68,7 +110,15 @@ class NotificationService {
   /// carrying over a stale opposite side.
   static Future<void> _ensureSide({required bool wantBroker}) async {
     if (_isBrokerSide == wantBroker) return;
-    if (!Get.isRegistered<ProfileController>()) return;
+    if (!Get.isRegistered<ProfileController>()) {
+      // Nothing can flip the role without the controller, so the screen we
+      // open next would render with the wrong side. Cheap to log, and it is
+      // the only way to tell this case apart from "side was already correct".
+      debugPrint(
+          '⚠️ Notification wanted ${wantBroker ? "broker" : "user"} side but '
+          'ProfileController is not registered — side left unchanged');
+      return;
+    }
 
     Get.dialog(
       const Center(child: CircularProgressIndicator()),
@@ -232,25 +282,20 @@ class NotificationService {
         await _openAnnouncementDetail(announcementId, true);
         break;
 
-      // Broadcast feed item — always open on broker side (the notification is
-      // sent to brokers to browse new listings), unless the current user is the
-      // owner of the announcement (in that case open on user side).
+      // Broadcast feed item — the side depends on who posted it, not on a
+      // fixed assumption: the backend broadcasts a user's listing to brokers
+      // and a broker's listing to users (notifyNewListingBroadcast targets
+      // the role opposite the creator), so mirror that with _sideForViewer.
       case 'new_announcement':
         if (announcementId == null || announcementId.isEmpty) return;
         try {
           final a = await AnnouncementRepository().fetchAnnouncementDetail(announcementId);
-          final isOwner = a.isOwner ?? false;
-          if (isOwner) {
-            // This user posted this announcement → open on user/owner side.
-            await _ensureSide(wantBroker: false);
-            _navigateToAnnouncementDetailModel(a, false);
-          } else {
-            // A "new listing available" push is always for brokers to browse.
-            // Switch to broker side regardless of the current active side so
-            // BrokerAnnouncementDetailView opens with the correct context.
-            await _ensureSide(wantBroker: true);
-            _navigateToAnnouncementDetailModel(a, true);
-          }
+          // Fall back to the old owner-based guess only when user_role is
+          // missing from the payload.
+          final side = _sideForViewer(a);
+          final wantBroker = side != null ? side == 2 : !(a.isOwner ?? false);
+          await _ensureSide(wantBroker: wantBroker);
+          _navigateToAnnouncementDetailModel(a, wantBroker);
         } catch (e) {
           debugPrint('⚠️ Failed to open new_announcement $announcementId from notification: $e');
         }
@@ -270,14 +315,20 @@ class NotificationService {
   }
 
   /// `chat_message` can be either side of the conversation — the role isn't
-  /// in the push payload, so fetch the announcement and use its `is_owner`
-  /// flag (computed server-side from the real account, not the currently
-  /// active side) to decide, then [_ensureSide] before opening the chat so
-  /// the proposal banner — and anything triggered from it, like Publish —
-  /// renders with the correct owner/broker context instead of a stale one.
+  /// in the push payload, so fetch the announcement and derive the viewer's
+  /// side from its `user_role` + `is_owner` (both computed server-side from
+  /// the real account, not the currently active side), then [_ensureSide]
+  /// before opening the chat so the proposal banner — and anything triggered
+  /// from it, like Publish — renders with the correct owner/broker context
+  /// instead of a stale one.
+  ///
+  /// The side must NOT be taken as "owner ⇒ user side": on a broker-posted
+  /// announcement the broker is the owner, so that shortcut used to drop the
+  /// broker into the user side when they tapped a reply from the user.
   static Future<void> _openChatFromNotification(
       String announcementId, Map<String, dynamic> data) async {
     bool? isOwnerHere;
+    int? side;
     String? peerAvatar;
     String? peerName;
 
@@ -286,6 +337,7 @@ class NotificationService {
     try {
       final a = await AnnouncementRepository().fetchAnnouncementDetail(announcementId);
       isOwnerHere = a.isOwner;
+      side = _sideForViewer(a);
 
       // Pull the counterparty's profile image from the proposal list.
       // When the viewer is the owner, the peer is the broker — their
@@ -303,7 +355,11 @@ class NotificationService {
       debugPrint('⚠️ Could not resolve role for chat notification: $e');
     }
 
-    if (isOwnerHere != null) {
+    // Prefer the user_role-derived side; fall back to the old owner-based
+    // guess only when the announcement carried no usable user_role.
+    if (side != null) {
+      await _ensureSide(wantBroker: side == 2);
+    } else if (isOwnerHere != null) {
       await _ensureSide(wantBroker: !isOwnerHere);
     }
 
@@ -314,9 +370,10 @@ class NotificationService {
       brokerName: senderName,
       brokerAvatar: peerAvatar,
       peerUserId: peerUserId,
-      userRole: isOwnerHere == null
-          ? (_isBrokerSide ? 2 : 1)
-          : (isOwnerHere ? 1 : 2),
+      userRole: side ??
+          (isOwnerHere == null
+              ? (_isBrokerSide ? 2 : 1)
+              : (isOwnerHere ? 1 : 2)),
     );
   }
 

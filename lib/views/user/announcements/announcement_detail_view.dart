@@ -1135,15 +1135,24 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
       // One unified "Interested Brokers" bar for any proposal count (1, 2, …).
       // The avatar stack below renders a single avatar when there's just one.
+      //
+      // With no proposals yet there is nothing to select, nothing to show an
+      // avatar for and nothing to open — so the bar collapses to a plain
+      // "No proposals" state: no subtitle, no avatars, no arrow, and no tap
+      // (which previously led to an empty proposals list).
+      final hasProposals = count > 0 || proposals.isNotEmpty;
+
       return Padding(
         // Figma: left:44, right:375-44-287=44 → symmetric 44.w; bottom ~18px + safe area
         padding: EdgeInsets.fromLTRB(44.w, 0, 44.w, 10.h + bottomPad),
         child: GestureDetector(
-          onTap: () => Get.to(() => AnnouncementProposalsView(
-                proposals: proposals,
-                proposalsLimit: _data.proposalsLimit,
-                announcementId: _data.id,
-              )),
+          onTap: hasProposals
+              ? () => Get.to(() => AnnouncementProposalsView(
+                    proposals: proposals,
+                    proposalsLimit: _data.proposalsLimit,
+                    announcementId: _data.id,
+                  ))
+              : null,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(77.r),
             child: BackdropFilter(
@@ -1159,17 +1168,26 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                 ),
                 // Figma text starts at 63px (pill left 44px) → left padding 19px
                 // Arrow ends at 320px → right padding 331-320=11px
-                padding: EdgeInsets.fromLTRB(19.w, 0, 11.w, 0),
+                // The empty state has no avatars or arrow to leave room for,
+                // so the asymmetric inset above is dropped and the label is
+                // centred across the full width of the pill instead.
+                padding: hasProposals
+                    ? EdgeInsets.fromLTRB(19.w, 0, 11.w, 0)
+                    : EdgeInsets.zero,
                 child: Row(
                   children: [
                     // ── Text ────────────────────────────────────────────────
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: hasProposals
+                            ? CrossAxisAlignment.start
+                            : CrossAxisAlignment.center,
                         children: [
                           Text(
-                            'Interested Brokers',
+                            hasProposals
+                                ? 'Interested Brokers'
+                                : 'No proposals',
                             style: GoogleFonts.poppins(
                               fontSize: 16.sp,
                               fontWeight: FontWeight.w400, // Figma: Regular
@@ -1177,29 +1195,33 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                               height: 1.0,
                             ),
                           ),
-                          SizedBox(height: 2.h),
-                          Text(
-                            'Select and start chat',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w300, // Figma: Light
-                              color: const Color(0xFF6C6C6C),
-                              height: 1.0,
+                          if (hasProposals) ...[
+                            SizedBox(height: 2.h),
+                            Text(
+                              'Select and start chat',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w300, // Figma: Light
+                                color: const Color(0xFF6C6C6C),
+                                height: 1.0,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
                     // ── Avatars + count ──────────────────────────────────────
-                    if (proposals.isNotEmpty)
-                      _bottomAvatarStack(proposals, count),
-                    SizedBox(width: 7.w), // Figma: 7px gap before arrow
-                    // ── Arrow (Figma: 7×14, gold) ────────────────────────────
-                    Icon(
-                      Icons.chevron_right,
-                      size: 16.sp,
-                      color: AppColors.primary,
-                    ),
+                    if (hasProposals) ...[
+                      if (proposals.isNotEmpty)
+                        _bottomAvatarStack(proposals, count),
+                      SizedBox(width: 7.w), // Figma: 7px gap before arrow
+                      // ── Arrow (Figma: 7×14, gold) ──────────────────────────
+                      Icon(
+                        Icons.chevron_right,
+                        size: 16.sp,
+                        color: AppColors.primary,
+                      ),
+                    ],
                   ],
                 ),
               ),

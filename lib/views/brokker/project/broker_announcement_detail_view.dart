@@ -1011,7 +1011,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Write Proposal Message To Buyer',
+                  'Write Proposal Message To Seller',
                   style: GoogleFonts.poppins(
                     fontSize: 15.sp,
                     fontWeight: FontWeight.w600,
