@@ -243,6 +243,42 @@ class AnnouncementRepository {
     throw json['message'] ?? 'Failed to fetch property types';
   }
 
+  /// Full proposals list for an announcement.
+  ///
+  /// The detail endpoint only carries `latest_proposals`, capped at 3 for the
+  /// avatar preview, while its `proposals_count` is the real total — so the
+  /// proposals screen has to fetch this list to match the count it was opened
+  /// from (see getProposalsList in
+  /// brokkerspot-backend/src/services/users/announcements.service.ts).
+  ///
+  /// That endpoint applies no status filter, unlike the detail count's
+  /// `status: { $nin: [4, 5] }`, so published (4) and cancelled (5) proposals
+  /// are dropped here — otherwise the list would instead overshoot the count.
+  ///
+  /// `perPage` has no server-side cap and an announcement's proposals are
+  /// bounded by its own `proposals_limit`, so one large page avoids paging.
+  Future<List<ProposalBroker>> fetchProposals(
+    String announcementId, {
+    int perPage = 100,
+  }) async {
+    final response = await api.getRequest(
+      endPoint: '${api.baseUrl}${ApiEndpoints.fetchProposals}'
+          '?announcement_id=$announcementId&page=1&perPage=$perPage',
+      headers: api.buildHeaders(),
+    );
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['success'] != true) {
+      throw json['message'] ?? 'Failed to fetch proposals';
+    }
+    final data = json['data'] as Map<String, dynamic>?;
+    final list = (data?['data'] as List?) ?? const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ProposalBroker.fromJson)
+        .where((p) => p.status != 4 && p.status != 5)
+        .toList();
+  }
+
   Future<AnnouncementModel> fetchAnnouncementDetail(String id) async {
     final response = await api.getRequest(
       endPoint: '${api.baseUrl}${ApiEndpoints.fetchAnnouncementDetail}/$id',

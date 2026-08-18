@@ -14,7 +14,7 @@ class CommonRepository {
   Future<List<CountryModel>> fetchCountries() async {
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.fetchCountries}?page=1&perPage=100',
+          '${api.baseUrl}${ApiEndpoints.fetchCountries}?page=1&perPage=500',
       headers: api.buildHeaders(),
     );
     return _parseList(response.body, CountryModel.fromJson);
@@ -23,7 +23,7 @@ class CommonRepository {
   Future<List<CityModel>> fetchCities(String countryId) async {
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.fetchCities}?page=1&perPage=100&country_id=$countryId',
+          '${api.baseUrl}${ApiEndpoints.fetchCities}?page=1&perPage=500&country_id=$countryId',
       headers: api.buildHeaders(),
     );
     return _parseList(response.body, CityModel.fromJson);
@@ -35,7 +35,7 @@ class CommonRepository {
   }) async {
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.fetchLocalities}?page=1&perPage=100&city_id=$cityId&country_id=$countryId',
+          '${api.baseUrl}${ApiEndpoints.fetchLocalities}?page=1&perPage=500&city_id=$cityId&country_id=$countryId',
       headers: api.buildHeaders(),
     );
     return _parseList(response.body, LocalityModel.fromJson);
@@ -44,7 +44,7 @@ class CommonRepository {
   Future<List<LanguageModel>> fetchLanguages() async {
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.fetchLanguages}?page=1&perPage=100',
+          '${api.baseUrl}${ApiEndpoints.fetchLanguages}?page=1&perPage=500',
       headers: api.buildHeaders(),
     );
     return _parseList(response.body, LanguageModel.fromJson);
@@ -53,7 +53,7 @@ class CommonRepository {
   Future<List<PropertyTypeModel>> fetchPropertyTypes() async {
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.fetchPropertyTypes}?page=1&perPage=100',
+          '${api.baseUrl}${ApiEndpoints.fetchPropertyTypes}?page=1&perPage=500',
       headers: api.buildHeaders(),
     );
     return _parseList(response.body, PropertyTypeModel.fromJson);

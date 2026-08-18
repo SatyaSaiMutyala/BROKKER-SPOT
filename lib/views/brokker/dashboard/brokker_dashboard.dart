@@ -1,4 +1,5 @@
-import 'dart:ui' show ImageFilter;
+// Only the old floating-pill create button needed ImageFilter.
+// import 'dart:ui' show ImageFilter;
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_account/broker_account_view.dart';
@@ -9,12 +10,15 @@ import 'package:brokkerspot/views/brokker/home/brokker_home_view.dart';
 import 'package:brokkerspot/views/brokker/meeting/broker_meeting_view.dart';
 import 'package:brokkerspot/views/brokker/project/broker_projects_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
-import 'package:brokkerspot/widgets/common/floating_pill_nav_bar.dart';
+// Replaced by the user dashboard's flat nav bar so both sides look identical.
+// import 'package:brokkerspot/widgets/common/floating_pill_nav_bar.dart';
+import 'package:brokkerspot/widgets/common/bottom_nav/bottom_nav.dart';
 import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+// Sizing helpers (.w/.h/.r) were only used by the commented-out create button.
+// import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 class BrokerDashBoardView extends StatefulWidget {
@@ -104,19 +108,47 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     BrokerProfileView(),
   ];
 
-  static const _navItems = [
-    PillNavItem(
-        iconAsset: 'assets/images/broker_home_icon.png',
-        activeIconAsset: 'assets/images/broker_active_home_icon.png'),
-    PillNavItem(
-        iconAsset: 'assets/images/broker_project_icon.png',
-        activeIconAsset: 'assets/images/broker_active_project_icon.png'),
-    PillNavItem(
-        iconAsset: 'assets/images/meeting_icon.png',
-        activeIconAsset: 'assets/images/meeting_active_icon.png'),
-    PillNavItem(
-        iconAsset: 'assets/images/broker_profile_icon.png',
-        activeIconAsset: 'assets/images/broker_active_profile_icon.png'),
+  // Old floating-pill items — kept for reference, superseded by
+  // _navDestinations below.
+  // static const _navItems = [
+  //   PillNavItem(
+  //       iconAsset: 'assets/images/broker_home_icon.png',
+  //       activeIconAsset: 'assets/images/broker_active_home_icon.png'),
+  //   PillNavItem(
+  //       iconAsset: 'assets/images/broker_project_icon.png',
+  //       activeIconAsset: 'assets/images/broker_active_project_icon.png'),
+  //   PillNavItem(
+  //       iconAsset: 'assets/images/meeting_icon.png',
+  //       activeIconAsset: 'assets/images/meeting_active_icon.png'),
+  //   PillNavItem(
+  //       iconAsset: 'assets/images/broker_profile_icon.png',
+  //       activeIconAsset: 'assets/images/broker_active_profile_icon.png'),
+  // ];
+
+  /// Same four tabs and the same broker artwork as before — only the bar that
+  /// renders them changed, so the user and broker dashboards now share one
+  /// nav bar widget and look identical.
+  static const _navDestinations = [
+    AppNavDestination(
+      iconAsset: 'assets/images/broker_home_icon.png',
+      activeIconAsset: 'assets/images/broker_active_home_icon.png',
+      semanticLabel: 'Home',
+    ),
+    AppNavDestination(
+      iconAsset: 'assets/images/broker_project_icon.png',
+      activeIconAsset: 'assets/images/broker_active_project_icon.png',
+      semanticLabel: 'Projects',
+    ),
+    AppNavDestination(
+      iconAsset: 'assets/images/meeting_icon.png',
+      activeIconAsset: 'assets/images/meeting_active_icon.png',
+      semanticLabel: 'Meetings',
+    ),
+    AppNavDestination(
+      iconAsset: 'assets/images/broker_profile_icon.png',
+      activeIconAsset: 'assets/images/broker_active_profile_icon.png',
+      semanticLabel: 'Account',
+    ),
   ];
 
   // Tabs 1 (Projects) and 2 (Meeting) are gated for signed-in users that
@@ -136,37 +168,39 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     Get.to(() => const CreateAnnouncementView(fromBroker: true));
   }
 
-  Widget _buildCreateButton(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pillBg = isDark ? const Color(0x30FFFFFF) : const Color(0x80DBDBDB);
-    final iconColor =
-        isDark ? const Color(0xFFCCCCCC) : const Color(0xFF444444);
-
-    return GestureDetector(
-      onTap: () => _onCreateTap(context),
-      behavior: HitTestBehavior.opaque,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(34.r),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            width: 50.w,
-            height: 50.h,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: pillBg,
-              borderRadius: BorderRadius.circular(34.r),
-            ),
-            child: Icon(
-              Icons.add_rounded,
-              size: 32.sp,
-              color: iconColor,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // Old floating create button — the shared nav bar draws its own centre
+  // action now, so this is kept only for reference.
+  //   Widget _buildCreateButton(BuildContext context) {
+  //     final isDark = Theme.of(context).brightness == Brightness.dark;
+  //     final pillBg = isDark ? const Color(0x30FFFFFF) : const Color(0x80DBDBDB);
+  //     final iconColor =
+  //         isDark ? const Color(0xFFCCCCCC) : const Color(0xFF444444);
+  // 
+  //     return GestureDetector(
+  //       onTap: () => _onCreateTap(context),
+  //       behavior: HitTestBehavior.opaque,
+  //       child: ClipRRect(
+  //         borderRadius: BorderRadius.circular(34.r),
+  //         child: BackdropFilter(
+  //           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+  //           child: Container(
+  //             width: 50.w,
+  //             height: 50.h,
+  //             alignment: Alignment.center,
+  //             decoration: BoxDecoration(
+  //               color: pillBg,
+  //               borderRadius: BorderRadius.circular(34.r),
+  //             ),
+  //             child: Icon(
+  //               Icons.add_rounded,
+  //               size: 32.sp,
+  //               color: iconColor,
+  //             ),
+  //           ),
+  //         ),
+  //       ),
+  //     );
+  //   }
 
   void _onNavTap(BuildContext context, int index) {
     final isLoggedIn = LocalStorageService.isLoggedIn();
@@ -222,16 +256,28 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
   Widget build(BuildContext context) {
     return Obx(
       () => Scaffold(
-        extendBody: true,
+        // extendBody was only needed so content showed through the translucent
+        // floating pill. The flat bar is opaque and the user dashboard doesn't
+        // set it either, so it goes — otherwise content runs under the bar.
+        // extendBody: true,
         body: (controller.currentIndex.value == 3 &&
                 !LocalStorageService.isLoggedIn())
             ? AccountMenuView()
             : pages[controller.currentIndex.value],
-        bottomNavigationBar: FloatingPillNavBar(
-          items: _navItems,
+        // bottomNavigationBar: FloatingPillNavBar(
+        //   items: _navItems,
+        //   currentIndex: controller.currentIndex.value,
+        //   onTap: (index) => _onNavTap(context, index),
+        //   trailing: _buildCreateButton(context),
+        // ),
+        bottomNavigationBar: AppBottomNavBar(
+          destinations: _navDestinations,
           currentIndex: controller.currentIndex.value,
-          onTap: (index) => _onNavTap(context, index),
-          trailing: _buildCreateButton(context),
+          onDestinationSelected: (index) => _onNavTap(context, index),
+          centerAction: AppNavCenterAction(
+            onTap: () => _onCreateTap(context),
+            semanticLabel: 'Create announcement',
+          ),
         ),
       ),
     );

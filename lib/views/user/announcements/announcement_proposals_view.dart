@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
+import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 
 class AnnouncementProposalsView extends StatefulWidget {
   final List<ProposalBroker> proposals;
@@ -27,7 +28,37 @@ class AnnouncementProposalsView extends StatefulWidget {
 class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
   bool _limitEnabled = true;
 
-  List<ProposalBroker> get _brokers => widget.proposals;
+  /// Seeded with the preview list the detail screen already had so the rows
+  /// render instantly, then replaced by the full list from the API.
+  ///
+  /// The preview is capped at 3 by the backend while the count shown on the
+  /// detail screen is the real total, so without this fetch a count of 4 would
+  /// open a screen listing only 3.
+  late List<ProposalBroker> _brokers = widget.proposals;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProposals();
+  }
+
+  Future<void> _loadProposals() async {
+    final id = widget.announcementId;
+    if (id == null || id.isEmpty) return;
+
+    setState(() => _loading = true);
+    try {
+      final full = await AnnouncementRepository().fetchProposals(id);
+      if (!mounted) return;
+      setState(() => _brokers = full);
+    } catch (e) {
+      // Keep the preview rows already on screen rather than emptying the list.
+      debugPrint('⚠️ Failed to load full proposals list: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   String _timeAgo(String? iso) {
     if (iso == null) return '';
@@ -257,7 +288,11 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
 
             // ── Broker list ──────────────────────────────────────────────────
             Expanded(
-              child: _brokers.isEmpty
+              child: _loading && _brokers.isEmpty
+                  // Opened with no preview rows to show — wait for the fetch
+                  // rather than flashing "No proposals yet" first.
+                  ? const Center(child: CircularProgressIndicator())
+                  : _brokers.isEmpty
                   ? Center(
                       child: Text(
                         'No proposals yet',

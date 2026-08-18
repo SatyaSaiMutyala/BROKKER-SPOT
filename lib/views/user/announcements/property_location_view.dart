@@ -367,8 +367,14 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
           SafeArea(
             child: Column(
               children: [
-                const CustomHeader(
-                  title: 'Property Location & Documents',
+                // The documents half of the title only makes sense when the
+                // documents section is actually rendered below — same _isUAE
+                // gate, so a non-UAE property doesn't advertise a section it
+                // never shows.
+                CustomHeader(
+                  title: _isUAE
+                      ? 'Property Location & Documents'
+                      : 'Property Location',
                   showBackButton: true,
                 ),
                 Expanded(

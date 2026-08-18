@@ -320,6 +320,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
               showBackButton: true,
               onBack: () => Get.back(),
               trailing: Builder(builder: (ctx) {
+                // Once every section is done there is nothing left to keep as
+                // a draft — Announce Now takes over, so Save Draft disappears
+                // on exactly the same _allSectionsDone gate that enables it.
+                if (_allSectionsDone) return const SizedBox.shrink();
                 // Save Draft is only available once step 1 is complete.
                 final step1Done = _stepFlags[0];
                 final enabled = step1Done && !_isSavingDraft && !_isSubmitting;

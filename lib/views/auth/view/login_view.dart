@@ -50,7 +50,7 @@ class LoginView extends StatelessWidget {
                                 TextSpan(
                                   text: "Let's ",
                                   style: GoogleFonts.roboto(
-                                    fontSize: 26.sp,
+                                    fontSize: 28.sp,
                                     fontWeight: FontWeight.w400,
                                     color: AppColors.primary,
                                   ),
@@ -58,7 +58,7 @@ class LoginView extends StatelessWidget {
                                 TextSpan(
                                   text: "Sign In",
                                   style: GoogleFonts.roboto(
-                                    fontSize: 26.sp,
+                                    fontSize: 28.sp,
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.primary,
                                   ),
@@ -67,7 +67,7 @@ class LoginView extends StatelessWidget {
                             ),
                           ),
 
-                          SizedBox(height: 10.h),
+                          SizedBox(height: 8.h),
 
                           // Subtitle
                           Text(

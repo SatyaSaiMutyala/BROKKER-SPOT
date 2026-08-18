@@ -1,12 +1,14 @@
 import 'dart:io';
 import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/controller/complete_profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/rules_screen.dart';
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,11 +26,30 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final TextEditingController bnrValueController = TextEditingController();
   bool isAgent = true;
 
+  /// Cached reference lists (countries → cities → localities), shared with the
+  /// rest of the app and fetched at most once per session.
+  final _common = CommonDataController.to;
+
+  /// Id of the picked country — the cities endpoint is keyed by it, and the
+  /// dropdowns themselves only ever deal in names (the profile stores
+  /// dealingCountry/dealingCities/dealingAreas as plain strings).
+  String? _countryId;
+
+  /// Locality names for every selected city, pooled into one list.
+  ///
+  /// Cities here are a multi-select while the localities endpoint takes a
+  /// single city_id, so each selected city is fetched separately and the
+  /// results merged — a broker's specialised areas can span all the cities
+  /// they deal in.
+  final _areaOptions = <String>[].obs;
+
   @override
   void initState() {
     super.initState();
     bnrValueController.addListener(() => setState(() {}));
     emailController.addListener(() => setState(() {}));
+    _common.loadCountries();
+    _common.loadLanguages();
     _prefillData();
   }
 
@@ -54,6 +75,62 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     bnrValueController.text = data['bnrNumber'] ?? '';
     if ((data['bnrNumber'] ?? '').toString().isNotEmpty) {
       setState(() => isAgent = false);
+    }
+    _restoreLocationChain();
+  }
+
+  /// Walks country → cities → localities for a profile that was prefilled with
+  /// existing selections, so the dependent dropdowns already hold their options
+  /// instead of opening empty until the user re-picks the country.
+  Future<void> _restoreLocationChain() async {
+    await _common.loadCountries();
+    if (!mounted) return;
+
+    final country = _common.countries
+        .firstWhereOrNull((c) => c.name == controller.selectedCountry.value.trim());
+    if (country == null) return;
+    _countryId = country.id;
+
+    await _common.loadCities(country.id);
+    if (!mounted) return;
+    await _loadAreaOptions();
+  }
+
+  /// Country changed — the cities and areas picked under the old one no longer
+  /// apply, so they're cleared before the new city list is fetched.
+  void _onCountrySelected(String name) {
+    final country = _common.countries.firstWhereOrNull((c) => c.name == name);
+    if (country == null) return;
+    _countryId = country.id;
+    controller.selectedCities.clear();
+    controller.selectedAreas.value = '';
+    _areaOptions.clear();
+    _common.loadCities(country.id);
+  }
+
+  /// Rebuilds [_areaOptions] from every currently selected city.
+  Future<void> _loadAreaOptions() async {
+    final countryId = _countryId;
+    if (countryId == null) {
+      _areaOptions.clear();
+      return;
+    }
+
+    final names = <String>{};
+    for (final cityName in controller.selectedCities) {
+      final city = _common.cities.firstWhereOrNull((c) => c.name == cityName);
+      if (city == null) continue;
+      // Cached per city by the controller, so re-ticking a city is free.
+      await _common.loadLocalities(cityId: city.id, countryId: countryId);
+      names.addAll(_common.localities.map((l) => l.name));
+    }
+    if (!mounted) return;
+
+    _areaOptions.assignAll(names.toList()..sort());
+    // An area picked under a city that has since been unticked is no longer
+    // a valid choice, so drop it rather than submitting a stale value.
+    if (!names.contains(controller.selectedAreas.value)) {
+      controller.selectedAreas.value = '';
     }
   }
 
@@ -221,36 +298,44 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               _sectionLabel("Select the country where you are dealing",
                   isRequired: true),
               SizedBox(height: 8.h),
-              _styledDropdown(
-                hint: "Select Country",
-                items: ["India", "UAE", "USA", "UK", "Canada", "France"],
-                value: controller.selectedCountry,
-              ),
+              // The outer Obx is what tracks the loading flag and the list —
+              // _styledDropdown's own Obx only covers its open/selected state.
+              Obx(() => _styledDropdown(
+                    hint: _common.isLoadingCountries.value
+                        ? "Loading countries..."
+                        : "Select Country",
+                    items: _common.countries.map((c) => c.name).toList(),
+                    value: controller.selectedCountry,
+                    onSelect: _onCountrySelected,
+                  )),
               SizedBox(height: 20.h),
               // City Multi-Select
               _sectionLabel("Select the City where you are dealing",
                   isRequired: true),
               SizedBox(height: 8.h),
-              _cityMultiSelect(
-                hint: "Select city",
-                items: ["Hyderabad", "Dubai", "New York", "London", "Toronto", "Paris", "Lyon", "Marseille"],
-              ),
+              Obx(() => _cityMultiSelect(
+                    hint: _common.isLoadingCities.value
+                        ? "Loading cities..."
+                        : controller.selectedCountry.value.isEmpty
+                            ? "Select a country first"
+                            : "Select city",
+                    items: _common.cities.map((c) => c.name).toList(),
+                    onChanged: _loadAreaOptions,
+                  )),
               SizedBox(height: 20.h),
               // Areas Dropdown
               _sectionLabel("Describe Your Specialized Dealing Areas",
                   isRequired: true),
               SizedBox(height: 8.h),
-              _styledDropdown(
-                hint: "Select Areas",
-                items: [
-                  "Residential",
-                  "Commercial",
-                  "Industrial",
-                  "Land",
-                  "Mixed Use"
-                ],
-                value: controller.selectedAreas,
-              ),
+              Obx(() => _styledDropdown(
+                    hint: _common.isLoadingLocalities.value
+                        ? "Loading areas..."
+                        : controller.selectedCities.isEmpty
+                            ? "Select a city first"
+                            : "Select Areas",
+                    items: _areaOptions.toList(),
+                    value: controller.selectedAreas,
+                  )),
               SizedBox(height: 20.h),
               // Experience Dropdown
               _sectionLabel("Your Experience", isRequired: true),
@@ -264,18 +349,12 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               // Languages Dropdown
               _sectionLabel("You know languages", isRequired: true),
               SizedBox(height: 8.h),
-              _languageMultiSelect(
-                hint: "Select languages",
-                items: [
-                  "English",
-                  "Hindi",
-                  "Arabic",
-                  "Telugu",
-                  "Tamil",
-                  "Urdu",
-                  "French"
-                ],
-              ),
+              Obx(() => _languageMultiSelect(
+                    hint: _common.isLoadingLanguages.value
+                        ? "Loading languages..."
+                        : "Select languages",
+                    items: _common.languages.map((l) => l.name).toList(),
+                  )),
               SizedBox(height: 20.h),
               // Professional Email
               _sectionLabel("Your Professional Email (optional)"),
@@ -309,13 +388,32 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   controller: bnrValueController,
                   hint: "BNR",
                   keyboardType: TextInputType.number,
+                  // A BNR is exactly 5 digits: block anything non-numeric and
+                  // stop the field at 5 so a longer value can't be typed at
+                  // all, leaving "too short" as the only state to warn about.
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(_bnrLength),
+                  ],
                 ),
+                if (bnrValueController.text.trim().isNotEmpty &&
+                    !_isValidBnr(bnrValueController.text.trim()))
+                  Padding(
+                    padding: EdgeInsets.only(top: 6.h, left: 4.w),
+                    child: Text(
+                      'BNR must be exactly $_bnrLength digits',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11.sp,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
                 SizedBox(height: 20.h),
               ],
               // Next Button
               Obx(() {
                 final brokerBrnValid =
-                    isAgent || bnrValueController.text.trim().isNotEmpty;
+                    isAgent || _isValidBnr(bnrValueController.text.trim());
                 final emailText = emailController.text.trim();
                 final emailValid =
                     emailText.isEmpty || _isValidEmail(emailText);
@@ -569,6 +667,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     return RegExp(r'^[\w\.\-\+]+@[\w\-]+\.\w{2,}$').hasMatch(email);
   }
 
+  /// A BNR is exactly [_bnrLength] digits — neither fewer nor more.
+  static const int _bnrLength = 5;
+
+  bool _isValidBnr(String bnr) => bnr.length == _bnrLength;
+
   // Close all dropdowns
   void _closeAllDropdowns() {
     _closeOtherDropdowns('');
@@ -589,11 +692,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   Widget _cityMultiSelect({
     required String hint,
     required List<String> items,
+    VoidCallback? onChanged,
   }) {
     return Obx(() {
       final selected = controller.selectedCities;
       final displayText = selected.isEmpty ? null : selected.join(', ');
       final isOpen = _cityDropdownOpen.value;
+      final showSearch = items.length > _searchThreshold;
+      final filtered = _filterItems(items, _dropdownQuery['_city'] ?? '');
 
       return Column(
         mainAxisSize: MainAxisSize.min,
@@ -601,6 +707,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           GestureDetector(
             onTap: () {
               _closeOtherDropdowns('_city');
+              _dropdownQuery['_city'] = '';
               _cityDropdownOpen.value = !_cityDropdownOpen.value;
             },
             child: Container(
@@ -653,56 +760,77 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 borderRadius:
                     BorderRadius.vertical(bottom: Radius.circular(4.r)),
               ),
+              // Same bounded, self-scrolling sheet as the language
+              // list — city lists from the API can run long.
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: items.map((city) {
-                  final isSelected = selected.contains(city);
-                  return InkWell(
-                    onTap: () {
-                      if (isSelected) {
-                        selected.remove(city);
-                      } else {
-                        selected.add(city);
-                      }
-                    },
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 16.w, vertical: 12.h),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 22.w,
-                            height: 22.w,
-                            decoration: BoxDecoration(
-                              color:
-                                  isSelected ? AppColors.primary : Colors.white,
-                              border: Border.all(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : Colors.grey.shade400,
-                                width: 1.5,
+                children: [
+                  if (showSearch)
+                    _dropdownSearchField(
+                      hintKey: '_city',
+                      placeholder: 'Search...',
+                    ),
+                  if (filtered.isEmpty)
+                    _dropdownNoResults()
+                  else
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: 220.h),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: filtered.map((city) {
+                            final isSelected = selected.contains(city);
+                            return InkWell(
+                              onTap: () {
+                                if (isSelected) {
+                                  selected.remove(city);
+                                } else {
+                                  selected.add(city);
+                                }
+                                onChanged?.call();
+                              },
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 16.w, vertical: 12.h),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 22.w,
+                                      height: 22.w,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isSelected ? AppColors.primary : Colors.white,
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? AppColors.primary
+                                              : Colors.grey.shade400,
+                                          width: 1.5,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4.r),
+                                      ),
+                                      child: isSelected
+                                          ? Icon(Icons.check,
+                                              size: 16.sp, color: Colors.white)
+                                          : null,
+                                    ),
+                                    SizedBox(width: 12.w),
+                                    Text(
+                                      city,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              borderRadius: BorderRadius.circular(4.r),
-                            ),
-                            child: isSelected
-                                ? Icon(Icons.check,
-                                    size: 16.sp, color: Colors.white)
-                                : null,
-                          ),
-                          SizedBox(width: 12.w),
-                          Text(
-                            city,
-                            style: GoogleFonts.poppins(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
-                  );
-                }).toList(),
+                ],
               ),
             ),
         ],
@@ -721,6 +849,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       final selected = controller.selectedLanguages;
       final displayText = selected.isEmpty ? null : selected.join(', ');
       final isOpen = _languageDropdownOpen.value;
+      final showSearch = items.length > _searchThreshold;
+      final filtered = _filterItems(items, _dropdownQuery['_language'] ?? '');
 
       return Column(
         mainAxisSize: MainAxisSize.min,
@@ -728,6 +858,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           GestureDetector(
             onTap: () {
               _closeOtherDropdowns('_language');
+              _dropdownQuery['_language'] = '';
               _languageDropdownOpen.value = !_languageDropdownOpen.value;
             },
             child: Container(
@@ -780,56 +911,77 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 borderRadius:
                     BorderRadius.vertical(bottom: Radius.circular(4.r)),
               ),
+              // The open sheet scrolls inside a capped height. Left
+              // unbounded it grows past the viewport, so dragging the
+              // options dragged the whole form instead of the list.
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: items.map((lang) {
-                  final isSelected = selected.contains(lang);
-                  return InkWell(
-                    onTap: () {
-                      if (isSelected) {
-                        selected.remove(lang);
-                      } else {
-                        selected.add(lang);
-                      }
-                    },
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 16.w, vertical: 12.h),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 22.w,
-                            height: 22.w,
-                            decoration: BoxDecoration(
-                              color:
-                                  isSelected ? AppColors.primary : Colors.white,
-                              border: Border.all(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : Colors.grey.shade400,
-                                width: 1.5,
+                children: [
+                  if (showSearch)
+                    _dropdownSearchField(
+                      hintKey: '_language',
+                      placeholder: 'Search...',
+                    ),
+                  if (filtered.isEmpty)
+                    _dropdownNoResults()
+                  else
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: 220.h),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: filtered.map((lang) {
+                            final isSelected = selected.contains(lang);
+                            return InkWell(
+                              onTap: () {
+                                if (isSelected) {
+                                  selected.remove(lang);
+                                } else {
+                                  selected.add(lang);
+                                }
+                              },
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 16.w, vertical: 12.h),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 22.w,
+                                      height: 22.w,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isSelected ? AppColors.primary : Colors.white,
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? AppColors.primary
+                                              : Colors.grey.shade400,
+                                          width: 1.5,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4.r),
+                                      ),
+                                      child: isSelected
+                                          ? Icon(Icons.check,
+                                              size: 16.sp, color: Colors.white)
+                                          : null,
+                                    ),
+                                    SizedBox(width: 12.w),
+                                    Text(
+                                      lang.toUpperCase(),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              borderRadius: BorderRadius.circular(4.r),
-                            ),
-                            child: isSelected
-                                ? Icon(Icons.check,
-                                    size: 16.sp, color: Colors.white)
-                                : null,
-                          ),
-                          SizedBox(width: 12.w),
-                          Text(
-                            lang.toUpperCase(),
-                            style: GoogleFonts.poppins(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
-                  );
-                }).toList(),
+                ],
               ),
             ),
         ],
@@ -839,14 +991,81 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
   final RxMap<String, bool> _dropdownOpenState = <String, bool>{}.obs;
 
+  /// Live search text per dropdown, keyed by the same hint [_dropdownOpenState]
+  /// uses. Cleared whenever a sheet is toggled so the box and the list can't
+  /// disagree — the sheet is removed from the tree when closed, which resets
+  /// the TextField's own text.
+  final RxMap<String, String> _dropdownQuery = <String, String>{}.obs;
+
+  /// Below this many options a search box is more clutter than help, so short
+  /// lists (experience, a country with a handful of cities) don't get one.
+  static const int _searchThreshold = 8;
+
+  List<String> _filterItems(List<String> items, String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return items;
+    return items.where((i) => i.toLowerCase().contains(q)).toList();
+  }
+
+  /// Search box pinned above a dropdown's scrolling option list.
+  Widget _dropdownSearchField({
+    required String hintKey,
+    required String placeholder,
+  }) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 6.h),
+      child: TextField(
+        autofocus: false,
+        style: GoogleFonts.poppins(fontSize: 13.sp, color: Colors.black87),
+        onChanged: (v) => _dropdownQuery[hintKey] = v,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: placeholder,
+          hintStyle: GoogleFonts.poppins(fontSize: 13.sp, color: Colors.grey),
+          prefixIcon: Icon(Icons.search, size: 18.sp, color: Colors.grey),
+          prefixIconConstraints:
+              BoxConstraints(minWidth: 32.w, minHeight: 32.w),
+          contentPadding:
+              EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4.r),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4.r),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4.r),
+            borderSide: BorderSide(color: AppColors.primary),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Shown in place of the option list when a search matches nothing.
+  Widget _dropdownNoResults() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+      child: Text(
+        'No results',
+        style: GoogleFonts.poppins(fontSize: 13.sp, color: Colors.grey),
+      ),
+    );
+  }
+
   Widget _styledDropdown({
     required String hint,
     required List<String> items,
     required RxString value,
+    ValueChanged<String>? onSelect,
   }) {
     return Obx(() {
       final isOpen = _dropdownOpenState[hint] == true;
       final displayText = value.value.isEmpty ? null : value.value;
+      final showSearch = items.length > _searchThreshold;
+      final filtered = _filterItems(items, _dropdownQuery[hint] ?? '');
 
       return Column(
         mainAxisSize: MainAxisSize.min,
@@ -854,6 +1073,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           GestureDetector(
             onTap: () {
               _closeOtherDropdowns(hint);
+              _dropdownQuery[hint] = '';
               _dropdownOpenState[hint] = !isOpen;
             },
             child: Container(
@@ -904,35 +1124,58 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 borderRadius:
                     BorderRadius.vertical(bottom: Radius.circular(4.r)),
               ),
+              // Shared by the country, areas and experience dropdowns.
+              // maxHeight only caps a long list, so short ones (e.g.
+              // experience) render exactly as before, while a long one
+              // scrolls here instead of dragging the whole form.
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: items.map((item) {
-                  final isSelected = value.value == item;
-                  return InkWell(
-                    onTap: () {
-                      value.value = item;
-                      _dropdownOpenState[hint] = false;
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 16.w, vertical: 12.h),
-                      color: isSelected
-                          ? AppColors.primary.withValues(alpha: 0.08)
-                          : null,
-                      child: Text(
-                        item,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14.sp,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.w400,
-                          color:
-                              isSelected ? AppColors.primary : Colors.black87,
+                children: [
+                  if (showSearch)
+                    _dropdownSearchField(
+                      hintKey: hint,
+                      placeholder: 'Search...',
+                    ),
+                  if (filtered.isEmpty)
+                    _dropdownNoResults()
+                  else
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: 220.h),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: filtered.map((item) {
+                            final isSelected = value.value == item;
+                            return InkWell(
+                              onTap: () {
+                                value.value = item;
+                                _dropdownOpenState[hint] = false;
+                                onSelect?.call(item);
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 16.w, vertical: 12.h),
+                                color: isSelected
+                                    ? AppColors.primary.withValues(alpha: 0.08)
+                                    : null,
+                                child: Text(
+                                  item,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14.sp,
+                                    fontWeight:
+                                        isSelected ? FontWeight.w600 : FontWeight.w400,
+                                    color:
+                                        isSelected ? AppColors.primary : Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ),
                     ),
-                  );
-                }).toList(),
+                ],
               ),
             ),
         ],
@@ -945,6 +1188,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     required TextEditingController controller,
     required String hint,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -961,6 +1205,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
         onTap: () => _closeAllDropdowns(),
         style: GoogleFonts.poppins(fontSize: 14.sp, color: Colors.black87),
         decoration: InputDecoration(

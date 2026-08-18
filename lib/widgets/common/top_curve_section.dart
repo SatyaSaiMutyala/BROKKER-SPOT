@@ -35,9 +35,10 @@ class TopCurveSection extends StatelessWidget {
             top: (curveTop ?? -100).h,
             right: (curveRight ?? -10).w,
             child: Image.asset(
-              'assets/images/top_curve2.png',
+              'assets/images/top_curve3.png',
               width: (curveWidth ?? 300).w,
-              height: 349.h,
+              height: 385.h,
+              // height: 349.h,
               fit: BoxFit.contain,
             ),
           ),

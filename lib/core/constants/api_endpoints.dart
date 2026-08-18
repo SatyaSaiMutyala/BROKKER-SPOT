@@ -32,6 +32,7 @@ class ApiEndpoints {
   static const String fetchAnnouncementDetail = 'user/announcements/fetch';
   static const String fetchAllAnnouncements = 'user/announcements/fetch-all';
   static const String sendProposal = 'user/announcements/sent-proposal';
+  static const String fetchProposals = 'user/announcements/fetch-proposals';
   static const String addToWishlist = 'user/announcements/wishlist/add';
   static const String fetchWishlist = 'user/announcements/wishlist/fetch';
   static const String removeFromWishlist =
