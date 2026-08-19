@@ -37,11 +37,24 @@ class AnnouncementDetailBody extends StatefulWidget {
   final bool showCommission;
   final bool showActualDocs;
 
+  /// Brokers who have signed the agreement (status 3) or already published
+  /// it (4), rendered under the location as "Property Advertise by Brokers".
+  ///
+  /// Passed in rather than fetched here: the parent already owns the
+  /// announcement id and the proposals request, and this widget is shared with
+  /// screens that have no such section. Empty hides it.
+  final List<ProposalBroker> contractedBrokers;
+
+  /// Tapping a broker's chat button. Left null to render the row without one.
+  final ValueChanged<ProposalBroker>? onBrokerChatTap;
+
   const AnnouncementDetailBody({
     super.key,
     required this.data,
     this.showCommission = false,
     this.showActualDocs = false,
+    this.contractedBrokers = const [],
+    this.onBrokerChatTap,
   });
 
   @override
@@ -300,6 +313,8 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
         ],
         SizedBox(height: 10.h),
         _buildLocationSection(isDark),
+        SizedBox(height: 10.h),
+        _buildContractedBrokersSection(isDark),
       ],
     );
   }
@@ -365,6 +380,8 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
         ],
         SizedBox(height: 10.h),
         _buildLocationSection(isDark),
+        SizedBox(height: 10.h),
+        _buildContractedBrokersSection(isDark),
       ],
     );
   }
@@ -864,6 +881,146 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
   }
 
   // ── Location ───────────────────────────────────────────────────────────────
+
+  /// "Property Advertise by Brokers" — the brokers who signed the agreement.
+  ///
+  /// Fed by [AnnouncementDetailBody.contractedBrokers] (proposal status 3 or
+  /// 4). Hidden entirely when none have signed yet.
+  Widget _buildContractedBrokersSection(bool isDark) {
+    final brokers = widget.contractedBrokers;
+    if (brokers.isEmpty) return const SizedBox.shrink();
+
+    final borderColor =
+        isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
+    final textColor = isDark ? AppColors.textWhite : const Color(0xFF202020);
+    final subColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Property Advertise by Brokers', isDark),
+          SizedBox(height: 4.h),
+          Text(
+            'Broker have permission to Advertise this property',
+            style: GoogleFonts.poppins(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w300,
+              color: subColor,
+            ),
+          ),
+          SizedBox(height: 12.h),
+          for (int i = 0; i < brokers.length; i++) ...[
+            if (i > 0)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 4.h),
+                child: Divider(height: 1, color: borderColor),
+              ),
+            _contractedBrokerRow(brokers[i], textColor, subColor, isDark),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _contractedBrokerRow(
+    ProposalBroker broker,
+    Color textColor,
+    Color subColor,
+    bool isDark,
+  ) {
+    final avatar = broker.brokerProfileImage;
+    final name = (broker.name ?? '').trim();
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8.h),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24.r,
+            backgroundColor:
+                isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED),
+            backgroundImage: (avatar != null && avatar.trim().isNotEmpty)
+                ? CachedNetworkImageProvider(avatar)
+                : null,
+            child: (avatar == null || avatar.trim().isEmpty)
+                ? Icon(Icons.person, size: 22.sp, color: subColor)
+                : null,
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name.isEmpty ? 'Broker' : name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: textColor,
+                  ),
+                ),
+                SizedBox(height: 3.h),
+                Text(
+                  'Sign Contract ${_signedAgo(broker)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w300,
+                    color: subColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (widget.onBrokerChatTap != null) ...[
+            SizedBox(width: 8.w),
+            GestureDetector(
+              onTap: () => widget.onBrokerChatTap!(broker),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 40.w,
+                height: 40.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.primary, width: 1.2),
+                ),
+                child: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 18.sp,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// "45 days ago" for the moment the agreement was signed.
+  String _signedAgo(ProposalBroker broker) {
+    final raw = broker.signedAt;
+    final dt = raw == null ? null : DateTime.tryParse(raw);
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inDays >= 1) {
+      return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    }
+    if (diff.inHours >= 1) {
+      return '${diff.inHours} hr${diff.inHours == 1 ? '' : 's'} ago';
+    }
+    if (diff.inMinutes >= 1) return '${diff.inMinutes} min ago';
+    return 'just now';
+  }
 
   Widget _buildLocationSection(bool isDark) {
     final borderColor =

@@ -15,18 +15,32 @@ class PropertyTypeController extends GetxController {
   final error = Rxn<String>();
   bool _loaded = false;
 
+  /// Loads property types, re-fetching in place when [force] is set.
+  ///
+  /// Same admin-managed reference list as the amenities one, so it goes stale
+  /// the same way and refreshes the same way: with something already cached
+  /// the fetch is silent — [isLoading] and [error] are only raised when there
+  /// is nothing to show, so the dropdown never falls back to a "Loading..."
+  /// hint over options that are already usable.
   Future<void> load({bool force = false}) async {
     if (_loaded && !force) return;
+    // A fetch is already in flight — it will publish the same fresh list.
+    if (isLoading.value) return;
+
+    final hasCached = propertyTypes.isNotEmpty;
     try {
-      isLoading.value = true;
-      error.value = null;
+      if (!hasCached) {
+        isLoading.value = true;
+        error.value = null;
+      }
       final result = await _repo.fetchPropertyTypes();
       propertyTypes.assignAll(result);
       _loaded = true;
+      error.value = null;
     } catch (e) {
-      error.value = e.toString();
+      if (!hasCached) error.value = e.toString();
     } finally {
-      isLoading.value = false;
+      if (!hasCached) isLoading.value = false;
     }
   }
 

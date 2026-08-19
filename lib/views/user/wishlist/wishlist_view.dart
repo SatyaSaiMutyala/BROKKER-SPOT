@@ -1,9 +1,10 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/models/property_filter_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.dart';
-import 'package:brokkerspot/widgets/announcements/announcement_filter_bar.dart';
+import 'package:brokkerspot/widgets/announcements/home_filter_bar.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/wishlist/wishlist_tile.dart';
 import 'package:flutter/material.dart';
@@ -28,8 +29,11 @@ class _WishlistViewState extends State<WishlistView> {
   final _controller = WishlistController.to;
   final _scrollController = ScrollController();
 
-  String? _selectedListingType; // null = all, 'Sell' = Buy, 'Rent' = Rent
-  String? _selectedPropertyType; // null = all
+  /// Same filter model the home feed uses, so both screens offer an identical
+  /// bar. Home sends it to the search API; the wishlist endpoint only accepts
+  /// page/perPage/listing_type, so the facets are matched here against the
+  /// items already loaded instead.
+  PropertyFilter _filter = PropertyFilter.empty;
 
   // 13 + 113 + 5 + 113 + 5 + 113 + 13 = 375, so a 3-column grid with these
   // insets lands on the spec's 113pt tile at the design width.
@@ -62,19 +66,50 @@ class _WishlistViewState extends State<WishlistView> {
     }
   }
 
+  /// Applies every facet of [_filter] to the loaded wishlist items.
+  ///
+  /// Mirrors what the search API does for the home feed, field by field. A
+  /// null facet means "any", so an empty filter returns the list untouched.
   List<AnnouncementModel> _filtered(List<AnnouncementModel> all) {
-    var list = all;
-    if (_selectedListingType != null) {
-      list = list.where((a) => a.listingType == _selectedListingType).toList();
-    }
-    if (_selectedPropertyType != null) {
-      list = list
-          .where((a) =>
-              a.propertyType?.toLowerCase() ==
-              _selectedPropertyType!.toLowerCase())
-          .toList();
-    }
-    return list;
+    final f = _filter;
+    if (f.hasNoFacets) return all;
+
+    bool matchesText(String? value, String? wanted) =>
+        wanted == null ||
+        wanted.trim().isEmpty ||
+        (value ?? '').toLowerCase().trim() == wanted.toLowerCase().trim();
+
+    return all.where((a) {
+      // The filter carries 1 = Buy / 2 = Rent; the model stores the label.
+      if (f.listingType != null) {
+        final wanted = f.listingType == 1 ? 'sell' : 'rent';
+        if ((a.listingType ?? '').toLowerCase() != wanted) return false;
+      }
+      if (f.propertyStatus != null && a.propertyStatus != f.propertyStatus) {
+        return false;
+      }
+      if (f.rentPeriod != null && !matchesText(a.rentPeriod, f.rentPeriod)) {
+        return false;
+      }
+      // Only names are available on a wishlist item, so the sheets' ids are
+      // matched through their display names.
+      if (!matchesText(a.propertyType, f.propertyTypeName)) return false;
+      if (!matchesText(a.propertyCountry, f.countryName)) return false;
+      if (!matchesText(a.propertyCity, f.cityName)) return false;
+      if (!matchesText(a.propertyArea, f.areaName)) return false;
+
+      if (f.bedrooms != null && a.bedrooms != f.bedrooms) return false;
+      if (f.bathrooms != null && a.bathrooms != f.bathrooms) return false;
+
+      final price = a.price;
+      if (f.minPrice != null && (price == null || price < f.minPrice!)) {
+        return false;
+      }
+      if (f.maxPrice != null && (price == null || price > f.maxPrice!)) {
+        return false;
+      }
+      return true;
+    }).toList();
   }
 
   @override
@@ -106,14 +141,12 @@ class _WishlistViewState extends State<WishlistView> {
                     slivers: [
                       SliverToBoxAdapter(child: SizedBox(height: 16.h)),
                       SliverToBoxAdapter(
-                        child: AnnouncementFilterBar(
+                        child: HomeFilterBar(
                           horizontalPadding: _gutter,
-                          selectedListingType: _selectedListingType,
-                          selectedPropertyType: _selectedPropertyType,
-                          onListingTypeChanged: (val) =>
-                              setState(() => _selectedListingType = val),
-                          onPropertyTypeChanged: (type) =>
-                              setState(() => _selectedPropertyType = type),
+                          filter: _filter,
+                          onFilterChanged: (f) => setState(() => _filter = f),
+                          onResetAll: () =>
+                              setState(() => _filter = PropertyFilter.empty),
                         ),
                       ),
                       SliverToBoxAdapter(child: SizedBox(height: 16.h)),

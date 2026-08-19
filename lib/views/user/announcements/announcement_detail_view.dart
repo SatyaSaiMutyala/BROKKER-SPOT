@@ -89,6 +89,20 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     'assets/images/rent2.png',
   ];
 
+  /// Proposal status 3 (signed) / 4 (published) — see [_fetchContractedBrokers].
+  List<ProposalBroker> _contractedBrokers = const [];
+
+  /// Opens the owner's chat with a broker from the advertising section.
+  void _openBrokerChat(ProposalBroker broker) {
+    AnnouncementChatView.open(
+      announcementId: _data.id ?? widget.announcement.id ?? '',
+      brokerName: broker.name ?? 'Broker',
+      brokerAvatar: broker.brokerProfileImage,
+      peerUserId: broker.brokerId,
+      userRole: 1, // this section only renders for the owner
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -126,6 +140,31 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       // the detail endpoint returns user_id as a plain string (no name/avatar).
       _supplementBrokerInfoFromCache();
     } catch (_) {}
+    _fetchContractedBrokers();
+  }
+
+  /// Brokers who signed the agreement, for the "Property Advertise by Brokers"
+  /// section under the location.
+  ///
+  /// The detail endpoint's own `latest_proposals` can't serve this: it caps at
+  /// 3 and filters out published (4) proposals. The proposals endpoint returns
+  /// every proposal with its status, so the signed ones are picked out here —
+  /// no backend change needed. Owner-only, since that endpoint is scoped to
+  /// the announcement's owner.
+  Future<void> _fetchContractedBrokers() async {
+    final id = widget.announcement.id;
+    if (id == null || id.isEmpty) return;
+    if (!(_data.isOwner ?? widget.isOwner)) return;
+    if (!LocalStorageService.isLoggedIn()) return;
+
+    try {
+      final all = await _repo.fetchProposals(id);
+      if (!mounted) return;
+      setState(() => _contractedBrokers =
+          all.where(AnnouncementRepository.isContractedBroker).toList());
+    } catch (e) {
+      debugPrint('⚠️ Failed to load contracted brokers: $e');
+    }
   }
 
   /// Looks up broker name / avatar in the [AnnouncementListController] cache
@@ -496,6 +535,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                   AnnouncementDetailBody(
                     data: a,
                     showCommission: widget.isOwner,
+                    contractedBrokers: _contractedBrokers,
+                    onBrokerChatTap: _openBrokerChat,
                   ),
                   SizedBox(height: 90.h + bottomPad),
                 ],
@@ -977,6 +1018,12 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     }
 
     if (!widget.isOwner) {
+      // Reached through the agreement screen's "View Property" (the only place
+      // that sets backOnChat). The property is already published and the chat
+      // this pill would open is the screen directly underneath, so it has
+      // nothing left to offer — every other !isOwner entry point still gets it.
+      if (widget.backOnChat) return const SizedBox.shrink();
+
       return Padding(
         padding: EdgeInsets.fromLTRB(44.w, 0, 44.w, 10.h + bottomPad),
         child: ClipRRect(

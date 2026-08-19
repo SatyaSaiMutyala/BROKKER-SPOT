@@ -50,9 +50,17 @@ class HomeFilterBar extends StatelessWidget {
       onTap: () => _showListingTypeSheet(context, isDark),
     ));
 
-    // ── 2. Property status: grouped segmented pill (All | Ready | Off Plan) ──
-    chips.add(SizedBox(width: 8.w));
-    chips.add(_statusGroup(isDark));
+    // ── 2. Property status / rent period: grouped segmented pill ────────────
+    // Both variants only mean something once a listing type is picked —
+    // Ready/Off Plan belongs to Buy and Yearly/Monthly to Rent — so under
+    // "All", which spans both, the group is hidden rather than defaulting to
+    // the Buy pair. Picking "All" already clears propertyStatus and
+    // rentPeriod (see _showListingTypeSheet), so nothing keeps filtering
+    // invisibly once it disappears.
+    if (filter.listingType != null) {
+      chips.add(SizedBox(width: 8.w));
+      chips.add(_statusGroup(isDark));
+    }
 
     // ── 3. Property Type ───────────────────────────────────────────────────
     chips.add(SizedBox(width: 8.w));
@@ -196,8 +204,10 @@ class HomeFilterBar extends StatelessWidget {
   }
 
   /// Contextual segmented pill:
-  ///  • Buy / All → Ready | Off Plan   (drives `propertyStatus`: 1 / 2)
-  ///  • Rent       → Yearly | Monthly  (drives `rentPeriod`)
+  ///  • Buy  → Ready | Off Plan   (drives `propertyStatus`: 1 / 2)
+  ///  • Rent → Yearly | Monthly   (drives `rentPeriod`)
+  ///
+  /// Not shown under "All" — the caller gates it on a chosen listing type.
   Widget _statusGroup(bool isDark) {
     final status = filter.propertyStatus; // null=All, 1=Ready, 2=Off Plan
     final isRent = filter.listingType == 2;

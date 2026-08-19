@@ -118,6 +118,15 @@ class ProposalBroker {
   /// Set when the broker has published the announcement (status == 4).
   final String? publishedAt;
 
+  /// Stamped when the owner approved the proposal and the agreement was
+  /// rendered — the closest thing the record has to "contract signed".
+  final String? approvedAt;
+
+  /// Last write to the proposal. Status 3 (broker accepted) sets it, and the
+  /// move to 4 does not, so it stands in for the signing moment when
+  /// [approvedAt] is missing.
+  final String? updatedAt;
+
   ProposalBroker({
     this.id,
     this.brokerId,
@@ -127,7 +136,12 @@ class ProposalBroker {
     this.createdAt,
     this.status,
     this.publishedAt,
+    this.approvedAt,
+    this.updatedAt,
   });
+
+  /// Best available "contract signed" timestamp, most specific first.
+  String? get signedAt => approvedAt ?? updatedAt ?? createdAt;
 
   factory ProposalBroker.fromJson(Map<String, dynamic> json) {
     final nested = (json['broker'] ?? json['user_id'] ?? json['user']);
@@ -144,6 +158,8 @@ class ProposalBroker {
       createdAt: json['created_at']?.toString(),
       status: (json['status'] as num?)?.toInt(),
       publishedAt: json['published_at']?.toString(),
+      approvedAt: json['approved_at']?.toString(),
+      updatedAt: json['updated_at']?.toString(),
     );
   }
 }

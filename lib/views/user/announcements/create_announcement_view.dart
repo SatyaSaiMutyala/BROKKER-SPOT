@@ -85,8 +85,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       _propertyFor =
           (a.listingType ?? '').toLowerCase() == 'sell' ? 'Sell' : 'Rent';
       _brokerProposalLimit = a.proposalsLimit?.toString();
-      _locationSaved = _informationSaved =
-          _videoImagesSaved = _priceSaved = _documentsSaved = true;
+      _deriveStepFlags();
     } else {
       _ctrl.loadDraft().then((flags) {
         if (flags != null && mounted) {
@@ -102,6 +101,60 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
         }
       });
     }
+  }
+
+  /// Marks each step done only if the loaded announcement actually satisfies
+  /// that step's own rules.
+  ///
+  /// Editing used to set all five flags to true unconditionally. That holds
+  /// for a published listing — it could not have gone live incomplete — but
+  /// not for a draft: one saved after only the first step reopened with all
+  /// three steps showing green, and Announce Now enabled over missing data.
+  /// Each check below mirrors the matching step screen's own validity getter
+  /// against what was actually saved.
+  void _deriveStepFlags() {
+    final c = _ctrl;
+    final isSell = c.listingType == 1;
+
+    // Step 1 — PropertyInformationView covers the details *and* the gallery,
+    // and only reports itself valid with at least 8 images (its _isValid and
+    // _filledSlotCount). It sets both flags together, so they match here too.
+    final step1 = c.listingType != null &&
+        (c.propertyType?.trim().isNotEmpty ?? false) &&
+        (c.sqft != null || c.sqm != null) &&
+        c.bedrooms != null &&
+        c.bathrooms != null &&
+        c.floor != null &&
+        c.totalFloors != null &&
+        (c.description?.trim().isNotEmpty ?? false) &&
+        // Sell must carry Ready/Off Plan; Off Plan must carry its date.
+        (!isSell || c.propertyStatus != null) &&
+        (c.propertyStatus != 2 || c.completionDate != null) &&
+        c.imageUrls.length >= 8;
+    _informationSaved = step1;
+    _videoImagesSaved = step1;
+
+    // Step 2 — PropertyLocationView. Documents sit behind the same _isUAE
+    // gate it uses, so a non-UAE property is complete on location alone.
+    _locationSaved = c.latitude != null &&
+        c.longitude != null &&
+        (c.country?.trim().isNotEmpty ?? false) &&
+        (c.city?.trim().isNotEmpty ?? false) &&
+        (c.area?.trim().isNotEmpty ?? false);
+
+    final country = (c.country ?? '').toLowerCase();
+    final isUAE = country.contains('uae') ||
+        country.contains('united arab emirates') ||
+        country.contains('u.a.e');
+    _documentsSaved = !isUAE ||
+        (c.titleDeedUrl != null &&
+            c.passportFrontUrl != null &&
+            c.passportBackUrl != null);
+
+    // Step 3 — PropertyPriceBrokerageView: rent also needs a period and an
+    // availability date.
+    _priceSaved = c.price != null &&
+        (isSell || (c.rentPeriod != null && c.availableDate != null));
   }
 
   @override

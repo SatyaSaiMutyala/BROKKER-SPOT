@@ -128,16 +128,25 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
   /// Same four tabs and the same broker artwork as before — only the bar that
   /// renders them changed, so the user and broker dashboards now share one
   /// nav bar widget and look identical.
+  ///
+  /// Home, Meetings and Account render the user dashboard's own assets at the
+  /// default size, so those three tabs are pixel-identical across both sides.
+  ///
+  /// Projects is the exception: it has no counterpart in the user set, so it
+  /// keeps the broker artwork. That PNG's glyph fills only ~66% of its canvas
+  /// against the user set's ~90%, so it is sized up to land at the same optical
+  /// size as its neighbours instead of reading visibly smaller.
   static const _navDestinations = [
     AppNavDestination(
-      iconAsset: 'assets/images/broker_home_icon.png',
-      activeIconAsset: 'assets/images/broker_active_home_icon.png',
+      iconAsset: 'assets/images/home_icon.png',
+      activeIconAsset: 'assets/images/home_active.png',
       semanticLabel: 'Home',
     ),
     AppNavDestination(
       iconAsset: 'assets/images/broker_project_icon.png',
       activeIconAsset: 'assets/images/broker_active_project_icon.png',
       semanticLabel: 'Projects',
+      iconSize: 35,
     ),
     AppNavDestination(
       iconAsset: 'assets/images/meeting_icon.png',
@@ -145,8 +154,8 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
       semanticLabel: 'Meetings',
     ),
     AppNavDestination(
-      iconAsset: 'assets/images/broker_profile_icon.png',
-      activeIconAsset: 'assets/images/broker_active_profile_icon.png',
+      iconAsset: 'assets/images/account_icon.png',
+      activeIconAsset: 'assets/images/account_active_icon.png',
       semanticLabel: 'Account',
     ),
   ];

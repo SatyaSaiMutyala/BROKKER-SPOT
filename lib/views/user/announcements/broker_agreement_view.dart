@@ -289,10 +289,18 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   /// Decides how many routes to pop when the user taps back.
   ///
   /// Normal path  →  pop 1 (this screen only).
-  /// acceptAndPublish + _published  →  pop 2 (this screen + the preview-detail
-  ///   screen that was pushed before us), landing back on the chat screen.
+  /// acceptAndPublish, once accepted  →  pop 2 (this screen + the
+  ///   preview-detail screen that was pushed before us), landing back on the
+  ///   chat screen.
+  ///
+  /// The accepted test is [_signedLocally] rather than [_published]: publish
+  /// runs in the background and only flips [_published] in its success
+  /// callback, so backing out in between would pop a single route and drop the
+  /// user on the preview screen they had already moved past. Pressing Accept
+  /// is what ends the preview step, not the API round-trip finishing.
+  /// [_isPublished] also covers reopening an already-published agreement.
   void _handleBack() {
-    if (widget.acceptAndPublish && _published) {
+    if (widget.acceptAndPublish && (_signedLocally || _isPublished)) {
       // Close both the Agreement screen and the AnnouncementDetailView(previewMode)
       // that was stacked underneath it, so the user returns directly to chat.
       Get.close(2);
@@ -321,6 +329,12 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                 CustomHeader(
                   title: 'Agreement',
                   showBackButton: true,
+                  // Without this the header falls back to Navigator.pop, which
+                  // pops a single route and lands on the preview detail screen.
+                  // PopScope only intercepts the system back gesture, not an
+                  // explicit pop from inside the header, so the button has to
+                  // be routed through _handleBack too.
+                  onBack: _handleBack,
                   trailing: Text(
                     _counter,
                     style: GoogleFonts.poppins(

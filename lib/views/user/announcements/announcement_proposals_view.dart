@@ -34,7 +34,12 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
   /// The preview is capped at 3 by the backend while the count shown on the
   /// detail screen is the real total, so without this fetch a count of 4 would
   /// open a screen listing only 3.
-  late List<ProposalBroker> _brokers = widget.proposals;
+  /// The seed comes from the detail screen's `latest_proposals`, which the
+  /// backend filters only by `$nin: [4, 5]` — so it can still contain a signed
+  /// (3) broker. Filtered here too, otherwise one would flash in the list
+  /// until the full fetch lands.
+  late List<ProposalBroker> _brokers =
+      widget.proposals.where(AnnouncementRepository.isOpenProposal).toList();
   bool _loading = false;
 
   @override
@@ -51,7 +56,11 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
     try {
       final full = await AnnouncementRepository().fetchProposals(id);
       if (!mounted) return;
-      setState(() => _brokers = full);
+      // Signed and published brokers move to the announcement detail screen's
+      // "Property Advertise by Brokers" section, so they stop appearing here.
+      setState(
+        () => _brokers = full.where(AnnouncementRepository.isOpenProposal).toList(),
+      );
     } catch (e) {
       // Keep the preview rows already on screen rather than emptying the list.
       debugPrint('⚠️ Failed to load full proposals list: $e');

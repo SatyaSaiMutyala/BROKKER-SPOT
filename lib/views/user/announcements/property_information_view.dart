@@ -228,8 +228,13 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     _totalFloor = _intToFloorStr(c.totalFloors);
     if (c.description != null) _descCtrl.text = c.description!;
     if (c.amenities.isNotEmpty) _selectedAmenityIds.addAll(c.amenities);
-    _amenityCtrl.loadAmenities();
-    _propertyTypeCtrl.load();
+    // Refresh rather than trust the session cache: both lists are edited in
+    // the admin panel, so an amenity or property type added there has to show
+    // up the next time this screen is opened, not after an app restart. With
+    // a cached list present this is silent — the current options stay on
+    // screen and are swapped for the fresh ones when the response lands.
+    _amenityCtrl.loadAmenities(force: true);
+    _propertyTypeCtrl.load(force: true);
     if (c.propertyStatus == 1) _isProperty = 'Ready';
     if (c.propertyStatus == 2) _isProperty = 'Off Plan';
     _completionDate = c.completionDate;

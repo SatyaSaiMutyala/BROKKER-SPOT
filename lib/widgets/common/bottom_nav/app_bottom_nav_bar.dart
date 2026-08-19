@@ -15,6 +15,10 @@ import 'app_nav_destination.dart';
 class AppBottomNavBar extends StatelessWidget {
   static const Duration _transition = Duration(milliseconds: 220);
 
+  /// Glyph box used when a destination doesn't override it, sized for the
+  /// user set's artwork. See [AppNavDestination.iconSize].
+  static const double defaultIconSize = 26;
+
   /// Padding kept under the row. The home-indicator inset is capped so the bar
   /// does not grow a band of empty space beneath the icons.
   static const double _maxBottomInset = 12;
@@ -129,8 +133,12 @@ class _DestinationSlot extends StatelessWidget {
                 duration: transition,
                 builder: (context, animatedColor, _) => Image.asset(
                   destination.assetFor(isSelected: isSelected),
-                  width: 26.w,
-                  height: 26.w,
+                  width: (destination.iconSize ??
+                          AppBottomNavBar.defaultIconSize)
+                      .w,
+                  height: (destination.iconSize ??
+                          AppBottomNavBar.defaultIconSize)
+                      .w,
                   color: animatedColor ?? color,
                   colorBlendMode: BlendMode.srcIn,
                 ),

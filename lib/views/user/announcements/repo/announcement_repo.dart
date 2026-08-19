@@ -251,9 +251,10 @@ class AnnouncementRepository {
   /// from (see getProposalsList in
   /// brokkerspot-backend/src/services/users/announcements.service.ts).
   ///
-  /// That endpoint applies no status filter, unlike the detail count's
-  /// `status: { $nin: [4, 5] }`, so published (4) and cancelled (5) proposals
-  /// are dropped here — otherwise the list would instead overshoot the count.
+  /// Returned unfiltered, carrying each proposal's `status`, because callers
+  /// split the same list by workflow stage: the proposals screen lists the
+  /// ones still being negotiated (0-2) while the announcement detail screen
+  /// lists the brokers who have signed (3) or published (4).
   ///
   /// `perPage` has no server-side cap and an announcement's proposals are
   /// bounded by its own `proposals_limit`, so one large page avoids paging.
@@ -275,9 +276,22 @@ class AnnouncementRepository {
     return list
         .whereType<Map<String, dynamic>>()
         .map(ProposalBroker.fromJson)
-        .where((p) => p.status != 4 && p.status != 5)
         .toList();
   }
+
+  /// Proposals still in negotiation — what the proposals screen lists.
+  ///
+  /// A broker drops out of this list the moment they sign (3): from then on
+  /// they belong to the announcement detail screen's advertising section.
+  /// Cancelled (5) never belonged here.
+  static bool isOpenProposal(ProposalBroker p) {
+    final s = p.status ?? 0;
+    return s == 0 || s == 1 || s == 2;
+  }
+
+  /// Brokers who signed the agreement (3) or have already published it (4).
+  static bool isContractedBroker(ProposalBroker p) =>
+      p.status == 3 || p.status == 4;
 
   Future<AnnouncementModel> fetchAnnouncementDetail(String id) async {
     final response = await api.getRequest(

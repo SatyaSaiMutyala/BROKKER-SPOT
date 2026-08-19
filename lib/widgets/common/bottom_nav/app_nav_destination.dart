@@ -15,11 +15,22 @@ class AppNavDestination {
   /// Announced by screen readers; falls back to [label].
   final String? semanticLabel;
 
+  /// Rendered box for the glyph, in logical pixels before screen scaling.
+  /// Defaults to [AppBottomNavBar.defaultIconSize].
+  ///
+  /// Artwork does not carry a consistent amount of transparent margin: the
+  /// user set's glyphs fill ~90% of their canvas while the broker set's fill
+  /// only ~66%, so drawing both into the same box makes the broker icons read
+  /// as visibly smaller. Padded assets can size up here to match optically
+  /// without anyone having to redraw them.
+  final double? iconSize;
+
   const AppNavDestination({
     required this.iconAsset,
     this.activeIconAsset,
     this.label,
     this.semanticLabel,
+    this.iconSize,
   });
 
   String assetFor({required bool isSelected}) =>
