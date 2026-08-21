@@ -228,24 +228,72 @@ class MyInformationView extends StatelessWidget {
 
   // ─── Shared dialog helpers ────────────────────────────────────────────────────
 
-  // Dialog title row with close button
-  Widget _dialogHeader(BuildContext ctx, String title, bool isDark) {
+  /// Dialog title row: brand-tinted icon, title (with optional subtitle) and a
+  /// close button, followed by a divider that separates it from the content.
+  ///
+  /// [icon] and [subtitle] are optional so existing callers keep working; both
+  /// are what give each dialog its own identity instead of four identical
+  /// title strings.
+  Widget _dialogHeader(
+    BuildContext ctx,
+    String title,
+    bool isDark, {
+    IconData? icon,
+    String? subtitle,
+  }) {
+    final titleColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final subtitleColor =
+        isDark ? Colors.grey.shade500 : Colors.grey.shade600;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: GoogleFonts.poppins(
-                fontSize: 18.sp,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-                height: 1.0,
+            if (icon != null) ...[
+              Container(
+                width: 40.w,
+                height: 40.w,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: isDark ? 0.18 : 0.14),
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Icon(icon, size: 20.sp, color: AppColors.primary),
+              ),
+              SizedBox(width: 12.w),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 17.sp,
+                      fontWeight: FontWeight.w600,
+                      color: titleColor,
+                      height: 1.2,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    SizedBox(height: 3.h),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w300,
+                        color: subtitleColor,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const Spacer(),
+            SizedBox(width: 8.w),
             GestureDetector(
               onTap: () => Navigator.pop(ctx),
               child: Container(
@@ -262,6 +310,14 @@ class MyInformationView extends StatelessWidget {
             ),
           ],
         ),
+        SizedBox(height: 16.h),
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
         SizedBox(height: 20.h),
       ],
     );
@@ -273,9 +329,23 @@ class MyInformationView extends StatelessWidget {
     required bool loading,
     required VoidCallback? onPressed,
   }) {
-    return SizedBox(
+    return Container(
       width: double.infinity,
       height: 52.h,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14.r),
+        // Soft brand-coloured glow so the primary action reads as raised
+        // without an elevation shadow that would look grey against the gold.
+        boxShadow: loading
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+      ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
@@ -306,15 +376,35 @@ class MyInformationView extends StatelessWidget {
   }
 
   // Subtle cancel text button
+  /// Secondary action — an outlined button so it balances the filled Save
+  /// above it instead of trailing off as bare text.
   Widget _cancelButton(BuildContext ctx, bool isDark) {
-    return TextButton(
-      onPressed: () => Navigator.pop(ctx),
-      child: Text(
-        'Cancel',
-        style: GoogleFonts.poppins(
-          fontSize: 14.sp,
-          fontWeight: FontWeight.w500,
-          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.10);
+
+    return Padding(
+      padding: EdgeInsets.only(top: 10.h),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48.h,
+        child: OutlinedButton(
+          onPressed: () => Navigator.pop(ctx),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: borderColor),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14.r),
+            ),
+          ),
+          child: Text(
+            'Cancel',
+            style: GoogleFonts.poppins(
+              fontSize: 15.sp,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+              height: 1.0,
+            ),
+          ),
         ),
       ),
     );
@@ -374,11 +464,31 @@ class MyInformationView extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1B1D27) : Colors.white,
             borderRadius: BorderRadius.circular(20.r),
+            // Hairline lifts the surface off a dark background, and the
+            // shadow gives the dialog depth over the dimmed page.
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.black.withValues(alpha: 0.04),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _dialogHeader(ctx, 'Edit Name', isDark),
+              _dialogHeader(
+                ctx,
+                'Edit Name',
+                isDark,
+                icon: Icons.person_outline_rounded,
+                subtitle: 'This is how your name appears across the app.',
+              ),
               TextField(
                 controller: nameCtrl,
                 autofocus: true,
@@ -424,6 +534,20 @@ class MyInformationView extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1B1D27) : Colors.white,
             borderRadius: BorderRadius.circular(20.r),
+            // Hairline lifts the surface off a dark background, and the
+            // shadow gives the dialog depth over the dimmed page.
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.black.withValues(alpha: 0.04),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -432,6 +556,8 @@ class MyInformationView extends StatelessWidget {
                 ctx,
                 controller.phone.isEmpty ? 'Add Phone' : 'Edit Phone',
                 isDark,
+                icon: Icons.phone_iphone_rounded,
+                subtitle: 'Pick your country code, then the number.',
               ),
               Row(
                 children: [
@@ -500,11 +626,31 @@ class MyInformationView extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1B1D27) : Colors.white,
             borderRadius: BorderRadius.circular(20.r),
+            // Hairline lifts the surface off a dark background, and the
+            // shadow gives the dialog depth over the dimmed page.
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.black.withValues(alpha: 0.04),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _dialogHeader(ctx, 'Edit Email', isDark),
+              _dialogHeader(
+                ctx,
+                'Edit Email',
+                isDark,
+                icon: Icons.mail_outline_rounded,
+                subtitle: 'We will send a code to confirm the new address.',
+              ),
               Text(
                 'An OTP will be sent to your new email for verification.',
                 style: GoogleFonts.poppins(
@@ -565,11 +711,31 @@ class MyInformationView extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1B1D27) : Colors.white,
             borderRadius: BorderRadius.circular(20.r),
+            // Hairline lifts the surface off a dark background, and the
+            // shadow gives the dialog depth over the dimmed page.
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.black.withValues(alpha: 0.04),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _dialogHeader(ctx, 'Verify Email', isDark),
+              _dialogHeader(
+                ctx,
+                'Verify Email',
+                isDark,
+                icon: Icons.verified_user_outlined,
+                subtitle: 'Enter the 6-digit code we just sent you.',
+              ),
               Text(
                 'Enter the OTP sent to\n$email',
                 textAlign: TextAlign.center,

@@ -3,7 +3,9 @@ import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class CreateNewPasswordController extends GetxController {
   CreateNewPasswordController(this.email);
@@ -85,6 +87,9 @@ class CreateNewPasswordController extends GetxController {
         Get.bottomSheet(
           _successBottomSheet(),
           isDismissible: false,
+          // Without this the sheet paints its own opaque background behind the
+          // container, squaring off the rounded top corners.
+          backgroundColor: Colors.transparent,
         );
 
         Future.delayed(const Duration(seconds: 2), () {
@@ -104,18 +109,49 @@ class CreateNewPasswordController extends GetxController {
     }
   }
 
+  /// Success sheet shown after the password is reset.
+  ///
+  /// Mirrors the "account created" sheet in EmailVerificationView so both
+  /// confirmations look the same — a filled circle with a check above the
+  /// message. This one was previously text alone on a plain rectangle.
   Widget _successBottomSheet() {
+    final isDark = Get.isDarkMode;
+    final sheetBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.grey.shade400 : Colors.black54;
+
     return Container(
-      height: 220,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      height: 220.h,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: sheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: const Center(
-        child: Text(
-          "Your New Password has successfully created.",
-          textAlign: TextAlign.center,
-        ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            height: 56.h,
+            width: 56.h,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFFD9C27C),
+            ),
+            child: const Icon(
+              Icons.check,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Text(
+            "Your New Password has successfully created.",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 14.sp,
+              color: textColor,
+            ),
+          ),
+        ],
       ),
     );
   }

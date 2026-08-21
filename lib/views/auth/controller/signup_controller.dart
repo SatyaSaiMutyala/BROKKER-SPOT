@@ -13,6 +13,13 @@ class SignupController extends GetxController {
   final countryCodeController = TextEditingController();
   final mobileController = TextEditingController();
 
+  /// Country of residence (plain name, e.g. "United Arab Emirates").
+  ///
+  /// Distinct from [countryCodeController], which holds the phone dial code.
+  /// The signup endpoint requires this and derives the account's currency
+  /// from it.
+  final countryController = TextEditingController();
+
   // Loading state
   var isLoading = false.obs;
 
@@ -33,6 +40,7 @@ class SignupController extends GetxController {
     emailController.addListener(_checkFormValid);
     passwordController.addListener(_checkFormValid);
     mobileController.addListener(_checkFormValid);
+    countryController.addListener(_checkFormValid);
   }
 
   void _checkFormValid() {
@@ -40,6 +48,9 @@ class SignupController extends GetxController {
         emailController.text.trim().isNotEmpty &&
         GetUtils.isEmail(emailController.text.trim()) &&
         mobileController.text.trim().length >= 6 &&
+        // Mandatory server-side, so the button stays disabled without it
+        // rather than letting the request fail.
+        countryController.text.trim().isNotEmpty &&
         hasUppercase.value &&
         hasLowercase.value &&
         hasNumber.value &&
@@ -63,6 +74,9 @@ class SignupController extends GetxController {
         "password": passwordController.text.trim(),
         "countryCode": countryCodeController.text.trim().replaceAll('+', ''),
         "mobileNumber": mobileController.text.trim(),
+        // Required by the endpoint — it validates the field and looks the
+        // account's currency up from this exact name.
+        "country": countryController.text.trim(),
       };
 
       final response =
@@ -176,6 +190,14 @@ class SignupController extends GetxController {
       return false;
     }
 
+    // The endpoint rejects the request without it.
+    if (countryController.text.trim().isEmpty) {
+      AppToast.warning(
+        "Please select your country",
+      );
+      return false;
+    }
+
     return true;
   }
 
@@ -185,6 +207,7 @@ class SignupController extends GetxController {
     emailController.dispose();
     passwordController.dispose();
     countryCodeController.dispose();
+    countryController.dispose();
     mobileController.dispose();
     super.onClose();
   }

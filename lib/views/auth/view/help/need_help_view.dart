@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:brokkerspot/core/constants/app_assets.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/country_codes.dart';
 
 class NeedHelpView extends StatefulWidget {
   const NeedHelpView({super.key});
@@ -20,6 +20,9 @@ class _NeedHelpViewState extends State<NeedHelpView> {
   String _selectedCountryCode = '+971';
   bool _isFormValid = false;
 
+  /// Drives the underline thickness, matching the signup field.
+  final FocusNode _phoneFocus = FocusNode();
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +30,93 @@ class _NeedHelpViewState extends State<NeedHelpView> {
     _phoneController.addListener(_validateForm);
     _emailController.addListener(_validateForm);
     _messageController.addListener(_validateForm);
+    _phoneFocus.addListener(() => setState(() {}));
+  }
+
+  /// Phone number with a dial-code picker — the same field the signup screen
+  /// uses (see SignupView._phoneField), sharing [kCountryDialCodes] so both
+  /// offer an identical list. The old version here was a fixed UAE flag with
+  /// the code rendered as plain text, so no other country could be selected.
+  Widget _phoneField() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dropdownBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final dropdownTextColor = isDark ? Colors.white : Colors.black87;
+    final underlineColor = isDark
+        ? Colors.white.withValues(alpha: 0.5)
+        : const Color(0xFFB5B5B5);
+    final hintColor = isDark ? Colors.grey.shade500 : Colors.grey.shade400;
+    final inputTextColor = isDark ? Colors.white : Colors.black87;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.w),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedCountryCode,
+                  dropdownColor: dropdownBg,
+                  menuMaxHeight: 300,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    color: dropdownTextColor,
+                  ),
+                  items: kCountryDialCodes
+                      .map((c) => DropdownMenuItem(
+                            value: c['code'],
+                            child: Text(
+                              '${c['flag']} ${c['code']}',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.sp,
+                                color: dropdownTextColor,
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _selectedCountryCode = value);
+                  },
+                ),
+              ),
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: TextField(
+                controller: _phoneController,
+                focusNode: _phoneFocus,
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
+                maxLength: 10,
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  color: inputTextColor,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Phone Number',
+                  hintStyle: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    color: hintColor,
+                  ),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: true,
+                  fillColor: Colors.transparent,
+                  counterText: '',
+                  contentPadding: EdgeInsets.symmetric(vertical: 12.h),
+                ),
+              ),
+            ),
+          ],
+        ),
+        Container(
+          height: _phoneFocus.hasFocus ? 0.9 : 0.5,
+          color: underlineColor,
+        ),
+      ],
+    );
   }
 
   void _validateForm() {
@@ -46,6 +136,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
     _phoneController.dispose();
     _emailController.dispose();
     _messageController.dispose();
+    _phoneFocus.dispose();
     super.dispose();
   }
 
@@ -160,64 +251,10 @@ class _NeedHelpViewState extends State<NeedHelpView> {
 
         SizedBox(height: 14.h),
 
-        // Phone Number
-        Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.only(top: 12.h, bottom: 12.h),
-              child: Row(
-                children: [
-                  Image.asset(
-                    'assets/images/uae_flag.png',
-                    width: 28.w,
-                    height: 20.h,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Text(
-                      '🇦🇪',
-                      style: TextStyle(fontSize: 18.sp),
-                    ),
-                  ),
-                  SizedBox(width: 10.w),
-                  Text(
-                    _selectedCountryCode,
-                    style: GoogleFonts.roboto(
-                      fontSize: 14.sp,
-                      color: Colors.black,
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Container(
-                    width: 1,
-                    height: 24.h,
-                    color: const Color(0xFFB5B5B5),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: TextField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      style: GoogleFonts.roboto(fontSize: 14.sp),
-                      decoration: InputDecoration(
-                        hintText: 'Phone Number',
-                        hintStyle: GoogleFonts.roboto(
-                          fontSize: 14.sp,
-                          color: Colors.grey,
-                        ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              height: 1,
-              color: const Color(0xFFB5B5B5),
-            ),
-          ],
-        ),
+        // Phone Number — same field as the signup screen: a real dial-code
+        // picker instead of a fixed UAE flag, capped at 10 digits, with the
+        // underline thickening on focus.
+        _phoneField(),
 
         SizedBox(height: 14.h),
 

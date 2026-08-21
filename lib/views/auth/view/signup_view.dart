@@ -1,4 +1,6 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/country_codes.dart';
+import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/views/auth/controller/signup_controller.dart';
 import 'package:brokkerspot/views/auth/controller/welcome_view_controller.dart';
 import 'package:brokkerspot/views/auth/view/email_verification_view.dart';
@@ -28,84 +30,18 @@ class _SignUpViewState extends State<SignUpView> {
   bool _obscurePassword = true;
   bool _agreeToCreateBroker = false;
 
-  static final List<Map<String, String>> _countryCodes = [
-    {'flag': '🇦🇪', 'code': '+971'},
-    {'flag': '🇮🇳', 'code': '+91'},
-    {'flag': '🇺🇸', 'code': '+1'},
-    {'flag': '🇬🇧', 'code': '+44'},
-    {'flag': '🇦🇺', 'code': '+61'},
-    {'flag': '🇸🇦', 'code': '+966'},
-    {'flag': '🇶🇦', 'code': '+974'},
-    {'flag': '🇰🇼', 'code': '+965'},
-    {'flag': '🇧🇭', 'code': '+973'},
-    {'flag': '🇴🇲', 'code': '+968'},
-    {'flag': '🇪🇬', 'code': '+20'},
-    {'flag': '🇯🇴', 'code': '+962'},
-    {'flag': '🇱🇧', 'code': '+961'},
-    {'flag': '🇮🇶', 'code': '+964'},
-    {'flag': '🇵🇰', 'code': '+92'},
-    {'flag': '🇧🇩', 'code': '+880'},
-    {'flag': '🇱🇰', 'code': '+94'},
-    {'flag': '🇳🇵', 'code': '+977'},
-    {'flag': '🇵🇭', 'code': '+63'},
-    {'flag': '🇮🇩', 'code': '+62'},
-    {'flag': '🇲🇾', 'code': '+60'},
-    {'flag': '🇸🇬', 'code': '+65'},
-    {'flag': '🇹🇭', 'code': '+66'},
-    {'flag': '🇻🇳', 'code': '+84'},
-    {'flag': '🇨🇳', 'code': '+86'},
-    {'flag': '🇯🇵', 'code': '+81'},
-    {'flag': '🇰🇷', 'code': '+82'},
-    {'flag': '🇩🇪', 'code': '+49'},
-    {'flag': '🇫🇷', 'code': '+33'},
-    {'flag': '🇮🇹', 'code': '+39'},
-    {'flag': '🇪🇸', 'code': '+34'},
-    {'flag': '🇵🇹', 'code': '+351'},
-    {'flag': '🇳🇱', 'code': '+31'},
-    {'flag': '🇧🇪', 'code': '+32'},
-    {'flag': '🇨🇭', 'code': '+41'},
-    {'flag': '🇦🇹', 'code': '+43'},
-    {'flag': '🇸🇪', 'code': '+46'},
-    {'flag': '🇳🇴', 'code': '+47'},
-    {'flag': '🇩🇰', 'code': '+45'},
-    {'flag': '🇫🇮', 'code': '+358'},
-    {'flag': '🇵🇱', 'code': '+48'},
-    {'flag': '🇬🇷', 'code': '+30'},
-    {'flag': '🇹🇷', 'code': '+90'},
-    {'flag': '🇷🇺', 'code': '+7'},
-    {'flag': '🇺🇦', 'code': '+380'},
-    {'flag': '🇿🇦', 'code': '+27'},
-    {'flag': '🇳🇬', 'code': '+234'},
-    {'flag': '🇰🇪', 'code': '+254'},
-    {'flag': '🇬🇭', 'code': '+233'},
-    {'flag': '🇪🇹', 'code': '+251'},
-    {'flag': '🇲🇦', 'code': '+212'},
-    {'flag': '🇹🇳', 'code': '+216'},
-    {'flag': '🇧🇷', 'code': '+55'},
-    {'flag': '🇲🇽', 'code': '+52'},
-    {'flag': '🇦🇷', 'code': '+54'},
-    {'flag': '🇨🇴', 'code': '+57'},
-    {'flag': '🇨🇱', 'code': '+56'},
-    {'flag': '🇵🇪', 'code': '+51'},
-    {'flag': '🇳🇿', 'code': '+64'},
-    {'flag': '🇮🇪', 'code': '+353'},
-    {'flag': '🇮🇱', 'code': '+972'},
-    {'flag': '🇭🇰', 'code': '+852'},
-    {'flag': '🇹🇼', 'code': '+886'},
-    {'flag': '🇲🇲', 'code': '+95'},
-    {'flag': '🇦🇫', 'code': '+93'},
-    {'flag': '🇮🇷', 'code': '+98'},
-    {'flag': '🇾🇪', 'code': '+967'},
-    {'flag': '🇸🇾', 'code': '+963'},
-    {'flag': '🇱🇾', 'code': '+218'},
-    {'flag': '🇸🇩', 'code': '+249'},
-    {'flag': '🇩🇿', 'code': '+213'},
-  ];
+  /// Country of residence — see [_countryField].
+  String? _selectedCountry;
+  final _common = CommonDataController.to;
+
+  // Shared with NeedHelpView so both phone fields offer the same list.
+  static const List<Map<String, String>> _countryCodes = kCountryDialCodes;
 
   @override
   void initState() {
     super.initState();
     controller.countryCodeController.text = selectedCode.replaceAll('+', '');
+    _common.loadCountries();
     controller.passwordController.addListener(() {
       controller.validatePassword(controller.passwordController.text);
     });
@@ -151,7 +87,8 @@ class _SignUpViewState extends State<SignUpView> {
                     ),
                   ),
                 ),
-                _bottomCityImage(),
+                // Bottom city illustration removed.
+                // _bottomCityImage(),
               ],
             ),
           ),
@@ -228,6 +165,8 @@ class _SignUpViewState extends State<SignUpView> {
           SizedBox(height: 8.h),
           _phoneField(isDark),
           SizedBox(height: 8.h),
+          _countryField(isDark),
+          SizedBox(height: 8.h),
           CustomTextField(
             controller: controller.emailController,
             hintText: 'E-mail',
@@ -264,6 +203,75 @@ class _SignUpViewState extends State<SignUpView> {
         ],
       ),
     );
+  }
+
+  // ── Country field ─────────────────────────────────────────────────────────────
+
+  /// Country of residence, sent to the signup API as `country`.
+  ///
+  /// Backed by the same `user/common/fetch-countries` list the broker-conversion
+  /// flow uses. That endpoint is the only one of the common lookups without an
+  /// auth guard, so it works before the account exists.
+  ///
+  /// The backend stores the plain country name and resolves the account's
+  /// currency from it (`CURRENCIES[country]` in auth.service.ts), which is why
+  /// this is a picker rather than free text — a typo would leave the account
+  /// with no currency.
+  Widget _countryField(bool isDark) {
+    final dropdownBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? Colors.grey.shade500 : Colors.grey.shade400;
+    final underlineColor = isDark
+        ? Colors.white.withValues(alpha: 0.5)
+        : const Color(0xFFB5B5B5);
+
+    return Obx(() {
+      final countries = _common.countries;
+      final loading = _common.isLoadingCountries.value;
+      final names = countries.map((c) => c.name).toList();
+      // Guard against a stale selection if the list reloads without it.
+      final value = names.contains(_selectedCountry) ? _selectedCountry : null;
+
+      return Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8.w),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+                isExpanded: true,
+                dropdownColor: dropdownBg,
+                menuMaxHeight: 300,
+                hint: Text(
+                  loading && names.isEmpty ? 'Loading countries...' : 'Country',
+                  style: GoogleFonts.inter(fontSize: 13.sp, color: hintColor),
+                ),
+                style: GoogleFonts.inter(fontSize: 13.sp, color: textColor),
+                items: names
+                    .map((n) => DropdownMenuItem(
+                          value: n,
+                          child: Text(
+                            n,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 13.sp,
+                              color: textColor,
+                            ),
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _selectedCountry = v);
+                  controller.countryController.text = v;
+                },
+              ),
+            ),
+          ),
+          Container(height: 0.5, color: underlineColor),
+        ],
+      );
+    });
   }
 
   // ── Phone field ───────────────────────────────────────────────────────────────
@@ -553,13 +561,14 @@ class _SignUpViewState extends State<SignUpView> {
     );
   }
 
-  Widget _bottomCityImage() {
-    return Image.asset(
-      'assets/images/city.png',
-      width: double.infinity,
-      fit: BoxFit.fitWidth,
-    );
-  }
+  // Kept for reference — no longer rendered (see above).
+  //   Widget _bottomCityImage() {
+  //     return Image.asset(
+  //       'assets/images/city.png',
+  //       width: double.infinity,
+  //       fit: BoxFit.fitWidth,
+  //     );
+  //   }
 }
 
 // ── Password rule chip ────────────────────────────────────────────────────────
