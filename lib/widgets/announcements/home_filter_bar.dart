@@ -1,6 +1,8 @@
+import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/models/property_filter_model.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -62,7 +64,21 @@ class HomeFilterBar extends StatelessWidget {
       chips.add(_statusGroup(isDark));
     }
 
-    // ── 3. Property Type ───────────────────────────────────────────────────
+    // ── 3. Country ─────────────────────────────────────────────────────────
+    // Backed by the same `country` name param the search endpoint already
+    // filters on (property_country regex in getAllAnnouncements). Unpicked,
+    // the chip shows the account's own country as a hint — it is a label, not
+    // an applied filter, so the feed still opens worldwide.
+    chips.add(SizedBox(width: 8.w));
+    chips.add(_chip(
+      context: context,
+      label: filter.countryName ?? _profileCountry ?? 'Country',
+      isActive: filter.countryName != null,
+      isDark: isDark,
+      onTap: () => _showCountrySheet(context, isDark),
+    ));
+
+    // ── 4. Property Type ───────────────────────────────────────────────────
     chips.add(SizedBox(width: 8.w));
     chips.add(_chip(
       context: context,
@@ -362,6 +378,157 @@ class HomeFilterBar extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// The signed-in account's country, used as the chip's resting label.
+  /// Null for guests and for accounts that predate signup sending `country`.
+  String? get _profileCountry {
+    if (!Get.isRegistered<ProfileController>()) return null;
+    final c = ProfileController.to.country;
+    return c.isEmpty ? null : c;
+  }
+
+  /// Placeholder chips shown while the country list loads.
+  ///
+  /// Shaped like the real chips — same 20r pill, same height and run spacing,
+  /// with varied widths so it reads as a list of names rather than a block —
+  /// so the sheet keeps its layout when the data lands instead of swapping a
+  /// centred spinner for a full grid.
+  Widget _countryShimmer(bool isDark) {
+    const widths = <double>[86, 112, 74, 128, 96, 68, 118, 90, 104, 80, 122, 92];
+    return Wrap(
+      spacing: 8.w,
+      runSpacing: 8.h,
+      children: widths
+          .map((w) => ClipRRect(
+                borderRadius: BorderRadius.circular(20.r),
+                child: ShimmerBox(width: w.w, height: 36.h),
+              ))
+          .toList(),
+    );
+  }
+
+  /// Country picker — one filter, browsing the whole list from
+  /// `user/common/fetch-countries` so listings can be viewed country by
+  /// country. Tapping the selected one again clears the filter.
+  void _showCountrySheet(BuildContext context, bool isDark) {
+    FocusScope.of(context).unfocus();
+    final common = CommonDataController.to;
+    common.loadCountries();
+
+    String? selName = filter.countryName;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: _handle(isDark)),
+              SizedBox(height: 20.h),
+              _title('Country', isDark),
+              SizedBox(height: 16.h),
+              Obx(() {
+                final countries = common.countries;
+                if (common.isLoadingCountries.value && countries.isEmpty) {
+                  return _countryShimmer(isDark);
+                }
+                // The list runs long, so it scrolls inside a capped height
+                // rather than pushing the Apply button off screen.
+                return ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: 320.h),
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 8.w,
+                      runSpacing: 8.h,
+                      children: countries.map((c) {
+                        final isSel = selName == c.name;
+                        return GestureDetector(
+                          onTap: () => setSheet(
+                              () => selName = isSel ? null : c.name),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 16.w, vertical: 9.h),
+                            decoration: BoxDecoration(
+                              color: isSel
+                                  ? AppColors.primary
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(20.r),
+                              border: Border.all(
+                                color: isSel
+                                    ? AppColors.primary
+                                    : isDark
+                                        ? Colors.grey.shade600
+                                        : Colors.grey.shade300,
+                              ),
+                            ),
+                            child: Text(
+                              c.name,
+                              style: GoogleFonts.poppins(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w400,
+                                color: isSel
+                                    ? Colors.white
+                                    : isDark
+                                        ? Colors.white70
+                                        : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                );
+              }),
+              SizedBox(height: 20.h),
+              Row(
+                children: [
+                  // Drops the country filter outright, so the feed goes back to
+                  // listings from every country. Only offered when there is
+                  // something to clear.
+                  if (selName != null || filter.countryName != null) ...[
+                    Expanded(
+                      child: _clearBtn(() {
+                        onFilterChanged(filter.cleared(
+                            country: true, city: true, area: true));
+                        Navigator.of(ctx).pop();
+                      }, isDark),
+                    ),
+                    SizedBox(width: 12.w),
+                  ],
+                  Expanded(
+                    child: _applyBtn(() {
+                      onFilterChanged(
+                        selName == null
+                            // Country sits above city/area, so clearing it
+                            // drops those with it rather than leaving an
+                            // orphaned city.
+                            ? filter.cleared(
+                                country: true, city: true, area: true)
+                            : filter
+                                .copyWith(countryName: selName)
+                                .cleared(city: true, area: true),
+                      );
+                      Navigator.of(ctx).pop();
+                    }, isDark),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20.h),
+            ],
+          ),
         ),
       ),
     );
@@ -945,6 +1112,33 @@ class HomeFilterBar extends StatelessWidget {
                 : isDark
                     ? Colors.white70
                     : Colors.black87,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Secondary action beside Apply — outlined so the filled Apply stays the
+  /// primary one.
+  Widget _clearBtn(VoidCallback onTap, bool isDark) {
+    return SizedBox(
+      height: 50.h,
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(
+            color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30.r),
+          ),
+        ),
+        child: Text(
+          'Clear',
+          style: GoogleFonts.poppins(
+            fontSize: 15.sp,
+            fontWeight: FontWeight.w500,
+            color: isDark ? Colors.white70 : Colors.black87,
           ),
         ),
       ),

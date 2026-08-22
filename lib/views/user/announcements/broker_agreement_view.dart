@@ -157,9 +157,21 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
 
   bool get _brokerSigned => _status >= 3 || (!widget.isOwner && _signedLocally);
 
-  /// Both parties have signed. Signing is NOT publishing — the property only
-  /// goes live once the broker actually publishes it (see [_isPublished]).
-  bool get _bothSigned => _brokerSigned;
+  /// Both parties have signed, **as confirmed by the server**.
+  ///
+  /// Deliberately ignores [_signedLocally], unlike [_brokerSigned]. That flag
+  /// flips the instant Accept is tapped, while the request that actually moves
+  /// the proposal to status 3 is still in flight — so publishing could be
+  /// started against a contract the backend had not yet completed, and would
+  /// be rejected. Reading the status directly means the step only opens once
+  /// the agreement is genuinely done.
+  ///
+  /// Status 3 already implies the owner signed: a proposal only reaches it
+  /// through 1 (owner approved) → 3 (broker accepted).
+  ///
+  /// Signing is NOT publishing — the property goes live only once the broker
+  /// publishes it (see [_isPublished]).
+  bool get _bothSigned => _status >= 3;
 
   /// The listing is live — the broker has published it. Driven by the publish
   /// broadcast OR by the proposal status already being 4 (published) when the

@@ -16,6 +16,7 @@ class ApiEndpoints {
   static const String changePassword = 'user/profile/change-password';
   static const String getProfile = 'user/profile/get-profile';
   static const String editInfo = 'user/profile/edit-info';
+  static const String editSettings = 'user/profile/edit-settings';
   static const String editMobileNumber = 'user/profile/edit-mobilenumber';
   static const String editEmail = 'user/profile/edit-email';
   static const String verifyEmailOtp = 'user/profile/verify-email-otp';

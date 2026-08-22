@@ -1,3 +1,4 @@
+import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
@@ -37,34 +38,36 @@ class AccountMenuView extends StatelessWidget {
                     (vs == 'inactive' || vs == 'pending' || vs == 'rejected');
 
                 final bool canAccess = isLoggedIn && !isPending;
+                final isDark =
+                    Theme.of(context).brightness == Brightness.dark;
                 return SingleChildScrollView(
                   padding:
                       EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
                   child: Column(
                     children: [
                       // First card group
-                      _buildCardGroup([
+                      _buildCardGroup(isDark: isDark, [
                         _menuItem(
                             'assets/images/broker_my_profile_icon.png',
                             'My Information',
                             () => Get.to(() => const BrokerMyInformationView()),
-                            enabled: canAccess),
+                            enabled: canAccess, isDark: isDark),
                         _menuItem('assets/images/broker_mydeal_icon.png',
                             'My Deals', () {},
-                            enabled: canAccess),
+                            enabled: canAccess, isDark: isDark),
                         _menuItem('assets/images/broker_bank_icon.png',
                             'My Bank Account Details', () {},
-                            enabled: canAccess),
+                            enabled: canAccess, isDark: isDark),
                         _menuItem('assets/images/broker_announcement.png',
                             'Announcement', () {},
-                            enabled: canAccess),
+                            enabled: canAccess, isDark: isDark),
                         _menuItem('assets/images/broker_wishlist_icon.png',
                             'My Wishlist', () {},
-                            showDivider: false, enabled: canAccess),
+                            enabled: canAccess, isDark: isDark),
                       ]),
                       SizedBox(height: 16.h),
                       // Second card group
-                      _buildCardGroup([
+                      _buildCardGroup(isDark: isDark, [
                         _menuItem('assets/images/switch_to_user_icon.png',
                             'Switch to User side', () async {
                           Get.dialog(
@@ -81,16 +84,16 @@ class AccountMenuView extends StatelessWidget {
                             await clearRoleScopedCache();
                             Get.offAll(() => const DashboardView());
                           }
-                        }),
+                        }, isDark: isDark),
                         _menuItem('assets/images/subscription_icon.png',
                             'My Subscription', () {},
-                            enabled: canAccess),
+                            enabled: canAccess, isDark: isDark),
                         _menuItem(
                             'assets/images/broker_settings_icon.png',
                             'Setting',
                             () => Get.to(() => SettingsView(side: 'broker')),
-                            showDivider: false,
-                            enabled: isLoggedIn),
+
+                            enabled: isLoggedIn, isDark: isDark),
                       ]),
                     ],
                   ),
@@ -103,68 +106,79 @@ class AccountMenuView extends StatelessWidget {
     );
   }
 
-  Widget _buildCardGroup(List<Widget> children) {
+  /// Card shell, matching AccountMenuView's user-side counterpart
+  /// (`_buildCard` in views/user/account/account_view.dart) exactly: a bordered
+  /// surface rather than a shadowed one, so both profile screens read as the
+  /// same component.
+  Widget _buildCardGroup(List<Widget> children, {required bool isDark}) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF090B11) : Colors.white,
         borderRadius: BorderRadius.circular(16.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A2D3C) : const Color(0xFFE8E8E8),
+        ),
       ),
-      child: Column(children: children),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      ),
     );
   }
 
+  /// Row, matching the user-side `_tile`: title on the left, gold-tinted
+  /// icon on the right at 26x26, no chevron and no divider. The icon
+  /// assets were already shared between the two screens — only the way
+  /// they were drawn differed (left, 20x20 and untinted here).
   Widget _menuItem(
     String assetPath,
     String title,
     VoidCallback onTap, {
-    bool showDivider = true,
+    required bool isDark,
     bool enabled = true,
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        InkWell(
-          onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(16.r),
-          child: Opacity(
-            opacity: enabled ? 1.0 : 0.4,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
-              child: Row(
-                children: [
-                  Image.asset(assetPath, width: 20.w, height: 20.w),
-                  SizedBox(width: 20.w),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.chevron_right,
-                      size: 22.sp, color: Colors.grey.shade400),
-                ],
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(16.r),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 18.h),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w500,
+                  color: enabled
+                      ? (isDark ? Colors.white : const Color(0xFF1A1A1A))
+                      : Colors.grey.shade400,
+                  height: 1.0,
+                  letterSpacing: 0,
+                ),
               ),
             ),
-          ),
+            Opacity(
+              opacity: enabled ? 1.0 : 0.4,
+              child: Image.asset(
+                assetPath,
+                width: 26.w,
+                height: 26.w,
+                // Image.asset defaults to BoxFit.scaleDown, which only ever
+                // shrinks. Two of the broker-only assets are tiny at source
+                // (broker_bank_icon 14x14, subscription_icon 19x12), so they
+                // sat well under the 26 box while every other icon filled it —
+                // which is what made this screen's icons look uneven against
+                // the user side. contain scales them up to match.
+                fit: BoxFit.contain,
+                color: AppColors.primary,
+                colorBlendMode: BlendMode.srcIn,
+              ),
+            ),
+          ],
         ),
-        if (showDivider)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.w),
-            child:
-                Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
-          ),
-      ],
+      ),
     );
   }
 }

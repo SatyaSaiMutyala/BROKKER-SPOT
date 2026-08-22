@@ -1,5 +1,6 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/theme/theme_controller.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/settings/change_password_view.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
@@ -85,12 +86,20 @@ class SettingsView extends StatelessWidget {
                           isDark: isDark,
                           onTap: () {},
                         ),
-                        _tile(
-                          title: 'Currency',
-                          iconAsset: 'assets/images/currency.png',
-                          isDark: isDark,
-                          onTap: () {},
-                        ),
+                        Obx(() => _tile(
+                              title: 'Currency',
+                              iconAsset: 'assets/images/currency.png',
+                              isDark: isDark,
+                              trailing: Text(
+                                ProfileController.to.currency,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              onTap: () => _showCurrencyPicker(context, isDark),
+                            )),
                       ],
                     ),
 
@@ -217,6 +226,155 @@ class SettingsView extends StatelessWidget {
   }
 
   // ── Logout bottom sheet ────────────────────────────────────────────────────
+
+  /// Currencies offered in the picker.
+  ///
+  /// `edit-settings` accepts any code in its country→currency table (~143 of
+  /// them), but the backend only computes exchange rates for these seven
+  /// (see exchange-rates.cron.ts), so anything else would leave prices with no
+  /// rate to convert against. Kept deliberately narrow for that reason.
+  static const List<(String code, String label)> _currencies = [
+    ('AED', 'UAE Dirham'),
+    ('USD', 'US Dollar'),
+    ('EUR', 'Euro'),
+    ('INR', 'Indian Rupee'),
+    ('MAD', 'Moroccan Dirham'),
+    ('NPR', 'Nepalese Rupee'),
+    ('CNY', 'Chinese Yuan'),
+  ];
+
+  void _showCurrencyPicker(BuildContext context, bool isDark) {
+    final profile = ProfileController.to;
+    final sheetBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final titleColor = Theme.of(context).colorScheme.onSurface;
+    final subColor = isDark ? Colors.grey.shade500 : Colors.grey.shade600;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      // Closing mid-save would leave the spinner's result with nowhere to go
+      // and the row still showing the old value.
+      isDismissible: !profile.isSavingCurrency,
+      enableDrag: !profile.isSavingCurrency,
+      builder: (sheetCtx) => Container(
+        padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 28.h),
+        decoration: BoxDecoration(
+          color: sheetBg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40.w,
+                height: 4.h,
+                decoration: BoxDecoration(
+                  color: subColor.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+            ),
+            SizedBox(height: 20.h),
+            Text(
+              'Currency',
+              style: GoogleFonts.poppins(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: titleColor,
+              ),
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              'Prices across the app are shown in this currency.',
+              style: GoogleFonts.poppins(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w300,
+                color: subColor,
+              ),
+            ),
+            SizedBox(height: 12.h),
+            Obx(() {
+              final selected = profile.currency;
+              final pending = profile.savingCurrencyCode.value;
+              final saving = pending != null;
+
+              return Column(
+                children: _currencies.map((c) {
+                  final isSelected = c.$1 == selected;
+                  final isPending = c.$1 == pending;
+                  // While a save runs, the row being saved keeps full contrast
+                  // and shows a spinner; the rest fade so it is obvious which
+                  // one is in flight and that the others are inert.
+                  final dimmed = saving && !isPending;
+
+                  return InkWell(
+                    onTap: saving
+                        ? null
+                        : () async {
+                            final ok = await profile.updateCurrency(c.$1);
+                            if (ok && sheetCtx.mounted) {
+                              Navigator.pop(sheetCtx);
+                            }
+                          },
+                    borderRadius: BorderRadius.circular(12.r),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      opacity: dimmed ? 0.4 : 1,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 52.w,
+                              child: Text(
+                                c.$1,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected || isPending
+                                      ? AppColors.primary
+                                      : titleColor,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                c.$2,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w400,
+                                  color: subColor,
+                                ),
+                              ),
+                            ),
+                            if (isPending)
+                              SizedBox(
+                                width: 20.sp,
+                                height: 20.sp,
+                                child: const CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            else if (isSelected)
+                              Icon(Icons.check_circle,
+                                  size: 20.sp, color: AppColors.primary),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showLogoutDialog(BuildContext context) {
     showModalBottomSheet(

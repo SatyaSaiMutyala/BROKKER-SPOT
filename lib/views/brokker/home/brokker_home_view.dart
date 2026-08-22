@@ -11,7 +11,6 @@ import 'package:brokkerspot/widgets/home/story_circle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class BrokerHomeView extends StatefulWidget {
   const BrokerHomeView({super.key});
@@ -115,34 +114,6 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
   Widget _buildStoriesSection() {
     return Column(
       children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.w),
-          child: Row(
-            children: [
-              Text(
-                'All Story',
-                style: GoogleFonts.poppins(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              SizedBox(width: 2.w),
-              Icon(Icons.keyboard_arrow_down,
-                  size: 20.sp, color: Theme.of(context).colorScheme.onSurface),
-              const Spacer(),
-              Text(
-                '3 Filter',
-                style: GoogleFonts.poppins(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 12.h),
         SizedBox(
           height: 94.h,
           child: ListView.separated(
@@ -222,8 +193,9 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
 
   // ─── BOOST BANNER ───
   Widget _buildBoostBanner() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final banners = [
-      'assets/images/brokker_boost_banner.png',
+      isDark ? 'assets/images/bannerD.png' : 'assets/images/bannerL.png',
       'assets/images/brokker_boost_commision.png',
     ];
     return Padding(

@@ -195,9 +195,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
 
     // Always call API with status=0 for draft.
     setState(() => _isSavingDraft = true);
-    _ctrl.setProposalsLimit(_brokerProposalLimit != null
-        ? int.tryParse(_brokerProposalLimit!)
-        : null);
+    _ctrl.setProposalsLimit(_proposalLimitValue);
     final success = await _ctrl.createDraftAnnouncement();
     if (!mounted) return;
     setState(() => _isSavingDraft = false);
@@ -211,9 +209,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
 
   Future<void> _submit() async {
     setState(() => _isSubmitting = true);
-    _ctrl.setProposalsLimit(_brokerProposalLimit != null
-        ? int.tryParse(_brokerProposalLimit!)
-        : null);
+    _ctrl.setProposalsLimit(_proposalLimitValue);
 
     bool success;
     if (widget.isEditing) {
@@ -247,9 +243,22 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
 
   // ── Dialogs ──────────────────────────────────────────────────────────────────
 
-  /// Label for the "don't cap proposals" row — selecting it sends no limit at
-  /// all, exactly like leaving the old toggle off did.
+  /// Label for the "don't cap proposals" row.
   static const String _noProposalLimit = 'No limit';
+
+  /// What "No limit" actually sends.
+  ///
+  /// The field used to be omitted entirely, which was the opposite of no
+  /// limit: `proposals_limit` defaults to 0 on the announcement, and the
+  /// backend rejects a proposal once `totalProposals > proposals_limit` — so
+  /// an uncapped listing accepted exactly one. A high ceiling is sent instead.
+  static const int _unlimitedProposals = 1000;
+
+  /// The value to send for the current selection — the parsed number, or the
+  /// ceiling when the user chose "No limit".
+  int? get _proposalLimitValue => _brokerProposalLimit == null
+      ? _unlimitedProposals
+      : int.tryParse(_brokerProposalLimit!);
 
   /// Asks for the broker-proposal limit, then runs [onChosen].
   ///

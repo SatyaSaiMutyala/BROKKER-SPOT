@@ -48,6 +48,16 @@ class AnnouncementDetailBody extends StatefulWidget {
   /// Tapping a broker's chat button. Left null to render the row without one.
   final ValueChanged<ProposalBroker>? onBrokerChatTap;
 
+  /// Adds a "Property Name" row at the top of the Property Details card.
+  ///
+  /// Off by default so this stays limited to the user-side detail screen —
+  /// the broker screens share this body and are not to show it.
+  final bool showPropertyName;
+
+  /// Labels the commission card from the broker's side — they earn the fee and
+  /// the owner keeps the remainder. Off by default, which is the owner's view.
+  final bool commissionAsBroker;
+
   const AnnouncementDetailBody({
     super.key,
     required this.data,
@@ -55,6 +65,8 @@ class AnnouncementDetailBody extends StatefulWidget {
     this.showActualDocs = false,
     this.contractedBrokers = const [],
     this.onBrokerChatTap,
+    this.showPropertyName = false,
+    this.commissionAsBroker = false,
   });
 
   @override
@@ -65,7 +77,6 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
   int _tabIndex = 0;
   bool _descExpanded = false;
   bool _amenitiesExpanded = false;
-  bool _commissionEnabled = false;
 
   final _amenityCtrl = AmenityController.to;
 
@@ -86,7 +97,6 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
       _tabIndex = 0;
       _descExpanded = false;
       _amenitiesExpanded = false;
-      _commissionEnabled = false;
     }
   }
 
@@ -99,6 +109,14 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(height: 16.h),
+          // Directly under the photo carousel, above the stats — the owner's
+          // commission is the first thing they came to check.
+          if (widget.showCommission &&
+              a.brokkeragePercent != null &&
+              (a.brokkeragePercent ?? 0) > 0) ...[
+            _buildCommissionCard(isDark),
+            SizedBox(height: 10.h),
+          ],
           _buildStatsCard(isDark),
           SizedBox(height: 10.h),
           _buildTabBar(isDark),
@@ -297,12 +315,6 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
           SizedBox(height: 10.h),
         ],
         _buildPropertyDetailsSection(isDark),
-        if (widget.showCommission &&
-            a.brokkeragePercent != null &&
-            (a.brokkeragePercent ?? 0) > 0) ...[
-          SizedBox(height: 10.h),
-          _buildCommissionCard(isDark),
-        ],
         if ((a.amenities ?? []).isNotEmpty) ...[
           SizedBox(height: 10.h),
           Obx(() {
@@ -571,6 +583,20 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
         children: [
           _sectionTitle('Property Details', isDark),
           SizedBox(height: 14.h),
+          // Full width of its own rather than a third of a row: a property
+          // name is long enough to be clipped in a chip.
+          if (widget.showPropertyName &&
+              (a.propertyName ?? '').trim().isNotEmpty) ...[
+            _buildDetailCard(
+              _DetailItem(
+                Icons.home_work_outlined,
+                'Property Name',
+                a.propertyName!.trim(),
+              ),
+              isDark,
+            ),
+            SizedBox(height: 8.h),
+          ],
           // Explicit rows of 3 so every column aligns perfectly.
           for (int i = 0; i < items.length; i += 3) ...[
             IntrinsicHeight(
@@ -648,24 +674,73 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
 
   // ── Commission card (owner only) ───────────────────────────────────────────
 
+  /// Owner's commission breakdown, shown above the stats on a listing they own.
+  ///
+  /// Three shapes, driven by how the property is listed:
+  ///   • Sell           — a percentage of the price
+  ///   • Rent, yearly   — one month out of the yearly rent
+  ///   • Rent, monthly  — one month's rent
   Widget _buildCommissionCard(bool isDark) {
-    final percent = (a.brokkeragePercent ?? 0).toDouble();
-    final price = a.price ?? 0;
-    final commission = (price * percent) / 100;
-    final receive = price - commission;
     final currency = a.currency ?? 'AED';
+    final price = a.price ?? 0;
+    final isRent = (a.listingType ?? '').toLowerCase() == 'rent';
+    final isMonthly = (a.rentPeriod ?? '').toLowerCase() == 'monthly';
+
+    final String title;
+    final String receiveLabel;
+    final String payLabel;
+    final double receive;
+    final double pay;
+
+    // The two sides of the same deal. An owner nets the price less the fee and
+    // pays that fee; a broker looking at someone else's listing earns the fee
+    // while the owner keeps the rest — so the rows are labelled for whoever is
+    // reading, rather than showing an owner's wording to a broker.
+    final forBroker = widget.commissionAsBroker;
+
+    if (!isRent) {
+      final percent = (a.brokkeragePercent ?? 0).toDouble();
+      final fee = (price * percent) / 100;
+      title = '${percent.toStringAsFixed(0)} % Broker Commission';
+      if (forBroker) {
+        receive = fee;
+        pay = price - fee;
+        receiveLabel = 'You will receive';
+        payLabel = 'Owner will receive';
+      } else {
+        receive = price - fee;
+        pay = fee;
+        receiveLabel = 'You will receive';
+        payLabel = 'You will Pay';
+      }
+    } else {
+      // The broker's fee is one month either way; on a yearly listing that is
+      // a twelfth of the figure quoted, on a monthly one it is the figure.
+      final oneMonth = isMonthly ? price : price / 12;
+      title = '1 Month Broker Commission';
+      if (forBroker) {
+        receive = oneMonth;
+        pay = price;
+        receiveLabel = 'You will receive 1 month';
+        payLabel = isMonthly ? 'Owner will receive Monthly' : 'Owner will receive yearly';
+      } else {
+        receive = price;
+        pay = oneMonth;
+        receiveLabel =
+            isMonthly ? 'You will receive Monthly' : 'You will receive yearly';
+        payLabel = 'You will Pay 1 month';
+      }
+    }
 
     final borderColor =
         isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
     final cardBg = isDark ? const Color(0xFF0E1118) : Colors.white;
-    final primaryText =
-        isDark ? Colors.white : const Color(0xFF252525);
-    final subText =
-        isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final titleColor = isDark ? Colors.white : const Color(0xFF252525);
+    final labelColor = isDark ? Colors.grey.shade400 : const Color(0xFF4A4A4A);
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 14.h),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16.r),
@@ -675,103 +750,80 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Gold rule marking the heading.
               Container(
                 width: 3.w,
-                height: 21.h,
+                height: 17.h,
                 decoration: BoxDecoration(
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(2.r),
                 ),
               ),
-              SizedBox(width: 10.w),
+              SizedBox(width: 9.w),
               Expanded(
                 child: Text(
-                  'Broker Commission',
+                  title,
                   style: GoogleFonts.poppins(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w500,
-                    color: primaryText,
-                    height: 1.0,
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w600,
+                    color: titleColor,
+                    height: 1.1,
                   ),
-                ),
-              ),
-              Transform.scale(
-                scale: 0.85,
-                child: Switch(
-                  value: _commissionEnabled,
-                  onChanged: (v) =>
-                      setState(() => _commissionEnabled = v),
-                  activeThumbColor: AppColors.primary,
-                  activeTrackColor:
-                      AppColors.primary.withValues(alpha: 0.4),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 6.h),
-          Text(
-            'Toggle to see a breakdown of the '
-            '${percent.toStringAsFixed(0)}% broker commission on this property.',
-            style:
-                GoogleFonts.inter(fontSize: 12.sp, color: subText, height: 1.4),
-          ),
-          if (_commissionEnabled) ...[
-            SizedBox(height: 14.h),
-            Divider(height: 1, thickness: 1, color: borderColor),
-            SizedBox(height: 14.h),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.account_balance_wallet_outlined,
-                        size: 16.sp, color: AppColors.primary),
-                    SizedBox(width: 8.w),
-                    Text('You will receive',
-                        style: GoogleFonts.inter(
-                            fontSize: 13.sp, color: subText, height: 1.0)),
-                  ],
-                ),
-                Text(
-                  '$currency ${_formatPrice(receive)}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF2E7D32),
-                    height: 1.0,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 12.h),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.payments_outlined,
-                        size: 16.sp, color: Colors.orange.shade600),
-                    SizedBox(width: 8.w),
-                    Text('You have to pay commission',
-                        style: GoogleFonts.inter(
-                            fontSize: 13.sp, color: subText, height: 1.0)),
-                  ],
-                ),
-                Text(
-                  '$currency ${_formatPrice(commission)}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.orange.shade700,
-                    height: 1.0,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          SizedBox(height: 14.h),
+          _commissionRow(receiveLabel, '$currency ${_formatPrice(receive)}',
+              labelColor),
+          SizedBox(height: 10.h),
+          _commissionRow(payLabel, '$currency ${_formatPrice(pay)}',
+              labelColor),
         ],
       ),
+    );
+  }
+
+  /// One "label … amount" line of the commission card.
+  Widget _commissionRow(String label, String amount, Color labelColor) {
+    return Row(
+      children: [
+        Image.asset(
+          'assets/images/broker_announcement.png',
+          width: 17.w,
+          height: 17.w,
+          color: AppColors.primary,
+          colorBlendMode: BlendMode.srcIn,
+          errorBuilder: (_, __, ___) => Icon(Icons.home_work_outlined,
+              size: 17.sp, color: AppColors.primary),
+        ),
+        SizedBox(width: 9.w),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.poppins(
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w400,
+              color: labelColor,
+              height: 1.2,
+            ),
+          ),
+        ),
+        SizedBox(width: 8.w),
+        Text(
+          amount,
+          style: GoogleFonts.poppins(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w700,
+            color: AppColors.primary,
+            height: 1.2,
+          ),
+        ),
+      ],
     );
   }
 

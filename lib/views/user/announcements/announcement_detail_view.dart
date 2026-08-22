@@ -537,6 +537,9 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                     showCommission: widget.isOwner,
                     contractedBrokers: _contractedBrokers,
                     onBrokerChatTap: _openBrokerChat,
+                    // User-side screen only — the broker detail screens share
+                    // this body and leave it off.
+                    showPropertyName: true,
                   ),
                   SizedBox(height: 90.h + bottomPad),
                 ],
@@ -773,8 +776,14 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Heart / wishlist icon — hidden on own announcements
-                        if (!widget.isOwner)
+                        // Heart / wishlist icon.
+                        //
+                        // Hidden on an announcement this account owns, and on
+                        // the agreement screen's "View Property" (the only
+                        // place that sets backOnChat) — that opens a listing
+                        // the broker has just published, where saving it is
+                        // meaningless.
+                        if (!widget.isOwner && !widget.backOnChat) ...[
                           Obx(() {
                             final isWishlisted =
                                 _wishlistCtrl.isWishlisted(_data.id ?? '');
@@ -793,7 +802,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                               ),
                             );
                           }),
-                        SizedBox(height: 10.h),
+                          SizedBox(height: 10.h),
+                        ],
                         GestureDetector(
                           onTap: (hasImages || hasVideo)
                               ? () => _openFullscreenGallery(

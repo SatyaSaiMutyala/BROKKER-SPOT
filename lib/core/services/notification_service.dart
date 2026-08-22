@@ -7,6 +7,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
+import 'package:brokkerspot/views/user/meeting/controller/meeting_controller.dart';
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
@@ -199,8 +201,51 @@ class NotificationService {
     debugPrint('✅ NotificationService initialised');
   }
 
+  /// Pulls the notification list (and with it the bell badge's unseen count)
+  /// so a push landing while the app is open is reflected straight away.
+  ///
+  /// Without this the badge only caught up the next time the notifications
+  /// screen was opened, since nothing else tells the app a record now exists
+  /// server-side. The controller is permanent, so this is safe from anywhere.
+  static void _refreshNotificationBadge() {
+    try {
+      NotificationListController.to.load(force: true);
+    } catch (e) {
+      debugPrint('⚠️ Could not refresh notifications after push: $e');
+    }
+  }
+
+  /// Flags the home feed when the push says a listing was just published, so
+  /// re-entering the screen refreshes without having to ask the server whether
+  /// anything changed.
+  static void _markFeedStaleIfNewListing(RemoteMessage message) {
+    final type = message.data['type']?.toString();
+    if (type != 'new_announcement' && type != 'property_published') return;
+    try {
+      AnnouncementListController.to.markAllStale();
+    } catch (e) {
+      debugPrint('⚠️ Could not flag the feed after push: $e');
+    }
+  }
+
+  /// Flags the meetings list when a chat push lands, so its unread badge is
+  /// right even if the socket was down or the app was in the background —
+  /// the socket listener covers the live case.
+  static void _markMeetingsStaleIfChat(RemoteMessage message) {
+    if (message.data['type']?.toString() != 'chat_message') return;
+    try {
+      MeetingController.to.markBrokerStale();
+    } catch (e) {
+      debugPrint('⚠️ Could not flag meetings after chat push: $e');
+    }
+  }
+
   static void _onForegroundMessage(RemoteMessage message) {
     debugPrint('🔔 Foreground message received');
+    // Before the iOS early-return below, so both platforms update the badge.
+    _refreshNotificationBadge();
+    _markFeedStaleIfNewListing(message);
+    _markMeetingsStaleIfChat(message);
     if (Platform.isIOS) return; // iOS shows it natively via Firebase options.
 
     final notification = message.notification;

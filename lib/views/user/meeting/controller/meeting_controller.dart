@@ -1,4 +1,8 @@
+import 'dart:async';
+
+import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/meeting_item_model.dart';
+import 'package:brokkerspot/views/user/announcements/chat/chat_events.dart';
 import 'package:brokkerspot/views/user/meeting/repo/meeting_repo.dart';
 import 'package:get/get.dart';
 
@@ -75,6 +79,80 @@ class MeetingController extends GetxController {
   /// Loads broker-side meetings for [f]. Cache-first per filter — tapping a
   /// previously-loaded chip renders instantly without re-hitting the API.
   /// Pull-to-refresh passes [force].
+  bool _chatListening = false;
+  Timer? _chatDebounce;
+
+  /// Raised when a chat message lands, since the unread badge each meeting
+  /// card shows (`chatProfilesCount`) is baked into the cached list and cannot
+  /// move on its own.
+  ///
+  /// Both sides are flagged: the user and broker lists come from the same
+  /// `fetch-meetings` endpoint (role-scoped server-side) and a message moves
+  /// the count on whichever of them shows that meeting.
+  final isBrokerStale = false.obs;
+  final isUserStale = false.obs;
+
+  /// Starts listening for chat traffic app-wide.
+  ///
+  /// `chat:message` is otherwise only subscribed to from inside the chat
+  /// screens, so a message arriving while the user sits on the meetings list
+  /// went unnoticed and its badge stayed at the count from whenever the list
+  /// was first cached. Mirrors ensurePublishListening in
+  /// AnnouncementListController.
+  void ensureChatListening() {
+    if (_chatListening) return;
+    SocketService.to.connect();
+    SocketService.to.on(ChatEvents.message, _onChatMessage);
+    _chatListening = true;
+  }
+
+  void _onChatMessage(dynamic _) => markBrokerStale();
+
+  /// Flags the broker meetings list as out of date.
+  ///
+  /// Debounced: a burst of messages should cost one refresh, not one each.
+  ///
+  /// Every filter's cache is dropped, not just the visible one — a message
+  /// changes the unread count wherever that meeting appears, so switching to
+  /// BUY/RENT/OWN after one arrives would otherwise serve a cached list still
+  /// showing the old badge.
+  void markBrokerStale() {
+    _chatDebounce?.cancel();
+    _chatDebounce = Timer(const Duration(milliseconds: 600), () {
+      _brokerCache.clear();
+      _cache.clear();
+      isBrokerStale.value = true;
+      isUserStale.value = true;
+    });
+  }
+
+  /// Refetches the broker list only when something said it moved, so a plain
+  /// revisit still costs nothing.
+  Future<void> refreshBrokerIfStale() async {
+    if (!isBrokerStale.value) return;
+    if (isLoadingBroker.value) return;
+    isBrokerStale.value = false;
+    await loadBroker(force: true);
+  }
+
+  /// User-side counterpart of [refreshBrokerIfStale].
+  Future<void> refreshUserIfStale() async {
+    if (!isUserStale.value) return;
+    if (isLoading.value) return;
+    isUserStale.value = false;
+    await load(force: true);
+  }
+
+  @override
+  void onClose() {
+    _chatDebounce?.cancel();
+    if (_chatListening) {
+      SocketService.to.off(ChatEvents.message, _onChatMessage);
+      _chatListening = false;
+    }
+    super.onClose();
+  }
+
   Future<void> loadBroker({MeetingFilter? f, bool force = false}) async {
     final target = f ?? brokerFilter.value;
     brokerFilter.value = target;

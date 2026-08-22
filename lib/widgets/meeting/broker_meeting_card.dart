@@ -12,11 +12,16 @@ class BrokerMeetingCard extends StatelessWidget {
   final bool isOwn;
   final VoidCallback onTap;
 
+  /// Tapping the round property thumbnail opens the property details screen
+  /// instead of the chat. The rest of the row still calls [onTap].
+  final VoidCallback? onPropertyTap;
+
   const BrokerMeetingCard({
     super.key,
     required this.meeting,
     required this.isOwn,
     required this.onTap,
+    this.onPropertyTap,
   });
 
   @override
@@ -37,7 +42,11 @@ class BrokerMeetingCard extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         child: Row(
           children: [
-            _PropertyThumb(imageUrl: a.propertyMedia?.thumbnail),
+            GestureDetector(
+              onTap: onPropertyTap,
+              behavior: HitTestBehavior.opaque,
+              child: _PropertyThumb(imageUrl: a.propertyMedia?.thumbnail),
+            ),
             SizedBox(width: 14.w),
             Expanded(
               child: Column(

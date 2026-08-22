@@ -1,9 +1,11 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/services/route_observer.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/meeting_item_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
+import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
 import 'package:brokkerspot/views/user/meeting/controller/meeting_controller.dart';
 import 'package:brokkerspot/views/user/meeting/repo/meeting_repo.dart';
@@ -21,7 +23,7 @@ class MeetingView extends StatefulWidget {
   State<MeetingView> createState() => _MeetingViewState();
 }
 
-class _MeetingViewState extends State<MeetingView> {
+class _MeetingViewState extends State<MeetingView> with RouteAware {
   final _ctrl = MeetingController.to;
   final _profile = Get.isRegistered<ProfileController>()
       ? Get.find<ProfileController>()
@@ -36,19 +38,60 @@ class _MeetingViewState extends State<MeetingView> {
 
   Worker? _precacheWorker;
 
+  /// Refreshes as soon as the controller reports chat traffic, so the unread
+  /// badge moves while the user is sitting on this screen.
+  Worker? _staleWorker;
+
   @override
   void initState() {
     super.initState();
     _precacheWorker = ever(_ctrl.meetings, (_) => _precacheAvatars());
+
+    // Chat is otherwise only listened to from inside the chat screens, so a
+    // message arriving here went unnoticed and the badge kept the count the
+    // list was cached with.
+    _ctrl.ensureChatListening();
+    _staleWorker = ever(_ctrl.isUserStale, (stale) {
+      if (stale == true && mounted) _ctrl.refreshUserIfStale();
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _ctrl.load();
     });
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is ModalRoute<void>) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  /// Back from a chat (or any pushed route) — a no-op unless something flagged
+  /// the list while it was covered.
+  @override
+  void didPopNext() => _ctrl.refreshUserIfStale();
+
+  @override
   void dispose() {
     _precacheWorker?.dispose();
+    _staleWorker?.dispose();
+    appRouteObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  /// Tapping the round property thumbnail opens the property details screen.
+  /// The detail view refetches the full announcement by id, so the trimmed
+  /// announcement carried by the meeting row is enough to seed it.
+  void _openProperty(MeetingItem m, bool isOwn) {
+    Get.to(() => AnnouncementDetailView(
+          announcement: m.announcement,
+          isOwner: isOwn,
+          ownerName: m.announcement.ownerName,
+          ownerAvatarUrl: m.announcement.ownerAvatarUrl,
+        ));
   }
 
   Future<void> _openConversations(MeetingItem m) async {
@@ -222,6 +265,7 @@ class _MeetingViewState extends State<MeetingView> {
               meeting: m,
               isOwn: isOwn,
               onTap: () => _openConversations(m),
+              onPropertyTap: () => _openProperty(m, isOwn),
             );
           },
         ),

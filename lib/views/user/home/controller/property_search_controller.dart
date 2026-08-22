@@ -44,6 +44,26 @@ class PropertySearchController extends GetxController {
 
   /// Applies the Filter-screen facets, preserving the current search text, and
   /// fetches page 1. Called when the user taps **Apply**.
+  /// Whether [seedDefaultCountry] has already run this session.
+  bool _countrySeeded = false;
+
+  /// Pre-selects the account's own country the first time the profile lands,
+  /// so the feed opens on listings from where the user signed up.
+  ///
+  /// Runs once, and never overrides a country the user picked themselves — it
+  /// only fills an empty slot, so browsing another country (or clearing the
+  /// chip) is never undone by a later profile refresh.
+  Future<void> seedDefaultCountry(String country) async {
+    if (_countrySeeded) return;
+    if (country.trim().isEmpty) return;
+    if (filter.value.countryName != null) {
+      _countrySeeded = true;
+      return;
+    }
+    _countrySeeded = true;
+    await applyFacets(filter.value.copyWith(countryName: country.trim()));
+  }
+
   Future<void> applyFacets(PropertyFilter facets) async {
     filter.value = facets.copyWith(search: filter.value.search);
     await _fetchFirstPage();

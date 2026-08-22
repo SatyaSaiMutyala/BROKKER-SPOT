@@ -2,6 +2,7 @@ import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/notification_service.dart';
 import 'package:brokkerspot/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:brokkerspot/core/services/route_observer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
@@ -72,6 +73,9 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           themeMode: ThemeController.to.themeMode,
+          // Lets screens hear when a pushed route pops back onto them — the
+          // home feed uses it to check for new listings on the way back.
+          navigatorObservers: [appRouteObserver],
           builder: (context, widget) {
             final child = EasyLoading.init()(context, widget);
             return GestureDetector(

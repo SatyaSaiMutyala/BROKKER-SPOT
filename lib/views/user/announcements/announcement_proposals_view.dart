@@ -26,7 +26,6 @@ class AnnouncementProposalsView extends StatefulWidget {
 }
 
 class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
-  bool _limitEnabled = true;
 
   /// Seeded with the preview list the detail screen already had so the rows
   /// render instantly, then replaced by the full list from the API.
@@ -240,7 +239,9 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
         children: [
           Expanded(
             child: Text(
-              'Set Broker Proposals Limit',
+              // "Set" dropped along with the toggle — the row only reports the
+              // limit now, it no longer changes it.
+              'Broker Proposals Limit',
               style: GoogleFonts.inter(
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w500,
@@ -254,18 +255,6 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
               fontSize: 14.sp,
               fontWeight: FontWeight.w600,
               color: countColor,
-            ),
-          ),
-          SizedBox(width: 6.w),
-          Transform.scale(
-            scale: 0.6,
-            child: Switch(
-              value: _limitEnabled,
-              onChanged: (v) => setState(() => _limitEnabled = v),
-              activeTrackColor: AppColors.primary,
-              thumbColor: const WidgetStatePropertyAll(Colors.white),
-              inactiveTrackColor:
-                  isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
             ),
           ),
         ],

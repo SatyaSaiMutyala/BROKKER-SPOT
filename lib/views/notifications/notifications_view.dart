@@ -29,9 +29,14 @@ class _NotificationsViewState extends State<NotificationsView> {
   void initState() {
     super.initState();
     // Defer so load()'s sync Rx mutations can't fire while an ancestor is
-    // still mid-build. Cache-first: still a no-op when already loaded.
+    // still mid-build.
+    //
+    // Forced: notifications arrive while the app is open, so the session cache
+    // goes stale the moment one lands. Opening the screen has to re-fetch or a
+    // brand-new notification stays invisible until a pull-to-refresh. The
+    // cached list stays on screen meanwhile, so this costs no spinner.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _ctrl.load();
+      if (mounted) _ctrl.load(force: true);
     });
   }
 

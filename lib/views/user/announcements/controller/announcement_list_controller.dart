@@ -38,6 +38,64 @@ class AnnouncementListController extends GetxController {
   int _allPage = 1;
   int _allTotalPages = 1;
   static const int _allPerPage = 10;
+
+  /// Total the server reported for the cached feed, compared against a cheap
+  /// count probe to decide whether re-entering the screen needs a refetch.
+  int _allTotalRecords = 0;
+
+  /// When the feed was last known to be current.
+  DateTime? _allCheckedAt;
+
+  /// Set when something outside the feed says it changed — a `new_announcement`
+  /// push, for one. Skips the probe entirely and goes straight to a refetch.
+  final isAllStale = false.obs;
+
+  /// Re-entering the screen inside this window skips the check, so moving
+  /// between tabs and back costs nothing.
+  static const _freshnessWindow = Duration(seconds: 30);
+
+  /// Marks the cached feed out of date without fetching anything.
+  void markAllStale() => isAllStale.value = true;
+
+  /// Freshness check for re-entering the feed, cheap by design.
+  ///
+  /// A push already told us the feed moved → refetch. Otherwise ask the server
+  /// for the total only (`countOnly=true`, no documents) and refetch page 1
+  /// just when it differs. Unchanged count means the cached list stays exactly
+  /// as it is, so returning to the screen normally costs one small request and
+  /// no list rebuild.
+  ///
+  /// [atTop] guards the refetch: page 1 replaces the list and resets
+  /// pagination, so doing it under someone who has scrolled would yank the
+  /// feed back to the top. Scrolled-down callers keep what they have — new
+  /// listings land at the top anyway, which they will refresh into on their
+  /// way back up.
+  Future<void> refreshAllIfChanged({bool atTop = true}) async {
+    if (isLoadingAll.value || isLoadingMoreAll.value) return;
+    // Nothing cached yet — the normal loadAll path covers this.
+    if (allAnnouncements.isEmpty) return;
+
+    if (isAllStale.value) {
+      isAllStale.value = false;
+      if (atTop) await loadAll(force: true);
+      return;
+    }
+
+    final last = _allCheckedAt;
+    if (last != null && DateTime.now().difference(last) < _freshnessWindow) {
+      return;
+    }
+
+    try {
+      final count = await _repo.fetchAnnouncementCount();
+      _allCheckedAt = DateTime.now();
+      if (count != _allTotalRecords && atTop) {
+        await loadAll(force: true);
+      }
+    } catch (_) {
+      // A failed probe is not worth surfacing — the cached feed stands.
+    }
+  }
   bool get hasMoreAll => _allPage < _allTotalPages;
 
   // Broker feed — user-role=2 (brokers) used by BrokerProjectsView -----------
@@ -120,6 +178,10 @@ class AnnouncementListController extends GetxController {
       allAnnouncements.assignAll(result.items);
       _allPage = result.page;
       _allTotalPages = result.totalPages;
+      // Baseline for the count probe in [refreshAllIfChanged].
+      _allTotalRecords = result.totalRecords;
+      _allCheckedAt = DateTime.now();
+      isAllStale.value = false;
       AnnouncementCache.saveList(AnnouncementCache.keyAll, result.raw);
       _allLoaded = true;
     } catch (e) {

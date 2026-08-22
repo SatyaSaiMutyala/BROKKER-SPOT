@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:brokkerspot/core/common_widget/full_screen_image_view.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
@@ -8,118 +7,11 @@ import 'package:brokkerspot/views/brokker/brokker_account/broker_my_information_
 import 'package:brokkerspot/views/brokker/project/broker_projects_view.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:brokkerspot/views/user/settings/settings_view.dart';
+import 'package:brokkerspot/views/user/wishlist/wishlist_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-class _VerifiedArcPainter extends CustomPainter {
-  final bool isVerified;
-  _VerifiedArcPainter({required this.isVerified});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (!isVerified) return;
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 6;
-
-    // Arc from 6 o'clock to 3 o'clock going SHORT way (bottom-right quarter)
-    // 6 o'clock = 90° canvas, 3 o'clock = 0°/360° canvas
-    // Sweep: from 90° going NEGATIVE (counter-clockwise) 90° to reach 0°
-    const startAngle = 90 * pi / 180; // 6 o'clock (bottom)
-    const sweepAngle = -(90 * pi / 180); // 90° counter-clockwise to 3 o'clock
-    // Badge will be at 0° (3 o'clock / right side)
-
-    // Draw thick green arc band
-    final arcPaint = Paint()
-      ..color = const Color(0xFF2E7D32)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 14.0
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepAngle,
-      false,
-      arcPaint,
-    );
-
-    // Draw each letter of "Verified" along the arc
-    // Arc goes from 90° (6 o'clock) to 0° (3 o'clock) counter-clockwise
-    // "V" near 6 o'clock, "d" near 3 o'clock — so letters go from high angle to low
-    const letters = ['V', 'e', 'r', 'i', 'f', 'i', 'e', 'd'];
-    const textPadding = 0.1; // 10% padding from edges
-    final arcStart = startAngle + sweepAngle * textPadding; // near 6 o'clock
-    final arcTextSweep = sweepAngle * (1 - 2 * textPadding);
-
-    for (int i = 0; i < letters.length; i++) {
-      final letterAngle = arcStart + (i / (letters.length - 1)) * arcTextSweep;
-
-      final tp = TextPainter(
-        text: TextSpan(
-          text: letters[i],
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      tp.layout();
-
-      canvas.save();
-      final x = center.dx + radius * cos(letterAngle);
-      final y = center.dy + radius * sin(letterAngle);
-      canvas.translate(x, y);
-      // Rotate letter: tangent direction is letterAngle - pi/2 for counter-clockwise
-      canvas.rotate(letterAngle - pi / 2);
-      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
-      canvas.restore();
-    }
-
-    // Gold circle badge with white star at 3 o'clock (right side)
-    const badgeAngle = 0.0;
-    final badgeX = center.dx + radius * cos(badgeAngle);
-    final badgeY = center.dy + radius * sin(badgeAngle);
-    final badgeCenter = Offset(badgeX, badgeY);
-    const badgeRadius = 12.0;
-
-    // Gold circle background
-    final badgeBgPaint = Paint()..color = const Color(0xFFD4AF37);
-    canvas.drawCircle(badgeCenter, badgeRadius, badgeBgPaint);
-
-    // White star inside the badge
-    _drawStar(canvas, badgeCenter, 7.0, Paint()..color = Colors.white);
-  }
-
-  void _drawStar(Canvas canvas, Offset center, double size, Paint paint) {
-    final path = Path();
-    const points = 5;
-    final outerRadius = size;
-    final innerRadius = size * 0.4;
-
-    for (int i = 0; i < points * 2; i++) {
-      final r = i.isEven ? outerRadius : innerRadius;
-      final angle = -pi / 2 + (i * pi / points);
-      final x = center.dx + r * cos(angle);
-      final y = center.dy + r * sin(angle);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _VerifiedArcPainter oldDelegate) =>
-      oldDelegate.isVerified != isVerified;
-}
 
 /// Broker "Account" tab — profile header (avatar + verified ribbon, name,
 /// email) followed by a menu list. Every action from the old stats screen
@@ -131,6 +23,42 @@ class BrokerProfileView extends StatelessWidget {
   final ProfileController controller = Get.put(ProfileController());
 
   static const _avatarSize = 100.0;
+
+  // ── "Verified" ribbon (assets/images/tag.png) ──────────────────────────────
+  // The ribbon is a circular arc baked into the artwork, so it only sits flush
+  // against the avatar if it is scaled and offset to be concentric with it.
+  // These are measured off the asset itself — the arc's centre, its radius and
+  // the extent of its opaque pixels, all as fractions of the image's own width.
+  static const _tagAspect = 2.0705; // image width / height
+  static const _tagArcCx = 0.39365; // arc centre x, from the image's left edge
+  static const _tagArcCy = -0.07657; // arc centre y — above the image's top
+  static const _tagInnerR = 0.41167; // arc's inner edge radius
+  static const _tagMaxR = 0.65500; // furthest opaque pixel from the arc centre
+  static const _tagSealAngle = 0.45025; // seal's bearing from the arc centre
+
+  /// Trim on the ribbon's overall size. At 1.0 the arc's inner edge lands
+  /// exactly on the avatar's rim; below that the band rides a little over the
+  /// photo's edge instead of sitting entirely outside it.
+  static const _tagScale = 0.85;
+
+  static const _tagW = (_avatarSize / 2) / _tagInnerR * _tagScale;
+
+  /// Where the image's top-left corner goes, relative to the avatar's centre.
+  static const _tagDx = -_tagArcCx * _tagW;
+  static const _tagDy = -_tagArcCy * _tagW;
+
+  /// How far above 3 o'clock the seal is lifted, in radians (20°).
+  static const _tagLift = 0.34907;
+
+  /// In the artwork the seal sits ~26° below the horizontal, which hangs the
+  /// ribbon off the bottom of the avatar. Turning it back by that much brings
+  /// the seal level with 3 o'clock; [_tagLift] carries it further up the
+  /// avatar's right-hand side.
+  static const _tagRotation = -(_tagSealAngle + _tagLift);
+
+  /// Square and centred on the avatar, sized by the ribbon's furthest pixel so
+  /// the artwork still fits whatever angle it is turned to.
+  static const _tagBox = 2 * _tagMaxR * _tagW;
 
   @override
   Widget build(BuildContext context) {
@@ -194,7 +122,12 @@ class BrokerProfileView extends StatelessWidget {
                           theme,
                           'assets/images/broker_wishlist_icon.png',
                           'Wishlist',
-                          () {},
+                          // Same screen the user side uses. The wishlist
+                          // endpoint scopes entries by the active role
+                          // (user_role in its $match), so opening it here
+                          // returns the broker-side saves.
+                          () => Get.to(
+                              () => const WishlistView(showBackButton: true)),
                         ),
                         // _menuItem(
                         //   theme,
@@ -207,7 +140,6 @@ class BrokerProfileView extends StatelessWidget {
                           'assets/images/broker_settings_icon.png',
                           'Setting',
                           () => Get.to(() => SettingsView(side: 'broker')),
-                          showDivider: false,
                         ),
                       ]),
                       SizedBox(height: 16.h),
@@ -217,7 +149,6 @@ class BrokerProfileView extends StatelessWidget {
                           'assets/images/switch_to_user_icon.png',
                           'Switch to User side',
                           () => _switchToUser(),
-                          showDivider: false,
                         ),
                       ]),
                       SizedBox(height: 30.h),
@@ -251,7 +182,6 @@ class BrokerProfileView extends StatelessWidget {
   Widget _buildProfileHeader(ThemeData theme) {
     final data = controller.profileData.value;
     final bool isVerified = data?['verificationStatus'] == 'approved';
-    const arcPad = 28.0;
 
     return Column(
       children: [
@@ -265,17 +195,12 @@ class BrokerProfileView extends StatelessWidget {
                 : null,
           ),
           child: SizedBox(
-            width: (_avatarSize + arcPad).w,
-            height: (_avatarSize + arcPad).w,
+            width: _tagBox.w,
+            height: _tagBox.w,
             child: Stack(
               alignment: Alignment.center,
+              clipBehavior: Clip.none,
               children: [
-                if (isVerified)
-                  CustomPaint(
-                    size: Size(
-                        (_avatarSize + arcPad).w, (_avatarSize + arcPad).w),
-                    painter: _VerifiedArcPainter(isVerified: isVerified),
-                  ),
                 Container(
                   width: _avatarSize.w,
                   height: _avatarSize.w,
@@ -305,6 +230,32 @@ class BrokerProfileView extends StatelessWidget {
                           ),
                   ),
                 ),
+                if (isVerified)
+                  // Last in the stack so the ribbon lies over the photo rather
+                  // than the photo's circle cropping it. Rotated about the
+                  // box's centre, which is also the avatar's centre and the
+                  // arc's — so turning it slides the ribbon around the rim
+                  // without breaking the fit.
+                  Positioned.fill(
+                    child: Transform.rotate(
+                      angle: _tagRotation,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned(
+                            left: (_tagBox / 2 + _tagDx).w,
+                            top: (_tagBox / 2 + _tagDy).w,
+                            width: _tagW.w,
+                            height: (_tagW / _tagAspect).w,
+                            child: Image.asset(
+                              'assets/images/tag.png',
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -349,13 +300,15 @@ class BrokerProfileView extends StatelessWidget {
     );
   }
 
+  /// Row, matching the user-side `_tile` exactly — same padding, weight and
+  /// bare gold icon, and no separator, so both profile screens render the
+  /// same component at the same height.
   Widget _menuItem(
     ThemeData theme,
     String assetPath,
     String title,
-    VoidCallback onTap, {
-    bool showDivider = true,
-  }) {
+    VoidCallback onTap,
+  ) {
     final isDark = theme.brightness == Brightness.dark;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -364,7 +317,9 @@ class BrokerProfileView extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(16.r),
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
+            // Same insets as the user-side tile so both cards stand the same
+            // height.
+            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 18.h),
             child: Row(
               children: [
                 Expanded(
@@ -372,33 +327,29 @@ class BrokerProfileView extends StatelessWidget {
                     title,
                     style: GoogleFonts.poppins(
                       fontSize: 15.sp,
-                      fontWeight: FontWeight.w400,
-                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                      height: 1.0,
+                      letterSpacing: 0,
                     ),
                   ),
                 ),
-                SizedBox(width: 12.w),
-                Container(
-                  padding: EdgeInsets.all(6.w),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8.r),
-                    border: Border.all(color: AppColors.goldAccent, width: 1),
-                  ),
-                  child: Image.asset(assetPath, width: 18.w, height: 18.w),
+                // Matches the user-side tile exactly (`_tile` in
+                // views/user/account/account_view.dart): the icon sits bare and
+                // gold-tinted at 26x26. It used to be an 18x18 untinted image
+                // inside a gold-bordered box, which is what made the same
+                // assets read as different icons across the two screens.
+                Image.asset(
+                  assetPath,
+                  width: 26.w,
+                  height: 26.w,
+                  color: AppColors.primary,
+                  colorBlendMode: BlendMode.srcIn,
                 ),
               ],
             ),
           ),
         ),
-        if (showDivider)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.w),
-            child: Divider(
-              height: 1,
-              thickness: 0.5,
-              color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-            ),
-          ),
       ],
     );
   }

@@ -65,14 +65,27 @@ class PropertyFilter {
 
   /// True when nothing beyond the free-text [search] is set — i.e. the Filter
   /// screen contributes no constraints.
+  /// True when the location facets carry nothing the query would use.
+  ///
+  /// Checked by name as well as id: [toQueryString] sends the *names*
+  /// (`country`/`city`/`area`) and deliberately omits the ids, so a filter
+  /// holding only a name is still a real, applied filter. Looking at the id
+  /// alone made a country-only selection read as "no filters" — the home feed
+  /// then stayed on its unfiltered list and nothing appeared to change.
+  bool get _hasNoLocation =>
+      countryId == null &&
+      countryName == null &&
+      cityId == null &&
+      cityName == null &&
+      areaId == null &&
+      areaName == null;
+
   bool get hasNoFacets =>
       listingType == null &&
       propertyStatus == null &&
       rentPeriod == null &&
       propertyTypeId == null &&
-      countryId == null &&
-      cityId == null &&
-      areaId == null &&
+      _hasNoLocation &&
       bedrooms == null &&
       bathrooms == null &&
       minPrice == null &&
@@ -87,9 +100,11 @@ class PropertyFilter {
     if (listingType != null) n++;
     if (propertyStatus != null || rentPeriod != null) n++;
     if (propertyTypeId != null) n++;
-    if (countryId != null) n++;
-    if (cityId != null) n++;
-    if (areaId != null) n++;
+    // By name too, for the same reason as [_hasNoLocation] — otherwise the
+    // filter badge under-counts a country picked without an id.
+    if (countryId != null || countryName != null) n++;
+    if (cityId != null || cityName != null) n++;
+    if (areaId != null || areaName != null) n++;
     if (bedrooms != null) n++;
     if (bathrooms != null) n++;
     if (minPrice != null || maxPrice != null) n++;

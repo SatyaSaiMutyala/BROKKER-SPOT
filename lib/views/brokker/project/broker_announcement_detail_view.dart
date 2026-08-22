@@ -10,7 +10,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/core/common_widget/fullscreen_media_viewer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart'
     show showLoginRequiredDialog;
@@ -71,7 +73,49 @@ class _BrokerAnnouncementDetailViewState
     _pageController = PageController();
     _data = widget.announcement;
     _isWishlisted = widget.announcement.isWishlisted ?? false;
+    _wishlistCtrl.seed(
+      widget.announcement.id ?? '',
+      isWishlisted: _isWishlisted,
+    );
     _fetchDetail();
+  }
+
+  final _wishlistCtrl = WishlistController.to;
+
+  /// Whether this listing belongs to the signed-in account.
+  ///
+  /// Derived from the announcement rather than passed in by the caller, so it
+  /// holds however this screen was opened — from "My Announcements", from the
+  /// browse feed, or from a notification tap.
+  bool get _isOwnAnnouncement {
+    final myId = LocalStorageService.getUserIdFromToken() ??
+        LocalStorageService.getUser()?.data?.id ??
+        '';
+    final ownerId = _data.userId ?? '';
+    return myId.isNotEmpty && ownerId.isNotEmpty && myId == ownerId;
+  }
+
+  /// Saves or unsaves this listing.
+  ///
+  /// The heart used to only flip local state — no request went out, so nothing
+  /// ever reached the broker's wishlist. Routed through the same controller the
+  /// user-side detail screen uses, which owns the API call, the optimistic
+  /// update and the shared saved-id set.
+  Future<void> _onWishlistTap() async {
+    if (!LocalStorageService.isLoggedIn()) {
+      showLoginRequiredDialog(context);
+      return;
+    }
+    final id = _data.id;
+    if (id == null || id.isEmpty) return;
+
+    final was = _wishlistCtrl.isWishlisted(id);
+    final now = await _wishlistCtrl.toggle(id);
+    if (!mounted) return;
+    if (now == was) return; // request failed; the controller toasted already
+
+    setState(() => _isWishlisted = now);
+    AppToast.success(now ? 'Added to wishlist' : 'Removed from wishlist');
   }
 
   @override
@@ -310,6 +354,13 @@ class _BrokerAnnouncementDetailViewState
                     AnnouncementDetailBody(
                       data: a,
                       showActualDocs: true,
+                      showPropertyName: true,
+                      // Listings opened from the Projects feed belong to
+                      // someone else, and the fee is what the broker stands to
+                      // earn on them. Their own announcements have no broker to
+                      // pay, so the card is left off there.
+                      showCommission: !_isOwnAnnouncement,
+                      commissionAsBroker: true,
                     ),
                     SizedBox(height: 90.h + bottomPad),
                   ],
@@ -544,27 +595,27 @@ class _BrokerAnnouncementDetailViewState
                       crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CustomIconButton(
-                          isDark: true,
-                          size: 35,
-                          onTap: () {
-                            if (!LocalStorageService.isLoggedIn()) {
-                              showLoginRequiredDialog(context);
-                              return;
-                            }
-                            setState(() => _isWishlisted = !_isWishlisted);
-                          },
-                          child: Icon(
-                            _isWishlisted
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            size: 26.sp,
-                            color: _isWishlisted
-                                ? Colors.red.shade400
-                                : Colors.white,
+                        // Hidden on the broker's own listing — there is nothing
+                        // to save, and the endpoint rejects it anyway
+                        // ("Cannot add own announcement to wishlist"). Every
+                        // other listing opened here still shows it.
+                        if (!_isOwnAnnouncement) ...[
+                          CustomIconButton(
+                            isDark: true,
+                            size: 35,
+                            onTap: _onWishlistTap,
+                            child: Icon(
+                              _isWishlisted
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              size: 26.sp,
+                              color: _isWishlisted
+                                  ? Colors.red.shade400
+                                  : Colors.white,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 10.h),
+                          SizedBox(height: 10.h),
+                        ],
                         GestureDetector(
                           onTap: (hasImages || hasVideo)
                               ? () => _openFullscreenGallery(
@@ -708,6 +759,11 @@ class _BrokerAnnouncementDetailViewState
         ),
       );
     }
+
+    // The bar's actions — chat with the owner, or send them a proposal — are
+    // both about someone else's listing. On the broker's own announcement
+    // there is no counterparty, so the bar is dropped entirely.
+    if (_isOwnAnnouncement) return const SizedBox.shrink();
 
     final alreadySent = _proposalSent || _data.isProposalSent == true;
     final chatReady = _data.isChatAvailable == true;

@@ -1,4 +1,5 @@
 import 'dart:math' show Random, max;
+import 'package:brokkerspot/core/services/route_observer.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
 import 'package:brokkerspot/views/notifications/notifications_view.dart';
@@ -32,7 +33,7 @@ class HomeView extends StatefulWidget {
   State<HomeView> createState() => _HomeViewState();
 }
 
-class _HomeViewState extends State<HomeView> {
+class _HomeViewState extends State<HomeView> with RouteAware {
   final _profileCtrl = Get.put(ProfileController());
   final _announcementCtrl = AnnouncementListController.to;
   final _searchCtrl = PropertySearchController.to;
@@ -43,6 +44,11 @@ class _HomeViewState extends State<HomeView> {
   /// Side gutter for every row on this screen — header, stories, search,
   /// filters and cards all line up against it.
   double get _gutter => 10.w;
+
+  /// Feed card footprint, shared by the real cards and their shimmer
+  /// placeholders so the two always occupy the same space.
+  double get _cardHeight => 263.h;
+  double get _cardGap => 10.h;
 
   /// Breathing room between the status bar and the header.
   ///
@@ -84,6 +90,47 @@ class _HomeViewState extends State<HomeView> {
     _scrollController.addListener(_onScroll);
     _announcementCtrl.loadAll();
     _notificationCtrl.load();
+
+    // Default the country filter to the one picked at signup. The profile is
+    // usually still in flight here, so seed on whatever is already loaded and
+    // again when it arrives — seedDefaultCountry itself runs only once and
+    // won't overwrite a country the user has chosen.
+    _seedCountryFilter();
+    _profileWorker = ever(_profileCtrl.profileData, (_) => _seedCountryFilter());
+  }
+
+  Worker? _profileWorker;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is ModalRoute<void>) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  /// A pushed route just popped back to this screen.
+  ///
+  /// Checks for new listings the cheap way — see
+  /// [AnnouncementListController.refreshAllIfChanged]. Only when the feed is
+  /// near the top, since a refetch resets pagination and would otherwise pull
+  /// the list out from under someone mid-scroll.
+  @override
+  void didPopNext() {
+    if (_isFiltering) return; // the search feed has its own lifecycle
+    _announcementCtrl.refreshAllIfChanged(atTop: _isNearTop);
+  }
+
+  /// Within a screenful of the top, so replacing page 1 costs no context.
+  bool get _isNearTop =>
+      !_scrollController.hasClients || _scrollController.position.pixels < 600;
+
+  void _seedCountryFilter() {
+    if (_profileCtrl.isGuest) return;
+    final country = _profileCtrl.country;
+    if (country.isEmpty) return;
+    _searchCtrl.seedDefaultCountry(country);
   }
 
   /// True when the user has typed a search query or applied filter facets.
@@ -95,6 +142,8 @@ class _HomeViewState extends State<HomeView> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchTextCtrl.dispose();
+    _profileWorker?.dispose();
+    appRouteObserver.unsubscribe(this);
     super.dispose();
   }
 
@@ -218,7 +267,12 @@ class _HomeViewState extends State<HomeView> {
             ? 'Guest'
             : _profileCtrl.userName.value.split(' ').first,
         isGreetingLoading: isProfileLoading,
-        location: 'Dubai',
+        // The account's country from /me. Guests have no profile, and accounts
+        // created before signup started sending `country` have none stored, so
+        // both fall back to the previous fixed label rather than a blank.
+        location: _profileCtrl.isGuest || _profileCtrl.country.isEmpty
+            ? 'Dubai'
+            : _profileCtrl.country,
         notificationCount: _notificationCtrl.unseenCount.value,
         onAvatarTap: () => widget.onAccountTap?.call(),
         onLocationTap: () => Get.to(() => SettingsView()),
@@ -344,7 +398,7 @@ class _HomeViewState extends State<HomeView> {
         padding: EdgeInsets.symmetric(horizontal: _gutter),
         sliver: SliverList.separated(
           itemCount: items.length,
-          separatorBuilder: (_, __) => SizedBox(height: 10.h),
+          separatorBuilder: (_, __) => SizedBox(height: _cardGap),
           itemBuilder: (_, i) {
             final a = items[i];
             return RepaintBoundary(
@@ -354,7 +408,7 @@ class _HomeViewState extends State<HomeView> {
                   announcement: a,
                   index: i,
                   cardWidth: double.infinity,
-                  cardHeight: 263.h,
+                  cardHeight: _cardHeight,
                   onTap: () => Get.to(() => AnnouncementDetailView(
                         announcement: a,
                         isOwner: false,
@@ -444,7 +498,7 @@ class _HomeViewState extends State<HomeView> {
         padding: EdgeInsets.symmetric(horizontal: _gutter),
         sliver: SliverList.separated(
           itemCount: entries.length,
-          separatorBuilder: (_, __) => SizedBox(height: 10.h),
+          separatorBuilder: (_, __) => SizedBox(height: _cardGap),
           itemBuilder: (_, i) {
             final entry = entries[i];
             if (entry.banner != null) return _buildFeedBanner(entry.banner!);
@@ -459,7 +513,7 @@ class _HomeViewState extends State<HomeView> {
                   // Fill the gutter-to-gutter width instead of a fixed size, so
                   // cards stay flush with the header and filter rows.
                   cardWidth: double.infinity,
-                  cardHeight: 263.h,
+                  cardHeight: _cardHeight,
                   onTap: () => Get.to(() => AnnouncementDetailView(
                         announcement: a,
                         isOwner: false,
@@ -519,10 +573,14 @@ class _HomeViewState extends State<HomeView> {
 
   /// A single card-shaped skeleton, matching the real card's footprint so the
   /// list doesn't jump when the data lands.
+  ///
+  /// Both dimensions come from the same constants the real cards are built
+  /// with ([_cardHeight], and the 20r corner the card's own container uses),
+  /// so the placeholder can't drift out of step with them again.
   Widget _skeletonCard() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20.r),
-      child: ShimmerBox(width: double.infinity, height: 263.h),
+      child: ShimmerBox(width: double.infinity, height: _cardHeight),
     );
   }
 
@@ -531,7 +589,9 @@ class _HomeViewState extends State<HomeView> {
       padding: EdgeInsets.symmetric(horizontal: _gutter),
       sliver: SliverList.separated(
         itemCount: count,
-        separatorBuilder: (_, __) => SizedBox(height: 16.h),
+        // Same gap the two real feeds use — it was 16 here, which spaced the
+        // shimmer list wider than the list that replaced it.
+        separatorBuilder: (_, __) => SizedBox(height: _cardGap),
         itemBuilder: (_, __) => _skeletonCard(),
       ),
     );

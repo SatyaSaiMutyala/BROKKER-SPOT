@@ -205,16 +205,24 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  widget.brokerName,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w600,
-                    color: nameColor,
-                    height: 1.1,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.brokerName,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: nameColor,
+                          height: 1.1,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    _peerRolePill(),
+                  ],
                 ),
                 SizedBox(height: 3.h),
                 Obx(() {
@@ -437,9 +445,37 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     );
   }
 
-  /// Agreement "signed" state green — design token #159D37 at 30% alpha
-  /// (CSS #159D374D → Flutter ARGB order).
-  static const Color _agreementGreen = Color(0x4D159D37);
+  /// Agreement "signed" state green — design token #159D37, fully opaque.
+  ///
+  /// Was 30% alpha (0x4D), which washed the Information button out against the
+  /// banner behind it and left its white label low-contrast.
+  static const Color _agreementGreen = Color(0xFF159D37);
+
+  /// Role of the person on the other end, shown beside their name.
+  ///
+  /// [AnnouncementChatView.userRole] is the *viewer's* side (1 = user,
+  /// 2 = broker), so the pill names the counterparty: a user is talking to a
+  /// broker, a broker is talking to a client. One widget covers both sides
+  /// because this screen is shared by them.
+  Widget _peerRolePill() {
+    final label = (widget.userRole ?? 1) == 2 ? 'Client' : 'Broker';
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 3.h),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(20.r),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.poppins(
+          fontSize: 11.sp,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
 
   Widget _bannerButton({
     required IconData icon,

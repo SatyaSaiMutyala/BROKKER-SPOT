@@ -1,11 +1,12 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/services/route_observer.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/meeting_item_model.dart';
+import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
 import 'package:brokkerspot/views/user/meeting/controller/meeting_controller.dart';
 import 'package:brokkerspot/views/user/meeting/repo/meeting_repo.dart';
-import 'package:brokkerspot/widgets/common/support_fab.dart';
 import 'package:brokkerspot/widgets/meeting/broker_meeting_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -27,8 +28,12 @@ class BrokerMeetingView extends StatefulWidget {
   State<BrokerMeetingView> createState() => _BrokerMeetingViewState();
 }
 
-class _BrokerMeetingViewState extends State<BrokerMeetingView> {
+class _BrokerMeetingViewState extends State<BrokerMeetingView> with RouteAware {
   final _ctrl = MeetingController.to;
+
+  /// Refreshes the moment the controller says a chat message landed, so the
+  /// unread badge moves while the user is sitting on this screen.
+  Worker? _staleWorker;
 
   // Same filter set + labels as the user-side meeting screen.
   final List<({String label, MeetingFilter filter})> _filters = const [
@@ -44,6 +49,14 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
   void initState() {
     super.initState();
     _precacheWorker = ever(_ctrl.brokerMeetings, (_) => _precacheAvatars());
+
+    // Chat traffic is what moves the unread badge, and it is otherwise only
+    // heard inside the chat screens — start listening app-wide and refresh
+    // here as soon as it flags the list.
+    _ctrl.ensureChatListening();
+    _staleWorker = ever(_ctrl.isBrokerStale, (stale) {
+      if (stale == true && mounted) _ctrl.refreshBrokerIfStale();
+    });
     // Defer so loadBroker()'s sync Rx mutations don't run while an ancestor
     // is still mid-build (same post-login race as the user-side tabs).
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -54,8 +67,24 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
   @override
   void dispose() {
     _precacheWorker?.dispose();
+    _staleWorker?.dispose();
+    appRouteObserver.unsubscribe(this);
     super.dispose();
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is ModalRoute<void>) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  /// Back from a chat (or any pushed route) — pick up anything that changed
+  /// while it covered this screen. A no-op unless something flagged the list.
+  @override
+  void didPopNext() => _ctrl.refreshBrokerIfStale();
 
   void _precacheAvatars() {
     if (!mounted) return;
@@ -83,6 +112,17 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
     return myId.isNotEmpty &&
         m.announcement.userId == myId &&
         (m.announcement.userRole ?? 1) == 1;
+  }
+
+  /// Tapping the round property thumbnail opens the property details screen.
+  /// The detail view refetches the full announcement by id, so the trimmed
+  /// announcement carried by the meeting row is enough to seed it.
+  void _openProperty(MeetingItem m) {
+    Get.to(() => BrokerAnnouncementDetailView(
+          announcement: m.announcement,
+          ownerName: m.announcement.ownerName,
+          ownerAvatarUrl: m.announcement.ownerAvatarUrl,
+        ));
   }
 
   Future<void> _onTap(MeetingItem m) async {
@@ -141,21 +181,12 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(theme),
-                _buildFilterChips(theme),
-                Expanded(child: _buildList(theme)),
-              ],
-            ),
-            Positioned(
-              right: 20.w,
-              bottom: 20.h,
-              child: SupportFab(onTap: () {}),
-            ),
+            _buildHeader(theme),
+            _buildFilterChips(theme),
+            Expanded(child: _buildList(theme)),
           ],
         ),
       ),
@@ -303,6 +334,7 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> {
               meeting: m,
               isOwn: _isOwn(m),
               onTap: () => _onTap(m),
+              onPropertyTap: () => _openProperty(m),
             );
           },
         ),

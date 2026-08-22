@@ -54,6 +54,30 @@ class HomeAnnouncementCard extends StatelessWidget {
   // Strip sits flush below the image card — no overlap.
   static const _brokerageRowHeight = 40.0;
 
+  /// Text on the brokerage strip, which reads differently per listing type.
+  ///
+  /// A sale is brokered on a percentage of the price; a rental on one month's
+  /// rent — a twelfth of a yearly figure, or the figure itself when the rent is
+  /// quoted monthly. The counterparty differs too, so the empty state names the
+  /// seller on a sale and the owner on a rental.
+  String get _brokerageLabel {
+    final currency = announcement.currency ?? 'AED';
+    final price = announcement.price ?? 0;
+    final isRent = (announcement.listingType ?? '').toLowerCase() == 'rent';
+
+    if (isRent) {
+      if (price <= 0) return 'No Owner Brokerage';
+      final isMonthly = (announcement.rentPeriod ?? '').toLowerCase() == 'monthly';
+      final oneMonth = isMonthly ? price : price / 12;
+      return 'Brokerage 1 Month ~ $currency ${_formatPrice(oneMonth)}';
+    }
+
+    final percent = announcement.brokkeragePercent;
+    if (percent == null) return 'No Seller Brokerage';
+    return 'Brokerage $percent% ~ $currency '
+        '${_formatPrice(price * percent / 100)}';
+  }
+
   String get _listingBadge {
     if (announcement.listingType == 'Sell') return 'FOR SELL';
     if (announcement.listingType == 'Rent') return 'FOR RENT';
@@ -101,11 +125,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    a.brokkeragePercent != null
-                        ? 'Brokerage ${a.brokkeragePercent}% ~ '
-                            '${a.currency ?? 'AED'} '
-                            '${_formatPrice((a.price ?? 0) * a.brokkeragePercent! / 100)}'
-                        : 'No Seller Brokerage',
+                    _brokerageLabel,
                     style: GoogleFonts.poppins(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w400,

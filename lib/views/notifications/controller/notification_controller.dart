@@ -26,9 +26,17 @@ class NotificationListController extends GetxController {
   final unseenCount = 0.obs;
   bool _loaded = false;
 
-  /// Loads the first page. No-op when already loaded unless [force].
+  /// Loads the first page, re-fetching in place when [force] is set.
+  ///
+  /// With a list already cached this is a silent refresh: the screen keeps
+  /// showing what it has (its shimmer and error states are both gated on an
+  /// empty list) and swaps in the fresh page when it lands. That is what lets
+  /// the screen open on the newest notifications instead of a session-old
+  /// snapshot that only pull-to-refresh could update.
   Future<void> load({bool force = false}) async {
     if (_loaded && !force) return;
+    // A fetch is already running — it will publish the same fresh page.
+    if (isLoading.value) return;
     try {
       isLoading.value = true;
       error.value = null;

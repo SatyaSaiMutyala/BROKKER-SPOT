@@ -24,6 +24,12 @@ class ProfileController extends GetxController {
   // 2 = broker). The switch-role API toggles this.
   var currentRole = 0.obs;
   var isLoading = false.obs;
+  /// Screens reach the shared instance through this rather than each calling
+  /// Get.put, matching the other controllers' accessors.
+  static ProfileController get to => Get.isRegistered<ProfileController>()
+      ? Get.find<ProfileController>()
+      : Get.put(ProfileController());
+
   var profileData = Rxn<Map<String, dynamic>>();
 
   // Lists
@@ -36,6 +42,69 @@ class ProfileController extends GetxController {
   /// The logged-in user's id (from /me). Used to tell "my" announcements apart
   /// from others in shared feeds.
   String? get currentUserId => profileData.value?['_id'] as String?;
+
+  /// Country chosen at signup, as returned by the profile endpoint.
+  ///
+  /// Empty for accounts created before the app started sending `country`, and
+  /// for guests — callers fall back rather than showing a blank.
+  String get country =>
+      (profileData.value?['country'] as String?)?.trim() ?? '';
+
+  /// Account currency, as returned by the profile endpoint. The backend
+  /// defaults it to AED and derives it from the country chosen at signup.
+  String get currency =>
+      (profileData.value?['currency'] as String?)?.trim().isNotEmpty == true
+          ? profileData.value!['currency'] as String
+          : 'AED';
+
+  /// The code currently being saved, so the picker can put a spinner on that
+  /// exact row instead of leaving every option looking idle. Null when idle.
+  final savingCurrencyCode = Rxn<String>();
+
+  bool get isSavingCurrency => savingCurrencyCode.value != null;
+
+  /// Updates the account currency via `user/profile/edit-settings`.
+  ///
+  /// The endpoint validates the code against its country→currency table and
+  /// returns the updated user, so the profile is refreshed on success to keep
+  /// everything reading from one source.
+  Future<bool> updateCurrency(String code) async {
+    if (code == currency) return true;
+    if (isSavingCurrency) return false; // a save is already in flight
+    try {
+      savingCurrencyCode.value = code;
+      final response = await putRequest(
+        endPoint: '$baseUrl${ApiEndpoints.editSettings}',
+        body: {'currency': code},
+        headers: buildHeaders(),
+      );
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      if (json['success'] == true) {
+        // The endpoint returns the updated user, so publish that instead of
+        // re-fetching /me — one round-trip rather than two.
+        final data = json['data'];
+        if (data is Map<String, dynamic>) {
+          applyProfileData(data);
+        } else {
+          await getProfile();
+        }
+        return true;
+      }
+      Get.snackbar(
+        'Error',
+        json['message']?.toString() ?? 'Failed to update currency',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+      );
+      return false;
+    } catch (e) {
+      debugPrint('⚠️ Currency update failed: $e');
+      return false;
+    } finally {
+      savingCurrencyCode.value = null;
+    }
+  }
 
   /// True if the user has been granted the broker role (bit 2 set → 2 or 3).
   bool get hasBrokerRole => (role.value & 2) != 0;
@@ -72,7 +141,32 @@ class ProfileController extends GetxController {
       if (response.statusCode == 200) {
         final responseJson = jsonDecode(response.body);
         if (responseJson['success'] == true && responseJson['data'] != null) {
-          final data = responseJson['data'];
+          applyProfileData(responseJson['data']);
+          print('Profile loaded: ${userName.value}');
+        }
+      } else {
+        print('Profile API failed: ${response.statusCode}');
+        // Fallback to Firebase Auth user data
+        _loadFromFirebaseUser();
+      }
+    } catch (e, s) {
+      print('Profile API Error: $e');
+      print('Stack: $s');
+      // Fallback to Firebase Auth user data
+      _loadFromFirebaseUser();
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Fans a profile payload out across the observable fields.
+  ///
+  /// Shared so endpoints that already return the updated user — edit-settings,
+  /// for one — can publish their response directly instead of paying for a
+  /// second round-trip to /me just to read back what they were just told.
+  void applyProfileData(Map<String, dynamic> data) {
+    {
+      {
           profileData.value = data;
           userName.value = data['name'] ?? '';
           userEmail.value = data['email'] ?? '';
@@ -89,20 +183,7 @@ class ProfileController extends GetxController {
           dealingAreas.value = List<String>.from(data['dealingAreas'] ?? []);
           knownLanguages.value =
               List<String>.from(data['knownLanguages'] ?? []);
-          print('Profile loaded: ${userName.value}');
-        }
-      } else {
-        print('Profile API failed: ${response.statusCode}');
-        // Fallback to Firebase Auth user data
-        _loadFromFirebaseUser();
       }
-    } catch (e, s) {
-      print('Profile API Error: $e');
-      print('Stack: $s');
-      // Fallback to Firebase Auth user data
-      _loadFromFirebaseUser();
-    } finally {
-      isLoading.value = false;
     }
   }
 

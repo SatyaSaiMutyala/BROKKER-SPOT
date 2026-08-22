@@ -228,98 +228,108 @@ class MyInformationView extends StatelessWidget {
 
   // ─── Shared dialog helpers ────────────────────────────────────────────────────
 
-  /// Dialog title row: brand-tinted icon, title (with optional subtitle) and a
-  /// close button, followed by a divider that separates it from the content.
+  /// Height of the header block, and therefore where the card is perforated.
+  /// The shell every edit dialog on this screen is built from.
   ///
-  /// [icon] and [subtitle] are optional so existing callers keep working; both
-  /// are what give each dialog its own identity instead of four identical
-  /// title strings.
-  Widget _dialogHeader(
-    BuildContext ctx,
-    String title,
-    bool isDark, {
-    IconData? icon,
-    String? subtitle,
+  /// Restrained on purpose: a crisp surface, a clear title block over a
+  /// hairline rule, and the brand gold spent only where it carries meaning —
+  /// the focused field and the primary action. No banner, no ornament.
+  Widget _dialogShell({
+    required BuildContext ctx,
+    required bool isDark,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
   }) {
-    final titleColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
-    final subtitleColor =
-        isDark ? Colors.grey.shade500 : Colors.grey.shade600;
+    final surface = isDark ? const Color(0xFF15171F) : Colors.white;
+    final hairline = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.07);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(horizontal: 26.w),
+      child: Container(
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(18.r),
+          border: Border.all(color: hairline),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.14),
+              blurRadius: 30,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (icon != null) ...[
-              Container(
-                width: 40.w,
-                height: 40.w,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: isDark ? 0.18 : 0.14),
-                  borderRadius: BorderRadius.circular(12.r),
-                ),
-                child: Icon(icon, size: 20.sp, color: AppColors.primary),
-              ),
-              SizedBox(width: 12.w),
-            ],
-            Expanded(
-              child: Column(
+            Padding(
+              padding: EdgeInsets.fromLTRB(22.w, 20.h, 12.w, 16.h),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 17.sp,
-                      fontWeight: FontWeight.w600,
-                      color: titleColor,
-                      height: 1.2,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.poppins(
+                            fontSize: 17.sp,
+                            fontWeight: FontWeight.w600,
+                            color:
+                                isDark ? Colors.white : const Color(0xFF16181F),
+                            height: 1.2,
+                          ),
+                        ),
+                        SizedBox(height: 5.h),
+                        Text(
+                          subtitle,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.5.sp,
+                            fontWeight: FontWeight.w300,
+                            height: 1.4,
+                            color: isDark
+                                ? Colors.grey.shade500
+                                : Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  if (subtitle != null) ...[
-                    SizedBox(height: 3.h),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w300,
-                        color: subtitleColor,
-                        height: 1.3,
+                  SizedBox(width: 8.w),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: EdgeInsets.all(8.w),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 18.sp,
+                        color: isDark ? Colors.white54 : Colors.black38,
                       ),
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
-            SizedBox(width: 8.w),
-            GestureDetector(
-              onTap: () => Navigator.pop(ctx),
-              child: Container(
-                width: 32.w,
-                height: 32.w,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isDark ? Colors.white10 : Colors.grey.shade100,
-                ),
-                child: Icon(Icons.close,
-                    size: 16.sp,
-                    color: isDark ? Colors.white60 : Colors.black45),
+            Divider(height: 1, thickness: 1, color: hairline),
+            Padding(
+              padding: EdgeInsets.fromLTRB(22.w, 20.h, 22.w, 20.h),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: children,
               ),
             ),
           ],
         ),
-        SizedBox(height: 16.h),
-        Divider(
-          height: 1,
-          thickness: 1,
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05),
-        ),
-        SizedBox(height: 20.h),
-      ],
+      ),
     );
   }
 
@@ -329,77 +339,81 @@ class MyInformationView extends StatelessWidget {
     required bool loading,
     required VoidCallback? onPressed,
   }) {
-    return Container(
-      width: double.infinity,
-      height: 52.h,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14.r),
-        // Soft brand-coloured glow so the primary action reads as raised
-        // without an elevation shadow that would look grey against the gold.
-        boxShadow: loading
-            ? null
-            : [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-      ),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
-          elevation: 0,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+    // Solid brand colour, no gradient or glow — the only filled element in the
+    // dialog, so it reads as the primary action on weight alone.
+    return Opacity(
+      opacity: loading ? 0.7 : 1,
+      child: Container(
+        width: double.infinity,
+        height: 48.h,
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(12.r),
         ),
-        onPressed: loading ? null : onPressed,
-        child: loading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.black),
-              )
-            : Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                  height: 1.0,
-                ),
-              ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12.r),
+            onTap: loading ? null : onPressed,
+            child: Center(
+              child: loading
+                  ? SizedBox(
+                      width: 18.w,
+                      height: 18.w,
+                      child: const CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8.w),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          style: GoogleFonts.poppins(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            height: 1.0,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  // Subtle cancel text button
-  /// Secondary action — an outlined button so it balances the filled Save
-  /// above it instead of trailing off as bare text.
+  /// Secondary action — outlined, and narrower than Save, so the two sit
+  /// together without competing.
   Widget _cancelButton(BuildContext ctx, bool isDark) {
     final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.10);
+        ? Colors.white.withValues(alpha: 0.14)
+        : Colors.black.withValues(alpha: 0.12);
 
-    return Padding(
-      padding: EdgeInsets.only(top: 10.h),
-      child: SizedBox(
-        width: double.infinity,
-        height: 48.h,
-        child: OutlinedButton(
-          onPressed: () => Navigator.pop(ctx),
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: borderColor),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14.r),
-            ),
+    return SizedBox(
+      width: double.infinity,
+      height: 48.h,
+      child: OutlinedButton(
+        onPressed: () => Navigator.pop(ctx),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: borderColor),
+          // OutlinedButton's default insets are wide enough to squeeze the
+          // label in the narrower of the two action slots.
+          padding: EdgeInsets.symmetric(horizontal: 6.w),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.r),
           ),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
           child: Text(
             'Cancel',
+            maxLines: 1,
             style: GoogleFonts.poppins(
-              fontSize: 15.sp,
+              fontSize: 14.sp,
               fontWeight: FontWeight.w500,
               color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
               height: 1.0,
@@ -415,27 +429,33 @@ class MyInformationView extends StatelessWidget {
     required bool isDark,
     EdgeInsetsGeometry? contentPadding,
   }) {
-    final fillColor = isDark ? const Color(0xFF252836) : Colors.grey.shade100;
-    final borderColor = isDark ? const Color(0xFF2A2D3C) : Colors.grey.shade300;
+    // Borderless at rest, with a gold ring only on focus — quieter than a box
+    // outlined all the time, and it makes the active field obvious.
+    final fillColor = isDark ? const Color(0xFF1E212B) : const Color(0xFFF6F6F4);
     return InputDecoration(
       hintText: hint,
       filled: true,
       fillColor: fillColor,
       hintStyle: GoogleFonts.poppins(
         fontSize: 14.sp,
-        color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+        fontWeight: FontWeight.w300,
+        color: isDark ? Colors.grey.shade600 : Colors.grey.shade500,
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12.r),
-        borderSide: BorderSide(color: borderColor),
+        borderRadius: BorderRadius.circular(14.r),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12.r),
-        borderSide: BorderSide(color: borderColor),
+        borderRadius: BorderRadius.circular(14.r),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12.r),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        borderRadius: BorderRadius.circular(14.r),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
       ),
       contentPadding: contentPadding ??
           EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
@@ -449,163 +469,173 @@ class MyInformationView extends StatelessWidget {
 
   // ─── Edit Name ────────────────────────────────────────────────────────────────
 
-  void _showEditNameDialog(
-      BuildContext context, MyInformationController controller) {
+  /// The one edit dialog this screen uses.
+  ///
+  /// Name, phone and email are the same dialog with different contents, so
+  /// rather than three near-identical builders they each just describe what
+  /// makes them different: the crown copy, the input, and what saving does.
+  /// Everything shared — shell, labelling, save/cancel, loading and closing —
+  /// lives here once.
+  ///
+  /// [onSave] returns whether the dialog should close, so a caller that fails
+  /// validation or whose request is rejected can keep it open.
+  void _showEditDialog({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String saveLabel,
+    required RxBool saving,
+    required Future<bool> Function() onSave,
+    required Widget Function(bool isDark) field,
+    String? fieldLabel,
+    Widget Function(bool isDark)? above,
+    Widget Function(bool isDark)? below,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final nameCtrl = TextEditingController(text: controller.name);
 
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
-        child: Container(
-          padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1B1D27) : Colors.white,
-            borderRadius: BorderRadius.circular(20.r),
-            // Hairline lifts the surface off a dark background, and the
-            // shadow gives the dialog depth over the dimmed page.
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.black.withValues(alpha: 0.04),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      builder: (ctx) => _dialogShell(
+        ctx: ctx,
+        isDark: isDark,
+        icon: icon,
+        title: title,
+        subtitle: subtitle,
+        children: [
+          if (above != null) ...[
+            above(isDark),
+            SizedBox(height: 18.h),
+          ],
+          if (fieldLabel != null) ...[
+            _fieldLabel(fieldLabel, isDark),
+            SizedBox(height: 8.h),
+          ],
+          field(isDark),
+          if (below != null) ...[
+            SizedBox(height: 12.h),
+            below(isDark),
+          ],
+          SizedBox(height: 24.h),
+          // Side by side, with the primary action given the greater width —
+          // the conventional arrangement, and it keeps the dialog compact.
+          Row(
             children: [
-              _dialogHeader(
-                ctx,
-                'Edit Name',
-                isDark,
-                icon: Icons.person_outline_rounded,
-                subtitle: 'This is how your name appears across the app.',
+              Expanded(flex: 2, child: _cancelButton(ctx, isDark)),
+              SizedBox(width: 10.w),
+              Expanded(
+                flex: 3,
+                child: Obx(() => _saveButton(
+                      label: saveLabel,
+                      loading: saving.value,
+                      onPressed: () async {
+                        final close = await onSave();
+                        if (close && ctx.mounted) Navigator.pop(ctx);
+                      },
+                    )),
               ),
-              TextField(
-                controller: nameCtrl,
-                autofocus: true,
-                textCapitalization: TextCapitalization.words,
-                style: _fieldTextStyle(isDark),
-                decoration: _fieldDecoration(hint: 'Full name', isDark: isDark),
-              ),
-              SizedBox(height: 20.h),
-              Obx(() => _saveButton(
-                    label: 'Save Changes',
-                    loading: controller.isSavingName.value,
-                    onPressed: () async {
-                      final newName = nameCtrl.text.trim();
-                      if (newName.isEmpty) return;
-                      await controller.updateInfo(name: newName);
-                      if (ctx.mounted) Navigator.pop(ctx);
-                    },
-                  )),
-              _cancelButton(ctx, isDark),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
+
+  void _showEditNameDialog(
+      BuildContext context, MyInformationController controller) {
+    final nameCtrl = TextEditingController(text: controller.name);
+
+    _showEditDialog(
+      context: context,
+      icon: Icons.person_outline_rounded,
+      title: 'Edit Name',
+      subtitle: 'This is how your name appears across the app.',
+      fieldLabel: 'Full name',
+      saveLabel: 'Save Changes',
+      saving: controller.isSavingName,
+      field: (isDark) => TextField(
+        controller: nameCtrl,
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
+        style: _fieldTextStyle(isDark),
+        decoration: _fieldDecoration(hint: 'Enter your name', isDark: isDark),
+      ),
+      onSave: () async {
+        final newName = nameCtrl.text.trim();
+        if (newName.isEmpty) return false;
+        await controller.updateInfo(name: newName);
+        return true;
+      },
+    );
+  }
+
+  /// Small caps-ish label above a field — gives the body a hierarchy instead of
+  /// a bare input sitting under the crown.
+  Widget _fieldLabel(String text, bool isDark) => Text(
+        text.toUpperCase(),
+        style: GoogleFonts.poppins(
+          fontSize: 10.sp,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.8,
+          color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+          height: 1.0,
+        ),
+      );
 
   // ─── Edit/Add Phone ───────────────────────────────────────────────────────────
 
   void _showEditPhoneDialog(
       BuildContext context, MyInformationController controller) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final codeCtrl = TextEditingController(
         text: controller.countryCode.isEmpty ? '+' : controller.countryCode);
     final phoneCtrl = TextEditingController(text: controller.phone);
 
-    showDialog(
+    _showEditDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
-        child: Container(
-          padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1B1D27) : Colors.white,
-            borderRadius: BorderRadius.circular(20.r),
-            // Hairline lifts the surface off a dark background, and the
-            // shadow gives the dialog depth over the dimmed page.
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.black.withValues(alpha: 0.04),
+      icon: Icons.phone_iphone_rounded,
+      title: controller.phone.isEmpty ? 'Add Phone' : 'Edit Phone',
+      subtitle: 'Pick your country code, then the number.',
+      fieldLabel: 'Mobile number',
+      saveLabel: 'Save Changes',
+      saving: controller.isSavingPhone,
+      // Two inputs in the one slot — the dial code stays narrow beside the
+      // number so they read as a single field.
+      field: (isDark) => Row(
+        children: [
+          SizedBox(
+            width: 74.w,
+            child: TextField(
+              controller: codeCtrl,
+              keyboardType: TextInputType.phone,
+              textAlign: TextAlign.center,
+              style: _fieldTextStyle(isDark),
+              decoration: _fieldDecoration(
+                hint: '+91',
+                isDark: isDark,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 8.w, vertical: 16.h),
+              ),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
-              ),
-            ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _dialogHeader(
-                ctx,
-                controller.phone.isEmpty ? 'Add Phone' : 'Edit Phone',
-                isDark,
-                icon: Icons.phone_iphone_rounded,
-                subtitle: 'Pick your country code, then the number.',
-              ),
-              Row(
-                children: [
-                  SizedBox(
-                    width: 74.w,
-                    child: TextField(
-                      controller: codeCtrl,
-                      keyboardType: TextInputType.phone,
-                      textAlign: TextAlign.center,
-                      style: _fieldTextStyle(isDark),
-                      decoration: _fieldDecoration(
-                        hint: '+91',
-                        isDark: isDark,
-                        contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8.w, vertical: 16.h),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 10.w),
-                  Expanded(
-                    child: TextField(
-                      controller: phoneCtrl,
-                      autofocus: true,
-                      keyboardType: TextInputType.phone,
-                      style: _fieldTextStyle(isDark),
-                      decoration: _fieldDecoration(
-                          hint: 'Phone number', isDark: isDark),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 20.h),
-              Obx(() => _saveButton(
-                    label: 'Save Changes',
-                    loading: controller.isSavingPhone.value,
-                    onPressed: () async {
-                      final phone = phoneCtrl.text.trim();
-                      final code = codeCtrl.text.trim();
-                      if (phone.isEmpty) return;
-                      final saved = await controller.updatePhone(code, phone);
-                      if (saved && ctx.mounted) Navigator.pop(ctx);
-                    },
-                  )),
-              _cancelButton(ctx, isDark),
-            ],
+          SizedBox(width: 10.w),
+          Expanded(
+            child: TextField(
+              controller: phoneCtrl,
+              autofocus: true,
+              keyboardType: TextInputType.phone,
+              style: _fieldTextStyle(isDark),
+              decoration:
+                  _fieldDecoration(hint: 'Phone number', isDark: isDark),
+            ),
           ),
-        ),
+        ],
       ),
+      onSave: () async {
+        final phone = phoneCtrl.text.trim();
+        final code = codeCtrl.text.trim();
+        if (phone.isEmpty) return false;
+        return controller.updatePhone(code, phone);
+      },
     );
   }
 
@@ -616,77 +646,67 @@ class MyInformationView extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final emailCtrl = TextEditingController(text: controller.email);
 
-    showDialog(
+    _showEditDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
-        child: Container(
-          padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1B1D27) : Colors.white,
-            borderRadius: BorderRadius.circular(20.r),
-            // Hairline lifts the surface off a dark background, and the
-            // shadow gives the dialog depth over the dimmed page.
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.black.withValues(alpha: 0.04),
+      icon: Icons.mail_outline_rounded,
+      title: 'Edit Email',
+      subtitle: 'We will send a code to confirm the new address.',
+      fieldLabel: 'New email address',
+      saveLabel: 'Send OTP',
+      saving: controller.isSavingEmail,
+      field: (isDark) => TextField(
+        controller: emailCtrl,
+        autofocus: true,
+        keyboardType: TextInputType.emailAddress,
+        style: _fieldTextStyle(isDark),
+        decoration: _fieldDecoration(hint: 'name@example.com', isDark: isDark),
+      ),
+      below: (isDark) => _noteStrip(
+        'A one-time code will be sent there before the change is applied.',
+        isDark,
+      ),
+      onSave: () async {
+        final newEmail = emailCtrl.text.trim();
+        if (newEmail.isEmpty) return false;
+        final sent = await controller.updateEmail(newEmail);
+        if (sent) {
+          // Queued so it opens after this dialog has finished closing.
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _showOtpDialog(controller, newEmail, isDark),
+          );
+        }
+        return sent;
+      },
+    );
+  }
+
+  /// Tinted note under a field — carries the "what happens next" copy without
+  /// it reading as another paragraph of body text.
+  Widget _noteStrip(String text, bool isDark) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: isDark ? 0.12 : 0.10),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded,
+              size: 14.sp, color: AppColors.primaryDark),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w300,
+                height: 1.4,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+              ),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
-              ),
-            ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _dialogHeader(
-                ctx,
-                'Edit Email',
-                isDark,
-                icon: Icons.mail_outline_rounded,
-                subtitle: 'We will send a code to confirm the new address.',
-              ),
-              Text(
-                'An OTP will be sent to your new email for verification.',
-                style: GoogleFonts.poppins(
-                  fontSize: 13.sp,
-                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                  fontWeight: FontWeight.w400,
-                  height: 1.4,
-                ),
-              ),
-              SizedBox(height: 16.h),
-              TextField(
-                controller: emailCtrl,
-                autofocus: true,
-                keyboardType: TextInputType.emailAddress,
-                style: _fieldTextStyle(isDark),
-                decoration:
-                    _fieldDecoration(hint: 'New email address', isDark: isDark),
-              ),
-              SizedBox(height: 20.h),
-              Obx(() => _saveButton(
-                    label: 'Send OTP',
-                    loading: controller.isSavingEmail.value,
-                    onPressed: () async {
-                      final newEmail = emailCtrl.text.trim();
-                      if (newEmail.isEmpty) return;
-                      final sent = await controller.updateEmail(newEmail);
-                      if (sent && ctx.mounted) {
-                        Navigator.pop(ctx);
-                        _showOtpDialog(controller, newEmail, isDark);
-                      }
-                    },
-                  )),
-              _cancelButton(ctx, isDark),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -703,77 +723,70 @@ class MyInformationView extends StatelessWidget {
     showDialog(
       context: Get.context!,
       barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
-        child: Container(
-          padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1B1D27) : Colors.white,
-            borderRadius: BorderRadius.circular(20.r),
-            // Hairline lifts the surface off a dark background, and the
-            // shadow gives the dialog depth over the dimmed page.
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.black.withValues(alpha: 0.04),
+      builder: (ctx) => _dialogShell(
+        ctx: ctx,
+        isDark: isDark,
+        icon: Icons.verified_user_outlined,
+        title: 'Verify Email',
+        subtitle: 'Enter the 6-digit code we just sent you.',
+        children: [
+          Center(
+            child: Text.rich(
+              TextSpan(
+                text: 'Code sent to\n',
+                children: [
+                  TextSpan(
+                    text: email,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                    ),
+                  ),
+                ],
+              ),
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w300,
+                height: 1.6,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+              ),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
-              ),
-            ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _dialogHeader(
-                ctx,
-                'Verify Email',
-                isDark,
-                icon: Icons.verified_user_outlined,
-                subtitle: 'Enter the 6-digit code we just sent you.',
-              ),
-              Text(
-                'Enter the OTP sent to\n$email',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 13.sp,
-                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                  fontWeight: FontWeight.w400,
-                  height: 1.4,
-                ),
-              ),
-              SizedBox(height: 20.h),
-              TextField(
-                controller: otpCtrl,
-                autofocus: true,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                maxLength: 6,
-                style: _fieldTextStyle(isDark),
-                decoration: _fieldDecoration(hint: 'Enter OTP', isDark: isDark)
-                    .copyWith(counterText: ''),
-              ),
-              SizedBox(height: 20.h),
-              Obx(() => _saveButton(
-                    label: 'Verify',
-                    loading: controller.isVerifyingOtp.value,
-                    onPressed: () async {
-                      final otp = otpCtrl.text.trim();
-                      if (otp.isEmpty) return;
-                      final verified =
-                          await controller.verifyEmailOtp(email, otp);
-                      if (verified && ctx.mounted) Navigator.pop(ctx);
-                    },
-                  )),
-              _cancelButton(ctx, isDark),
-            ],
+          SizedBox(height: 18.h),
+          TextField(
+            controller: otpCtrl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            maxLength: 6,
+            // Wide tracking turns the single field into something that reads
+            // like a code entry rather than an ordinary text box.
+            style: GoogleFonts.poppins(
+              fontSize: 20.sp,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 10,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+            decoration: _fieldDecoration(hint: '••••••', isDark: isDark)
+                .copyWith(counterText: ''),
           ),
-        ),
+          SizedBox(height: 22.h),
+          Obx(() => _saveButton(
+                label: 'Verify',
+                loading: controller.isVerifyingOtp.value,
+                onPressed: () async {
+                  final otp = otpCtrl.text.trim();
+                  if (otp.isEmpty) return;
+                  final verified = await controller.verifyEmailOtp(email, otp);
+                  if (verified && ctx.mounted) Navigator.pop(ctx);
+                },
+              )),
+          _cancelButton(ctx, isDark),
+        ],
       ),
     );
   }
 }
+

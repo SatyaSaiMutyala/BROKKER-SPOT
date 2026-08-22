@@ -124,11 +124,14 @@ class WishlistController extends GetxController {
   ///
   /// Always re-fetches — unlike the cached lists elsewhere, this one changes
   /// from any screen with a heart on it, so a cached page is routinely wrong.
-  /// Marks the feed stale first so the grid shows skeletons for the whole
-  /// fetch instead of rendering the previous page and then correcting itself.
+  ///
+  /// The refetch is silent: the grid keeps showing what it has and swaps in
+  /// the new page when it lands. It used to flag the list stale first, which
+  /// blanked it to skeletons on every open even when nothing had changed. The
+  /// skeletons still appear on a genuinely empty first load, since the view
+  /// gates them on `items.isEmpty` too.
   Future<void> reload() {
     if (isLoading.value) return Future.value(); // one in flight already
-    isStale.value = true;
     return load(force: true);
   }
 

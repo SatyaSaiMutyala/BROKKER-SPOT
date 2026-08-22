@@ -8,8 +8,11 @@ import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_filter_bar.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_card_skeleton.dart';
+import 'package:brokkerspot/widgets/announcements/guest_locked_card.dart';
+import 'package:brokkerspot/views/auth/view/login_view.dart';
 import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
+import 'package:brokkerspot/core/services/route_observer.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/home/search_view.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart'
@@ -34,7 +37,8 @@ class BrokerProjectsView extends StatefulWidget {
   State<BrokerProjectsView> createState() => _BrokerProjectsViewState();
 }
 
-class _BrokerProjectsViewState extends State<BrokerProjectsView> {
+class _BrokerProjectsViewState extends State<BrokerProjectsView>
+    with RouteAware {
   final _controller = AnnouncementListController.to;
   final _profileCtrl = Get.isRegistered<ProfileController>()
       ? Get.find<ProfileController>()
@@ -45,10 +49,6 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   String? _selectedPropertyType;
 
   bool get _isGuest => !LocalStorageService.isLoggedIn();
-
-  /// Set once the guest has been told that more listings need an account, so
-  /// the dialog doesn't reappear every time they scroll back to the bottom.
-  bool _guestLoginPromptShown = false;
 
   /// Whether the backend actually holds more announcements than the guest cap
   /// renders — either we fetched more than we show, or more pages exist.
@@ -75,47 +75,58 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    appRouteObserver.unsubscribe(this);
     super.dispose();
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is ModalRoute<void>) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  /// Back from a pushed route — same freshness check the user-side home feed
+  /// runs, since this screen reads the same cached `allAnnouncements` list and
+  /// went stale the same way.
+  ///
+  /// "Mine" is skipped: that list only changes through this account's own
+  /// actions, which already refresh it directly.
+  @override
+  void didPopNext() {
+    if (widget.showMineOnly) return;
+    _controller.refreshAllIfChanged(atTop: _isNearTop);
+  }
+
+  /// Near enough to the top that replacing page 1 costs no scroll context.
+  bool get _isNearTop =>
+      !_scrollController.hasClients || _scrollController.position.pixels < 600;
 
   void _onScroll() {
     if (!_scrollController.hasClients || widget.showMineOnly) return;
     final pos = _scrollController.position;
 
-    // Guests get a fixed, capped list instead of pagination. Hitting the end of
-    // it is the cue to explain that the rest of the feed needs an account.
-    // Tighter threshold than the paging one below: with only a handful of cards
-    // the whole scroll extent can be under 300px, which would fire on the very
-    // first drag.
-    if (_isGuest) {
-      if (pos.pixels >= pos.maxScrollExtent - 24) {
-        _promptGuestLoginForMore();
-      }
-      return;
-    }
+    // Guests get a fixed, capped list instead of pagination — the last card is
+    // frosted over with a login prompt, so there is nothing to page in and
+    // nothing to interrupt the scroll with.
+    if (_isGuest) return;
 
     if (pos.pixels >= pos.maxScrollExtent - 300 && _controller.hasMoreAll) {
       _controller.loadMoreAll();
     }
   }
 
-  /// Shows the "log in to see more" dialog the first time a guest reaches the
-  /// bottom of the capped feed. No-op when there is nothing more to show, or
-  /// once it has already been shown, or while another screen sits on top (a
-  /// scroll callback can land mid-navigation).
-  void _promptGuestLoginForMore() {
-    if (_guestLoginPromptShown || !mounted) return;
-    if (!_hasMoreBehindLogin) return;
-    if (ModalRoute.of(context)?.isCurrent != true) return;
-    _guestLoginPromptShown = true;
-    showLoginRequiredDialog(
-      context,
-      title: 'More Announcements Await',
-      message:
-          'You are viewing only $kGuestAnnouncementLimit of many announcements. '
-          'Log in or sign up to browse them all.',
-    );
-  }
+  /// The last card of a guest's capped feed is frosted over with a login
+  /// prompt instead of a dialog. Only when the backend really does hold more
+  /// than we render — otherwise a guest whose whole feed fits under the cap
+  /// would be teased with listings that don't exist.
+  bool _isLockedForGuest(int index, int cardEnd) =>
+      _isGuest &&
+      !widget.showMineOnly &&
+      _hasMoreBehindLogin &&
+      index == cardEnd - 1;
 
   void _onCreateTap() {
     if (_isGuest) {
@@ -175,6 +186,19 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
 
   // ── Header ────────────────────────────────────────────────────────────────
 
+  /// Create-announcement icon, in the variant made for the active theme.
+  ///
+  /// The artwork carries its own circular background, so it is swapped rather
+  /// than tinted. Note the file names read the opposite way round to what they
+  /// suggest: homeL is the dark-filled circle (for a dark screen) and homeD the
+  /// light-filled one (for a light screen).
+  Widget _createIcon(ThemeData theme) {
+    final asset = theme.brightness == Brightness.dark
+        ? 'assets/images/homeL.png'
+        : 'assets/images/homeD.png';
+    return Image.asset(asset, width: 35.w, height: 35.w);
+  }
+
   Widget _buildHeader(ThemeData theme) {
     if (widget.showMineOnly) {
       return Padding(
@@ -214,11 +238,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
               onTap: () =>
                   Get.to(() => const CreateAnnouncementView(fromBroker: true)),
               behavior: HitTestBehavior.opaque,
-              child: Image.asset(
-                'assets/images/home_add_icon.png',
-                width: 35.w,
-                height: 35.w,
-              ),
+              child: _createIcon(theme),
             ),
           ],
         ),
@@ -258,11 +278,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
           GestureDetector(
             onTap: _onCreateTap,
             behavior: HitTestBehavior.opaque,
-            child: Image.asset(
-              'assets/images/home_add_icon.png',
-              width: 35.w,
-              height: 35.w,
-            ),
+            child: _createIcon(theme),
           ),
         ],
       ),
@@ -367,19 +383,29 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView> {
             itemBuilder: (_, i) {
               if (i < cardEnd) {
                 final a = announcements[i];
+                final card = HomeAnnouncementCard(
+                  announcement: a,
+                  index: i,
+                  cardWidth: 344.w,
+                  cardHeight: 263.h,
+                  showBrokerageRow: true,
+                  // "My Announcements" lists this broker's own listings, so
+                  // the owner avatar in the corner would just be their own
+                  // photo on every card.
+                  showAvatar: !widget.showMineOnly,
+                  showOwnerAvatar: true,
+                  onTap: () => Get.to(
+                      () => BrokerAnnouncementDetailView(announcement: a)),
+                );
                 return Padding(
                   padding: EdgeInsets.only(bottom: 16.h),
                   child: RepaintBoundary(
-                    child: HomeAnnouncementCard(
-                      announcement: a,
-                      index: i,
-                      cardWidth: 344.w,
-                      cardHeight: 263.h,
-                      showBrokerageRow: true,
-                      showOwnerAvatar: true,
-                      onTap: () => Get.to(
-                          () => BrokerAnnouncementDetailView(announcement: a)),
-                    ),
+                    child: _isLockedForGuest(i, cardEnd)
+                        ? GuestLockedCard(
+                            onLoginTap: () => Get.to(() => LoginView()),
+                            child: card,
+                          )
+                        : card,
                   ),
                 );
               }

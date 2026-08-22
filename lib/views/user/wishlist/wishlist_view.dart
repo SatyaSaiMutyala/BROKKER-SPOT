@@ -6,12 +6,11 @@ import 'package:brokkerspot/views/user/announcements/announcement_detail_view.da
 import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.dart';
 import 'package:brokkerspot/widgets/announcements/home_filter_bar.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
-import 'package:brokkerspot/widgets/wishlist/wishlist_tile.dart';
+import 'package:brokkerspot/widgets/wishlist/wishlist_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shimmer/shimmer.dart';
 
 /// Saved announcements, three to a row.
 class WishlistView extends StatefulWidget {
@@ -185,16 +184,11 @@ class _WishlistViewState extends State<WishlistView> {
       SliverPadding(
         padding: EdgeInsets.symmetric(horizontal: _gutter),
         sliver: SliverGrid(
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: _tileGap,
-            crossAxisSpacing: _tileGap,
-            childAspectRatio: 1,
-          ),
+          gridDelegate: _cardGridDelegate,
           delegate: SliverChildBuilderDelegate(
             (_, i) {
               final a = items[i];
-              return WishlistTile(
+              return WishlistCard(
                 announcement: a,
                 onTap: () => Get.to(() => AnnouncementDetailView(
                       announcement: a,
@@ -217,52 +211,47 @@ class _WishlistViewState extends State<WishlistView> {
     ];
   }
 
+  /// Two cards to a row.
+  ///
+  /// The aspect ratio has to cover the photo plus the text block beneath it,
+  /// and is shared with the shimmer so both lay out identically — a mismatch
+  /// here is what makes a grid jump when the real data arrives.
+  SliverGridDelegate get _cardGridDelegate =>
+      SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12.h,
+        crossAxisSpacing: 12.w,
+        childAspectRatio: 0.72,
+      );
+
   Widget _skeletonGrid(bool isDark, {required int count}) {
     return SliverPadding(
       padding: EdgeInsets.symmetric(horizontal: _gutter),
       sliver: SliverGrid(
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: _tileGap,
-          crossAxisSpacing: _tileGap,
-          childAspectRatio: 1,
-        ),
+        gridDelegate: _cardGridDelegate,
         delegate: SliverChildBuilderDelegate(
-          (_, __) => _skeletonTile(isDark),
+          (_, __) => const WishlistCardShimmer(),
           childCount: count,
         ),
       ),
     );
   }
 
+  /// The next-page placeholder, laid out as one row of the same grid so it
+  /// lines up with the cards above it.
   Widget _skeletonRow(bool isDark) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: _gutter),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: List.generate(
-          3,
+          2,
           (i) => Expanded(
             child: Padding(
-              padding: EdgeInsets.only(right: i < 2 ? _tileGap : 0),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: _skeletonTile(isDark),
-              ),
+              padding: EdgeInsets.only(right: i == 0 ? 12.w : 0),
+              child: const WishlistCardShimmer(),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _skeletonTile(bool isDark) {
-    return Shimmer.fromColors(
-      baseColor: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
-      highlightColor: isDark ? Colors.grey.shade700 : Colors.grey.shade100,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(5.r),
         ),
       ),
     );
