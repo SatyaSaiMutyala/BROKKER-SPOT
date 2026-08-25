@@ -205,7 +205,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
     final name = cached.ownerName;
     final avatar = cached.brokerAvatarUrl;
-    if ((name != null && name.isNotEmpty) || (avatar != null && avatar.isNotEmpty)) {
+    if ((name != null && name.isNotEmpty) ||
+        (avatar != null && avatar.isNotEmpty)) {
       setState(() {
         _brokerName ??= name;
         _brokerAvatar ??= avatar;
@@ -553,8 +554,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               ),
             ),
 
-            // ── Floating top buttons (back, share, more) ──
-            _buildTopButtons(a, topPadding),
+            // ── Floating top buttons (back, dots, share/more) ──
+            _buildTopButtons(a, topPadding, totalPages),
 
             // ── Fixed bottom bar ──
             Positioned(
@@ -601,6 +602,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       carousel = PageView.builder(
         controller: _pageController,
         itemCount: totalPages,
+        physics: const NeverScrollableScrollPhysics(),
         onPageChanged: (i) => setState(() => _currentPage = i),
         itemBuilder: (_, i) {
           if (hasVideo && i == 0) {
@@ -635,222 +637,218 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       );
     }
 
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          carousel,
+    final pageWidth = MediaQuery.of(context).size.width;
 
-          // Gradient overlay: rgba(39,39,39,0.05) → #000000
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0x0D272727),
-                  Colors.black,
-                ],
-                stops: [0.0, 1.0],
-              ),
-            ),
-          ),
+    return GestureDetector(
+        onHorizontalDragUpdate: (details) {
+          if (totalPages <= 1) return;
+          final newOffset = (_pageController.offset - details.delta.dx)
+              .clamp(0.0, (totalPages - 1).toDouble() * pageWidth);
+          _pageController.jumpTo(newOffset);
+        },
+        onHorizontalDragEnd: (details) {
+          if (totalPages <= 1) return;
+          final velocity = details.primaryVelocity ?? 0;
+          if (velocity < -300 && _currentPage < totalPages - 1) {
+            _pageController.nextPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut);
+          } else if (velocity > 300 && _currentPage > 0) {
+            _pageController.previousPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut);
+          } else {
+            _pageController.animateToPage(_currentPage,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut);
+          }
+        },
+        child: SizedBox(
+          height: height,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              carousel,
 
-          // Prev arrow (left edge, vertically centered)
-          if (totalPages > 1)
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: GestureDetector(
-                  onTap: () => _currentPage > 0
-                      ? _pageController.previousPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut)
-                      : null,
-                  child: _navArrow(isLeft: true),
+              // Gradient overlay: rgba(39,39,39,0.05) → #000000
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0x0D272727),
+                      Colors.black,
+                    ],
+                    stops: [0.0, 1.0],
+                  ),
                 ),
               ),
-            ),
 
-          // Next arrow (right edge, vertically centered)
-          if (totalPages > 1)
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: GestureDetector(
-                  onTap: () => _currentPage < totalPages - 1
-                      ? _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut)
-                      : null,
-                  child: _navArrow(isLeft: false),
-                ),
-              ),
-            ),
+              // Prev/Next arrow tap buttons removed — swipe is the primary
+              // navigation; dots in the top bar show position instead.
+              // if (totalPages > 1) Positioned(left: 0, ..., child: _navArrow(isLeft: true)),
+              // if (totalPages > 1) Positioned(right: 0, ..., child: _navArrow(isLeft: false)),
 
-          // Bottom overlay: status pill + price/info + heart + image cluster
-          Positioned(
-            bottom: 20.h,
-            left: 14.w,
-            right: 14.w,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Status pill "ACTIVE • 15 MIN AGO"
-                if (a.status != null)
-                  AnnouncementHeroStatusPill(timeAgo: a.timeAgo),
-                SizedBox(height: 10.h),
-
-                // Price + info row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+              // Bottom overlay: status pill + price/info + heart + image cluster
+              Positioned(
+                bottom: 20.h,
+                left: 14.w,
+                right: 14.w,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Left: AED / Price / ListingType / Location
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            a.currency ?? 'AED',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w300,
-                              color: Colors.white,
-                              height: 1.0,
-                            ),
-                          ),
-                          SizedBox(height: 4.h),
-                          // The rent period rides beside the figure, as it does
-                          // on the feed card — a rent price without it is
-                          // ambiguous.
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                    // Status pill "ACTIVE • 15 MIN AGO"
+                    if (a.status != null)
+                      AnnouncementHeroStatusPill(timeAgo: a.timeAgo),
+                    SizedBox(height: 10.h),
+
+                    // Price + info row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Left: AED / Price / ListingType / Location
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                _formatPrice(a.price ?? 0),
+                                a.currency ?? 'AED',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 22.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFFDBC483),
+                                  fontSize: 14.sp,
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.white,
                                   height: 1.0,
                                 ),
                               ),
-                              if (rentPeriodLabel(a) != null) ...[
-                                SizedBox(width: 6.w),
-                                Padding(
-                                  padding: EdgeInsets.only(bottom: 1.h),
-                                  child: Text(
-                                    rentPeriodLabel(a)!,
+                              SizedBox(height: 4.h),
+                              // The rent period rides beside the figure, as it does
+                              // on the feed card — a rent price without it is
+                              // ambiguous.
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    _formatPrice(a.price ?? 0),
                                     style: GoogleFonts.poppins(
-                                      fontSize: 14.sp,
-                                      fontWeight: FontWeight.w400,
-                                      color: Colors.white70,
+                                      fontSize: 22.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFFDBC483),
                                       height: 1.0,
                                     ),
                                   ),
+                                  if (rentPeriodLabel(a) != null) ...[
+                                    SizedBox(width: 6.w),
+                                    Padding(
+                                      padding: EdgeInsets.only(bottom: 1.h),
+                                      child: Text(
+                                        rentPeriodLabel(a)!,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14.sp,
+                                          fontWeight: FontWeight.w400,
+                                          color: Colors.white70,
+                                          height: 1.0,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              SizedBox(height: 5.h),
+                              if (a.listingType != null ||
+                                  a.propertyType != null)
+                                Text(
+                                  [
+                                    if (a.listingType != null)
+                                      'For ${a.listingType}',
+                                    if (a.propertyType != null) a.propertyType!,
+                                  ].join(' • '),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16.sp,
+                                    fontWeight: FontWeight.w300,
+                                    color: Colors.white,
+                                    height: 1.0,
+                                  ),
                                 ),
-                              ],
+                              SizedBox(height: 6.h),
+                              if (_shortLocation(a).isNotEmpty)
+                                Row(
+                                  children: [
+                                    Icon(Icons.location_on_rounded,
+                                        size: 14.sp, color: AppColors.primary),
+                                    SizedBox(width: 4.w),
+                                    Expanded(
+                                      child: Text(
+                                        _shortLocation(a),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14.sp,
+                                          fontWeight: FontWeight.w300,
+                                          color: const Color(0xFF9E9E9E),
+                                          height: 1.0,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                             ],
                           ),
-                          SizedBox(height: 5.h),
-                          if (a.listingType != null || a.propertyType != null)
-                            Text(
-                              [
-                                if (a.listingType != null)
-                                  'For ${a.listingType}',
-                                if (a.propertyType != null) a.propertyType!,
-                              ].join(' • '),
-                              style: GoogleFonts.poppins(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w300,
-                                color: Colors.white,
-                                height: 1.0,
-                              ),
-                            ),
-                          SizedBox(height: 6.h),
-                          if (_shortLocation(a).isNotEmpty)
-                            Row(
-                              children: [
-                                Icon(Icons.location_on_rounded,
-                                    size: 14.sp, color: AppColors.primary),
-                                SizedBox(width: 4.w),
-                                Expanded(
-                                  child: Text(
-                                    _shortLocation(a),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14.sp,
-                                      fontWeight: FontWeight.w300,
-                                      color: const Color(0xFF9E9E9E),
-                                      height: 1.0,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    // Right: heart + image cluster
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Heart / wishlist icon.
-                        //
-                        // Hidden on an announcement this account owns, and on
-                        // the agreement screen's "View Property" (the only
-                        // place that sets backOnChat) — that opens a listing
-                        // the broker has just published, where saving it is
-                        // meaningless.
-                        if (!widget.isOwner && !widget.backOnChat) ...[
-                          Obx(() {
-                            final isWishlisted =
-                                _wishlistCtrl.isWishlisted(_data.id ?? '');
-                            return CustomIconButton(
-                              isDark: true,
-                              size: 35,
-                              onTap: _onWishlistTap,
-                              child: Icon(
-                                isWishlisted
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                size: 26.sp,
-                                color: isWishlisted
-                                    ? Colors.red.shade400
-                                    : Colors.white,
-                              ),
-                            );
-                          }),
-                          SizedBox(height: 10.h),
-                        ],
-                        GestureDetector(
-                          onTap: (hasImages || hasVideo)
-                              ? () => _openFullscreenGallery(
-                                  images, hasImages, hasVideo, a)
-                              : null,
-                          child: _buildImageCluster(a),
+                        // Right: heart + image cluster
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Heart / wishlist icon.
+                            //
+                            // Hidden on an announcement this account owns, and on
+                            // the agreement screen's "View Property" (the only
+                            // place that sets backOnChat) — that opens a listing
+                            // the broker has just published, where saving it is
+                            // meaningless.
+                            if (!widget.isOwner && !widget.backOnChat) ...[
+                              Obx(() {
+                                final isWishlisted =
+                                    _wishlistCtrl.isWishlisted(_data.id ?? '');
+                                return CustomIconButton(
+                                  isDark: true,
+                                  size: 35,
+                                  onTap: _onWishlistTap,
+                                  child: Icon(
+                                    isWishlisted
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    size: 26.sp,
+                                    color: isWishlisted
+                                        ? Colors.red.shade400
+                                        : Colors.white,
+                                  ),
+                                );
+                              }),
+                              SizedBox(height: 10.h),
+                            ],
+                            GestureDetector(
+                              onTap: (hasImages || hasVideo)
+                                  ? () => _openFullscreenGallery(
+                                      images, hasImages, hasVideo, a)
+                                  : null,
+                              child: _buildImageCluster(a),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        ));
   }
 
   Widget _buildImageCluster(AnnouncementModel a) {
@@ -928,7 +926,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
   // ── Top floating buttons ─────────────────────────────────────────────────────
 
-  Widget _buildTopButtons(AnnouncementModel a, double topPadding) {
+  Widget _buildTopButtons(
+      AnnouncementModel a, double topPadding, int totalPages) {
     return Positioned(
       top: topPadding + 10.h,
       left: 0,
@@ -943,11 +942,36 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               iconColor: const Color(0xD1FFFFFF),
               onTap: () => Navigator.of(context).pop(),
             ),
-            const Spacer(),
+            // Pagination dots — centered between back and the right edge
+            if (totalPages > 1)
+              Expanded(
+                child: Center(child: _buildPageDots(totalPages)),
+              )
+            else
+              const Spacer(),
             _buildMoreMenu(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPageDots(int totalPages) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(totalPages, (i) {
+        final active = i == _currentPage;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: EdgeInsets.symmetric(horizontal: 3.w),
+          width: active ? 20.w : 8.w,
+          height: 8.w,
+          decoration: BoxDecoration(
+            color: active ? Colors.white : Colors.white.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(4.r),
+          ),
+        );
+      }),
     );
   }
 
@@ -1189,7 +1213,8 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                         brokerName: peerName,
                         brokerAvatar: peerAvatar,
                         peerUserId: a.userId ?? widget.announcement.userId,
-                        userRole: 2, // viewer is always broker in !isOwner context
+                        userRole:
+                            2, // viewer is always broker in !isOwner context
                       );
                     },
                     child: Container(

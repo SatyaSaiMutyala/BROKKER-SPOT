@@ -8,6 +8,7 @@ import 'package:brokkerspot/views/user/announcements/announcement_detail_view.da
 import 'package:brokkerspot/views/user/announcements/controller/publish_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
+import 'package:brokkerspot/widgets/common/custom_primary_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -96,7 +97,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     // the persisted flag to keep step 3 lit.  Use the broker-scoped key so a
     // different broker's publication doesn't light up step 3 incorrectly.
     _published = LocalStorageService.isAnnouncementPublished(
-        widget.announcementId, brokerId: widget.brokerId);
+        widget.announcementId,
+        brokerId: widget.brokerId);
     _loadAnnouncement();
     // Pull the current status so a broker signature that landed while this
     // owner was away shows the completed timeline on open.
@@ -120,7 +122,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
       // the published state (status == 4) is sent once as a live broadcast and
       // is not re-sent on reconnect. If we missed that broadcast, seed
       // _published from the REST API instead — it always has the latest status.
-      if (!_published && widget.brokerId.isNotEmpty &&
+      if (!_published &&
+          widget.brokerId.isNotEmpty &&
           a.latestProposals != null) {
         final brokerPublished = a.latestProposals!.any(
           (p) => p.brokerId == widget.brokerId && (p.status ?? 0) >= 4,
@@ -128,8 +131,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
         if (brokerPublished) {
           _published = true;
           // Write the scoped key so future opens skip this fetch.
-          LocalStorageService.markAnnouncementPublished(
-              widget.announcementId, brokerId: widget.brokerId);
+          LocalStorageService.markAnnouncementPublished(widget.announcementId,
+              brokerId: widget.brokerId);
         }
       }
 
@@ -642,19 +645,61 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   // ── Timeline page ───────────────────────────────────────────────────────────
 
   Widget _buildTimeline() {
+    final isDark = _isDark;
     final dividerColor =
-        _isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade200;
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildPropertyCard(),
-          Divider(height: 1, thickness: 1, color: dividerColor),
-          SizedBox(height: 20.h),
-          _buildTimelineSteps(),
-          SizedBox(height: 40.h),
-        ],
-      ),
+        isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade200;
+    final containerBg = isDark ? const Color(0xFF0B0D12) : Colors.white;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+
+    final step2Done = _brokerSigned;
+    final canOpenProperty = widget.isOwner ? _isPublished : _bothSigned;
+
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildPropertyCard(),
+                Divider(height: 1, thickness: 1, color: dividerColor),
+                SizedBox(height: 20.h),
+                _buildTimelineSteps(),
+                SizedBox(height: 24.h),
+              ],
+            ),
+          ),
+        ),
+        Container(
+          color: containerBg,
+          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 12.h + bottomPad),
+          child: Row(
+            children: [
+              Expanded(
+                child: CustomPrimaryButton(
+                  title: 'View Contract',
+                  onPressed: _openContract,
+                  isDisabled: !step2Done,
+                  backgroundColor: AppColors.primary,
+                  radius: 30.r,
+                  height: 50.h,
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: CustomPrimaryButton(
+                  title: 'View Property',
+                  onPressed: _openProperty,
+                  isDisabled: !canOpenProperty,
+                  backgroundColor: AppColors.primary,
+                  radius: 30.r,
+                  height: 50.h,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -676,7 +721,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
       padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
       child: Row(
         children: [
-          _circleImage(thumb, size: 56.w, fallbackIcon: Icons.home_outlined),
+          _roundedImage(thumb, size: 72.w, fallbackIcon: Icons.home_outlined),
           SizedBox(width: 14.w),
           Expanded(
             child: Column(
@@ -756,9 +801,6 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
               ],
             ),
           ),
-          SizedBox(width: 12.w),
-          _circleImage(widget.counterpartyAvatar,
-              size: 46.w, fallbackIcon: Icons.person_outline),
         ],
       ),
     );
@@ -786,11 +828,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   Widget _buildTimelineSteps() {
     final step1Done = _ownerSigned;
     final step2Done = _brokerSigned;
-    // Step 3 only completes on actual publish, not on signing.
     final step3Done = _isPublished;
-    // The broker reaches the publish page once both sides have signed; the
-    // owner can open the live listing only after it's published.
-    final canOpenProperty = widget.isOwner ? _isPublished : _bothSigned;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -820,11 +858,6 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
             subtitle: widget.isOwner
                 ? 'Contract Signed by Broker'
                 : 'Contract Signed by You',
-            action: _timelineButton(
-              label: 'View Contract',
-              enabled: step2Done,
-              onTap: _openContract,
-            ),
           ),
           _timelineStep(
             number: 3,
@@ -835,11 +868,6 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
             subtitle: widget.isOwner
                 ? 'Your Property Published by Broker successfully'
                 : 'Owner Property Published by You successfully.',
-            action: _timelineButton(
-              label: 'View Property',
-              enabled: canOpenProperty,
-              onTap: _openProperty,
-            ),
           ),
         ],
       ),
@@ -937,38 +965,9 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     );
   }
 
-  Widget _timelineButton({
-    required String label,
-    required bool enabled,
-    required VoidCallback onTap,
-  }) {
-    final isDark = _isDark;
-    final disabledBg = isDark ? const Color(0xFF3A3F47) : Colors.grey.shade200;
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
-        decoration: BoxDecoration(
-          color: enabled ? AppColors.primary : disabledBg,
-          borderRadius: BorderRadius.circular(24.r),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w500,
-            color: enabled ? Colors.white : Colors.grey.shade500,
-            height: 1.0,
-          ),
-        ),
-      ),
-    );
-  }
-
   // ── Shared bits ─────────────────────────────────────────────────────────────
 
-  Widget _circleImage(String? url,
+  Widget _roundedImage(String? url,
       {required double size, required IconData fallbackIcon}) {
     final isDark = _isDark;
     final fallbackBg = isDark ? const Color(0xFF20242C) : Colors.grey.shade100;
@@ -978,27 +977,18 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: fallbackBg,
-        border: Border.all(color: AppColors.primary, width: 1),
       ),
       alignment: Alignment.center,
       child: Icon(fallbackIcon, size: size * 0.4, color: Colors.grey.shade500),
     );
     if (url == null || url.isEmpty) return fallback;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primary, width: 1),
-      ),
-      child: ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: url,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorWidget: (_, __, ___) => fallback,
-        ),
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorWidget: (_, __, ___) => fallback,
       ),
     );
   }
