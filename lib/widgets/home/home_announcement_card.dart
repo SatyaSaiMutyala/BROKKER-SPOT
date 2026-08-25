@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/utils/brokerage_label.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 
 /// Full-image dark overlay property card used on the Home and More screens.
@@ -54,29 +55,19 @@ class HomeAnnouncementCard extends StatelessWidget {
   // Strip sits flush below the image card — no overlap.
   static const _brokerageRowHeight = 40.0;
 
-  /// Text on the brokerage strip, which reads differently per listing type.
+  /// Line height for the two lines that ellipsise (type and location).
   ///
-  /// A sale is brokered on a percentage of the price; a rental on one month's
-  /// rent — a twelfth of a yearly figure, or the figure itself when the rent is
-  /// quoted monthly. The counterparty differs too, so the empty state names the
-  /// seller on a sale and the owner on a rental.
-  String get _brokerageLabel {
-    final currency = announcement.currency ?? 'AED';
-    final price = announcement.price ?? 0;
-    final isRent = (announcement.listingType ?? '').toLowerCase() == 'rent';
+  /// They used to run on a squeezed line box (0.9–1.0) to keep the block
+  /// compact. That reads fine while the text fits, because a paragraph is free
+  /// to paint outside its own bounds — but the moment it overflows and has to
+  /// ellipsise, the render object starts clipping to those bounds and shears
+  /// the tops off the letters. Poppins needs 1.4em (ascender 1050 + descender
+  /// 350 per 1000 em) to hold its glyphs, so this stays just above that.
+  static const _lineHeight = 1.45;
 
-    if (isRent) {
-      if (price <= 0) return 'No Owner Brokerage';
-      final isMonthly = (announcement.rentPeriod ?? '').toLowerCase() == 'monthly';
-      final oneMonth = isMonthly ? price : price / 12;
-      return 'Brokerage 1 Month ~ $currency ${_formatPrice(oneMonth)}';
-    }
-
-    final percent = announcement.brokkeragePercent;
-    if (percent == null) return 'No Seller Brokerage';
-    return 'Brokerage $percent% ~ $currency '
-        '${_formatPrice(price * percent / 100)}';
-  }
+  /// Text on the brokerage strip. Shared with the detail screens so the two
+  /// always read the same — see [brokerageLabel].
+  String get _brokerageLabel => brokerageLabel(announcement);
 
   String get _listingBadge {
     if (announcement.listingType == 'Sell') return 'FOR SELL';
@@ -165,20 +156,24 @@ class HomeAnnouncementCard extends StatelessWidget {
                           : null,
                     ),
 
-                    // Scrim for the overlaid text. Ramps to 70% black rather
-                    // than solid — a fully opaque stop reads as a black block
-                    // across the bottom of the photo.
+                    // Scrim for the overlaid text. A light wash over the whole
+                    // photo keeps the top badge and avatar readable, then it
+                    // ramps hard through the lower half where the price and
+                    // location sit — a bright photo used to swallow them. It
+                    // stops short of solid black, which would read as a bar
+                    // pasted across the bottom rather than part of the image.
                     const DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.transparent,
-                            Color(0x59000000), // 35%
-                            Color(0xB3000000), // 70%
+                            Color(0x1F000000), // 12%
+                            Color(0x33000000), // 20%
+                            Color(0x8C000000), // 55%
+                            Color(0xDB000000), // 86%
                           ],
-                          stops: [0.35, 0.72, 1.0],
+                          stops: [0.0, 0.32, 0.62, 1.0],
                         ),
                       ),
                     ),
@@ -315,7 +310,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                                               fontSize: 17.sp,
                                               fontWeight: FontWeight.w300,
                                               color: const Color(0xFFC8C8C8),
-                                              height: 0.9,
+                                              height: _lineHeight,
                                               letterSpacing: 0,
                                             ),
                                           ),
@@ -326,7 +321,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                                               fontSize: 17.sp,
                                               fontWeight: FontWeight.w300,
                                               color: Colors.white,
-                                              height: 0.9,
+                                              height: _lineHeight,
                                               letterSpacing: 0,
                                             ),
                                           ),
@@ -365,7 +360,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                                         fontSize: 14.sp,
                                         fontWeight: FontWeight.w300,
                                         color: const Color(0xFF9E9E9E),
-                                        height: 1.0,
+                                        height: _lineHeight,
                                         letterSpacing: 0,
                                       ),
                                     ),

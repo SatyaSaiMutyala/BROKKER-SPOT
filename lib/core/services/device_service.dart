@@ -33,6 +33,34 @@ class DeviceService {
     }
   }
 
+  /// Asks for notification permission, but only while the user still has an
+  /// answer left to give.
+  ///
+  /// Two reasons to stay quiet: permission is already granted, or they were
+  /// asked once and declined. Android reports a never-asked device and a
+  /// refused one identically — both come back `denied` — so the "already
+  /// asked" half is remembered locally rather than read from the platform.
+  static Future<void> ensureNotificationPermission() async {
+    final current = await FirebaseMessaging.instance.getNotificationSettings();
+    if (_isGranted(current.authorizationStatus)) {
+      await registerDevice();
+      return;
+    }
+    if (LocalStorageService.getNotificationPermissionAsked()) return;
+    await LocalStorageService.saveNotificationPermissionAsked(true);
+
+    final result = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    if (_isGranted(result.authorizationStatus)) await registerDevice();
+  }
+
+  static bool _isGranted(AuthorizationStatus status) =>
+      status == AuthorizationStatus.authorized ||
+      status == AuthorizationStatus.provisional;
+
   static Future<void> registerDevice() async {
     final fcmToken = await _getFcmToken();
     if (fcmToken == null) {

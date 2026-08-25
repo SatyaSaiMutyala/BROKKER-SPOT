@@ -51,7 +51,9 @@ class CustomHeader extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 12.h),
+            // Trimmed by the 9px the title's line box gained below, so the
+            // header keeps the height it always had.
+            padding: EdgeInsets.fromLTRB(14.w, 11.h, 14.w, 8.h),
             child: Row(
               children: [
                 if (leftWidget != null) ...[
@@ -65,7 +67,10 @@ class CustomHeader extends StatelessWidget {
                       fontSize: 20.sp,
                       fontWeight: FontWeight.w500,
                       color: textColor,
-                      height: 1.0,
+                      // A long title ellipsises, and an overflowing paragraph
+                      // clips to its own line box — at 1.0 that box is shorter
+                      // than Poppins' glyphs (1.4em) and shears their tops off.
+                      height: 1.45,
                       letterSpacing: 0,
                     ),
                     maxLines: 1,

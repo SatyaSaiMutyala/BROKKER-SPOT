@@ -74,3 +74,41 @@ Future<void> clearRoleScopedCache() async {
   }
   await AnnouncementCache.clear();
 }
+
+/// Re-pulls every priced list after the account currency changes.
+///
+/// The server converts prices into the caller's currency before returning
+/// them, so the instant that setting changes, every figure already fetched —
+/// in memory and on disk — is wrong. Clearing alone isn't enough: the feed,
+/// meetings and wishlist tabs sit in an IndexedStack whose `initState` ran
+/// once at launch and won't run again, so they are re-fetched here rather
+/// than left empty until something else happens to poke them.
+///
+/// Screens reached by a push (details, My Announcements, broker projects)
+/// need no help — [AnnouncementListController.clearAll] resets their
+/// loaded-flags, so they fetch on their next open.
+Future<void> reloadForCurrencyChange() async {
+  await AnnouncementCache.clear();
+
+  if (Get.isRegistered<AnnouncementListController>()) {
+    final announcements = AnnouncementListController.to;
+    announcements.clearAll();
+    await announcements.loadAll(force: true);
+  }
+  if (Get.isRegistered<WishlistController>()) {
+    final wishlist = WishlistController.to;
+    wishlist.clearAll();
+    await wishlist.load(force: true);
+  }
+  if (Get.isRegistered<MeetingController>()) {
+    final meetings = MeetingController.to;
+    meetings.clearAll();
+    await meetings.load(force: true);
+    await meetings.loadBroker(force: true);
+  }
+  // The search feed only exists while a filter is applied; clearing is enough,
+  // since re-applying a facet re-fetches from page one anyway.
+  if (Get.isRegistered<PropertySearchController>()) {
+    PropertySearchController.to.clearAll();
+  }
+}

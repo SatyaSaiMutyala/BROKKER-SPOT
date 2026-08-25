@@ -2,7 +2,6 @@ import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/models/property_filter_model.dart';
-import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -66,13 +65,13 @@ class HomeFilterBar extends StatelessWidget {
 
     // ── 3. Country ─────────────────────────────────────────────────────────
     // Backed by the same `country` name param the search endpoint already
-    // filters on (property_country regex in getAllAnnouncements). Unpicked,
-    // the chip shows the account's own country as a hint — it is a label, not
-    // an applied filter, so the feed still opens worldwide.
+    // filters on (property_country regex in getAllAnnouncements). Unpicked it
+    // reads simply "Country": the feed starts worldwide and only narrows once
+    // a country is actually chosen.
     chips.add(SizedBox(width: 8.w));
     chips.add(_chip(
       context: context,
-      label: filter.countryName ?? _profileCountry ?? 'Country',
+      label: filter.countryName ?? 'Country',
       isActive: filter.countryName != null,
       isDark: isDark,
       onTap: () => _showCountrySheet(context, isDark),
@@ -381,14 +380,6 @@ class HomeFilterBar extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  /// The signed-in account's country, used as the chip's resting label.
-  /// Null for guests and for accounts that predate signup sending `country`.
-  String? get _profileCountry {
-    if (!Get.isRegistered<ProfileController>()) return null;
-    final c = ProfileController.to.country;
-    return c.isEmpty ? null : c;
   }
 
   /// Placeholder chips shown while the country list loads.

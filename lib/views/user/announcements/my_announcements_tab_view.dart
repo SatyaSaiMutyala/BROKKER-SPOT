@@ -5,12 +5,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
+import 'package:brokkerspot/widgets/home/home_announcement_card_shimmer.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
 
@@ -238,33 +238,17 @@ class _ShimmerCardList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Shimmer.fromColors(
-      baseColor: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300,
-      highlightColor: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade100,
-      child: ListView.builder(
-        padding: EdgeInsets.symmetric(vertical: 8.h),
-        itemCount: 4,
-        itemBuilder: (_, __) => const _ShimmerCard(),
-      ),
-    );
-  }
-}
-
-class _ShimmerCard extends StatelessWidget {
-  const _ShimmerCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final blockColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300;
-
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-      height: 263.h,
-      decoration: BoxDecoration(
-        color: blockColor,
-        borderRadius: BorderRadius.circular(20.r),
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(vertical: 8.h),
+      itemCount: 4,
+      itemBuilder: (_, __) => Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        // These are the account's own listings, so the real cards carry no
+        // owner avatar — the placeholder shouldn't either.
+        child: HomeAnnouncementCardShimmer(
+          cardHeight: 263.h,
+          showAvatar: false,
+        ),
       ),
     );
   }

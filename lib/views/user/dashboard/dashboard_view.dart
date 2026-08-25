@@ -6,9 +6,8 @@ import 'package:brokkerspot/views/user/meeting/meeting_view.dart';
 import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.dart';
 import 'package:brokkerspot/views/user/wishlist/wishlist_view.dart';
 import 'package:brokkerspot/widgets/common/bottom_nav/bottom_nav.dart';
-import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
+// import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -44,25 +43,19 @@ class _DashboardViewState extends State<DashboardView> {
       const AccountView(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (widget.showLocationPicker) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const LocationPickerPopup(),
-        );
-        return;
-      }
+      // Location picker popup — disabled on request.
+      // if (widget.showLocationPicker) {
+      //   showDialog(
+      //     context: context,
+      //     barrierDismissible: false,
+      //     builder: (_) => const LocationPickerPopup(),
+      //   );
+      //   return;
+      // }
       await Future.delayed(const Duration(milliseconds: 1800));
       if (!mounted) return;
-      final result = await FirebaseMessaging.instance.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-      if (result.authorizationStatus == AuthorizationStatus.authorized ||
-          result.authorizationStatus == AuthorizationStatus.provisional) {
-        DeviceService.registerDevice();
-      }
+      // Prompts only until the user has actually answered it.
+      await DeviceService.ensureNotificationPermission();
     });
   }
 

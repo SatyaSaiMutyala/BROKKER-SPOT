@@ -207,6 +207,132 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
     ));
   }
 
+  // ── Leaving mid-creation ──────────────────────────────────────────────────
+
+  /// Anything the user has actually completed and would lose by walking away.
+  bool get _hasProgress => _stepFlags.any((done) => done);
+
+  /// Backing out of a half-filled form.
+  ///
+  /// The form used to keep its own state quietly and hand it back on the next
+  /// open, which meant nobody was ever asked what should happen to it. Now the
+  /// choice is explicit: keep the work as a real draft, or drop it.
+  Future<void> _handleBack() async {
+    if (widget.isEditing || !_hasProgress) {
+      Get.back();
+      return;
+    }
+
+    final keep = await _askSaveOrDiscard();
+    if (keep == null || !mounted) return; // dismissed — stay on the form
+
+    if (keep) {
+      await _saveDraft();
+      if (!mounted) return;
+    } else {
+      // Nothing kept: wipe the in-progress state so it can't reappear here or
+      // on the other side.
+      _ctrl.resetDraft();
+    }
+    Get.back();
+  }
+
+  /// Returns true to save, false to discard, null if dismissed.
+  Future<bool?> _askSaveOrDiscard() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    // Step 1 gates the header's Save Draft too — the server won't take a draft
+    // without it, so the choice here is between discarding and staying.
+    final canSave = _stepFlags[0];
+
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: isDark ? const Color(0xFF15181F) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(22.w, 24.h, 22.w, 18.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Leave this announcement?',
+                style: GoogleFonts.poppins(
+                  fontSize: 17.sp,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                canSave
+                    ? 'Keep what you have filled in as a draft, or discard it '
+                        'and start over next time.'
+                    : 'Complete "Property Info" before this can be kept as a '
+                        'draft. Leaving now discards what you have filled in.',
+                style: GoogleFonts.poppins(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w300,
+                  height: 1.5,
+                  color: isDark ? Colors.grey.shade400 : Colors.black54,
+                ),
+              ),
+              SizedBox(height: 22.h),
+              if (canSave) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 46.h,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30.r),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text(
+                      'Save in Draft',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10.h),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 46.h,
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30.r),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.grey.shade400 : Colors.black54,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     setState(() => _isSubmitting = true);
     _ctrl.setProposalsLimit(_proposalLimitValue);
@@ -380,7 +506,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                   ? 'Edit Announcement'
                   : 'Create Announcement',
               showBackButton: true,
-              onBack: () => Get.back(),
+              onBack: _handleBack,
               trailing: Builder(builder: (ctx) {
                 // Once every section is done there is nothing left to keep as
                 // a draft — Announce Now takes over, so Save Draft disappears

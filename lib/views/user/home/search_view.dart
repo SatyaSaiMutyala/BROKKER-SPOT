@@ -9,6 +9,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
+import 'package:brokkerspot/widgets/home/home_announcement_card_shimmer.dart';
 
 /// Server-driven property search. The search bar feeds the `search` query
 /// param; the filter button opens [FilterView] and its returned facets are
@@ -244,19 +245,12 @@ class _SearchViewState extends State<SearchView> {
   }
 
   Widget _buildShimmer(bool isDark) {
-    final color = isDark ? Colors.grey.shade800 : Colors.grey.shade300;
     return ListView.separated(
       physics: const NeverScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),
       itemCount: 3,
       separatorBuilder: (_, __) => SizedBox(height: 16.h),
-      itemBuilder: (_, __) => Container(
-        height: 263.h,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20.r),
-        ),
-      ),
+      itemBuilder: (_, __) => HomeAnnouncementCardShimmer(cardHeight: 263.h),
     );
   }
 }

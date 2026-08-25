@@ -1,5 +1,6 @@
 import 'package:brokkerspot/core/common_widget/full_screen_image_view.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/country_codes.dart';
 import 'package:brokkerspot/views/user/my_information/my_information_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:flutter/material.dart';
@@ -586,9 +587,14 @@ class MyInformationView extends StatelessWidget {
 
   void _showEditPhoneDialog(
       BuildContext context, MyInformationController controller) {
-    final codeCtrl = TextEditingController(
-        text: controller.countryCode.isEmpty ? '+' : controller.countryCode);
     final phoneCtrl = TextEditingController(text: controller.phone);
+
+    // The account may hold the code with or without its '+' — signup stores it
+    // without. Show it with one either way, and put it back the way it was
+    // found on save so editing a number never quietly reformats the code.
+    final stored = controller.countryCode.trim();
+    final storedHasPlus = stored.startsWith('+');
+    var code = stored.isEmpty || storedHasPlus ? stored : '+$stored';
 
     _showEditDialog(
       context: context,
@@ -599,42 +605,37 @@ class MyInformationView extends StatelessWidget {
       saveLabel: 'Save Changes',
       saving: controller.isSavingPhone,
       // Two inputs in the one slot — the dial code stays narrow beside the
-      // number so they read as a single field.
-      field: (isDark) => Row(
-        children: [
-          SizedBox(
-            width: 74.w,
-            child: TextField(
-              controller: codeCtrl,
-              keyboardType: TextInputType.phone,
-              textAlign: TextAlign.center,
-              style: _fieldTextStyle(isDark),
-              decoration: _fieldDecoration(
-                hint: '+91',
-                isDark: isDark,
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 8.w, vertical: 16.h),
+      // number so they read as a single field. IntrinsicHeight lets the picker
+      // match the text field's height exactly instead of guessing at it.
+      field: (isDark) => IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _DialCodeField(
+              initialCode: code,
+              isDark: isDark,
+              onChanged: (value) => code = value,
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: TextField(
+                controller: phoneCtrl,
+                autofocus: true,
+                keyboardType: TextInputType.phone,
+                style: _fieldTextStyle(isDark),
+                decoration:
+                    _fieldDecoration(hint: 'Phone number', isDark: isDark),
               ),
             ),
-          ),
-          SizedBox(width: 10.w),
-          Expanded(
-            child: TextField(
-              controller: phoneCtrl,
-              autofocus: true,
-              keyboardType: TextInputType.phone,
-              style: _fieldTextStyle(isDark),
-              decoration:
-                  _fieldDecoration(hint: 'Phone number', isDark: isDark),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
       onSave: () async {
         final phone = phoneCtrl.text.trim();
-        final code = codeCtrl.text.trim();
         if (phone.isEmpty) return false;
-        return controller.updatePhone(code, phone);
+        final outgoing =
+            storedHasPlus ? code : code.replaceFirst('+', '');
+        return controller.updatePhone(outgoing, phone);
       },
     );
   }
@@ -790,3 +791,102 @@ class MyInformationView extends StatelessWidget {
   }
 }
 
+
+/// Dial-code picker for the phone dialog — flag plus code, styled to sit
+/// flush beside the number field.
+///
+/// Kept stateful and local because [_showEditDialog] hands its `field` slot a
+/// plain builder: the dropdown has to redraw on its own when a code is
+/// picked, without rebuilding the whole dialog.
+class _DialCodeField extends StatefulWidget {
+  final String initialCode;
+  final bool isDark;
+  final ValueChanged<String> onChanged;
+
+  const _DialCodeField({
+    required this.initialCode,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  @override
+  State<_DialCodeField> createState() => _DialCodeFieldState();
+}
+
+class _DialCodeFieldState extends State<_DialCodeField> {
+  late final List<Map<String, String>> _codes;
+  late String _code;
+
+  @override
+  void initState() {
+    super.initState();
+    final saved = widget.initialCode.trim();
+    final known = kCountryDialCodes.any((c) => c['code'] == saved);
+    // An account can hold a code this list does not offer. Rather than let
+    // DropdownButton assert on a value with no matching item — or silently
+    // swap it for another country — carry it as its own entry.
+    _codes = known || saved.isEmpty
+        ? kCountryDialCodes
+        : [
+            {'flag': '🏳️', 'code': saved},
+            ...kCountryDialCodes,
+          ];
+    _code = saved.isEmpty ? kCountryDialCodes.first['code']! : saved;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+
+    return Container(
+      width: 106.w,
+      padding: EdgeInsets.symmetric(horizontal: 12.w),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E212B) : const Color(0xFFF6F6F4),
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _code,
+          isDense: true,
+          isExpanded: true,
+          dropdownColor: isDark ? const Color(0xFF1E212B) : Colors.white,
+          borderRadius: BorderRadius.circular(14.r),
+          menuMaxHeight: 320.h,
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 18.sp,
+            color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+          ),
+          style: GoogleFonts.poppins(fontSize: 14.sp, color: textColor),
+          items: _codes
+              .map((c) => DropdownMenuItem(
+                    value: c['code'],
+                    child: Text(
+                      '${c['flag']}  ${c['code']}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14.sp,
+                        color: textColor,
+                      ),
+                    ),
+                  ))
+              .toList(),
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() => _code = value);
+            widget.onChanged(value);
+          },
+        ),
+      ),
+    );
+  }
+}

@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/country_codes.dart';
+import 'package:brokkerspot/core/theme/borderless_input.dart';
 
 class NeedHelpView extends StatefulWidget {
   const NeedHelpView({super.key});
@@ -290,7 +291,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
             controller: _messageController,
             maxLines: 5,
             style: GoogleFonts.roboto(fontSize: 14.sp),
-            decoration: InputDecoration(
+            decoration: kBorderlessInput.copyWith(
               hintText: 'Write Your Message Here....',
               hintStyle: GoogleFonts.roboto(
                 fontSize: 13.sp,
@@ -298,7 +299,6 @@ class _NeedHelpViewState extends State<NeedHelpView> {
               ),
               contentPadding:
                   EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
-              border: InputBorder.none,
             ),
           ),
         ),

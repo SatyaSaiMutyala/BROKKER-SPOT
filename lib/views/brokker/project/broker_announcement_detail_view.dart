@@ -1,5 +1,8 @@
 import 'dart:ui';
 
+import 'package:brokkerspot/core/theme/borderless_input.dart';
+import 'package:brokkerspot/core/utils/brokerage_label.dart';
+import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -355,11 +358,10 @@ class _BrokerAnnouncementDetailViewState
                       data: a,
                       showActualDocs: true,
                       showPropertyName: true,
-                      // Listings opened from the Projects feed belong to
-                      // someone else, and the fee is what the broker stands to
-                      // earn on them. Their own announcements have no broker to
-                      // pay, so the card is left off there.
-                      showCommission: !_isOwnAnnouncement,
+                      // The fee is the broker's take either way — on a listing
+                      // from the feed and on one they posted themselves — so
+                      // the card shows on both, always from their side.
+                      showCommission: true,
                       commissionAsBroker: true,
                     ),
                     SizedBox(height: 90.h + bottomPad),
@@ -540,14 +542,37 @@ class _BrokerAnnouncementDetailViewState
                             ),
                           ),
                           SizedBox(height: 4.h),
-                          Text(
-                            _formatPrice(a.price ?? 0),
-                            style: GoogleFonts.poppins(
-                              fontSize: 22.sp,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFFDBC483),
-                              height: 1.0,
-                            ),
+                          // The rent period rides beside the figure, as it
+                          // does on the feed card — a rent price without it
+                          // is ambiguous.
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                _formatPrice(a.price ?? 0),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 22.sp,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFDBC483),
+                                  height: 1.0,
+                                ),
+                              ),
+                              if (rentPeriodLabel(a) != null) ...[
+                                SizedBox(width: 6.w),
+                                Padding(
+                                  padding: EdgeInsets.only(bottom: 1.h),
+                                  child: Text(
+                                    rentPeriodLabel(a)!,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w400,
+                                      color: Colors.white70,
+                                      height: 1.0,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           SizedBox(height: 5.h),
                           if (a.listingType != null || a.propertyType != null)
@@ -738,6 +763,54 @@ class _BrokerAnnouncementDetailViewState
     );
   }
 
+  /// Same action the user side puts on a draft — reopens the create form with
+  /// this announcement loaded, and pops back to the list once it is saved so
+  /// the row reflects whatever it became.
+  Widget _buildResumeDraftBar(bool isDark, double bottomPad) {
+    final barBg = isDark ? const Color(0xFF15181F) : Colors.white;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: barBg,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 12.h + bottomPad),
+      child: SizedBox(
+        width: double.infinity,
+        height: 52.h,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14.r),
+            ),
+          ),
+          onPressed: () => Get.to(() => CreateAnnouncementView(
+                announcement: _data,
+                fromBroker: true,
+              ))?.then((result) {
+            if (result == true && mounted) Get.back(result: true);
+          }),
+          child: Text(
+            'Complete Your Announcement',
+            style: GoogleFonts.poppins(
+              fontSize: 15.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Bottom bar (broker-specific) ───────────────────────────────────────────
 
   Widget _buildBottomBar(bool isDark, double bottomPad) {
@@ -762,8 +835,15 @@ class _BrokerAnnouncementDetailViewState
 
     // The bar's actions — chat with the owner, or send them a proposal — are
     // both about someone else's listing. On the broker's own announcement
-    // there is no counterparty, so the bar is dropped entirely.
-    if (_isOwnAnnouncement) return const SizedBox.shrink();
+    // there is no counterparty, so the bar is dropped entirely — except for a
+    // draft, which is unfinished work and needs the way back into the form
+    // that the user side already offers.
+    if (_isOwnAnnouncement) {
+      if ((_data.status ?? '').toLowerCase() == 'draft') {
+        return _buildResumeDraftBar(isDark, bottomPad);
+      }
+      return const SizedBox.shrink();
+    }
 
     final alreadySent = _proposalSent || _data.isProposalSent == true;
     final chatReady = _data.isChatAvailable == true;
@@ -1093,11 +1173,10 @@ class _ProposalSheetState extends State<_ProposalSheet> {
                       LengthLimitingTextInputFormatter(_maxLength)
                     ],
                     style: GoogleFonts.inter(fontSize: 13.sp, color: textColor),
-                    decoration: InputDecoration(
+                    decoration: kBorderlessInput.copyWith(
                       hintText: 'Write Here...',
                       hintStyle:
                           GoogleFonts.inter(fontSize: 13.sp, color: hintColor),
-                      border: InputBorder.none,
                       contentPadding: EdgeInsets.all(12.w),
                     ),
                   ),

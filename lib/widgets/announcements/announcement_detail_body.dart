@@ -13,6 +13,7 @@ import 'dart:ui' as ui show Gradient;
 
 import 'package:brokkerspot/core/common_widget/fullscreen_media_viewer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/utils/brokerage_label.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/controller/amenity_controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -58,6 +59,15 @@ class AnnouncementDetailBody extends StatefulWidget {
   /// the owner keeps the remainder. Off by default, which is the owner's view.
   final bool commissionAsBroker;
 
+  /// Shows the "Proposal Limit" row. It is the owner's own cap on how many
+  /// broker proposals they will take, so it means nothing to someone browsing
+  /// the feed. On by default to leave the broker screens as they were.
+  final bool showProposalLimit;
+
+  /// Shows the "Brokerage" percentage row. On by default; the user-side detail
+  /// screen turns it off, where the commission card already covers the fee.
+  final bool showBrokerage;
+
   const AnnouncementDetailBody({
     super.key,
     required this.data,
@@ -67,6 +77,8 @@ class AnnouncementDetailBody extends StatefulWidget {
     this.onBrokerChatTap,
     this.showPropertyName = false,
     this.commissionAsBroker = false,
+    this.showProposalLimit = true,
+    this.showBrokerage = true,
   });
 
   @override
@@ -111,9 +123,12 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
           SizedBox(height: 16.h),
           // Directly under the photo carousel, above the stats — the owner's
           // commission is the first thing they came to check.
-          if (widget.showCommission &&
-              a.brokkeragePercent != null &&
-              (a.brokkeragePercent ?? 0) > 0) ...[
+          //
+          // A rental never carries a percentage: its fee is one month's rent,
+          // worked out from the price, so a rent listing is gated on having a
+          // price rather than on a percent it was never asked for. Requiring
+          // the percent used to drop the card from every rental.
+          if (widget.showCommission && _hasCommission) ...[
             _buildCommissionCard(isDark),
             SizedBox(height: 10.h),
           ],
@@ -126,6 +141,13 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
       ),
     );
   }
+
+  /// Whether there is a fee worth breaking down: one month's rent on a rental,
+  /// a percentage of the price on a sale.
+  bool get _hasCommission => isRentListing(a)
+      ? (a.price ?? 0) > 0
+      : (a.brokkeragePercent ?? 0) > 0;
+
 
   // ── Stats card ─────────────────────────────────────────────────────────────
 
@@ -557,11 +579,11 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
     if (a.sqft != null) {
       items.add(_DetailItem(Icons.square_foot, 'Area', '${a.sqft} sqft'));
     }
-    if (a.proposalsLimit != null) {
+    if (widget.showProposalLimit && a.proposalsLimit != null) {
       items.add(_DetailItem(
           Icons.people_outline, 'Proposal Limit', '${a.proposalsLimit}'));
     }
-    if (a.brokkeragePercent != null) {
+    if (widget.showBrokerage && a.brokkeragePercent != null) {
       items.add(_DetailItem(
           Icons.percent, 'Brokerage', '${a.brokkeragePercent}%'));
     }
@@ -778,9 +800,15 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
           SizedBox(height: 14.h),
           _commissionRow(receiveLabel, '$currency ${_formatPrice(receive)}',
               labelColor),
-          SizedBox(height: 10.h),
-          _commissionRow(payLabel, '$currency ${_formatPrice(pay)}',
-              labelColor),
+          // The second row is the other party's side of the deal. An owner
+          // wants to see what the fee costs them, so theirs stays. A broker
+          // only needs their own take — what the owner walks away with is not
+          // their business, on a percentage or on a month's rent.
+          if (!forBroker) ...[
+            SizedBox(height: 10.h),
+            _commissionRow(payLabel, '$currency ${_formatPrice(pay)}',
+                labelColor),
+          ],
         ],
       ),
     );

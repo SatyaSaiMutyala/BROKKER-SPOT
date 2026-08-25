@@ -88,6 +88,10 @@ class ProfileController extends GetxController {
         } else {
           await getProfile();
         }
+        // Prices come back converted into the account currency, so everything
+        // already fetched is stale. Re-pull rather than leaving the user to
+        // find the old figures and refresh by hand.
+        await reloadForCurrencyChange();
         return true;
       }
       Get.snackbar(

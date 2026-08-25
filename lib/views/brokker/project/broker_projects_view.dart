@@ -7,6 +7,7 @@ import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_filter_bar.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
+import 'package:brokkerspot/widgets/home/home_announcement_card_shimmer.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_card_skeleton.dart';
 import 'package:brokkerspot/widgets/announcements/guest_locked_card.dart';
 import 'package:brokkerspot/views/auth/view/login_view.dart';
@@ -47,6 +48,14 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
 
   String? _selectedListingType;
   String? _selectedPropertyType;
+
+  /// `status` the backend files drafts under.
+  static const _draftStatus = 0;
+
+  /// Status filter for "My Announcements" — null is everything, [_draftStatus]
+  /// is drafts only. Applied server-side (`?status=`), unlike the listing and
+  /// property-type chips which sieve the page already fetched.
+  int? _selectedStatus;
 
   bool get _isGuest => !LocalStorageService.isLoggedIn();
 
@@ -175,6 +184,14 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                   setState(() => _selectedListingType = val),
               onPropertyTypeChanged: (type) =>
                   setState(() => _selectedPropertyType = type),
+              // Drafts only exist on the broker's own list.
+              showDraftChip: widget.showMineOnly,
+              draftSelected: _selectedStatus == _draftStatus,
+              onDraftChanged: (on) {
+                final status = on ? _draftStatus : null;
+                setState(() => _selectedStatus = status);
+                _controller.loadBrokerMine(status: status);
+              },
             ),
             SizedBox(height: 20.h),
             Expanded(child: _buildContent(theme)),
@@ -309,10 +326,17 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       final announcements = _filtered(rawList);
 
       Future<void> refresh() => isMine
-          ? _controller.loadBrokerMine(force: true)
+          ? _controller.loadBrokerMine(status: _selectedStatus, force: true)
           : _controller.loadAll(force: true);
 
-      if (isLoading && announcements.isEmpty) {
+      // Shimmer until the first fetch has actually come back. `isLoading` alone
+      // is still false while this screen waits for its postFrameCallback to
+      // fire the request, which used to flash "No announcements" before the
+      // spinner even started.
+      final settled = isMine
+          ? _controller.brokerMineSettled.value
+          : _controller.allSettled.value;
+      if ((isLoading || !settled) && announcements.isEmpty) {
         return _buildShimmer();
       }
       if (error != null && announcements.isEmpty) {
@@ -426,13 +450,11 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),
       itemCount: 2,
       separatorBuilder: (_, __) => SizedBox(height: 16.h),
-      itemBuilder: (_, __) => Container(
-        width: double.infinity,
-        height: 263.h,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade300,
-          borderRadius: BorderRadius.circular(20.r),
-        ),
+      itemBuilder: (_, __) => HomeAnnouncementCardShimmer(
+        cardHeight: 263.h,
+        // Mirrors the real cards below: strip always, avatar off on the
+        // broker's own listings.
+        showAvatar: !widget.showMineOnly,
       ),
     );
   }

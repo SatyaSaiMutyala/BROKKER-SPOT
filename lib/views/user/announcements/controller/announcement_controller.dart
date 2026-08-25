@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
@@ -197,7 +198,15 @@ class AnnouncementController extends GetxController {
   }
 
   // ── Draft persistence ──────────────────────────────────────────────────────
-  static const _draftKey = 'create_announcement_draft';
+
+  /// Scoped to the side the form is being filled on.
+  ///
+  /// The two sides post different announcements from the same account, so a
+  /// half-filled user-side form used to surface on the broker side the moment
+  /// Create Announcement was opened there — and vice versa. Keying by side
+  /// keeps each one's work to itself.
+  static String get _draftKey =>
+      'create_announcement_draft_${LocalStorageService.getLastSide()}';
 
   Future<void> saveDraft({
     String? propertyFor,

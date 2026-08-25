@@ -35,6 +35,14 @@ class AnnouncementListController extends GetxController {
   final isLoadingMoreAll = false.obs;
   final allError = Rxn<String>();
   bool _allLoaded = false;
+
+  /// Whether the first fetch of a list has finished, win or lose.
+  ///
+  /// Distinct from `isLoading`, which is still false in the gap between a feed
+  /// building and its `postFrameCallback` firing the request. A screen that
+  /// only checks `isLoading` shows "No announcements" across that gap, then
+  /// replaces it with a spinner — so the empty state flashes on every open.
+  final allSettled = false.obs;
   int _allPage = 1;
   int _allTotalPages = 1;
   static const int _allPerPage = 10;
@@ -129,6 +137,9 @@ class AnnouncementListController extends GetxController {
   final brokerMineError = Rxn<String>();
   bool _brokerMineLoaded = false;
 
+  /// First-fetch guard for the broker's own listings — see [allSettled].
+  final brokerMineSettled = false.obs;
+
   // Real-time "announcement published" updates -------------------------------
   bool _publishListening = false;
 
@@ -188,6 +199,7 @@ class AnnouncementListController extends GetxController {
       if (allAnnouncements.isEmpty) allError.value = e.toString();
     } finally {
       isLoadingAll.value = false;
+      allSettled.value = true;
     }
   }
 
@@ -307,9 +319,23 @@ class AnnouncementListController extends GetxController {
   /// Loads the broker's own announcements via `/user/announcements/fetch` —
   /// the backend returns the broker's posts when called from the broker side.
   /// Cache-first, then network. No network call if already loaded unless [force].
-  Future<void> loadBrokerMine({bool force = false}) async {
+  /// Status the broker's list is currently filtered to — null for "All".
+  /// Kept so a re-entry or a mutation refresh reloads the same view.
+  int? _brokerMineStatus;
+
+  Future<void> loadBrokerMine({int? status, bool force = false}) async {
     ensurePublishListening();
-    if (brokerMineAnnouncements.isEmpty) {
+
+    // Switching filters is a different list, so it always re-fetches. Only the
+    // unfiltered view is worth seeding from disk — the cache holds that one.
+    final statusChanged = status != _brokerMineStatus;
+    if (statusChanged) {
+      _brokerMineStatus = status;
+      _brokerMineLoaded = false;
+      brokerMineAnnouncements.clear();
+    }
+
+    if (status == null && brokerMineAnnouncements.isEmpty) {
       final cached = AnnouncementCache.readList(AnnouncementCache.keyBrokerMine);
       if (cached.isNotEmpty) {
         brokerMineAnnouncements
@@ -320,14 +346,17 @@ class AnnouncementListController extends GetxController {
     try {
       isLoadingBrokerMine.value = true;
       brokerMineError.value = null;
-      final result = await _repo.fetchAnnouncements();
+      final result = await _repo.fetchAnnouncements(status: status);
       brokerMineAnnouncements.assignAll(result.items);
-      AnnouncementCache.saveList(AnnouncementCache.keyBrokerMine, result.raw);
+      if (status == null) {
+        AnnouncementCache.saveList(AnnouncementCache.keyBrokerMine, result.raw);
+      }
       _brokerMineLoaded = true;
     } catch (e) {
       if (brokerMineAnnouncements.isEmpty) brokerMineError.value = e.toString();
     } finally {
       isLoadingBrokerMine.value = false;
+      brokerMineSettled.value = true;
     }
   }
 
@@ -340,7 +369,10 @@ class AnnouncementListController extends GetxController {
       if (_brokerLoaded) loadBroker(force: true),
       if (_mineLoaded) loadMine(status: _currentMineStatus, force: true),
       if (_homeLoaded) loadHome(force: true),
-      if (_brokerMineLoaded) loadBrokerMine(force: true),
+      // Keeps whatever status the broker's list is filtered to — passing none
+      // would quietly snap it back to "All".
+      if (_brokerMineLoaded)
+        loadBrokerMine(status: _brokerMineStatus, force: true),
     ]);
   }
 
@@ -368,6 +400,8 @@ class AnnouncementListController extends GetxController {
     brokerMineAnnouncements.clear();
     _mineCache.clear();
     _allLoaded = false;
+    allSettled.value = false;
+    brokerMineSettled.value = false;
     _brokerLoaded = false;
     _mineLoaded = false;
     _homeLoaded = false;

@@ -23,7 +23,7 @@ import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:brokkerspot/widgets/home/home_app_bar.dart';
 import 'package:brokkerspot/views/user/home/search_view.dart';
 import 'package:brokkerspot/views/user/settings/settings_view.dart';
-import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
+import 'package:brokkerspot/widgets/home/home_announcement_card_shimmer.dart';
 
 class HomeView extends StatefulWidget {
   final VoidCallback? onAccountTap;
@@ -91,15 +91,9 @@ class _HomeViewState extends State<HomeView> with RouteAware {
     _announcementCtrl.loadAll();
     _notificationCtrl.load();
 
-    // Default the country filter to the one picked at signup. The profile is
-    // usually still in flight here, so seed on whatever is already loaded and
-    // again when it arrives — seedDefaultCountry itself runs only once and
-    // won't overwrite a country the user has chosen.
-    _seedCountryFilter();
-    _profileWorker = ever(_profileCtrl.profileData, (_) => _seedCountryFilter());
+    // The country filter starts empty on purpose: the feed opens worldwide and
+    // only narrows once a country is picked from the chip.
   }
-
-  Worker? _profileWorker;
 
   @override
   void didChangeDependencies() {
@@ -126,13 +120,6 @@ class _HomeViewState extends State<HomeView> with RouteAware {
   bool get _isNearTop =>
       !_scrollController.hasClients || _scrollController.position.pixels < 600;
 
-  void _seedCountryFilter() {
-    if (_profileCtrl.isGuest) return;
-    final country = _profileCtrl.country;
-    if (country.isEmpty) return;
-    _searchCtrl.seedDefaultCountry(country);
-  }
-
   /// True when the user has typed a search query or applied filter facets.
   /// Drives which data source the feed shows.
   bool get _isFiltering => !_searchCtrl.filter.value.isEmpty;
@@ -142,7 +129,6 @@ class _HomeViewState extends State<HomeView> with RouteAware {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchTextCtrl.dispose();
-    _profileWorker?.dispose();
     appRouteObserver.unsubscribe(this);
     super.dispose();
   }
@@ -578,10 +564,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
   /// with ([_cardHeight], and the 20r corner the card's own container uses),
   /// so the placeholder can't drift out of step with them again.
   Widget _skeletonCard() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20.r),
-      child: ShimmerBox(width: double.infinity, height: _cardHeight),
-    );
+    return HomeAnnouncementCardShimmer(cardHeight: _cardHeight);
   }
 
   Widget _skeletonSliver({required int count}) {

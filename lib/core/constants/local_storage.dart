@@ -63,6 +63,16 @@ class LocalStorageService {
 
   static bool getDarkMode() => _prefs?.getBool('dark_mode') ?? false;
 
+  // Whether the notification permission prompt has already been put to the
+  // user. Android reports a never-asked device and a refused one identically,
+  // so the difference has to be remembered here — without it the prompt would
+  // reappear on every launch for anyone who said no.
+  static Future<void> saveNotificationPermissionAsked(bool value) async =>
+      _prefs?.setBool('notification_permission_asked', value);
+
+  static bool getNotificationPermissionAsked() =>
+      _prefs?.getBool('notification_permission_asked') ?? false;
+
   // Announcements a broker has published, remembered so both parties can
   // reopen the agreement/timeline from chat in a later session (the proposal
   // status may no longer report the signed state once published).

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/theme/borderless_input.dart';
 
 class BrokerReviewSheet extends StatefulWidget {
   final String brokerName;
@@ -141,11 +142,10 @@ class _BrokerReviewSheetState extends State<BrokerReviewSheet> {
                   maxLength: 100,
                   onChanged: (_) => setState(() {}),
                   style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black),
-                  decoration: InputDecoration(
+                  decoration: kBorderlessInput.copyWith(
                     hintText: 'Write here',
                     hintStyle: GoogleFonts.inter(
                         fontSize: 13.sp, color: Colors.grey.shade400),
-                    border: InputBorder.none,
                     contentPadding:
                         EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
                     counterText: '',

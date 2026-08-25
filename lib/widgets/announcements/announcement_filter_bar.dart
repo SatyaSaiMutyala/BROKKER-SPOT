@@ -21,6 +21,16 @@ class AnnouncementFilterBar extends StatelessWidget {
   /// Side inset, so a host screen can line the chips up with its own gutter.
   final double? horizontalPadding;
 
+  /// Whether the Draft chip rides in this bar. Only "My Announcements" has
+  /// drafts to filter — the public feeds never see them.
+  ///
+  /// Unlike the two above, which sieve the page already fetched, this one is a
+  /// server-side `?status=0`: a draft that hasn't been paged in yet would be
+  /// missed otherwise. [onDraftChanged] fires with the new state.
+  final bool showDraftChip;
+  final bool draftSelected;
+  final ValueChanged<bool>? onDraftChanged;
+
   const AnnouncementFilterBar({
     super.key,
     required this.selectedListingType,
@@ -28,6 +38,9 @@ class AnnouncementFilterBar extends StatelessWidget {
     required this.onListingTypeChanged,
     required this.onPropertyTypeChanged,
     this.horizontalPadding,
+    this.showDraftChip = false,
+    this.draftSelected = false,
+    this.onDraftChanged,
   });
 
   @override
@@ -52,6 +65,18 @@ class AnnouncementFilterBar extends StatelessWidget {
             isSelected: selectedListingType != null,
             isDark: isDark,
           ),
+          // Sits right after the listing chip, ahead of the property types —
+          // it narrows the whole list rather than picking a kind of property.
+          if (showDraftChip)
+            Padding(
+              padding: EdgeInsets.only(left: 8.w),
+              child: _chip(
+                label: 'Draft',
+                isSelected: draftSelected,
+                isDark: isDark,
+                onTap: () => onDraftChanged?.call(!draftSelected),
+              ),
+            ),
           ...propertyTypes.map((type) {
             final isSelected = selectedPropertyType == type;
             return Padding(

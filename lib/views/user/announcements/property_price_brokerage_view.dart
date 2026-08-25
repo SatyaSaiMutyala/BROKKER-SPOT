@@ -443,8 +443,10 @@ class _PropertyPriceBrokerageViewState
           _stepperButton(
             icon: Icons.remove,
             isDark: isDark,
+            // Stops at 1 while the toggle is on: 0% with commission enabled is
+            // the same contradiction the toggle itself already rules out.
             onTap: () {
-              if (_brokeragePercent > 0) setState(() => _brokeragePercent--);
+              if (_brokeragePercent > 1) setState(() => _brokeragePercent--);
             },
           ),
           Padding(
@@ -533,7 +535,14 @@ class _PropertyPriceBrokerageViewState
               value: _commissionEnabled,
               onChanged: (v) => setState(() {
                 _commissionEnabled = v;
-                if (!v) _brokeragePercent = 0;
+                // Switching it on means there *is* a fee, so the stepper opens
+                // at 1 rather than at 0 — which would have read as "enabled,
+                // but nothing to pay". Off zeroes it again.
+                if (v) {
+                  if (_brokeragePercent < 1) _brokeragePercent = 1;
+                } else {
+                  _brokeragePercent = 0;
+                }
               }),
               activeThumbColor: AppColors.primary,
               activeTrackColor: AppColors.primary.withValues(alpha: 0.4),

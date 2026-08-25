@@ -8,6 +8,7 @@ import 'package:brokkerspot/views/user/announcements/controller/announcement_lis
 import 'package:brokkerspot/views/user/home/search_view.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_filter_bar.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
+import 'package:brokkerspot/widgets/home/home_announcement_card_shimmer.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AnnouncementsView extends StatefulWidget {
@@ -140,7 +141,10 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
 
   Widget _buildBody(ThemeData theme) {
     return Obx(() {
-      if (_controller.isLoadingAll.value &&
+      // Same guard the broker feed uses: `isLoading` is still false in the gap
+      // before the postFrameCallback fires, and the empty state would flash
+      // there.
+      if ((_controller.isLoadingAll.value || !_controller.allSettled.value) &&
           _controller.allAnnouncements.isEmpty) {
         return _buildShimmer();
       }
@@ -240,14 +244,7 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
       padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 100.h),
       itemCount: 2,
       separatorBuilder: (_, __) => SizedBox(height: 16.h),
-      itemBuilder: (_, __) => Container(
-        width: double.infinity,
-        height: 263.h,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade300,
-          borderRadius: BorderRadius.circular(20.r),
-        ),
-      ),
+      itemBuilder: (_, __) => HomeAnnouncementCardShimmer(cardHeight: 263.h),
     );
   }
 }

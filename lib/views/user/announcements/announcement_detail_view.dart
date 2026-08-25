@@ -15,6 +15,7 @@ import 'package:brokkerspot/widgets/announcements/announcement_detail_body.dart'
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/core/common_widget/fullscreen_media_viewer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/utils/brokerage_label.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
@@ -540,6 +541,12 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                     // User-side screen only — the broker detail screens share
                     // this body and leave it off.
                     showPropertyName: true,
+                    // The limit is the owner's own setting. Opening a listing
+                    // from the feed, it is somebody else's housekeeping.
+                    showProposalLimit: widget.isOwner,
+                    // User side doesn't carry the percentage row at all — the
+                    // broker screens still do.
+                    showBrokerage: false,
                   ),
                   SizedBox(height: 90.h + bottomPad),
                 ],
@@ -721,14 +728,37 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                             ),
                           ),
                           SizedBox(height: 4.h),
-                          Text(
-                            _formatPrice(a.price ?? 0),
-                            style: GoogleFonts.poppins(
-                              fontSize: 22.sp,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFFDBC483),
-                              height: 1.0,
-                            ),
+                          // The rent period rides beside the figure, as it does
+                          // on the feed card — a rent price without it is
+                          // ambiguous.
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                _formatPrice(a.price ?? 0),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 22.sp,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFDBC483),
+                                  height: 1.0,
+                                ),
+                              ),
+                              if (rentPeriodLabel(a) != null) ...[
+                                SizedBox(width: 6.w),
+                                Padding(
+                                  padding: EdgeInsets.only(bottom: 1.h),
+                                  child: Text(
+                                    rentPeriodLabel(a)!,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w400,
+                                      color: Colors.white70,
+                                      height: 1.0,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           SizedBox(height: 5.h),
                           if (a.listingType != null || a.propertyType != null)

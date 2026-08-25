@@ -13,9 +13,8 @@ import 'package:brokkerspot/views/user/announcements/create_announcement_view.da
 // Replaced by the user dashboard's flat nav bar so both sides look identical.
 // import 'package:brokkerspot/widgets/common/floating_pill_nav_bar.dart';
 import 'package:brokkerspot/widgets/common/bottom_nav/bottom_nav.dart';
-import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
+// import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 // Sizing helpers (.w/.h/.r) were only used by the commented-out create button.
 // import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -46,27 +45,19 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     super.initState();
     controller.currentIndex.value = widget.initialIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (widget.showLocationPicker) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const LocationPickerPopup(),
-        );
-      } else {
-        // Wait for the dashboard's initial load to settle.
-        await Future.delayed(const Duration(milliseconds: 1800));
-        if (mounted) {
-          final result = await FirebaseMessaging.instance.requestPermission(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
-          if (result.authorizationStatus == AuthorizationStatus.authorized ||
-              result.authorizationStatus == AuthorizationStatus.provisional) {
-            DeviceService.registerDevice();
-          }
-        }
-      }
+      // Location picker popup — disabled on request.
+      // if (widget.showLocationPicker) {
+      //   showDialog(
+      //     context: context,
+      //     barrierDismissible: false,
+      //     builder: (_) => const LocationPickerPopup(),
+      //   );
+      // }
+
+      // Wait for the dashboard's initial load to settle.
+      await Future.delayed(const Duration(milliseconds: 1800));
+      // Prompts only until the user has actually answered it.
+      if (mounted) await DeviceService.ensureNotificationPermission();
       _showRejectedDialogIfNeeded();
     });
     // Listen for profile data changes (fires when API response arrives)

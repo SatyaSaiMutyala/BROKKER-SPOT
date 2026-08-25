@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/controllers/common_data_controller.dart';
+import 'package:brokkerspot/core/theme/borderless_input.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/controller/complete_profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/rules_screen.dart';
@@ -1208,12 +1209,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         inputFormatters: inputFormatters,
         onTap: () => _closeAllDropdowns(),
         style: GoogleFonts.poppins(fontSize: 14.sp, color: Colors.black87),
-        decoration: InputDecoration(
+        decoration: kBorderlessInput.copyWith(
           hintText: hint,
           hintStyle: GoogleFonts.poppins(fontSize: 14.sp, color: Colors.grey),
           contentPadding:
               EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-          border: InputBorder.none,
         ),
       ),
     );
