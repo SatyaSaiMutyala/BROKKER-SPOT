@@ -370,7 +370,7 @@ class _BrokerAnnouncementDetailViewState
               ),
 
               // ── Floating top buttons ──
-              _buildTopButtons(topPadding),
+              _buildTopButtons(topPadding, totalPages),
 
               // ── Fixed bottom bar ──
               Positioned(
@@ -446,6 +446,10 @@ class _BrokerAnnouncementDetailViewState
               : Image.asset(images[imgIdx],
                   width: double.infinity, height: height, fit: BoxFit.cover);
           return GestureDetector(
+            // Opaque so the whole page counts as the target — while the photo
+            // is still a shimmer placeholder there is nothing under the finger
+            // for deferToChild to land on.
+            behavior: HitTestBehavior.opaque,
             onTap: () => _openFullscreenGallery(images, hasImages, hasVideo, a),
             child: imageWidget,
           );
@@ -453,209 +457,209 @@ class _BrokerAnnouncementDetailViewState
       );
     }
 
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          carousel,
+    final pageWidth = MediaQuery.of(context).size.width;
 
-          // Gradient overlay — identical to user side.
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0x0D272727), Colors.black],
-                stops: [0.0, 1.0],
-              ),
-            ),
-          ),
+    // The hero drives its own paging, the way the user-side screen does. The
+    // PageView's own drag doesn't survive here — it sits inside a vertical
+    // scroll view, which claims the gesture first — so the drag is read here
+    // and pushed onto the controller.
+    return GestureDetector(
+      onHorizontalDragUpdate: (details) {
+        if (totalPages <= 1) return;
+        final newOffset = (_pageController.offset - details.delta.dx)
+            .clamp(0.0, (totalPages - 1).toDouble() * pageWidth);
+        _pageController.jumpTo(newOffset);
+      },
+      onHorizontalDragEnd: (details) {
+        if (totalPages <= 1) return;
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity < -300 && _currentPage < totalPages - 1) {
+          _pageController.nextPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut);
+        } else if (velocity > 300 && _currentPage > 0) {
+          _pageController.previousPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut);
+        } else {
+          _pageController.animateToPage(_currentPage,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut);
+        }
+      },
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            carousel,
 
-          // Prev arrow
-          if (totalPages > 1)
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: GestureDetector(
-                  onTap: () => _currentPage > 0
-                      ? _pageController.previousPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut)
-                      : null,
-                  child: _navArrow(isLeft: true),
+            // Gradient overlay — identical to user side.
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x0D272727), Colors.black],
+                  stops: [0.0, 1.0],
                 ),
               ),
             ),
 
-          // Next arrow
-          if (totalPages > 1)
+            // Prev/Next arrow tap buttons removed — swipe is the primary
+            // navigation and the dots in the top bar carry position, same as the
+            // user-side detail screen. They also sat over the photo and swallowed
+            // the tap that opens it full screen.
+
+            // Bottom overlay — matches user-side layout exactly.
             Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: GestureDetector(
-                  onTap: () => _currentPage < totalPages - 1
-                      ? _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut)
-                      : null,
-                  child: _navArrow(isLeft: false),
-                ),
-              ),
-            ),
+              bottom: 20.h,
+              left: 14.w,
+              right: 14.w,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Gradient time-ago pill (shared widget).
+                  if (a.status != null)
+                    AnnouncementHeroStatusPill(timeAgo: a.timeAgo),
+                  SizedBox(height: 10.h),
 
-          // Bottom overlay — matches user-side layout exactly.
-          Positioned(
-            bottom: 20.h,
-            left: 14.w,
-            right: 14.w,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Gradient time-ago pill (shared widget).
-                if (a.status != null)
-                  AnnouncementHeroStatusPill(timeAgo: a.timeAgo),
-                SizedBox(height: 10.h),
-
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    // Left: currency / price / listingType / location
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            a.currency ?? 'AED',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w300,
-                              color: Colors.white,
-                              height: 1.0,
-                            ),
-                          ),
-                          SizedBox(height: 4.h),
-                          // The rent period rides beside the figure, as it
-                          // does on the feed card — a rent price without it
-                          // is ambiguous.
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                _formatPrice(a.price ?? 0),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 22.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFFDBC483),
-                                  height: 1.0,
-                                ),
-                              ),
-                              if (rentPeriodLabel(a) != null) ...[
-                                SizedBox(width: 6.w),
-                                Padding(
-                                  padding: EdgeInsets.only(bottom: 1.h),
-                                  child: Text(
-                                    rentPeriodLabel(a)!,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14.sp,
-                                      fontWeight: FontWeight.w400,
-                                      color: Colors.white70,
-                                      height: 1.0,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          SizedBox(height: 5.h),
-                          if (a.listingType != null || a.propertyType != null)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Left: currency / price / listingType / location
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
                             Text(
-                              [
-                                if (a.listingType != null)
-                                  'For ${a.listingType}',
-                                if (a.propertyType != null) a.propertyType!,
-                              ].join(' • '),
+                              a.currency ?? 'AED',
                               style: GoogleFonts.poppins(
-                                fontSize: 16.sp,
+                                fontSize: 14.sp,
                                 fontWeight: FontWeight.w300,
                                 color: Colors.white,
                                 height: 1.0,
                               ),
                             ),
-                          SizedBox(height: 6.h),
-                          if (_shortLocation(a).isNotEmpty)
+                            SizedBox(height: 4.h),
+                            // The rent period rides beside the figure, as it
+                            // does on the feed card — a rent price without it
+                            // is ambiguous.
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Icon(Icons.location_on_rounded,
-                                    size: 14.sp, color: AppColors.primary),
-                                SizedBox(width: 4.w),
-                                Expanded(
-                                  child: Text(
-                                    _shortLocation(a),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14.sp,
-                                      fontWeight: FontWeight.w300,
-                                      color: const Color(0xFF9E9E9E),
-                                      height: 1.0,
-                                    ),
+                                Text(
+                                  _formatPrice(a.price ?? 0),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 22.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFFDBC483),
+                                    height: 1.0,
                                   ),
                                 ),
+                                if (rentPeriodLabel(a) != null) ...[
+                                  SizedBox(width: 6.w),
+                                  Padding(
+                                    padding: EdgeInsets.only(bottom: 1.h),
+                                    child: Text(
+                                      rentPeriodLabel(a)!,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w400,
+                                        color: Colors.white70,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
+                            SizedBox(height: 5.h),
+                            if (a.listingType != null || a.propertyType != null)
+                              Text(
+                                [
+                                  if (a.listingType != null)
+                                    'For ${a.listingType}',
+                                  if (a.propertyType != null) a.propertyType!,
+                                ].join(' • '),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.white,
+                                  height: 1.0,
+                                ),
+                              ),
+                            SizedBox(height: 6.h),
+                            if (_shortLocation(a).isNotEmpty)
+                              Row(
+                                children: [
+                                  Icon(Icons.location_on_rounded,
+                                      size: 14.sp, color: AppColors.primary),
+                                  SizedBox(width: 4.w),
+                                  Expanded(
+                                    child: Text(
+                                      _shortLocation(a),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w300,
+                                        color: const Color(0xFF9E9E9E),
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      // Right: wishlist heart + image cluster.
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Hidden on the broker's own listing — there is nothing
+                          // to save, and the endpoint rejects it anyway
+                          // ("Cannot add own announcement to wishlist"). Every
+                          // other listing opened here still shows it.
+                          if (!_isOwnAnnouncement) ...[
+                            CustomIconButton(
+                              isDark: true,
+                              size: 35,
+                              onTap: _onWishlistTap,
+                              child: Icon(
+                                _isWishlisted
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                size: 26.sp,
+                                color: _isWishlisted
+                                    ? Colors.red.shade400
+                                    : Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: 10.h),
+                          ],
+                          GestureDetector(
+                            onTap: (hasImages || hasVideo)
+                                ? () => _openFullscreenGallery(
+                                    images, hasImages, hasVideo, a)
+                                : null,
+                            child: _buildImageCluster(a),
+                          ),
                         ],
                       ),
-                    ),
-
-                    // Right: wishlist heart + image cluster.
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Hidden on the broker's own listing — there is nothing
-                        // to save, and the endpoint rejects it anyway
-                        // ("Cannot add own announcement to wishlist"). Every
-                        // other listing opened here still shows it.
-                        if (!_isOwnAnnouncement) ...[
-                          CustomIconButton(
-                            isDark: true,
-                            size: 35,
-                            onTap: _onWishlistTap,
-                            child: Icon(
-                              _isWishlisted
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              size: 26.sp,
-                              color: _isWishlisted
-                                  ? Colors.red.shade400
-                                  : Colors.white,
-                            ),
-                          ),
-                          SizedBox(height: 10.h),
-                        ],
-                        GestureDetector(
-                          onTap: (hasImages || hasVideo)
-                              ? () => _openFullscreenGallery(
-                                  images, hasImages, hasVideo, a)
-                              : null,
-                          child: _buildImageCluster(a),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -705,37 +709,9 @@ class _BrokerAnnouncementDetailViewState
     );
   }
 
-  Widget _navArrow({required bool isLeft}) {
-    return ClipRRect(
-      borderRadius: isLeft
-          ? BorderRadius.only(
-              topRight: Radius.circular(18.r),
-              bottomRight: Radius.circular(18.r))
-          : BorderRadius.only(
-              topLeft: Radius.circular(18.r),
-              bottomLeft: Radius.circular(18.r)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          width: 40.w,
-          height: 83.h,
-          color: const Color(0x40FFFFFF),
-          alignment: Alignment.center,
-          child: Icon(
-            isLeft
-                ? Icons.keyboard_double_arrow_left
-                : Icons.keyboard_double_arrow_right,
-            color: Colors.white,
-            size: 22.sp,
-          ),
-        ),
-      ),
-    );
-  }
-
   // ── Top buttons — same CustomBackButton as user detail view ────────────────
 
-  Widget _buildTopButtons(double topPadding) {
+  Widget _buildTopButtons(double topPadding, int totalPages) {
     return Positioned(
       top: topPadding + 10.h,
       left: 0,
@@ -749,7 +725,12 @@ class _BrokerAnnouncementDetailViewState
               iconColor: const Color(0xD1FFFFFF),
               onTap: _stopVideoAndPop,
             ),
-            const Spacer(),
+            // Pagination dots — centred between the back button and the right
+            // edge, matching the user-side detail screen.
+            if (totalPages > 1)
+              Expanded(child: Center(child: _buildPageDots(totalPages)))
+            else
+              const Spacer(),
             CustomIconButton(
               isDark: true,
               size: 35,
@@ -760,6 +741,25 @@ class _BrokerAnnouncementDetailViewState
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPageDots(int totalPages) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(totalPages, (i) {
+        final active = i == _currentPage;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: EdgeInsets.symmetric(horizontal: 3.w),
+          width: active ? 20.w : 8.w,
+          height: 8.w,
+          decoration: BoxDecoration(
+            color: active ? Colors.white : Colors.white.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(4.r),
+          ),
+        );
+      }),
     );
   }
 

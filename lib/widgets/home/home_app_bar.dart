@@ -1,21 +1,18 @@
 import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
-import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Shared home-screen app bar: avatar + greeting/location on the left,
-/// a notification+search pill on the right. Used by both the user and
-/// broker home screens so they stay visually identical.
+/// Shared home-screen app bar: avatar + greeting on the left, a
+/// notification+search pill on the right. Used by both the user and broker
+/// home screens so they stay visually identical.
 class HomeAppBar extends StatelessWidget {
   final String avatarUrl;
   final bool isAvatarLoading;
   final String greetingName;
   final bool isGreetingLoading;
-  final String location;
   final int notificationCount;
   final VoidCallback? onAvatarTap;
-  final VoidCallback? onLocationTap;
   final VoidCallback onNotificationTap;
   final VoidCallback onSearchTap;
 
@@ -25,10 +22,8 @@ class HomeAppBar extends StatelessWidget {
     this.isAvatarLoading = false,
     required this.greetingName,
     this.isGreetingLoading = false,
-    required this.location,
     required this.notificationCount,
     this.onAvatarTap,
-    this.onLocationTap,
     required this.onNotificationTap,
     required this.onSearchTap,
   });
@@ -41,6 +36,9 @@ class HomeAppBar extends StatelessWidget {
         GestureDetector(
           onTap: onAvatarTap,
           child: Row(
+            // The greeting is a single line now that the country came out, so
+            // it lines up on the avatar's middle instead of its top edge.
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Avatar — 41×41 with 1px #DBC483 border
               Container(
@@ -69,54 +67,26 @@ class HomeAppBar extends StatelessWidget {
                 ),
               ),
               SizedBox(width: 12.w),
-              // Greeting + location
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isGreetingLoading) ...[
-                    ShimmerBox(
-                        width: 120.w,
-                        height: 18.h,
-                        borderRadius: BorderRadius.circular(4.r)),
-                    SizedBox(height: 4.h),
-                    ShimmerBox(
-                        width: 80.w,
-                        height: 14.h,
-                        borderRadius: BorderRadius.circular(4.r)),
-                  ] else ...[
-                    Text(
-                      'Hi, $greetingName',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w500,
-                        color: theme.colorScheme.onSurface,
-                        letterSpacing: 14 * 0.075,
-                        height: 1.0,
-                      ),
-                    ),
-                    SizedBox(height: 2.h),
-                    GestureDetector(
-                      onTap: onLocationTap,
-                      child: Row(
-                        children: [
-                          Icon(Icons.location_on_rounded,
-                              size: 15.sp, color: AppColors.primary),
-                          SizedBox(width: 2.w),
-                          Text(
-                            location,
-                            style: GoogleFonts.poppins(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w300,
-                              color: theme.colorScheme.onSurface,
-                              height: 1.0,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+              if (isGreetingLoading)
+                // Tracks the text's own box: 18sp on a 1.35 line.
+                ShimmerBox(
+                  width: 140.w,
+                  height: 24.h,
+                  borderRadius: BorderRadius.circular(4.r),
+                )
+              else
+                Text(
+                  'Hi, $greetingName',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface,
+                    letterSpacing: 18 * 0.05,
+                    // Poppins needs 1.4em for its glyphs; a tight box shears
+                    // the tops off once a long name ellipsises.
+                    height: 1.35,
+                  ),
+                ),
             ],
           ),
         ),

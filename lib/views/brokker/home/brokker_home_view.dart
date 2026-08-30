@@ -94,8 +94,7 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
         greetingName: _profileCtrl.userName.value.isNotEmpty
             ? _profileCtrl.userName.value.split(' ').first
             : 'Guest',
-        isGreetingLoading: isLoading,
-        location: 'Dubai',
+        isGreetingLoading: isLoading,
         notificationCount: _notificationCtrl.unseenCount.value,
         onAvatarTap: () {
           if (LocalStorageService.isLoggedIn()) {

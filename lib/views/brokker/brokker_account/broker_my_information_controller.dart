@@ -1,18 +1,16 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
+import 'package:brokkerspot/core/services/profile_image_picker.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/model/complete_profile_model.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/repo/complete_profile_repo.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
 
 class BrokerMyInformationController extends GetxController {
   final ProfileController _profileCtrl = Get.find<ProfileController>();
   final CompleteProfileRepo _repo = CompleteProfileRepo();
-  final ImagePicker _picker = ImagePicker();
 
   RxBool isUploadingImage = false.obs;
   RxBool isSavingName = false.obs;
@@ -80,21 +78,11 @@ class BrokerMyInformationController extends GetxController {
 
   // ─── Upload Profile Image ───
   Future<void> pickAndUploadImage() async {
-    XFile? picked;
-    try {
-      picked = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
-        maxWidth: 1024,
-        maxHeight: 1024,
-      );
-    } catch (e) {
-      AppToast.error('Permission denied. Please allow photo access in Settings.');
-      return;
-    }
-    if (picked == null) return;
+    // Picks, then hands the user the circular crop before anything uploads —
+    // the avatar is a circle, so the framing is theirs to choose.
+    final file = await ProfileImagePicker.pickAndCrop();
+    if (file == null) return; // cancelled at the picker or the crop step
 
-    final file = File(picked.path);
     isUploadingImage.value = true;
     try {
       final response = await uploadFile(

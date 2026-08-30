@@ -394,7 +394,11 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     _showPickerDialog(
       isDark: isDark,
+      title: 'Set Broker Proposal Limit',
+      subtitle: 'How many brokers may pitch for this listing. '
+          'Pick No limit to leave it open.',
       options: [_noProposalLimit, '10', '20', '50', '100', '500'],
+      selected: _brokerProposalLimit ?? _noProposalLimit,
       onSelect: (option) {
         final noLimit = option == _noProposalLimit;
         setState(() {
@@ -411,46 +415,137 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
     _showBrokerProposalLimitDialog(onChosen: _submit);
   }
 
+  /// Option picker, styled like the My Information edit dialogs so the app
+  /// speaks with one voice: titled header, hairline rule, then the choices —
+  /// the one already in force carried in gold rather than left to guess at.
   void _showPickerDialog({
     required bool isDark,
+    required String title,
+    required String subtitle,
     required List<String> options,
+    required String? selected,
     required ValueChanged<String> onSelect,
   }) {
-    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final dividerColor =
-        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100;
-    final textColor = isDark ? Colors.white : Colors.black87;
+    final surface = isDark ? const Color(0xFF15171F) : Colors.white;
+    final hairline = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.07);
+    final titleColor = isDark ? Colors.white : const Color(0xFF16181F);
+    final subtitleColor =
+        isDark ? Colors.grey.shade500 : const Color(0xFF7A7D87);
+    final optionColor = isDark ? Colors.white : const Color(0xFF23262E);
 
     showDialog(
       context: context,
-      builder: (_) => Dialog(
-        backgroundColor: bgColor,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: options.map((option) {
-            return InkWell(
-              borderRadius: BorderRadius.circular(12.r),
-              onTap: () {
-                Navigator.pop(context);
-                onSelect(option);
-              },
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 18.h),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: dividerColor, width: 1),
-                  ),
-                ),
-                child: Text(
-                  option,
-                  style: GoogleFonts.inter(fontSize: 15.sp, color: textColor),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(horizontal: 26.w),
+        child: Container(
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(18.r),
+            border: Border.all(color: hairline),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.14),
+                blurRadius: 30,
+                offset: const Offset(0, 14),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(22.w, 20.h, 22.w, 16.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 17.sp,
+                        fontWeight: FontWeight.w600,
+                        color: titleColor,
+                        height: 1.2,
+                      ),
+                    ),
+                    SizedBox(height: 5.h),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11.5.sp,
+                        fontWeight: FontWeight.w300,
+                        height: 1.4,
+                        color: subtitleColor,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            );
-          }).toList(),
+              Divider(height: 1, thickness: 1, color: hairline),
+              Padding(
+                padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 14.h),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: options.map((option) {
+                    final isActive = option == selected;
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: 6.h),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12.r),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          onSelect(option);
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 16.w, vertical: 14.h),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? AppColors.primary.withValues(alpha: 0.14)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(
+                              color: isActive
+                                  ? AppColors.primary
+                                  : (isDark
+                                      ? Colors.white.withValues(alpha: 0.07)
+                                      : Colors.black.withValues(alpha: 0.06)),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  option,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14.sp,
+                                    fontWeight: isActive
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                    color: isActive
+                                        ? AppColors.primary
+                                        : optionColor,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                              if (isActive)
+                                Icon(Icons.check_rounded,
+                                    size: 17.sp, color: AppColors.primary),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

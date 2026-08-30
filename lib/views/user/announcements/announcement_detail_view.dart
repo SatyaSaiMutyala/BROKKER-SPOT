@@ -269,6 +269,30 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
   // ── Three-dot popup menu ────────────────────────────────────────────────────
 
+  /// Top-right actions.
+  ///
+  /// Share is a button rather than a menu row — the same one the broker detail
+  /// screen carries. On somebody else's listing that is the whole of it, since
+  /// the menu held nothing else; on the owner's own it sits to the left of the
+  /// menu, which keeps Edit and Delete.
+  Widget _buildTopRightAction() {
+    final share = CustomIconButton(
+      isDark: true,
+      size: 35,
+      onTap: () {},
+      child: Icon(Icons.share_outlined, size: 16.sp, color: Colors.white),
+    );
+    if (!widget.isOwner) return share;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        share,
+        SizedBox(width: 8.w),
+        _buildMoreMenu(),
+      ],
+    );
+  }
+
   Widget _buildMoreMenu() {
     return PopupMenuButton<String>(
       onSelected: (value) {
@@ -286,12 +310,11 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
       offset: const Offset(0, 48),
+      // Share moved out to its own button beside this one, so the menu is now
+      // only the owner's two destructive-ish actions.
       itemBuilder: (_) => [
-        _popupItem(value: 'share', label: 'Share'),
-        if (widget.isOwner) ...[
-          _popupItem(value: 'edit', label: 'Edit'),
-          _popupItem(value: 'delete', label: 'Delete', color: Colors.red),
-        ],
+        _popupItem(value: 'edit', label: 'Edit'),
+        _popupItem(value: 'delete', label: 'Delete', color: Colors.red),
       ],
       child: CustomIconButton(
         isDark: true,
@@ -894,36 +917,6 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     );
   }
 
-  Widget _navArrow({required bool isLeft}) {
-    return ClipRRect(
-      borderRadius: isLeft
-          ? BorderRadius.only(
-              topRight: Radius.circular(18.r),
-              bottomRight: Radius.circular(18.r),
-            )
-          : BorderRadius.only(
-              topLeft: Radius.circular(18.r),
-              bottomLeft: Radius.circular(18.r),
-            ),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          width: 40.w,
-          height: 83.h,
-          color: const Color(0x40FFFFFF),
-          alignment: Alignment.center,
-          child: Icon(
-            isLeft
-                ? Icons.keyboard_double_arrow_left
-                : Icons.keyboard_double_arrow_right,
-            color: Colors.white,
-            size: 22.sp,
-          ),
-        ),
-      ),
-    );
-  }
-
   // ── Top floating buttons ─────────────────────────────────────────────────────
 
   Widget _buildTopButtons(
@@ -949,7 +942,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               )
             else
               const Spacer(),
-            _buildMoreMenu(),
+            _buildTopRightAction(),
           ],
         ),
       ),

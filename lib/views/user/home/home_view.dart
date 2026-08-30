@@ -22,7 +22,6 @@ import 'package:brokkerspot/widgets/home/story_circle.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:brokkerspot/widgets/home/home_app_bar.dart';
 import 'package:brokkerspot/views/user/home/search_view.dart';
-import 'package:brokkerspot/views/user/settings/settings_view.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card_shimmer.dart';
 
 class HomeView extends StatefulWidget {
@@ -253,15 +252,8 @@ class _HomeViewState extends State<HomeView> with RouteAware {
             ? 'Guest'
             : _profileCtrl.userName.value.split(' ').first,
         isGreetingLoading: isProfileLoading,
-        // The account's country from /me. Guests have no profile, and accounts
-        // created before signup started sending `country` have none stored, so
-        // both fall back to the previous fixed label rather than a blank.
-        location: _profileCtrl.isGuest || _profileCtrl.country.isEmpty
-            ? 'Dubai'
-            : _profileCtrl.country,
         notificationCount: _notificationCtrl.unseenCount.value,
         onAvatarTap: () => widget.onAccountTap?.call(),
-        onLocationTap: () => Get.to(() => SettingsView()),
         onNotificationTap: () => Get.to(() => const NotificationsView()),
         onSearchTap: () => Get.to(() => const SearchView()),
       );

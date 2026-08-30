@@ -64,17 +64,21 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   final ImagePicker _picker = ImagePicker();
   File? _videoFile;
   String? _existingVideoUrl;
-  final List<File?> _imageFiles = List.filled(12, null);
-  final List<String?> _existingImageUrls = List.filled(12, null);
+  final List<File?> _imageFiles = List.filled(_maxImages, null);
+  final List<String?> _existingImageUrls = List.filled(_maxImages, null);
   bool _isUploading = false;
   int _uploadedCount = 0;
   int _totalToUpload = 0;
 
   static const int _maxVideoBytes = 50 * 1024 * 1024;
 
+  /// Photo slots a listing gets. The grid, the upload loop and the gallery
+  /// picker all read this, so the cap can't drift apart between them.
+  static const int _maxImages = 12;
+
   int get _filledSlotCount {
     int count = 0;
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < _maxImages; i++) {
       if (_imageFiles[i] != null || _existingImageUrls[i] != null) count++;
     }
     return count;
@@ -240,7 +244,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     _completionDate = c.completionDate;
     _isCommercial = c.isCommercialProperty == 1;
     _existingVideoUrl = c.videoUrl;
-    for (int i = 0; i < c.imageUrls.length && i < 12; i++) {
+    for (int i = 0; i < c.imageUrls.length && i < _maxImages; i++) {
       _existingImageUrls[i] = c.imageUrls[i];
     }
     _descCtrl.addListener(() => setState(() {}));
@@ -435,6 +439,14 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
         _existingVideoUrl = null;
       });
 
+  /// One-line notice about the photo cap.
+  void _warn(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   void _pickImage(int index) {
     _showSourceSheet(
       onCamera: () async {
@@ -461,20 +473,46 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
             source: ImageSource.gallery, needsMicrophone: false);
         if (!ok) return;
         try {
-          final picked = await _picker.pickMultiImage(imageQuality: 80);
+          final free = _maxImages - _filledSlotCount;
+          if (free <= 0) {
+            _warn('You can add up to $_maxImages photos.');
+            return;
+          }
+          // Cap the picker itself rather than quietly dropping the overflow
+          // afterwards. The platform picker stops accepting taps at the limit,
+          // so the count on screen is the count that lands.
+          final List<XFile> picked;
+          if (free == 1) {
+            // The plugin only accepts a limit of 2 or more, so a single free
+            // slot goes through the single-image picker instead.
+            final one = await _picker.pickImage(
+                source: ImageSource.gallery, imageQuality: 80);
+            picked = one == null ? <XFile>[] : <XFile>[one];
+          } else {
+            picked = await _picker.pickMultiImage(imageQuality: 80, limit: free);
+          }
+
           if (picked.isNotEmpty) {
+            int added = 0;
             setState(() {
               int slot = index;
               for (final f in picked) {
-                while (slot < 12 && _imageFiles[slot] != null) {
+                while (slot < _maxImages && _imageFiles[slot] != null) {
                   slot++;
                 }
-                if (slot >= 12) break;
+                if (slot >= _maxImages) break;
                 _imageFiles[slot] = File(f.path);
                 slot++;
+                added++;
               }
             });
             _revealSection(_imageSectionKey);
+            // Older platforms ignore the picker limit, so anything that still
+            // didn't fit is called out rather than vanishing.
+            if (added < picked.length) {
+              _warn('Only $added of ${picked.length} photos were added — '
+                  'the limit is $_maxImages.');
+            }
           }
         } catch (e) {
           if (mounted) {
@@ -549,7 +587,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     });
     try {
       final imageUrls = <String>[];
-      for (int i = 0; i < 12; i++) {
+      for (int i = 0; i < _maxImages; i++) {
         if (_imageFiles[i] != null) {
           final url = await api.uploadImage(
               file: _imageFiles[i]!, fileType: 'announcements');
@@ -965,8 +1003,8 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                             // No border to redden here — the grid is 12 separate
                             // tiles — so the count carries the error instead.
                             _showErrors && _filledSlotCount < 8
-                                ? '$_filledSlotCount/12 selected — add at least 8'
-                                : '$_filledSlotCount/12 selected',
+                                ? '$_filledSlotCount/$_maxImages selected — add at least 8'
+                                : '$_filledSlotCount/$_maxImages selected',
                             style: GoogleFonts.inter(
                               fontSize: 11.sp,
                               color: _showErrors && _filledSlotCount < 8
@@ -1184,7 +1222,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
         crossAxisSpacing: 8.w,
         mainAxisSpacing: 8.h,
       ),
-      itemCount: 12,
+      itemCount: _maxImages,
       itemBuilder: (_, i) => GestureDetector(
         onTap: () => _pickImage(i),
         child: _imageBox(i, isDark),

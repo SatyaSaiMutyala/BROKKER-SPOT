@@ -4,7 +4,6 @@ import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/settings/change_password_view.dart';
 import 'package:brokkerspot/views/user/account/controller/account_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
-import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -70,15 +69,6 @@ class SettingsView extends StatelessWidget {
                           iconAsset: 'assets/images/password.png',
                           isDark: isDark,
                           onTap: () => Get.to(() => ChangePasswordView()),
-                        ),
-                        _tile(
-                          title: 'Location',
-                          icon: Icons.location_on_outlined,
-                          isDark: isDark,
-                          onTap: () => Get.dialog(
-                            const LocationPickerPopup(),
-                            barrierDismissible: false,
-                          ),
                         ),
                         _tile(
                           title: 'Language',
