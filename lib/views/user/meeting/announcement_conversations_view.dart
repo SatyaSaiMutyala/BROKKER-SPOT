@@ -199,16 +199,15 @@ class _AnnouncementConversationsViewState
       // taken instead; this is a routing bug upstream.
       return;
     }
-    // Use the user_role stored on the last_message if the server gave us one
-    // — that's the exact value chat:history needs for a first-attempt hit.
-    // Fall back to computing from the announcement role.
-    final isOwner = myId.isNotEmpty &&
-        widget.meeting.announcement.userId == myId &&
-        (widget.meeting.announcement.userRole ?? 1) == 1;
-    final annRole = widget.meeting.announcement.userRole ?? 2;
-    final computedRole = isOwner ? annRole : (3 - annRole);
-    final chatUserRole = c.lastMessageUserRole ?? computedRole;
-    debugPrint('💬 [Conversations]   chatUserRole=$chatUserRole (lmRole=${c.lastMessageUserRole} computed=$computedRole)');
+    // The viewer's own side, from the announcement.
+    //
+    // This used to prefer `last_message.user_role`, which is the role of
+    // whoever sent the last message — so as soon as the broker replied last,
+    // the owner's own chat opened as if the owner were the broker: the peer
+    // pill read "Client" instead of "Broker", and the proposal banner offered
+    // "Awaiting owner approval" rather than the owner's own sign action.
+    final chatUserRole = widget.meeting.announcement.viewerSide(myId);
+    debugPrint('💬 [Conversations]   chatUserRole=$chatUserRole');
     // Clear the unread badge immediately for snappy UX.
     _ctrl.markRead(peerId);
     await AnnouncementChatView.open(

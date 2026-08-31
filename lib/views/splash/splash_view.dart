@@ -79,7 +79,15 @@ class _SplashViewState extends State<SplashView>
       // Re-register FCM token on every app open so the backend always has a
       // fresh token (Firebase rotates it periodically without a new login).
       DeviceService.registerDevice();
-      await Future.delayed(const Duration(milliseconds: 1500));
+      if (NotificationService.hasPendingTap) {
+        // Launched by tapping a push. Skip the branding pause and load the
+        // destination here, while the splash still covers the screen — the
+        // dashboard below is only ever a backdrop for the Back button, and
+        // shouldn't be sat on while a request goes out.
+        await NotificationService.prefetchPendingTap();
+      } else {
+        await Future.delayed(const Duration(milliseconds: 1500));
+      }
       if (!mounted) return;
       final lastSide = LocalStorageService.getLastSide();
       if (lastSide == 'broker') {

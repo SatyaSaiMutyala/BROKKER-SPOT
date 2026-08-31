@@ -135,6 +135,7 @@ class ChatController extends GetxController {
   // ── History ──
   void _requestHistory({required int page}) {
     if (page == 1) isLoadingHistory.value = true;
+
     // Start with the computed chat-context role (most likely to be correct),
     // then try the opposite, then omit user_role entirely as a last resort.
     final int otherRole = (userRole == 1) ? 2 : 1;
@@ -152,6 +153,11 @@ class ChatController extends GetxController {
     };
     debugPrint('🔄 [Chat] chat:history attempt=$_historyAttempt user_role=$roleToSend recipient=$recipientId ann=$announcementId');
     _socket.emit(ChatEvents.history, payload);
+    _armHistoryTimeout();
+  }
+
+  /// Gives up on the request after 8s and says so, rather than spinning.
+  void _armHistoryTimeout() {
     _historyTimeout?.cancel();
     _historyTimeout = Timer(const Duration(seconds: 8), () {
       if (isLoadingHistory.value || _loadingMore) {

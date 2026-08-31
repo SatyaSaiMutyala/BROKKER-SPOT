@@ -334,25 +334,25 @@ class _CardWithStatusBadge extends StatelessWidget {
                               height: 1.0,
                             ),
                           ),
-                          if (a.timeAgo != null) ...[
-                            Text(
-                              ' • ',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12.sp,
-                                color: Colors.white70,
-                                height: 1.0,
-                              ),
-                            ),
-                            Text(
-                              a.timeAgo!.toUpperCase(),
-                              style: GoogleFonts.poppins(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFFCFCFCF),
-                                height: 1.0,
-                              ),
-                            ),
-                          ],
+                          // if (a.timeAgo != null) ...[
+                          //   Text(
+                          //     ' • ',
+                          //     style: GoogleFonts.poppins(
+                          //       fontSize: 12.sp,
+                          //       color: Colors.white70,
+                          //       height: 1.0,
+                          //     ),
+                          //   ),
+                          //   Text(
+                          //     a.timeAgo!.toUpperCase(),
+                          //     style: GoogleFonts.poppins(
+                          //       fontSize: 12.sp,
+                          //       fontWeight: FontWeight.w500,
+                          //       color: const Color(0xFFCFCFCF),
+                          //       height: 1.0,
+                          //     ),
+                          //   ),
+                          // ],
                         ],
                       ),
                     ),

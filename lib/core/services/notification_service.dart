@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
+import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
@@ -55,6 +56,67 @@ class NotificationService {
       ...message.data,
       if (title != null && title.isNotEmpty) '_title': title,
     };
+  }
+
+  /// True when the app was launched cold by tapping a push and hasn't routed
+  /// it yet. The splash screen uses this to prepare the destination before it
+  /// hands over, instead of dropping the user on a dashboard first.
+  static bool get hasPendingTap => _pendingTapData != null;
+
+  /// Announcement already loaded for the pending tap — see
+  /// [prefetchPendingTap].
+  static AnnouncementModel? _prefetched;
+
+  /// Loads what a cold-start tap is going to open, while the splash is still
+  /// on screen.
+  ///
+  /// Without this the sequence was: splash → dashboard → *request* → detail,
+  /// so the dashboard sat there for the length of a network round-trip and the
+  /// tap looked like it had gone to the wrong place. Fetching here means the
+  /// detail can be pushed in the same breath as the shell beneath it.
+  static Future<void> prefetchPendingTap() async {
+    final data = _pendingTapData;
+    if (data == null) return;
+    // Every announcement-shaped notification resolves through
+    // [_fetchAnnouncement], including chat — which reads the announcement to
+    // work out which side of the conversation the viewer is on. Types that
+    // don't (broker_approved, say) are skipped so nothing is fetched for a
+    // screen that will never ask for it.
+    if (!_opensAnnouncement(data['type']?.toString())) return;
+    final id = data['announcement_id']?.toString();
+    if (id == null || id.isEmpty) return;
+    _prefetched = await _fetchAnnouncement(id);
+  }
+
+  static const _announcementTypes = {
+    'chat_message',
+    'announcement_approved',
+    'announcement_rejected',
+    'property_published',
+    'announcement_proposal',
+    'agreement_completed',
+    'proposal_accepted',
+    'new_announcement',
+  };
+
+  static bool _opensAnnouncement(String? type) =>
+      type != null && _announcementTypes.contains(type);
+
+  /// Fetches an announcement, reusing [prefetchPendingTap]'s result when it is
+  /// for this same one. Returns null rather than throwing — a failed lookup
+  /// should leave the user where they are, not crash the tap.
+  static Future<AnnouncementModel?> _fetchAnnouncement(String id) async {
+    final ready = _prefetched;
+    if (ready != null && ready.id == id) {
+      _prefetched = null;
+      return ready;
+    }
+    try {
+      return await AnnouncementRepository().fetchAnnouncementDetail(id);
+    } catch (e) {
+      debugPrint('⚠️ Failed to load announcement $id from notification: $e');
+      return null;
+    }
   }
 
   /// Whether the app is currently on the broker side.
@@ -316,15 +378,13 @@ class NotificationService {
       case 'announcement_proposal':
       case 'agreement_completed':
         if (announcementId == null || announcementId.isEmpty) return;
-        await _ensureSide(wantBroker: false);
-        await _openAnnouncementDetail(announcementId, false);
+        await _openDetailDirectly(announcementId, isBroker: false);
         break;
 
       // Broker-only.
       case 'proposal_accepted':
         if (announcementId == null || announcementId.isEmpty) return;
-        await _ensureSide(wantBroker: true);
-        await _openAnnouncementDetail(announcementId, true);
+        await _openDetailDirectly(announcementId, isBroker: true);
         break;
 
       // Broadcast feed item — the side depends on who posted it, not on a
@@ -333,17 +393,14 @@ class NotificationService {
       // the role opposite the creator), so mirror that with _sideForViewer.
       case 'new_announcement':
         if (announcementId == null || announcementId.isEmpty) return;
-        try {
-          final a = await AnnouncementRepository().fetchAnnouncementDetail(announcementId);
-          // Fall back to the old owner-based guess only when user_role is
-          // missing from the payload.
-          final side = _sideForViewer(a);
-          final wantBroker = side != null ? side == 2 : !(a.isOwner ?? false);
-          await _ensureSide(wantBroker: wantBroker);
-          _navigateToAnnouncementDetailModel(a, wantBroker);
-        } catch (e) {
-          debugPrint('⚠️ Failed to open new_announcement $announcementId from notification: $e');
-        }
+        final a = await _fetchAnnouncement(announcementId);
+        if (a == null) return;
+        // Fall back to the old owner-based guess only when user_role is
+        // missing from the payload.
+        final side = _sideForViewer(a);
+        final wantBroker = side != null ? side == 2 : !(a.isOwner ?? false);
+        await _ensureSide(wantBroker: wantBroker);
+        _navigateToAnnouncementDetailModel(a, wantBroker);
         break;
 
       // Account-level broker verification outcome — land on the broker
@@ -380,7 +437,8 @@ class NotificationService {
     final peerUserId = data['sender_user_id']?.toString();
 
     try {
-      final a = await AnnouncementRepository().fetchAnnouncementDetail(announcementId);
+      final a = await _fetchAnnouncement(announcementId);
+      if (a == null) return;
       isOwnerHere = a.isOwner;
       side = _sideForViewer(a);
 
@@ -395,6 +453,15 @@ class NotificationService {
           peerAvatar = match.brokerProfileImage;
           peerName = match.name;
         }
+      }
+
+      // The other direction: the viewer is the broker and the peer is the
+      // listing's owner. Proposals only ever carry brokers, so the owner's
+      // details come off the announcement — without this their real photo was
+      // there all along and the header still fell back to a placeholder.
+      if (peerUserId != null && peerAvatar == null && a.userId == peerUserId) {
+        peerName ??= a.ownerName;
+        peerAvatar = a.ownerAvatarUrl ?? a.brokerAvatarUrl;
       }
     } catch (e) {
       debugPrint('⚠️ Could not resolve role for chat notification: $e');
@@ -422,17 +489,61 @@ class NotificationService {
     );
   }
 
-  /// Fetches the announcement and opens the same detail screen
-  /// NotificationsView._onTap opens for the in-app notification list, so
-  /// push taps land in exactly the same place.
-  static Future<void> _openAnnouncementDetail(
-      String announcementId, bool isBroker) async {
-    try {
-      final a = await AnnouncementRepository().fetchAnnouncementDetail(announcementId);
-      _navigateToAnnouncementDetailModel(a, isBroker);
-    } catch (e) {
-      debugPrint('⚠️ Failed to open announcement $announcementId from notification: $e');
+  /// Opens the same detail screen NotificationsView._onTap opens for the in-app
+  /// list, so push taps land in exactly the same place.
+  ///
+  /// The fetch is started *before* the side check rather than after it. When
+  /// the account has to be flipped, [_ensureSide] resets the navigator to a
+  /// dashboard — and the request used to only go out once that had happened, so
+  /// the dashboard was left on screen for a whole round-trip. Running the two
+  /// together means the detail is ready to push the moment the flip lands.
+  static Future<void> _openDetailDirectly(
+    String announcementId, {
+    required bool isBroker,
+  }) async {
+    final pending = _fetchAnnouncement(announcementId);
+    await _ensureSide(wantBroker: isBroker);
+    final a = await pending;
+    if (a == null) {
+      // Say so rather than leaving the tap looking like it went to the
+      // dashboard on purpose.
+      AppToast.error("Couldn't open this announcement");
+      return;
     }
+    _navigateToAnnouncementDetailModel(a, isBroker);
+  }
+
+  /// Routes a tap on a row of the in-app notifications list.
+  ///
+  /// Shares the push rules on purpose. The list used to pick the screen from
+  /// whichever side happened to be active, so a proposal — which is always
+  /// about the account's *user-side* listing — opened the broker detail screen
+  /// whenever the account sat on the broker side, without the owner-only
+  /// sections the notification was pointing at.
+  ///
+  /// Categories match the push `type` strings one-for-one. Anything unmapped
+  /// still opens the listing, with the side read off the announcement.
+  static Future<void> openFromInApp({
+    required String? category,
+    required String? announcementId,
+  }) async {
+    if (announcementId == null || announcementId.isEmpty) return;
+    if (_opensAnnouncement(category)) {
+      await _handleNotificationData({
+        'type': category,
+        'announcement_id': announcementId,
+      });
+      return;
+    }
+    final a = await _fetchAnnouncement(announcementId);
+    if (a == null) {
+      AppToast.error("Couldn't open this announcement");
+      return;
+    }
+    final side = _sideForViewer(a);
+    final wantBroker = side != null ? side == 2 : !(a.isOwner ?? false);
+    await _ensureSide(wantBroker: wantBroker);
+    _navigateToAnnouncementDetailModel(a, wantBroker);
   }
 
   /// Core navigation — given an already-fetched [AnnouncementModel] decide

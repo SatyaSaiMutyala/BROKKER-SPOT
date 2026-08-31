@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
 import 'package:brokkerspot/widgets/common/floating_dropdown.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +10,20 @@ import 'package:google_fonts/google_fonts.dart';
 
 class PropertyPriceBrokerageView extends StatefulWidget {
   final String? propertyFor;
-  const PropertyPriceBrokerageView({super.key, this.propertyFor});
+
+  /// Posting from the broker side.
+  ///
+  /// The commission block asks an owner what they will pay a broker to sell or
+  /// let their property. A broker posting their own listing is the other side
+  /// of that deal — there is no broker for them to pay — so the block is left
+  /// out entirely rather than shown as an empty question.
+  final bool fromBroker;
+
+  const PropertyPriceBrokerageView({
+    super.key,
+    this.propertyFor,
+    this.fromBroker = false,
+  });
 
   @override
   State<PropertyPriceBrokerageView> createState() =>
@@ -71,6 +85,9 @@ class _PropertyPriceBrokerageViewState
     Get.find<AnnouncementController>().setPrice(
       price: _price,
       brokeragePercent: _brokeragePercent,
+      // Stored in the same currency the figures were entered in. Left out, it
+      // defaulted to AED regardless of what the fields were labelled.
+      currency: _currency,
       rentPeriod: _isSell ? null : _priceType,
       availableDate: _isSell ? null : _availableDate,
     );
@@ -111,6 +128,14 @@ class _PropertyPriceBrokerageViewState
 
   double get _oneMonthRent => _priceType == 'Yearly' ? _price / 12 : _price;
 
+  /// The account's own currency, from Settings.
+  ///
+  /// Every figure on this screen is shown in it and the listing is saved with
+  /// it — the fields used to read a hardcoded `€` while the payload went out as
+  /// AED, so the number on screen and the number stored meant different things.
+  String get _currency => Get.isRegistered<ProfileController>()
+      ? ProfileController.to.currency
+      : 'AED';
 
   @override
   void initState() {
@@ -262,25 +287,27 @@ class _PropertyPriceBrokerageViewState
         _label('Set Property Price', required: true, isDark: isDark),
         SizedBox(height: 8.h),
         KeyedSubtree(key: _priceKey, child: _priceField(isDark)),
-        SizedBox(height: 24.h),
-        _commissionToggleRow(isDark),
-        if (_commissionEnabled) ...[
-          SizedBox(height: 20.h),
-          _label('Set Brokerage', isDark: isDark),
-          SizedBox(height: 8.h),
-          _brokerageStepperRow(isDark),
-          SizedBox(height: 20.h),
-          _readOnlyAmountField(
-            label: 'You will receive',
-            amount: _receiveAmount,
-            isDark: isDark,
-          ),
-          SizedBox(height: 16.h),
-          _readOnlyAmountField(
-            label: 'You have to pay commission',
-            amount: _brokerageAmount,
-            isDark: isDark,
-          ),
+        if (!widget.fromBroker) ...[
+          SizedBox(height: 24.h),
+          _commissionToggleRow(isDark),
+          if (_commissionEnabled) ...[
+            SizedBox(height: 20.h),
+            _label('Set Brokerage', isDark: isDark),
+            SizedBox(height: 8.h),
+            _brokerageStepperRow(isDark),
+            SizedBox(height: 20.h),
+            _readOnlyAmountField(
+              label: 'You will receive',
+              amount: _receiveAmount,
+              isDark: isDark,
+            ),
+            SizedBox(height: 16.h),
+            _readOnlyAmountField(
+              label: 'You have to pay commission',
+              amount: _brokerageAmount,
+              isDark: isDark,
+            ),
+          ],
         ],
         SizedBox(height: 32.h),
       ],
@@ -333,21 +360,19 @@ class _PropertyPriceBrokerageViewState
             required: true, isDark: isDark),
         SizedBox(height: 8.h),
         KeyedSubtree(key: _availableDateKey, child: _datePicker(isDark)),
-        SizedBox(height: 24.h),
-        _commissionToggleRow(isDark),
-        SizedBox(height: 16.h),
-        _readOnlyAmountField(
-          label: 'You will receive',
-          amount: _oneMonthRent,
-          isDark: isDark,
-        ),
-        if (_commissionEnabled) ...[
-          SizedBox(height: 16.h),
-          _readOnlyAmountField(
-            label: 'You have to pay commission',
-            amount: _oneMonthRent,
-            isDark: isDark,
-          ),
+        if (!widget.fromBroker) ...[
+          SizedBox(height: 24.h),
+          _commissionToggleRow(isDark),
+          if (_commissionEnabled) ...[
+            SizedBox(height: 16.h),
+            _readOnlyAmountField(
+              // A rental fee is always one month's rent, so the label says so
+              // rather than leaving the figure to be worked out.
+              label: 'One month commission for broker',
+              amount: _oneMonthRent,
+              isDark: isDark,
+            ),
+          ],
         ],
         SizedBox(height: 32.h),
       ],
@@ -391,7 +416,7 @@ class _PropertyPriceBrokerageViewState
           Padding(
             padding: EdgeInsets.only(left: 12.w),
             child: Text(
-              '€ ',
+              '$_currency ',
               style: GoogleFonts.inter(
                 fontSize: 14.sp,
                 color: isDark ? Colors.white : Colors.black87,
@@ -490,8 +515,7 @@ class _PropertyPriceBrokerageViewState
   }
 
   Widget _commissionToggleRow(bool isDark) {
-    final borderColor =
-        isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
+    final borderColor = isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
     final textColor = isDark ? Colors.grey.shade300 : Colors.black87;
     final subColor = isDark ? Colors.grey.shade500 : Colors.grey.shade600;
     return Container(
@@ -518,7 +542,7 @@ class _PropertyPriceBrokerageViewState
                 ),
                 SizedBox(height: 3.h),
                 Text(
-                  'Enable to include broker commission in the price breakdown.',
+                  'Enable to include broker commission.',
                   style: GoogleFonts.inter(
                     fontSize: 11.sp,
                     color: subColor,
@@ -578,7 +602,9 @@ class _PropertyPriceBrokerageViewState
           ),
           SizedBox(height: 6.h),
           Text(
-            hasPrice ? '€ ${amount.toStringAsFixed(0)}' : '€ 0',
+            hasPrice
+                ? '$_currency ${amount.toStringAsFixed(0)}'
+                : '$_currency 0',
             style: GoogleFonts.inter(
               fontSize: 14.sp,
               color: AppColors.primary,

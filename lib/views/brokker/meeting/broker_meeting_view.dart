@@ -158,8 +158,8 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> with RouteAware {
             '📋 [BrokerMeeting]   → non-owner path: no valid peer found, aborting');
         return;
       }
-      final annRole = m.announcement.userRole ?? 1;
-      final chatUserRole = 3 - annRole;
+      // Owner or broker, worked out from the announcement — not assumed.
+      final chatUserRole = m.announcement.viewerSide(myId);
       debugPrint(
           '📋 [BrokerMeeting]   → non-owner path: peer=${peer?.name}($ownerId) chatUserRole=$chatUserRole');
       await AnnouncementChatView.open(

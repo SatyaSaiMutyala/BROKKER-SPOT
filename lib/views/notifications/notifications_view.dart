@@ -1,11 +1,8 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
+import 'package:brokkerspot/core/services/notification_service.dart';
 import 'package:brokkerspot/models/notification_model.dart';
-import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
-import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_view.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
-import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
-import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/notifications/notification_card.dart';
 import 'package:flutter/material.dart';
@@ -23,7 +20,6 @@ class NotificationsView extends StatefulWidget {
 
 class _NotificationsViewState extends State<NotificationsView> {
   final _ctrl = NotificationListController.to;
-  final _announcementRepo = AnnouncementRepository();
 
   @override
   void initState() {
@@ -52,27 +48,15 @@ class _NotificationsViewState extends State<NotificationsView> {
 
     final overlay = _showLoader();
     try {
-      final a = await _announcementRepo.fetchAnnouncementDetail(announcementId);
+      // Same routing a push tap uses, side switch included. Deciding here from
+      // whichever side happened to be active sent an owner's proposal to the
+      // broker detail screen whenever the account sat on the broker side.
+      await NotificationService.openFromInApp(
+        category: n.category,
+        announcementId: announcementId,
+      );
+    } finally {
       overlay.remove();
-      final isBroker = (Get.isRegistered<ProfileController>()
-                  ? Get.find<ProfileController>()
-                  : null)
-              ?.isOnBrokerSide ==
-          true;
-      if (isBroker) {
-        Get.to(() => BrokerAnnouncementDetailView(announcement: a));
-      } else {
-        // a.isOwner comes from the backend's `is_owner` flag — the
-        // "interested brokers" row is gated behind `isOwner`, so hardcoding
-        // false here was hiding it even when this account owns the listing.
-        Get.to(() => AnnouncementDetailView(
-              announcement: a,
-              isOwner: a.isOwner ?? false,
-            ));
-      }
-    } catch (e) {
-      overlay.remove();
-      AppToast.error("Couldn't open this announcement");
     }
   }
 

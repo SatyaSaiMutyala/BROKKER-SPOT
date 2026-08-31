@@ -93,6 +93,13 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   /// Proposal status 3 (signed) / 4 (published) — see [_fetchContractedBrokers].
   List<ProposalBroker> _contractedBrokers = const [];
 
+  /// The signed-in account's id, for working out which side of it a listing
+  /// concerns — see [AnnouncementModel.viewerSide].
+  String get _myId =>
+      LocalStorageService.getUserIdFromToken() ??
+      LocalStorageService.getUser()?.data?.id ??
+      '';
+
   /// Opens the owner's chat with a broker from the advertising section.
   void _openBrokerChat(ProposalBroker broker) {
     AnnouncementChatView.open(
@@ -100,7 +107,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       brokerName: broker.name ?? 'Broker',
       brokerAvatar: broker.brokerProfileImage,
       peerUserId: broker.brokerId,
-      userRole: 1, // this section only renders for the owner
+      // Read off the listing rather than pinned to 1. This section is
+      // owner-only, but an owner who posted from their broker side sits on
+      // side 2 — the announcement is the only thing that knows.
+      userRole: _data.viewerSide(_myId),
     );
   }
 
@@ -1206,8 +1216,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                         brokerName: peerName,
                         brokerAvatar: peerAvatar,
                         peerUserId: a.userId ?? widget.announcement.userId,
-                        userRole:
-                            2, // viewer is always broker in !isOwner context
+                        // Not always 2: on a broker-posted listing the viewer
+                        // here is the owner-side party, not the broker. The
+                        // announcement settles which.
+                        userRole: a.viewerSide(_myId),
                       );
                     },
                     child: Container(

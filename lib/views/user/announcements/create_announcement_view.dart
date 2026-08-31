@@ -709,7 +709,9 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => PropertyPriceBrokerageView(
-                                    propertyFor: _propertyFor)));
+                                      propertyFor: _propertyFor,
+                                      fromBroker: widget.fromBroker,
+                                    )));
                         if (result == true) {
                           setState(() => _priceSaved = true);
                           _saveLocally();

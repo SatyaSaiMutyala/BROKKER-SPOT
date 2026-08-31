@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:brokkerspot/core/common_widget/full_screen_image_view.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
@@ -23,42 +25,22 @@ class BrokerProfileView extends StatelessWidget {
   final ProfileController controller = Get.put(ProfileController());
 
   static const _avatarSize = 100.0;
+  // ── Verified badge (assets/images/v-icon.png) ─────────────────────────────
+  // A standalone seal, so it just gets pinned to the avatar's rim — the
+  // previous artwork was a curved ribbon and needed its arc measured off the
+  // image to sit flush.
+  static const _badgeSize = 30.0;
 
-  // ── "Verified" ribbon (assets/images/tag.png) ──────────────────────────────
-  // The ribbon is a circular arc baked into the artwork, so it only sits flush
-  // against the avatar if it is scaled and offset to be concentric with it.
-  // These are measured off the asset itself — the arc's centre, its radius and
-  // the extent of its opaque pixels, all as fractions of the image's own width.
-  static const _tagAspect = 2.0705; // image width / height
-  static const _tagArcCx = 0.39365; // arc centre x, from the image's left edge
-  static const _tagArcCy = -0.07657; // arc centre y — above the image's top
-  static const _tagInnerR = 0.41167; // arc's inner edge radius
-  static const _tagMaxR = 0.65500; // furthest opaque pixel from the arc centre
-  static const _tagSealAngle = 0.45025; // seal's bearing from the arc centre
+  /// Distance from the avatar's centre to the badge's, and the bearing it sits
+  /// at. Positive angles are above the horizontal, so this one puts it down and
+  /// to the right — just past the rim, overlapping the photo rather than
+  /// floating clear of it.
+  static const _badgeDistance = 52.0;
+  static const _badgeAngle = -0.73; // ~42° below the horizontal
 
-  /// Trim on the ribbon's overall size. At 1.0 the arc's inner edge lands
-  /// exactly on the avatar's rim; below that the band rides a little over the
-  /// photo's edge instead of sitting entirely outside it.
-  static const _tagScale = 0.85;
-
-  static const _tagW = (_avatarSize / 2) / _tagInnerR * _tagScale;
-
-  /// Where the image's top-left corner goes, relative to the avatar's centre.
-  static const _tagDx = -_tagArcCx * _tagW;
-  static const _tagDy = -_tagArcCy * _tagW;
-
-  /// How far above 3 o'clock the seal is lifted, in radians (20°).
-  static const _tagLift = 0.34907;
-
-  /// In the artwork the seal sits ~26° below the horizontal, which hangs the
-  /// ribbon off the bottom of the avatar. Turning it back by that much brings
-  /// the seal level with 3 o'clock; [_tagLift] carries it further up the
-  /// avatar's right-hand side.
-  static const _tagRotation = -(_tagSealAngle + _tagLift);
-
-  /// Square and centred on the avatar, sized by the ribbon's furthest pixel so
-  /// the artwork still fits whatever angle it is turned to.
-  static const _tagBox = 2 * _tagMaxR * _tagW;
+  /// Square and centred on the avatar, wide enough for the badge's far edge —
+  /// that way the avatar itself stays put on screen.
+  static const _badgeBox = 2 * (_badgeDistance + _badgeSize / 2);
 
   @override
   Widget build(BuildContext context) {
@@ -195,8 +177,8 @@ class BrokerProfileView extends StatelessWidget {
                 : null,
           ),
           child: SizedBox(
-            width: _tagBox.w,
-            height: _tagBox.w,
+            width: _badgeBox.w,
+            height: _badgeBox.w,
             child: Stack(
               alignment: Alignment.center,
               clipBehavior: Clip.none,
@@ -230,30 +212,23 @@ class BrokerProfileView extends StatelessWidget {
                           ),
                   ),
                 ),
+                // Last in the stack so the badge sits over the photo rather
+                // than the photo's circle cropping it.
                 if (isVerified)
-                  // Last in the stack so the ribbon lies over the photo rather
-                  // than the photo's circle cropping it. Rotated about the
-                  // box's centre, which is also the avatar's centre and the
-                  // arc's — so turning it slides the ribbon around the rim
-                  // without breaking the fit.
-                  Positioned.fill(
-                    child: Transform.rotate(
-                      angle: _tagRotation,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Positioned(
-                            left: (_tagBox / 2 + _tagDx).w,
-                            top: (_tagBox / 2 + _tagDy).w,
-                            width: _tagW.w,
-                            height: (_tagW / _tagAspect).w,
-                            child: Image.asset(
-                              'assets/images/tag.png',
-                              fit: BoxFit.fill,
-                            ),
-                          ),
-                        ],
-                      ),
+                  Positioned(
+                    left: (_badgeBox / 2 +
+                            _badgeDistance * math.cos(_badgeAngle) -
+                            _badgeSize / 2)
+                        .w,
+                    top: (_badgeBox / 2 -
+                            _badgeDistance * math.sin(_badgeAngle) -
+                            _badgeSize / 2)
+                        .w,
+                    width: _badgeSize.w,
+                    height: _badgeSize.w,
+                    child: Image.asset(
+                      'assets/images/v-icon.png',
+                      fit: BoxFit.contain,
                     ),
                   ),
               ],

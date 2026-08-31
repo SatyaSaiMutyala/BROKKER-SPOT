@@ -139,8 +139,9 @@ class AnnouncementConversationsController extends GetxController {
       lastMessage: text ?? existing.lastMessage,
       lastMessageAt: at,
       unseenCount: fromPeer ? existing.unseenCount + 1 : existing.unseenCount,
-      // Preserve (and update) lastMessageUserRole so _openChat doesn't fall
-      // back to the computed role when the user taps before reload() finishes.
+      // Who sent the last message, kept as it arrives. Opening a chat no longer
+      // reads it — that is the announcement's job — so this is data about the
+      // thread, not a stand-in for the viewer's own side.
       lastMessageUserRole: userRole ?? existing.lastMessageUserRole,
     );
     // Reassign with the updated entry first so the row jumps to the top

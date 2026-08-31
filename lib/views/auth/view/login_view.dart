@@ -71,7 +71,7 @@ class LoginView extends StatelessWidget {
 
                           // Subtitle
                           Text(
-                            'quis nostrud exercitation ullamco laboris nisi ut',
+                            'Welcome back sign in to access your account',
                             style: GoogleFonts.roboto(
                               fontSize: 13.sp,
                               color:

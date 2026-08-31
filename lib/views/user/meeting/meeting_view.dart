@@ -114,13 +114,13 @@ class _MeetingViewState extends State<MeetingView> with RouteAware {
       final peer = peers.isNotEmpty ? peers.first : null;
       final ownerId = peer?.id ?? m.announcement.userId ?? '';
       if (ownerId.isEmpty || ownerId == myId) return;
-      final annRole = m.announcement.userRole ?? 1;
       await AnnouncementChatView.open(
         announcementId: m.announcementId,
         brokerName: peer?.name ?? m.announcement.ownerName ?? 'User',
         brokerAvatar: peer?.brokerProfileImageUrl ?? peer?.profileImageUrl ?? m.announcement.ownerAvatarUrl,
         peerUserId: ownerId,
-        userRole: 3 - annRole,
+        // Owner or broker, worked out from the announcement — not assumed.
+        userRole: m.announcement.viewerSide(myId),
       );
     }
     if (!mounted) return;

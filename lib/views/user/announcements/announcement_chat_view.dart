@@ -6,7 +6,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/theme/borderless_input.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/models/chat_message.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_controller.dart';
@@ -43,9 +45,10 @@ class AnnouncementChatView extends StatefulWidget {
       showLoginRequiredDialog(Get.context!);
       return;
     }
-    final avatar = (brokerAvatar != null && brokerAvatar.trim().isNotEmpty)
-        ? brokerAvatar
-        : 'assets/images/story1.png';
+    // Passed through as-is. Substituting a stock photo here made every
+    // pictureless account look like the same stranger; empty falls through to
+    // the neutral placeholder [_headerAvatar] already draws.
+    final avatar = brokerAvatar?.trim() ?? '';
     try {
       await Get.to(() => AnnouncementChatView(
             announcementId: announcementId,
@@ -266,12 +269,352 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
               ],
             ),
           ),
-          CustomIconButton(
-            isDark: isDark,
-            size: 38,
-            child: Icon(Icons.more_horiz, size: 20.sp, color: iconColor),
-          ),
+          // Owner-only: cancelling the contract is the owner's call, and the
+          // menu holds nothing else — so the broker side keeps a clean header
+          // rather than a button that opens an empty sheet.
+          if ((widget.userRole ?? 1) == 1)
+            CustomIconButton(
+              isDark: isDark,
+              size: 38,
+              onTap: () => _showChatMenu(isDark),
+              child: Icon(Icons.more_horiz, size: 20.sp, color: iconColor),
+            ),
         ],
+      ),
+    );
+  }
+
+  // ── Cancel contract ───────────────────────────────────────────────────────
+
+  /// Reasons offered when cancelling. Static for now — there is no endpoint
+  /// behind this yet, so nothing is sent anywhere.
+  static const List<String> _cancelReasons = [
+    'I found a better opportunity',
+    'I found a better deal',
+    'The terms no longer work for me',
+    'Other reason — Please specify',
+  ];
+
+  /// The last entry opens a free-text box instead of standing on its own.
+  static String get _otherReason => _cancelReasons.last;
+
+  void _showChatMenu(bool isDark) {
+    final surface = isDark ? const Color(0xFF15171F) : Colors.white;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 10.h),
+            Container(
+              width: 38.w,
+              height: 4.h,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : Colors.black12,
+                borderRadius: BorderRadius.circular(2.r),
+              ),
+            ),
+            SizedBox(height: 8.h),
+            InkWell(
+              onTap: () {
+                Navigator.pop(ctx);
+                _showCancelContractDialog(isDark);
+              },
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 18.h),
+                child: Row(
+                  children: [
+                    Icon(Icons.cancel_outlined,
+                        size: 19.sp, color: Colors.red.shade400),
+                    SizedBox(width: 12.w),
+                    Text(
+                      'Cancel Contract',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14.5.sp,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.red.shade400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 6.h),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCancelContractDialog(bool isDark) {
+    String? selected;
+    final otherCtrl = TextEditingController();
+
+    final surface = isDark ? const Color(0xFF15171F) : Colors.white;
+    final hairline = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.07);
+    final titleColor = isDark ? Colors.white : const Color(0xFF16181F);
+    final subColor = isDark ? Colors.grey.shade500 : const Color(0xFF7A7D87);
+    final optionColor = isDark ? Colors.white : const Color(0xFF23262E);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final needsText = selected == _otherReason;
+          final canConfirm = selected != null &&
+              (!needsText || otherCtrl.text.trim().isNotEmpty);
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: EdgeInsets.symmetric(horizontal: 26.w),
+            child: Container(
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(18.r),
+                border: Border.all(color: hairline),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.14),
+                    blurRadius: 30,
+                    offset: const Offset(0, 14),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(22.w, 20.h, 22.w, 14.h),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Reason for canceling the contract',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                            color: titleColor,
+                            height: 1.35,
+                          ),
+                        ),
+                        SizedBox(height: 5.h),
+                        Text(
+                          'Select a reason :',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.5.sp,
+                            fontWeight: FontWeight.w300,
+                            color: subColor,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, thickness: 1, color: hairline),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 4.h),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final reason in _cancelReasons)
+                            _reasonRow(
+                              reason: reason,
+                              active: selected == reason,
+                              isDark: isDark,
+                              optionColor: optionColor,
+                              onTap: () => setSheet(() => selected = reason),
+                            ),
+                          if (needsText) ...[
+                            SizedBox(height: 4.h),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 2.w),
+                              child: TextField(
+                                controller: otherCtrl,
+                                autofocus: true,
+                                maxLines: 3,
+                                maxLength: 200,
+                                onChanged: (_) => setSheet(() {}),
+                                buildCounter: (_,
+                                        {required currentLength,
+                                        required isFocused,
+                                        maxLength}) =>
+                                    null,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13.sp,
+                                  color: optionColor,
+                                  height: 1.45,
+                                ),
+                                decoration: kBorderlessInput.copyWith(
+                                  hintText: 'Tell us your reason...',
+                                  hintStyle: GoogleFonts.poppins(
+                                    fontSize: 12.5.sp,
+                                    fontWeight: FontWeight.w300,
+                                    color: subColor,
+                                  ),
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? const Color(0xFF1E212B)
+                                      : const Color(0xFFF6F6F4),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 14.w, vertical: 12.h),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                          SizedBox(height: 10.h),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(14.w, 0, 14.w, 14.h),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: SizedBox(
+                            height: 46.h,
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12.r),
+                                ),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                AppToast.success('Cancellation dismissed');
+                              },
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14.sp,
+                                  fontWeight: FontWeight.w500,
+                                  color: subColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          flex: 3,
+                          child: SizedBox(
+                            height: 46.h,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red.shade400,
+                                disabledBackgroundColor:
+                                    Colors.red.shade400.withValues(alpha: 0.35),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12.r),
+                                ),
+                              ),
+                              onPressed: canConfirm
+                                  ? () {
+                                      final reason = needsText
+                                          ? otherCtrl.text.trim()
+                                          : selected!;
+                                      Navigator.pop(ctx);
+                                      // No endpoint for this yet — the choice
+                                      // is echoed back so the flow can be
+                                      // walked through end to end.
+                                      AppToast.success(
+                                          'Contract cancellation requested: $reason');
+                                    }
+                                  : null,
+                              child: Text(
+                                'Confirm',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ).whenComplete(otherCtrl.dispose);
+  }
+
+  Widget _reasonRow({
+    required String reason,
+    required bool active,
+    required bool isDark,
+    required Color optionColor,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 6.h),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12.r),
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
+          decoration: BoxDecoration(
+            color: active
+                ? AppColors.primary.withValues(alpha: 0.14)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(
+              color: active
+                  ? AppColors.primary
+                  : (isDark
+                      ? Colors.white.withValues(alpha: 0.07)
+                      : Colors.black.withValues(alpha: 0.06)),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                active
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked,
+                size: 18.sp,
+                color: active
+                    ? AppColors.primary
+                    : (isDark ? Colors.white24 : Colors.black26),
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Text(
+                  reason,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13.sp,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                    color: active ? AppColors.primary : optionColor,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -225,6 +225,22 @@ class AnnouncementModel {
   /// which directional lookup to perform for chat:history).
   final int? userRole;
 
+  /// Which side of the signed-in account this listing concerns:
+  /// 1 = user side, 2 = broker side.
+  ///
+  /// The owner sees it on the side it was posted from; anyone else is the
+  /// broker working it, so they see it on the opposite side.
+  ///
+  /// Note what this deliberately does *not* look at: the `user_role` carried on
+  /// chat messages. That records who sent a message, not whose side the thread
+  /// belongs to — reading it as the viewer's own role is what made an owner's
+  /// chat render as if the owner were the broker.
+  int viewerSide(String? myId) {
+    final annSide = (userRole == 1 || userRole == 2) ? userRole! : 1;
+    final mine = myId != null && myId.isNotEmpty && userId == myId;
+    return mine ? annSide : 3 - annSide;
+  }
+
   AnnouncementModel({
     this.id,
     this.userId,

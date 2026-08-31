@@ -171,6 +171,19 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
       return;
     }
     setState(() => _showErrors = true);
+
+    // Not a missing field but a contradictory pair, so it needs its own say —
+    // "Please add Floor" would make no sense when a floor is already picked.
+    if (_floorExceedsTotal) {
+      _revealSection(_floorKey);
+      EasyLoading.showToast(
+        'Floor cannot be higher than Total Floor',
+        duration: const Duration(seconds: 2),
+        toastPosition: EasyLoadingToastPosition.bottom,
+      );
+      return;
+    }
+
     final first = _requiredFields.where((f) => f.missing).firstOrNull;
     if (first == null) return;
     // Next frame: the red borders we just triggered change some heights, so
@@ -192,6 +205,31 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     );
   }
 
+  /// Floors a unit can sit on — never above the building's own height.
+  ///
+  /// `_floorCounts` runs G, 1, 2 … 5+ in order, so position in that list is
+  /// the comparison.
+  List<String> get _floorOptions {
+    if (_totalFloor == null) return _floorCounts;
+    final cap = _floorCounts.indexOf(_totalFloor!);
+    return cap < 0 ? _floorCounts : _floorCounts.sublist(0, cap + 1);
+  }
+
+  /// The mirror of [_floorOptions]: a building is at least as tall as the floor
+  /// already chosen, so anything shorter is off the list.
+  List<String> get _totalFloorOptions {
+    if (_floor == null) return _floorCounts;
+    final floorAt = _floorCounts.indexOf(_floor!);
+    return floorAt < 0 ? _floorCounts : _floorCounts.sublist(floorAt);
+  }
+
+  /// A unit sitting above the top of its own building. The dropdown rules this
+  /// out going forward, but a draft saved before the rule can still carry it.
+  bool get _floorExceedsTotal =>
+      _floor != null &&
+      _totalFloor != null &&
+      _floorCounts.indexOf(_floor!) > _floorCounts.indexOf(_totalFloor!);
+
   bool get _isValid =>
       _propertyFor != null &&
       _propertyType != null &&
@@ -200,6 +238,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
       _bathroom != null &&
       _floor != null &&
       _totalFloor != null &&
+      !_floorExceedsTotal &&
       _descCtrl.text.trim().isNotEmpty &&
       (_propertyFor == 'Rent' || _isProperty != null) &&
       (_isProperty != 'Off Plan' || _completionDate != null) &&
@@ -854,10 +893,15 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                                     SizedBox(height: 8.h),
                                     OverlayDropdownField(
                                       key: _floorKey,
-                                      hasError: _showErrors && _floor == null,
+                                      hasError: _showErrors &&
+                                          (_floor == null ||
+                                              _floorExceedsTotal),
                                       hint: 'Select Floor',
                                       value: _floor,
-                                      items: _floorCounts,
+                                      // Capped at whatever Total Floor says,
+                                      // so an impossible floor can't be picked
+                                      // in the first place.
+                                      items: _floorOptions,
                                       onSelect: (v) =>
                                           setState(() => _floor = v),
                                       prefixIcon: Icons.layers_outlined,
@@ -880,9 +924,18 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                                           _showErrors && _totalFloor == null,
                                       hint: 'Select Floor',
                                       value: _totalFloor,
-                                      items: _floorCounts,
-                                      onSelect: (v) =>
-                                          setState(() => _totalFloor = v),
+                                      // Starts at whatever Floor says — a
+                                      // building shorter than its own floor
+                                      // isn't offered.
+                                      items: _totalFloorOptions,
+                                      onSelect: (v) => setState(() {
+                                        _totalFloor = v;
+                                        // The building can't end up shorter
+                                        // than the floor already chosen — drop
+                                        // that choice rather than leave an
+                                        // impossible pair standing.
+                                        if (_floorExceedsTotal) _floor = null;
+                                      }),
                                       prefixIcon: Icons.layers_outlined,
                                       maxPanelHeight: 264,
                                     ),

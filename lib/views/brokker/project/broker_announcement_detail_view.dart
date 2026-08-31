@@ -54,6 +54,14 @@ class _BrokerAnnouncementDetailViewState
   bool _detailLoaded = false;
   bool _videoActive = true;
 
+  /// True while the owner's name and photo are still being resolved.
+  ///
+  /// The detail endpoint can return `user_id` as a bare string, so those come
+  /// from a second lookup that finishes after [_detailLoaded] is already set.
+  /// The proposal sheet shows them, and shimmers that block until they land
+  /// rather than flashing a placeholder name.
+  bool _ownerResolving = true;
+
   late AnnouncementModel _data;
   late final PageController _pageController;
   final _videoKey = GlobalKey<CachedVideoPlayerState>();
@@ -152,9 +160,15 @@ class _BrokerAnnouncementDetailViewState
         // returned user_id as a plain string (no name/avatar on fresh model).
         // This is awaited so the UI updates before the frame settles.
         await _supplementOwnerInfoFromCache();
+        if (mounted) setState(() => _ownerResolving = false);
       }
     } catch (_) {
-      if (mounted) setState(() => _detailLoaded = true);
+      if (mounted) {
+        setState(() {
+          _detailLoaded = true;
+          _ownerResolving = false;
+        });
+      }
     }
   }
 
@@ -274,7 +288,16 @@ class _BrokerAnnouncementDetailViewState
           borderRadius: BorderRadius.circular(16.r),
         ),
         insetPadding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 60.h),
-        child: _ProposalSheet(announcementId: id, isDark: isDark),
+        // The sheet shows the listing and its owner beside the message box, so
+        // it needs the model rather than just the id. The fallback name covers
+        // a detail response that returned `user_id` as a bare string.
+        child: _ProposalSheet(
+          announcement: _data,
+          ownerNameFallback: _ownerName ?? widget.ownerName,
+          ownerAvatarFallback: _ownerAvatar ?? widget.ownerAvatarUrl,
+          isLoading: !_detailLoaded || _ownerResolving,
+          isDark: isDark,
+        ),
       ),
     );
     if (sent == true && mounted) {
@@ -290,8 +313,12 @@ class _BrokerAnnouncementDetailViewState
     final id = _data.id;
     final peerId = _data.userId;
     if (id == null || peerId == null) return;
-    final annRole = _data.userRole ?? 1;
-    final brokerRole = 3 - annRole;
+    // Worked out from the announcement rather than assumed to be the broker's
+    // — the same rule every other chat entry point uses.
+    final myId = LocalStorageService.getUserIdFromToken() ??
+        LocalStorageService.getUser()?.data?.id ??
+        '';
+    final brokerRole = _data.viewerSide(myId);
     final peerName = _data.ownerName?.isNotEmpty == true
         ? _data.ownerName!
         : widget.announcement.ownerName?.isNotEmpty == true
@@ -1061,12 +1088,26 @@ class _BrokerAnnouncementDetailViewState
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ProposalSheet extends StatefulWidget {
-  final String announcementId;
+  final AnnouncementModel announcement;
+
+  /// Owner name / photo the parent screen already resolved, for the case where
+  /// the detail endpoint returned `user_id` as a bare string and the model has
+  /// neither.
+  final String? ownerNameFallback;
+  final String? ownerAvatarFallback;
+
+  /// The listing or its owner is still being fetched — the summary row is
+  /// shimmered rather than showing half of it and filling in the rest.
+  final bool isLoading;
+
   final bool isDark;
 
   const _ProposalSheet({
-    required this.announcementId,
+    required this.announcement,
     required this.isDark,
+    this.ownerNameFallback,
+    this.ownerAvatarFallback,
+    this.isLoading = false,
   });
 
   @override
@@ -1075,11 +1116,14 @@ class _ProposalSheet extends StatefulWidget {
 
 class _ProposalSheetState extends State<_ProposalSheet> {
   final TextEditingController _controller = TextEditingController();
-  final int _maxLength = 500;
+  static const int _maxLength = 500;
   static const int _minChars = 10;
+
   bool _submitted = false;
   bool _isLoading = false;
   String? _error;
+
+  AnnouncementModel get a => widget.announcement;
 
   @override
   void initState() {
@@ -1095,10 +1139,6 @@ class _ProposalSheetState extends State<_ProposalSheet> {
 
   Future<void> _submit() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) {
-      setState(() => _error = 'Message is required');
-      return;
-    }
     if (text.length < _minChars) {
       setState(() => _error = 'Message must be at least $_minChars characters');
       return;
@@ -1108,10 +1148,7 @@ class _ProposalSheetState extends State<_ProposalSheet> {
       _error = null;
     });
     try {
-      await AnnouncementRepository().sendProposal(
-        widget.announcementId,
-        message: _controller.text.trim(),
-      );
+      await AnnouncementRepository().sendProposal(a.id ?? '', message: text);
       if (!mounted) return;
       setState(() {
         _submitted = true;
@@ -1129,131 +1166,485 @@ class _ProposalSheetState extends State<_ProposalSheet> {
     }
   }
 
+  // ── The listing this message is about ─────────────────────────────────────
+
+  String get _title {
+    final name = a.propertyName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    final type = a.propertyType?.trim();
+    return (type != null && type.isNotEmpty) ? type : 'Property';
+  }
+
+  String get _location => [a.propertyCity, a.propertyCountry]
+      .whereType<String>()
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .join(', ');
+
+  /// `AED / YEAR` on a rental, plain currency on a sale — the figure beside it
+  /// means a different thing in each case.
+  String get _priceSuffix {
+    final currency = a.currency ?? 'AED';
+    final period = rentPeriodLabel(a);
+    if (period == null) return currency;
+    return '$currency / ${period.toLowerCase() == 'monthly' ? 'MONTH' : 'YEAR'}';
+  }
+
+  String get _ownerName {
+    final fromModel = a.ownerName?.trim();
+    if (fromModel != null && fromModel.isNotEmpty) return fromModel;
+    final fallback = widget.ownerNameFallback?.trim();
+    if (fallback != null && fallback.isNotEmpty) return fallback;
+    return 'Owner';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
-    final titleColor = isDark ? Colors.white : Colors.black;
-    final fieldBorder = isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300;
-    final hintColor = isDark ? Colors.grey.shade600 : Colors.grey.shade400;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final charCount = _controller.text.trim().length;
+    if (_submitted) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 20.h),
+        child: _buildSuccess(isDark),
+      );
+    }
+
+    final count = _controller.text.trim().length;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 20.h),
-      child: _submitted
-          ? _buildSuccess(isDark)
-          : Column(
-              mainAxisSize: MainAxisSize.min,
+      padding: EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 18.h),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Message to owner',
+            style: GoogleFonts.poppins(
+              fontSize: 17.sp,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : const Color(0xFF16181F),
+              height: 1.3,
+            ),
+          ),
+          SizedBox(height: 16.h),
+          widget.isLoading ? _propertyRowShimmer(isDark) : _propertyRow(isDark),
+          SizedBox(height: 16.h),
+          _messageField(isDark),
+          SizedBox(height: 8.h),
+          _statusRow(isDark, count: count, enough: count >= _minChars),
+          if (_error != null) ...[
+            SizedBox(height: 10.h),
+            _errorBlock(),
+          ],
+          SizedBox(height: 16.h),
+          _sendButton(),
+        ],
+      ),
+    );
+  }
+
+  // ── Property + owner ──────────────────────────────────────────────────────
+
+  Widget _propertyRow(bool isDark) {
+    final subColor = isDark ? Colors.grey.shade500 : const Color(0xFF7A7D87);
+    final titleColor = isDark ? Colors.white : const Color(0xFF16181F);
+    final divider = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.07);
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10.r),
+            child: _thumbnail(isDark),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Write Proposal Message To Seller',
+                  _title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: 15.sp,
+                    fontSize: 13.5.sp,
                     fontWeight: FontWeight.w600,
                     color: titleColor,
+                    height: 1.35,
                   ),
                 ),
-                SizedBox(height: 14.h),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: fieldBorder),
-                    borderRadius: BorderRadius.circular(10.r),
-                  ),
-                  child: TextField(
-                    controller: _controller,
-                    maxLines: 6,
-                    maxLength: _maxLength,
-                    buildCounter: (_,
-                            {required currentLength,
-                            required isFocused,
-                            maxLength}) =>
-                        null,
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(_maxLength)
-                    ],
-                    style: GoogleFonts.inter(fontSize: 13.sp, color: textColor),
-                    decoration: kBorderlessInput.copyWith(
-                      hintText: 'Write Here...',
-                      hintStyle:
-                          GoogleFonts.inter(fontSize: 13.sp, color: hintColor),
-                      contentPadding: EdgeInsets.all(12.w),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.only(top: 6.h),
-                  child: Row(
+                if (_location.isNotEmpty) ...[
+                  SizedBox(height: 4.h),
+                  Row(
                     children: [
-                      if (charCount < _minChars)
-                        Text(
-                          'Minimum $_minChars characters required',
-                          style: GoogleFonts.inter(
-                              fontSize: 11.sp, color: Colors.red.shade400),
-                        )
-                      else
-                        Row(
-                          children: [
-                            Icon(Icons.check_circle_rounded,
-                                size: 12.sp, color: AppColors.successGreen),
-                            SizedBox(width: 4.w),
-                            Text('Looks good',
-                                style: GoogleFonts.inter(
-                                    fontSize: 11.sp,
-                                    color: AppColors.successGreen)),
-                          ],
+                      Icon(Icons.location_on_rounded,
+                          size: 12.sp, color: AppColors.primary),
+                      SizedBox(width: 3.w),
+                      Expanded(
+                        child: Text(
+                          _location,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w300,
+                            color: subColor,
+                            height: 1.35,
+                          ),
                         ),
-                      const Spacer(),
-                      Text('$charCount/$_maxLength',
-                          style: GoogleFonts.inter(
-                              fontSize: 11.sp, color: Colors.grey.shade500)),
+                      ),
                     ],
                   ),
-                ),
-                if (_error != null) ...[
-                  SizedBox(height: 8.h),
-                  Text(_error!,
-                      style: GoogleFonts.inter(
-                          fontSize: 12.sp, color: Colors.red.shade600),
-                      textAlign: TextAlign.center),
                 ],
-                SizedBox(height: 14.h),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52.h,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      disabledBackgroundColor:
-                          AppColors.primary.withValues(alpha: 0.6),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14.r)),
-                      elevation: 0,
+                SizedBox(height: 6.h),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        groupedPrice(a.price ?? 0),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDBC483),
+                          height: 1.2,
+                        ),
+                      ),
                     ),
-                    child: _isLoading
-                        ? SizedBox(
-                            width: 22.w,
-                            height: 22.w,
-                            child: const CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2.5),
-                          )
-                        : Text(
-                            'Send Proposal Request',
-                            style: GoogleFonts.poppins(
-                                fontSize: 15.sp,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white),
-                          ),
-                  ),
+                    SizedBox(width: 5.w),
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 1.h),
+                      child: Text(
+                        _priceSuffix,
+                        style: GoogleFonts.poppins(
+                          fontSize: 10.5.sp,
+                          fontWeight: FontWeight.w400,
+                          color: subColor,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
+          ),
+          SizedBox(width: 12.w),
+          VerticalDivider(width: 1, thickness: 1, color: divider),
+          SizedBox(width: 12.w),
+          _ownerBlock(isDark, subColor, titleColor),
+        ],
+      ),
+    );
+  }
+
+  /// Same footprint as [_propertyRow], so the sheet doesn't resize under the
+  /// user when the listing lands.
+  Widget _propertyRowShimmer(bool isDark) {
+    final base = isDark ? const Color(0xFF23262E) : Colors.grey.shade300;
+    final highlight = isDark ? const Color(0xFF2E323B) : Colors.grey.shade100;
+
+    Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(4.r),
+          ),
+        );
+
+    return Shimmer.fromColors(
+      baseColor: base,
+      highlightColor: highlight,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 62.w,
+            height: 62.w,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10.r),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                bar(double.infinity, 13.h),
+                SizedBox(height: 6.h),
+                bar(96.w, 11.h),
+                SizedBox(height: 8.h),
+                bar(120.w, 15.h),
+              ],
+            ),
+          ),
+          SizedBox(width: 24.w),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40.w,
+                height: 40.w,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              SizedBox(height: 7.h),
+              bar(60.w, 10.h),
+              SizedBox(height: 4.h),
+              bar(46.w, 9.h),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _thumbnail(bool isDark) {
+    final url = a.propertyMedia?.thumbnail ??
+        (a.imageUrls?.isNotEmpty == true ? a.imageUrls!.first : null);
+    final placeholder = Container(
+      width: 62.w,
+      height: 62.w,
+      color: isDark ? const Color(0xFF23262E) : Colors.grey.shade200,
+      alignment: Alignment.center,
+      child: Icon(Icons.home_outlined,
+          size: 22.sp, color: isDark ? Colors.grey.shade600 : Colors.grey),
+    );
+    if (url == null || url.isEmpty) return placeholder;
+    return CachedNetworkImage(
+      imageUrl: url,
+      width: 62.w,
+      height: 62.w,
+      fit: BoxFit.cover,
+      placeholder: (_, __) => placeholder,
+      errorWidget: (_, __, ___) => placeholder,
+    );
+  }
+
+  Widget _ownerBlock(bool isDark, Color subColor, Color titleColor) {
+    final name = _ownerName;
+    final fromModel = a.ownerAvatarUrl?.trim();
+    final avatar = (fromModel != null && fromModel.isNotEmpty)
+        ? fromModel
+        : widget.ownerAvatarFallback?.trim();
+    final blank = isDark ? const Color(0xFF23262E) : Colors.grey.shade200;
+
+    return SizedBox(
+      width: 78.w,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40.w,
+            height: 40.w,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.primary, width: 1),
+            ),
+            child: ClipOval(
+              // No stock face here: an initial still reads as this person,
+              // where a borrowed photo reads as somebody else entirely.
+              child: (avatar == null || avatar.isEmpty)
+                  ? Container(
+                      color: blank,
+                      alignment: Alignment.center,
+                      child: Text(
+                        name.substring(0, 1).toUpperCase(),
+                        style: GoogleFonts.poppins(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: subColor,
+                        ),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: avatar,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(color: blank),
+                      errorWidget: (_, __, ___) => Container(color: blank),
+                    ),
+            ),
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 11.5.sp,
+              fontWeight: FontWeight.w600,
+              color: titleColor,
+              height: 1.35,
+            ),
+          ),
+          Text(
+            'Property Owner',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 9.5.sp,
+              fontWeight: FontWeight.w300,
+              color: subColor,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Message box ───────────────────────────────────────────────────────────
+
+  Widget _messageField(bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.55)),
+      ),
+      child: TextField(
+        controller: _controller,
+        maxLines: 6,
+        maxLength: _maxLength,
+        buildCounter: (_,
+                {required currentLength, required isFocused, maxLength}) =>
+            null,
+        inputFormatters: [LengthLimitingTextInputFormatter(_maxLength)],
+        style: GoogleFonts.poppins(
+          fontSize: 13.sp,
+          color: isDark ? Colors.white : Colors.black87,
+          height: 1.45,
+        ),
+        decoration: kBorderlessInput.copyWith(
+          hintText: 'Type your proposal message...',
+          hintStyle: GoogleFonts.poppins(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w300,
+            color: isDark ? Colors.grey.shade600 : Colors.grey.shade500,
+          ),
+          contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
+        ),
+      ),
+    );
+  }
+
+  Widget _statusRow(bool isDark, {required int count, required bool enough}) {
+    final subColor = isDark ? Colors.grey.shade500 : const Color(0xFF9A9DA6);
+    return Row(
+      children: [
+        if (enough) ...[
+          Icon(Icons.check_circle_rounded,
+              size: 13.sp, color: AppColors.successGreen),
+          SizedBox(width: 4.w),
+          Text(
+            'Looks good',
+            style: GoogleFonts.poppins(
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w400,
+              color: AppColors.successGreen,
+            ),
+          ),
+        ] else
+          Text(
+            'Minimum $_minChars characters required',
+            style: GoogleFonts.poppins(
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w400,
+              color: Colors.red.shade400,
+            ),
+          ),
+        const Spacer(),
+        Text(
+          '$count/$_maxLength',
+          style: GoogleFonts.poppins(
+            fontSize: 11.sp,
+            fontWeight: FontWeight.w400,
+            color: subColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The limit message arrives as a sentence pair — "Proposals limit
+  /// exhausted. Maximum proposals limit already reached." — so it is broken at
+  /// the full stop rather than left to wrap wherever the width happens to run
+  /// out.
+  Widget _errorBlock() {
+    final lines = _error!
+        .split(RegExp(r'(?<=\.)\s+'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          for (final line in lines)
+            Text(
+              line,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 11.5.sp,
+                fontWeight: FontWeight.w400,
+                color: Colors.red.shade400,
+                height: 1.5,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sendButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 52.h,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _submit,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+          elevation: 0,
+        ),
+        child: _isLoading
+            ? SizedBox(
+                width: 22.w,
+                height: 22.w,
+                child: const CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2.5),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.send_rounded, size: 17.sp, color: Colors.white),
+                  SizedBox(width: 8.w),
+                  Text(
+                    'Send Proposal Request',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 
   Widget _buildSuccess(bool isDark) {
-    final titleColor = isDark ? Colors.white : Colors.black;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1270,9 +1661,9 @@ class _ProposalSheetState extends State<_ProposalSheet> {
             style: GoogleFonts.poppins(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w700,
-                color: titleColor)),
+                color: isDark ? Colors.white : Colors.black)),
         SizedBox(height: 6.h),
-        Text('Your proposal has been sent to the buyer.',
+        Text('Your proposal has been sent to the owner.',
             style:
                 GoogleFonts.inter(fontSize: 13.sp, color: AppColors.textHint),
             textAlign: TextAlign.center),
