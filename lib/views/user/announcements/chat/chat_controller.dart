@@ -76,6 +76,10 @@ class ChatController extends GetxController {
 
   Timer? _typingTimer;
   Timer? _historyTimeout;
+  // Watches the socket's connected state while a history request is
+  // in-flight but the socket hasn't finished (re)connecting yet — see
+  // _armHistoryTimeout.
+  Worker? _historyConnectWorker;
 
   String? get _currentUserId => LocalStorageService.getUser()?.data?.id;
 
@@ -130,6 +134,8 @@ class ChatController extends GetxController {
     isLoadingHistory.value = false;
     _loadingMore = false;
     _historyTimeout?.cancel();
+    _historyConnectWorker?.dispose();
+    _historyConnectWorker = null;
   }
 
   // ── History ──
@@ -156,19 +162,63 @@ class ChatController extends GetxController {
     _armHistoryTimeout();
   }
 
-  /// Gives up on the request after 8s and says so, rather than spinning.
+  /// Gives up on the request and says so, rather than spinning forever.
+  ///
+  /// `chat:history` is emitted straight away even when the socket hasn't
+  /// finished connecting yet — [SocketService.emit] just queues it and fires
+  /// it the moment the handshake completes, so nothing is lost. The old flat
+  /// 8s timer here counted that handshake time against the same budget as
+  /// the server's actual reply, so it routinely fired *while the request was
+  /// still queued* (most reliably right after a role switch, which tears the
+  /// socket down and reconnects from scratch — see ProfileController.
+  /// switchRole). The UI then showed "Couldn't load chat" and sat there until
+  /// the user tapped Retry — by which point the handshake had long since
+  /// finished, so the retry answered almost instantly. That was the
+  /// connection succeeding on its own, just too late to matter to a timer
+  /// that had already given up.
+  ///
+  /// So: don't start the 8s "is the server answering" clock until the socket
+  /// is actually connected. While still connecting, wait on
+  /// [SocketService.isConnected] instead, under a longer 20s outer cap for
+  /// the case where the connection itself never comes up (e.g. no network).
   void _armHistoryTimeout() {
     _historyTimeout?.cancel();
-    _historyTimeout = Timer(const Duration(seconds: 8), () {
-      if (isLoadingHistory.value || _loadingMore) {
-        isLoadingHistory.value = false;
-        _loadingMore = false;
-        if (messages.isEmpty && error.value.isEmpty) {
-          error.value =
-              "Couldn't load chat. Please check your connection or sign in again.";
-        }
-      }
+    _historyConnectWorker?.dispose();
+    _historyConnectWorker = null;
+
+    if (_socket.isReady) {
+      _startHistoryDeadline();
+      return;
+    }
+
+    _historyTimeout = Timer(const Duration(seconds: 20), _giveUpOnHistory);
+    _historyConnectWorker = ever(_socket.isConnected, (connected) {
+      if (connected != true) return;
+      _historyConnectWorker?.dispose();
+      _historyConnectWorker = null;
+      // Connected in time — swap the outer cap for the real, tighter
+      // "is the server answering" deadline.
+      _startHistoryDeadline();
     });
+  }
+
+  /// The focused deadline for the server's `chat:history` reply, started
+  /// only once the socket is actually connected and the request has really
+  /// gone out.
+  void _startHistoryDeadline() {
+    _historyTimeout?.cancel();
+    _historyTimeout = Timer(const Duration(seconds: 8), _giveUpOnHistory);
+  }
+
+  void _giveUpOnHistory() {
+    if (isLoadingHistory.value || _loadingMore) {
+      isLoadingHistory.value = false;
+      _loadingMore = false;
+      if (messages.isEmpty && error.value.isEmpty) {
+        error.value =
+            "Couldn't load chat. Please check your connection or sign in again.";
+      }
+    }
   }
 
   /// Reset and retry history from scratch — call from UI retry button.
@@ -217,10 +267,19 @@ class ChatController extends GetxController {
     isLoadingHistory.value = false;
     _loadingMore = false;
     _historyTimeout?.cancel();
+    _historyConnectWorker?.dispose();
+    _historyConnectWorker = null;
+    // Clears a stale "Couldn't load chat" left by an earlier attempt that
+    // gave up before this (delayed but successful) reply arrived — otherwise
+    // an empty-but-successful history leaves the Retry UI showing even
+    // though nothing is actually wrong.
+    error.value = '';
   }
 
   void _onHistoryError(dynamic data) {
     _historyTimeout?.cancel();
+    _historyConnectWorker?.dispose();
+    _historyConnectWorker = null;
     debugPrint('❌ [Chat] chat:history:error attempt=$_historyAttempt data=$data');
     if (_historyAttempt < 2 && messages.isEmpty) {
       _historyAttempt++;
@@ -436,6 +495,7 @@ class ChatController extends GetxController {
   void onClose() {
     _typingTimer?.cancel();
     _historyTimeout?.cancel();
+    _historyConnectWorker?.dispose();
     _socket
       ..off(ChatEvents.message, _onMessage)
       ..off(ChatEvents.messageError, _onMessageError)

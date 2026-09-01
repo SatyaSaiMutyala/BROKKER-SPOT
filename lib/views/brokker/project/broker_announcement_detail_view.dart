@@ -1210,7 +1210,13 @@ class _ProposalSheetState extends State<_ProposalSheet> {
 
     final count = _controller.text.trim().length;
 
-    return Padding(
+    // Scrollable rather than a plain Padding+Column: when the keyboard opens
+    // for the message field, the Dialog has less vertical room than the
+    // sheet's natural height, and a non-scrolling Column would overflow —
+    // pushing "Send Proposal Request" down behind the keyboard instead of
+    // letting the user scroll to it.
+    return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 18.h),
       child: Column(
         mainAxisSize: MainAxisSize.min,

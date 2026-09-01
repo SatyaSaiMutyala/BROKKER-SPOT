@@ -143,6 +143,11 @@ class _PropertyPriceBrokerageViewState
     final c = Get.find<AnnouncementController>();
     if (c.price != null) _priceCtrl.text = c.price!.toStringAsFixed(0);
     _brokeragePercent = c.brokeragePercent;
+    // The toggle itself has no separate field on the controller — a >0
+    // percent is what "on" means (see _commissionToggleRow: on forces it to
+    // at least 1, off zeroes it). Without this, leaving the step and coming
+    // back restored the percent but left the switch showing off.
+    _commissionEnabled = c.brokeragePercent > 0;
     if (c.rentPeriod != null) {
       final rp = c.rentPeriod!;
       _priceType = rp[0].toUpperCase() + rp.substring(1);

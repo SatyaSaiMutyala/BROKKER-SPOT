@@ -282,6 +282,9 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
       ownerName: !widget.isOwner ? widget.counterpartyName : null,
       ownerAvatarUrl: !widget.isOwner ? widget.counterpartyAvatar : null,
       backOnChat: !widget.isOwner,
+      // Whoever isn't the owner here is the broker on this agreement — show
+      // them the commission card their own detail screen already carries.
+      viewerIsBroker: !widget.isOwner,
     );
 
     if (widget.acceptAndPublish) {

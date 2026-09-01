@@ -53,6 +53,14 @@ class AnnouncementDetailView extends StatefulWidget {
   /// chat is already one level below on the navigator stack.
   final bool backOnChat;
 
+  /// The signed-in viewer is the broker on this listing's proposal (not the
+  /// owner, not someone just browsing the feed) — e.g. reached via
+  /// [BrokerAgreementView._openProperty()]. Reveals the commission card the
+  /// broker's own detail screen already shows, which plain [isOwner] can't:
+  /// [isOwner] is false for a broker too, and turning the card on for every
+  /// non-owner would leak it to anonymous feed browsing.
+  final bool viewerIsBroker;
+
   const AnnouncementDetailView({
     super.key,
     required this.announcement,
@@ -63,6 +71,7 @@ class AnnouncementDetailView extends StatefulWidget {
     this.ownerName,
     this.ownerAvatarUrl,
     this.backOnChat = false,
+    this.viewerIsBroker = false,
   });
 
   @override
@@ -569,7 +578,11 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                   // showCommission reveals the brokerage breakdown for owners.
                   AnnouncementDetailBody(
                     data: a,
-                    showCommission: widget.isOwner,
+                    showCommission: widget.isOwner || widget.viewerIsBroker,
+                    // Broker's own share of the fee, same as their dedicated
+                    // detail screen — only meaningful when they, not the
+                    // owner, are the one seeing the card.
+                    commissionAsBroker: widget.viewerIsBroker,
                     contractedBrokers: _contractedBrokers,
                     onBrokerChatTap: _openBrokerChat,
                     // User-side screen only — the broker detail screens share
@@ -578,9 +591,11 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                     // The limit is the owner's own setting. Opening a listing
                     // from the feed, it is somebody else's housekeeping.
                     showProposalLimit: widget.isOwner,
-                    // User side doesn't carry the percentage row at all — the
-                    // broker screens still do.
-                    showBrokerage: false,
+                    // Off for plain feed browsing — the commission card above
+                    // already covers the fee there. A broker viewing their own
+                    // contracted listing still gets it, matching their
+                    // dedicated detail screen.
+                    showBrokerage: widget.viewerIsBroker,
                   ),
                   SizedBox(height: 90.h + bottomPad),
                 ],

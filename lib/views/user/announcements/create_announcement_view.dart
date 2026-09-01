@@ -84,7 +84,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       final a = widget.announcement!;
       _propertyFor =
           (a.listingType ?? '').toLowerCase() == 'sell' ? 'Sell' : 'Rent';
-      _brokerProposalLimit = a.proposalsLimit?.toString();
+      // Broker flow never surfaces this field — always unlimited (see
+      // _onAnnounceTap), even when editing a listing that happens to carry
+      // an old value from before this was broker-hidden.
+      _brokerProposalLimit = widget.fromBroker ? null : a.proposalsLimit?.toString();
       _deriveStepFlags();
     } else {
       _ctrl.loadDraft().then((flags) {
@@ -96,7 +99,9 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
             _videoImagesSaved = flags['videoImagesSaved'] as bool? ?? false;
             _priceSaved = flags['priceSaved'] as bool? ?? false;
             _documentsSaved = flags['documentsSaved'] as bool? ?? false;
-            _brokerProposalLimit = flags['brokerProposalLimit'] as String?;
+            _brokerProposalLimit = widget.fromBroker
+                ? null
+                : flags['brokerProposalLimit'] as String?;
           });
         }
       });
@@ -411,7 +416,16 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
   }
 
   /// Announce Now / Update: pick the proposal limit first, then submit.
+  ///
+  /// A broker listing their own property doesn't need to be asked how many
+  /// brokers may pitch for it — that question only makes sense for an
+  /// owner's listing. The broker flow skips the dialog and submits straight
+  /// away with no cap (see [_proposalLimitValue]).
   void _onAnnounceTap() {
+    if (widget.fromBroker) {
+      _submit();
+      return;
+    }
     _showBrokerProposalLimitDialog(onChosen: _submit);
   }
 
