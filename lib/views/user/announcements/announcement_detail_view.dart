@@ -974,6 +974,43 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     );
   }
 
+  /// Stands in for the chat button on a listing the viewer already owns —
+  /// published for them by a broker they have a signed contract with.
+  Widget _ownPropertyBadge(bool isDark) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 7.h),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: isDark ? 0.16 : 0.12),
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'Your Property',
+            style: GoogleFonts.poppins(
+              fontSize: 11.5.sp,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+              height: 1.3,
+            ),
+          ),
+          Text(
+            'Published by broker',
+            style: GoogleFonts.poppins(
+              fontSize: 9.5.sp,
+              fontWeight: FontWeight.w300,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPageDots(int totalPages) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1200,58 +1237,68 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                     ),
                   ),
                   SizedBox(width: 10.w),
-                  // Chat icon button.
-                  // If backOnChat is true the chat screen is already on the
-                  // stack below (opened via BrokerAgreementView._openProperty
-                  // using Get.off), so just pop back instead of pushing a new
-                  // chat. Otherwise open a new chat as broker (userRole: 2).
-                  GestureDetector(
-                    onTap: () {
-                      if (widget.backOnChat) {
-                        Get.back();
-                        return;
-                      }
-                      final peerName = a.ownerName?.isNotEmpty == true
-                          ? a.ownerName!
-                          : widget.announcement.ownerName?.isNotEmpty == true
-                              ? widget.announcement.ownerName!
-                              : _brokerName?.isNotEmpty == true
-                                  ? _brokerName!
-                                  : widget.ownerName ?? 'Owner';
-                      final peerAvatar = a.brokerAvatarUrl?.isNotEmpty == true
-                          ? a.brokerAvatarUrl!
-                          : widget.announcement.brokerAvatarUrl?.isNotEmpty ==
-                                  true
-                              ? widget.announcement.brokerAvatarUrl!
-                              : _brokerAvatar?.isNotEmpty == true
-                                  ? _brokerAvatar!
-                                  : widget.ownerAvatarUrl ?? '';
-                      AnnouncementChatView.open(
-                        announcementId: a.id ?? '',
-                        brokerName: peerName,
-                        brokerAvatar: peerAvatar,
-                        peerUserId: a.userId ?? widget.announcement.userId,
-                        // Not always 2: on a broker-posted listing the viewer
-                        // here is the owner-side party, not the broker. The
-                        // announcement settles which.
-                        userRole: a.viewerSide(_myId),
-                      );
-                    },
-                    child: Container(
-                      width: 42.w,
-                      height: 42.w,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border:
-                            Border.all(color: AppColors.primary, width: 1.5),
-                      ),
-                      child: Icon(
-                        Icons.chat_bubble_outline_rounded,
-                        size: 18.sp,
-                        color: AppColors.primary,
+                  // Once a broker publishes a listing on the owner's behalf, a
+                  // second announcement exists — the broker's — and the owner
+                  // sees it in the feed like anyone else. Chatting there would
+                  // mean messaging a broker about their own property, so the
+                  // server marks it `is_chat_available: false` (it compares the
+                  // listing's owner_id against the caller) and the button gives
+                  // way to a label saying whose property this is.
+                  if (a.isChatAvailable == false)
+                    _ownPropertyBadge(isDark)
+                  else
+                    // Chat icon button.
+                    // If backOnChat is true the chat screen is already on the
+                    // stack below (opened via BrokerAgreementView._openProperty
+                    // using Get.off), so just pop back instead of pushing a new
+                    // chat. Otherwise open a new chat as broker (userRole: 2).
+                    GestureDetector(
+                      onTap: () {
+                        if (widget.backOnChat) {
+                          Get.back();
+                          return;
+                        }
+                        final peerName = a.ownerName?.isNotEmpty == true
+                            ? a.ownerName!
+                            : widget.announcement.ownerName?.isNotEmpty == true
+                                ? widget.announcement.ownerName!
+                                : _brokerName?.isNotEmpty == true
+                                    ? _brokerName!
+                                    : widget.ownerName ?? 'Owner';
+                        final peerAvatar = a.brokerAvatarUrl?.isNotEmpty == true
+                            ? a.brokerAvatarUrl!
+                            : widget.announcement.brokerAvatarUrl?.isNotEmpty ==
+                                    true
+                                ? widget.announcement.brokerAvatarUrl!
+                                : _brokerAvatar?.isNotEmpty == true
+                                    ? _brokerAvatar!
+                                    : widget.ownerAvatarUrl ?? '';
+                        AnnouncementChatView.open(
+                          announcementId: a.id ?? '',
+                          brokerName: peerName,
+                          brokerAvatar: peerAvatar,
+                          peerUserId: a.userId ?? widget.announcement.userId,
+                          // Not always 2: on a broker-posted listing the viewer
+                          // here is the owner-side party, not the broker. The
+                          // announcement settles which.
+                          userRole: a.viewerSide(_myId),
+                        );
+                      },
+                      child: Container(
+                        width: 42.w,
+                        height: 42.w,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border:
+                              Border.all(color: AppColors.primary, width: 1.5),
+                        ),
+                        child: Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 18.sp,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),

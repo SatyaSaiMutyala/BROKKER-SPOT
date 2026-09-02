@@ -418,6 +418,9 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                   // photo on every card.
                   showAvatar: !widget.showMineOnly,
                   showOwnerAvatar: true,
+                  // "My Announcements" only ever lists this broker's own
+                  // postings, and no broker is being paid on those.
+                  isPrivateDeal: widget.showMineOnly,
                   onTap: () => Get.to(
                       () => BrokerAnnouncementDetailView(announcement: a)),
                 );

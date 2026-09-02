@@ -38,6 +38,13 @@ class HomeAnnouncementCard extends StatelessWidget {
   final bool isWishlisted;
   final VoidCallback? onWishlistTap;
 
+  /// Replaces the brokerage strip's fee line with "Private Deal".
+  ///
+  /// For a broker's own listings, where there is no broker being paid — the
+  /// usual line would read "No Seller Brokerage", which says nothing useful
+  /// about a listing they posted themselves.
+  final bool isPrivateDeal;
+
   const HomeAnnouncementCard({
     super.key,
     required this.announcement,
@@ -50,6 +57,7 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.showOwnerAvatar = false,
     this.isWishlisted = false,
     this.onWishlistTap,
+    this.isPrivateDeal = false,
   });
 
   // Strip sits flush below the image card — no overlap.
@@ -67,7 +75,12 @@ class HomeAnnouncementCard extends StatelessWidget {
 
   /// Text on the brokerage strip. Shared with the detail screens so the two
   /// always read the same — see [brokerageLabel].
-  String get _brokerageLabel => brokerageLabel(announcement);
+  ///
+  /// A broker's own listing is the exception: there is no broker to pay on it,
+  /// so the usual fee line has nothing to say and the strip names the
+  /// arrangement instead.
+  String get _brokerageLabel =>
+      isPrivateDeal ? 'Private Deal' : brokerageLabel(announcement);
 
   String get _listingBadge {
     if (announcement.listingType == 'Sell') return 'FOR SELL';

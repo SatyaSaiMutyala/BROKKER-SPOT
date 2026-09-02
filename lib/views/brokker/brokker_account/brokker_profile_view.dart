@@ -64,7 +64,12 @@ class BrokerProfileView extends StatelessWidget {
             ),
             Expanded(
               child: Obx(() {
-                if (controller.isLoading.value) {
+                // A guest sees the same screen, laid out the same way, with
+                // every action greyed out — the user-side account screen has
+                // always worked this way. Showing the shape of what an account
+                // gets them beats an empty page or a bounce back to login.
+                final isGuest = !LocalStorageService.isLoggedIn();
+                if (!isGuest && controller.isLoading.value) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 return SingleChildScrollView(
@@ -72,7 +77,7 @@ class BrokerProfileView extends StatelessWidget {
                   child: Column(
                     children: [
                       SizedBox(height: 24.h),
-                      _buildProfileHeader(theme),
+                      _buildProfileHeader(theme, isGuest: isGuest),
                       SizedBox(height: 28.h),
                       _buildCardGroup(theme, [
                         _menuItem(
@@ -80,6 +85,7 @@ class BrokerProfileView extends StatelessWidget {
                           'assets/images/broker_my_profile_icon.png',
                           'Manage Profile',
                           () => Get.to(() => const BrokerMyInformationView()),
+                          enabled: !isGuest,
                         ),
                         _menuItem(
                           theme,
@@ -87,6 +93,7 @@ class BrokerProfileView extends StatelessWidget {
                           'My Announcements',
                           () => Get.to(() =>
                               const BrokerProjectsView(showMineOnly: true)),
+                          enabled: !isGuest,
                         ),
                         // _menuItem(
                         //   theme,
@@ -110,6 +117,7 @@ class BrokerProfileView extends StatelessWidget {
                           // returns the broker-side saves.
                           () => Get.to(
                               () => const WishlistView(showBackButton: true)),
+                          enabled: !isGuest,
                         ),
                         // _menuItem(
                         //   theme,
@@ -122,6 +130,7 @@ class BrokerProfileView extends StatelessWidget {
                           'assets/images/broker_settings_icon.png',
                           'Setting',
                           () => Get.to(() => SettingsView(side: 'broker')),
+                          enabled: !isGuest,
                         ),
                       ]),
                       SizedBox(height: 16.h),
@@ -131,6 +140,8 @@ class BrokerProfileView extends StatelessWidget {
                           'assets/images/switch_to_user_icon.png',
                           'Switch to User side',
                           () => _switchToUser(),
+                          // Stays live for a guest: browsing the user side
+                          // needs no account, so there is nothing to gate.
                         ),
                       ]),
                       SizedBox(height: 30.h),
@@ -146,6 +157,15 @@ class BrokerProfileView extends StatelessWidget {
   }
 
   Future<void> _switchToUser() async {
+    // A guest has no account to switch the role on — the call would just fail
+    // on a missing token. Browsing the other side needs nothing more than
+    // remembering which side to open on.
+    if (!LocalStorageService.isLoggedIn()) {
+      await LocalStorageService.saveLastSide('user');
+      Get.offAll(() => const DashboardView());
+      return;
+    }
+
     Get.dialog(
       const Center(child: CircularProgressIndicator()),
       barrierDismissible: false,
@@ -161,9 +181,12 @@ class BrokerProfileView extends StatelessWidget {
     }
   }
 
-  Widget _buildProfileHeader(ThemeData theme) {
+  Widget _buildProfileHeader(ThemeData theme, {required bool isGuest}) {
     final data = controller.profileData.value;
-    final bool isVerified = data?['verificationStatus'] == 'approved';
+    // A guest has no verification to show — the badge would be claiming
+    // something about an account that doesn't exist yet.
+    final bool isVerified =
+        !isGuest && data?['verificationStatus'] == 'approved';
 
     return Column(
       children: [
@@ -191,25 +214,34 @@ class BrokerProfileView extends StatelessWidget {
                     color: Colors.grey,
                   ),
                   child: ClipOval(
-                    child: controller.brokerProfileImage.value.isNotEmpty
-                        ? Image.network(
-                            controller.brokerProfileImage.value,
-                            fit: BoxFit.cover,
-                            width: _avatarSize.w,
-                            height: _avatarSize.w,
-                            errorBuilder: (_, __, ___) => Image.asset(
-                              'assets/images/profile.jpg',
-                              fit: BoxFit.cover,
-                              width: _avatarSize.w,
-                              height: _avatarSize.w,
-                            ),
+                    // A guest has no photo of their own, and the stock portrait
+                    // would put a stranger's face on their account. The
+                    // user-side screen shows a neutral placeholder here too.
+                    child: isGuest
+                        ? Icon(
+                            Icons.person,
+                            size: 46.sp,
+                            color: Colors.white70,
                           )
-                        : Image.asset(
-                            'assets/images/profile.jpg',
-                            fit: BoxFit.cover,
-                            width: _avatarSize.w,
-                            height: _avatarSize.w,
-                          ),
+                        : controller.brokerProfileImage.value.isNotEmpty
+                            ? Image.network(
+                                controller.brokerProfileImage.value,
+                                fit: BoxFit.cover,
+                                width: _avatarSize.w,
+                                height: _avatarSize.w,
+                                errorBuilder: (_, __, ___) => Image.asset(
+                                  'assets/images/profile.jpg',
+                                  fit: BoxFit.cover,
+                                  width: _avatarSize.w,
+                                  height: _avatarSize.w,
+                                ),
+                              )
+                            : Image.asset(
+                                'assets/images/profile.jpg',
+                                fit: BoxFit.cover,
+                                width: _avatarSize.w,
+                                height: _avatarSize.w,
+                              ),
                   ),
                 ),
                 // Last in the stack so the badge sits over the photo rather
@@ -237,9 +269,12 @@ class BrokerProfileView extends StatelessWidget {
         ),
         SizedBox(height: 12.h),
         Text(
-          controller.userName.value.isNotEmpty
-              ? controller.userName.value
-              : '-',
+          // Same wording the user-side account screen uses for a guest.
+          isGuest
+              ? 'Guest'
+              : (controller.userName.value.isNotEmpty
+                  ? controller.userName.value
+                  : '-'),
           style: GoogleFonts.poppins(
             fontSize: 18.sp,
             fontWeight: FontWeight.w600,
@@ -248,9 +283,11 @@ class BrokerProfileView extends StatelessWidget {
         ),
         SizedBox(height: 4.h),
         Text(
-          controller.userEmail.value.isNotEmpty
-              ? controller.userEmail.value
-              : '-',
+          isGuest
+              ? 'Sign in to manage your broker account'
+              : (controller.userEmail.value.isNotEmpty
+                  ? controller.userEmail.value
+                  : '-'),
           style: GoogleFonts.poppins(
             fontSize: 14.sp,
             fontWeight: FontWeight.w400,
@@ -282,14 +319,15 @@ class BrokerProfileView extends StatelessWidget {
     ThemeData theme,
     String assetPath,
     String title,
-    VoidCallback onTap,
-  ) {
+    VoidCallback onTap, {
+    bool enabled = true,
+  }) {
     final isDark = theme.brightness == Brightness.dark;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         InkWell(
-          onTap: onTap,
+          onTap: enabled ? onTap : null,
           borderRadius: BorderRadius.circular(16.r),
           child: Padding(
             // Same insets as the user-side tile so both cards stand the same
@@ -303,7 +341,9 @@ class BrokerProfileView extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       fontSize: 15.sp,
                       fontWeight: FontWeight.w500,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                      color: enabled
+                          ? (isDark ? Colors.white : const Color(0xFF1A1A1A))
+                          : Colors.grey.shade400,
                       height: 1.0,
                       letterSpacing: 0,
                     ),
@@ -314,12 +354,15 @@ class BrokerProfileView extends StatelessWidget {
                 // gold-tinted at 26x26. It used to be an 18x18 untinted image
                 // inside a gold-bordered box, which is what made the same
                 // assets read as different icons across the two screens.
-                Image.asset(
-                  assetPath,
-                  width: 26.w,
-                  height: 26.w,
-                  color: AppColors.primary,
-                  colorBlendMode: BlendMode.srcIn,
+                Opacity(
+                  opacity: enabled ? 1.0 : 0.4,
+                  child: Image.asset(
+                    assetPath,
+                    width: 26.w,
+                    height: 26.w,
+                    color: AppColors.primary,
+                    colorBlendMode: BlendMode.srcIn,
+                  ),
                 ),
               ],
             ),

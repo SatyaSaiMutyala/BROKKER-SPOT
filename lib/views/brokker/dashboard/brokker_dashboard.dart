@@ -2,7 +2,6 @@
 // import 'dart:ui' show ImageFilter;
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
-import 'package:brokkerspot/views/brokker/brokker_account/broker_account_view.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_account/brokker_profile_view.dart';
 import 'package:brokkerspot/views/brokker/dashboard/bottom_nav_controller.dart';
@@ -156,9 +155,14 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
   static const _loginRequiredTabs = {1, 2};
 
   // Tabs a guest (no token) may browse read-only instead of being pushed into
-  // the login dialog. Tab 1 shows the public announcement feed capped at
-  // [kGuestAnnouncementLimit] items via the /guest/announcements endpoints.
-  static const _guestBrowsableTabs = {1};
+  // the login dialog.
+  //
+  // 1 — the public announcement feed, capped at [kGuestAnnouncementLimit]
+  //     items via the /guest/announcements endpoints.
+  // 3 — Account, which renders its full layout with every action greyed out,
+  //     the way the user-side account screen already does. A guest tapping it
+  //     used to hit the login dialog and never see the screen at all.
+  static const _guestBrowsableTabs = {1, 3};
 
   void _onCreateTap(BuildContext context) {
     if (!LocalStorageService.isLoggedIn()) {
@@ -260,10 +264,11 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
         // floating pill. The flat bar is opaque and the user dashboard doesn't
         // set it either, so it goes — otherwise content runs under the bar.
         // extendBody: true,
-        body: (controller.currentIndex.value == 3 &&
-                !LocalStorageService.isLoggedIn())
-            ? AccountMenuView()
-            : pages[controller.currentIndex.value],
+        // One Account screen for both states. A guest used to get a separate
+        // [AccountMenuView] carrying a different set of rows, so the screen
+        // changed shape on sign-in; [BrokerProfileView] now renders the same
+        // sections either way and greys them out when there is no account.
+        body: pages[controller.currentIndex.value],
         // bottomNavigationBar: FloatingPillNavBar(
         //   items: _navItems,
         //   currentIndex: controller.currentIndex.value,

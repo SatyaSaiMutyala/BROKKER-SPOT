@@ -88,6 +88,23 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
 
   AnnouncementModel? _announcement;
 
+  /// Proposal status as carried by the REST detail response, used as the seed
+  /// until the socket's `chat:proposal:status` reply lands.
+  ///
+  /// The timeline reads [widget.proposalStatus] — the chat controller's
+  /// observable — which starts out null and is only filled by a socket
+  /// round-trip. On a first open that reply has not arrived by the time the
+  /// screen paints, so step 2 ("Contract Signed by Broker") rendered as
+  /// not-done even when the broker had already signed; leaving and coming back
+  /// worked only because the reply had landed by then. The detail response
+  /// this screen already fetches carries the same status under
+  /// `latest_proposals`, so seed from it and let the socket take over the
+  /// moment it answers.
+  ///
+  /// Owner side only — the backend returns `latest_proposals` exclusively to
+  /// the announcement's owner.
+  int _restStatus = 0;
+
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
   @override
@@ -136,7 +153,24 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
         }
       }
 
-      setState(() => _announcement = a);
+      // Seed the timeline from this response so it is right on the first
+      // frame, instead of waiting on the socket status reply. Scoped to this
+      // agreement's broker — an owner with several proposals out has one entry
+      // per broker here, and only this one describes this contract.
+      int restStatus = 0;
+      if (widget.brokerId.isNotEmpty) {
+        for (final p in a.latestProposals ?? const []) {
+          if (p.brokerId == widget.brokerId) {
+            restStatus = p.status ?? 0;
+            break;
+          }
+        }
+      }
+
+      setState(() {
+        _announcement = a;
+        _restStatus = restStatus;
+      });
     } catch (_) {
       // Card falls back to placeholders; the flow still works without it.
     }
@@ -154,7 +188,22 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
 
   // ── Derived state ───────────────────────────────────────────────────────────
 
-  int get _status => widget.proposalStatus.value ?? 0;
+  /// The socket reply is authoritative once it exists — it is a live read of
+  /// the proposal. [_restStatus] only stands in while that reply is still
+  /// outstanding (or came back empty), which is exactly the first-open window
+  /// the timeline used to render blank in.
+  ///
+  /// A known-published agreement floors at 3 (both signed). The backend only
+  /// lets a broker publish a proposal that already reached 3, so publishing is
+  /// proof both signatures exist — but neither stand-in reports it: the detail
+  /// response filters published proposals out of `latest_proposals`
+  /// (`status: { $nin: [4, 5] }`), and a broker never receives that list at
+  /// all. Without the floor, reopening a published agreement fell back to 0
+  /// and briefly showed the *sign* page instead of the finished timeline.
+  int get _status {
+    final live = widget.proposalStatus.value ?? _restStatus;
+    return (_published && live < 3) ? 3 : live;
+  }
 
   bool get _ownerSigned => _status >= 1 || (widget.isOwner && _signedLocally);
 
@@ -180,7 +229,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   /// broadcast OR by the proposal status already being 4 (published) when the
   /// screen opens after the fact — covers cold-open after a publish where the
   /// live socket event is long gone but the server still returns status == 4.
-  bool get _isPublished => _published || widget.proposalStatus.value == 4;
+  bool get _isPublished => _published || _status == 4;
 
   /// Whether the current user has taken their signing action.
   bool get _hasSigned => widget.isOwner ? _ownerSigned : _brokerSigned;

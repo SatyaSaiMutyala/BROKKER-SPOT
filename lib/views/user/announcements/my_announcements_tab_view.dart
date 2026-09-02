@@ -160,10 +160,17 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
               showBackButton: true,
               trailing: GestureDetector(
                 onTap: () => Get.to(() => const CreateAnnouncementView()),
+                // Same create icon the broker side uses. The artwork carries
+                // its own circular background, so the variant is swapped per
+                // theme rather than tinted — and the file names read the
+                // opposite way round to what they suggest: homeL is the
+                // dark-filled circle, homeD the light-filled one.
                 child: Image.asset(
-                  'assets/images/home_add_icon.png',
-                  width: 50.w,
-                  height: 50.w,
+                  isDark
+                      ? 'assets/images/homeL.png'
+                      : 'assets/images/homeD.png',
+                  width: 35.w,
+                  height: 35.w,
                 ),
               ),
             ),
