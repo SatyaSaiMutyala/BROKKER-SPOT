@@ -7,6 +7,7 @@ import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart
 import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
 import 'package:brokkerspot/views/user/meeting/controller/meeting_controller.dart';
 import 'package:brokkerspot/views/user/meeting/repo/meeting_repo.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 import 'package:brokkerspot/widgets/meeting/broker_meeting_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -123,6 +124,16 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> with RouteAware {
           ownerName: m.announcement.ownerName,
           ownerAvatarUrl: m.announcement.ownerAvatarUrl,
         ));
+  }
+
+  /// Tapping the round client avatar opens that person's profile instead of
+  /// the chat.
+  void _openProfile(ChatProfileSummary p) {
+    UserProfileView.open(
+      userId: p.id,
+      name: p.name,
+      avatarUrl: p.brokerProfileImageUrl ?? p.profileImageUrl,
+    );
   }
 
   Future<void> _onTap(MeetingItem m) async {
@@ -335,6 +346,7 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> with RouteAware {
               isOwn: _isOwn(m),
               onTap: () => _onTap(m),
               onPropertyTap: () => _openProperty(m),
+              onProfileTap: _openProfile,
             );
           },
         ),

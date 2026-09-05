@@ -16,12 +16,17 @@ class BrokerMeetingCard extends StatelessWidget {
   /// instead of the chat. The rest of the row still calls [onTap].
   final VoidCallback? onPropertyTap;
 
+  /// Tapping the client avatar opens that person's profile instead of the
+  /// chat. Reports the profile the avatar is drawing.
+  final void Function(ChatProfileSummary profile)? onProfileTap;
+
   const BrokerMeetingCard({
     super.key,
     required this.meeting,
     required this.isOwn,
     required this.onTap,
     this.onPropertyTap,
+    this.onProfileTap,
   });
 
   @override
@@ -130,6 +135,11 @@ class BrokerMeetingCard extends StatelessWidget {
                   ((peer?.name?.isNotEmpty == true ? peer!.name![0] : 'U'))
                       .toUpperCase(),
               count: meeting.chatProfilesCount,
+              // Left non-tappable when there is no peer behind the circle, so
+              // the row's own tap target keeps working.
+              onTap: (onProfileTap != null && peer != null)
+                  ? () => onProfileTap!(peer)
+                  : null,
             ),
           ],
         ),
@@ -200,52 +210,59 @@ class _ClientAvatar extends StatelessWidget {
   final String fallbackInitial;
   final int count;
 
+  final VoidCallback? onTap;
+
   const _ClientAvatar({
     required this.imageUrl,
     required this.fallbackInitial,
     required this.count,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 54.w,
-      height: 54.w,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 46.w,
-            height: 46.w,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.goldAccent, width: 2),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 54.w,
+        height: 54.w,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 46.w,
+              height: 46.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.goldAccent, width: 2),
+              ),
+              child: ClipOval(child: _image()),
             ),
-            child: ClipOval(child: _image()),
-          ),
-          if (count > 0)
-            Positioned(
-              top: -2,
-              right: -2,
-              child: Container(
-                width: 22.w,
-                height: 22.w,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  count > 9 ? '9+' : '$count',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+            if (count > 0)
+              Positioned(
+                top: -2,
+                right: -2,
+                child: Container(
+                  width: 22.w,
+                  height: 22.w,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    count > 9 ? '9+' : '$count',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

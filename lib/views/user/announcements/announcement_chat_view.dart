@@ -10,6 +10,7 @@ import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/theme/borderless_input.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 import 'package:brokkerspot/models/chat_message.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_controller.dart';
 import 'package:brokkerspot/views/user/announcements/broker_agreement_view.dart';
@@ -193,14 +194,16 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
             onTap: () => Navigator.pop(context),
           ),
           SizedBox(width: 12.w),
-          Container(
-            width: 44.w,
-            height: 44.w,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.primary, width: 1.5),
+          _opensProfile(
+            Container(
+              width: 44.w,
+              height: 44.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary, width: 1.5),
+              ),
+              child: ClipOval(child: _headerAvatar()),
             ),
-            child: ClipOval(child: _headerAvatar()),
           ),
           SizedBox(width: 10.w),
           Expanded(
@@ -211,16 +214,18 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                 Row(
                   children: [
                     Flexible(
-                      child: Text(
-                        widget.brokerName,
-                        style: GoogleFonts.poppins(
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w600,
-                          color: nameColor,
-                          height: 1.1,
+                      child: _opensProfile(
+                        Text(
+                          widget.brokerName,
+                          style: GoogleFonts.poppins(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w600,
+                            color: nameColor,
+                            height: 1.1,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     SizedBox(width: 8.w),
@@ -281,6 +286,24 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
             ),
         ],
       ),
+    );
+  }
+
+  /// Makes [child] open the person you are chatting with.
+  ///
+  /// Returned untouched when the conversation was opened without a peer id —
+  /// a tap target that can only do nothing is worse than none at all.
+  Widget _opensProfile(Widget child) {
+    final peerId = widget.peerUserId ?? '';
+    if (peerId.isEmpty) return child;
+    return GestureDetector(
+      onTap: () => UserProfileView.open(
+        userId: peerId,
+        name: widget.brokerName,
+        avatarUrl: widget.brokerAvatar,
+      ),
+      behavior: HitTestBehavior.opaque,
+      child: child,
     );
   }
 

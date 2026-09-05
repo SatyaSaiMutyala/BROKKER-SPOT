@@ -277,21 +277,21 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
             ),
           ),
           const Spacer(),
-          GestureDetector(
-            onTap: () => Get.to(() => const SearchView()),
-            behavior: HitTestBehavior.opaque,
-            child: SizedBox(
-              width: 35.w,
-              height: 35.w,
-              child: Image.asset(
-                'assets/images/search_icon.png',
-                width: 35.w,
-                height: 35.w,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ),
-          SizedBox(width: 10.w),
+          // GestureDetector(
+          //   onTap: () => Get.to(() => const SearchView()),
+          //   behavior: HitTestBehavior.opaque,
+          //   child: SizedBox(
+          //     width: 35.w,
+          //     height: 35.w,
+          //     child: Image.asset(
+          //       'assets/images/search_icon.png',
+          //       width: 35.w,
+          //       height: 35.w,
+          //       color: theme.colorScheme.onSurface,
+          //     ),
+          //   ),
+          // ),
+          // SizedBox(width: 10.w),
           GestureDetector(
             onTap: _onCreateTap,
             behavior: HitTestBehavior.opaque,

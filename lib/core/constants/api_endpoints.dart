@@ -20,6 +20,8 @@ class ApiEndpoints {
   static const String editMobileNumber = 'user/profile/edit-mobilenumber';
   static const String editEmail = 'user/profile/edit-email';
   static const String verifyEmailOtp = 'user/profile/verify-email-otp';
+  /// Another user's public profile. Append `/{user_id}`.
+  static const String getUserById = 'user/profile/get-user';
 
   // Guest (no auth required)
   static const String guestFetchAllAnnouncements = 'guest/announcements/fetch-all';

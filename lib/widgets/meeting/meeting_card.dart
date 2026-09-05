@@ -14,12 +14,18 @@ class MeetingCard extends StatelessWidget {
   /// instead of the chat. The rest of the row still calls [onTap].
   final VoidCallback? onPropertyTap;
 
+  /// Tapping one of the avatars on the right opens that person's profile
+  /// rather than the chat. Each avatar reports the profile it is drawing, so
+  /// the second one opens the second person and not the first.
+  final void Function(ChatProfileSummary profile)? onProfileTap;
+
   const MeetingCard({
     super.key,
     required this.meeting,
     required this.isOwn,
     required this.onTap,
     this.onPropertyTap,
+    this.onProfileTap,
   });
 
   @override
@@ -143,6 +149,7 @@ class MeetingCard extends StatelessWidget {
                 first: first,
                 second: second,
                 count: meeting.chatProfilesCount,
+                onProfileTap: onProfileTap,
               ),
             ],
           ),
@@ -213,10 +220,13 @@ class _AvatarCluster extends StatelessWidget {
   final ChatProfileSummary? second;
   final int count;
 
+  final void Function(ChatProfileSummary profile)? onProfileTap;
+
   const _AvatarCluster({
     required this.first,
     required this.second,
     required this.count,
+    this.onProfileTap,
   });
 
   // User-side meetings always have brokers in chat_profiles — always show
@@ -238,12 +248,12 @@ class _AvatarCluster extends StatelessWidget {
             Positioned(
               bottom: 0,
               right: 0,
-              child: _circle(_imgUrl(second), isDark),
+              child: _tappable(second, _circle(_imgUrl(second), isDark)),
             ),
           Positioned(
             bottom: 0,
             left: 0,
-            child: _circle(_imgUrl(first), isDark),
+            child: _tappable(first, _circle(_imgUrl(first), isDark)),
           ),
           if (count > 0)
             Positioned(
@@ -270,6 +280,19 @@ class _AvatarCluster extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+
+  /// Wraps an avatar so it opens [profile] instead of falling through to the
+  /// row's own tap target. Left as-is when there is no handler or no profile
+  /// behind the circle, so the row keeps working the way it always has.
+  Widget _tappable(ChatProfileSummary? profile, Widget child) {
+    final handler = onProfileTap;
+    if (handler == null || profile == null) return child;
+    return GestureDetector(
+      onTap: () => handler(profile),
+      behavior: HitTestBehavior.opaque,
+      child: child,
     );
   }
 

@@ -449,116 +449,148 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
         isDark ? Colors.grey.shade500 : const Color(0xFF7A7D87);
     final optionColor = isDark ? Colors.white : const Color(0xFF23262E);
 
+    // Row taps only move [pending]; nothing is committed until Continue is
+    // pressed. Dismissing the dialog still leaves the current value alone.
+    String pending = selected ?? options.first;
+
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.symmetric(horizontal: 26.w),
-        child: Container(
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(18.r),
-            border: Border.all(color: hairline),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.14),
-                blurRadius: 30,
-                offset: const Offset(0, 14),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(22.w, 20.h, 22.w, 16.h),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 17.sp,
-                        fontWeight: FontWeight.w600,
-                        color: titleColor,
-                        height: 1.2,
-                      ),
-                    ),
-                    SizedBox(height: 5.h),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.poppins(
-                        fontSize: 11.5.sp,
-                        fontWeight: FontWeight.w300,
-                        height: 1.4,
-                        color: subtitleColor,
-                      ),
-                    ),
-                  ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setPending) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.symmetric(horizontal: 26.w),
+          child: Container(
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(18.r),
+              border: Border.all(color: hairline),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.14),
+                  blurRadius: 30,
+                  offset: const Offset(0, 14),
                 ),
-              ),
-              Divider(height: 1, thickness: 1, color: hairline),
-              Padding(
-                padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 14.h),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: options.map((option) {
-                    final isActive = option == selected;
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: 6.h),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12.r),
-                        onTap: () {
-                          Navigator.pop(ctx);
-                          onSelect(option);
-                        },
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 16.w, vertical: 14.h),
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? AppColors.primary.withValues(alpha: 0.14)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12.r),
-                            border: Border.all(
-                              color: isActive
-                                  ? AppColors.primary
-                                  : (isDark
-                                      ? Colors.white.withValues(alpha: 0.07)
-                                      : Colors.black.withValues(alpha: 0.06)),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  option,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14.sp,
-                                    fontWeight: isActive
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    color: isActive
-                                        ? AppColors.primary
-                                        : optionColor,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                              if (isActive)
-                                Icon(Icons.check_rounded,
-                                    size: 17.sp, color: AppColors.primary),
-                            ],
-                          ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(22.w, 20.h, 22.w, 16.h),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 17.sp,
+                          fontWeight: FontWeight.w600,
+                          color: titleColor,
+                          height: 1.2,
                         ),
                       ),
-                    );
-                  }).toList(),
+                      SizedBox(height: 5.h),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11.5.sp,
+                          fontWeight: FontWeight.w300,
+                          height: 1.4,
+                          color: subtitleColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                Divider(height: 1, thickness: 1, color: hairline),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 14.h),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: options.map((option) {
+                      final isActive = option == pending;
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 6.h),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12.r),
+                          onTap: () => setPending(() => pending = option),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 16.w, vertical: 14.h),
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? AppColors.primary.withValues(alpha: 0.14)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12.r),
+                              border: Border.all(
+                                color: isActive
+                                    ? AppColors.primary
+                                    : (isDark
+                                        ? Colors.white.withValues(alpha: 0.07)
+                                        : Colors.black.withValues(alpha: 0.06)),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    option,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14.sp,
+                                      fontWeight: isActive
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      color: isActive
+                                          ? AppColors.primary
+                                          : optionColor,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                                if (isActive)
+                                  Icon(Icons.check_rounded,
+                                      size: 17.sp, color: AppColors.primary),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                Divider(height: 1, thickness: 1, color: hairline),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 14.h),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 46.h,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30.r),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        onSelect(pending);
+                      },
+                      child: Text(
+                        'Continue',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
