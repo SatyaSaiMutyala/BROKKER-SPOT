@@ -25,13 +25,35 @@ class AppNavDestination {
   /// without anyone having to redraw them.
   final double? iconSize;
 
+  /// Unread count drawn as a badge on the glyph's top-right corner.
+  ///
+  /// Zero or null draws nothing — a badge reading "0" is noise, not
+  /// information. Counts above 9 render as "9+".
+  final int? badgeCount;
+
   const AppNavDestination({
     required this.iconAsset,
     this.activeIconAsset,
     this.label,
     this.semanticLabel,
     this.iconSize,
+    this.badgeCount,
   });
+
+  bool get hasBadge => (badgeCount ?? 0) > 0;
+
+  String get badgeLabel => (badgeCount ?? 0) > 9 ? '9+' : '${badgeCount ?? 0}';
+
+  /// Copy of this destination carrying [count]. Lets a dashboard keep its
+  /// destination list `const` and attach the live number at build time.
+  AppNavDestination withBadge(int? count) => AppNavDestination(
+        iconAsset: iconAsset,
+        activeIconAsset: activeIconAsset,
+        label: label,
+        semanticLabel: semanticLabel,
+        iconSize: iconSize,
+        badgeCount: count,
+      );
 
   String assetFor({required bool isSelected}) =>
       isSelected ? (activeIconAsset ?? iconAsset) : iconAsset;

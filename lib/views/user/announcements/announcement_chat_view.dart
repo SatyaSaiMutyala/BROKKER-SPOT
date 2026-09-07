@@ -10,6 +10,10 @@ import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/theme/borderless_input.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:brokkerspot/views/user/announcements/cancellation/cancellation_submitted_view.dart';
+import 'package:brokkerspot/views/user/announcements/cancellation/cancellation_theme.dart';
+import 'package:brokkerspot/views/user/announcements/cancellation/contract_details_view.dart';
 import 'package:brokkerspot/views/user/profile/profile_view.dart';
 import 'package:brokkerspot/models/chat_message.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_controller.dart';
@@ -309,8 +313,8 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
 
   // ── Cancel contract ───────────────────────────────────────────────────────
 
-  /// Reasons offered when cancelling. Static for now — there is no endpoint
-  /// behind this yet, so nothing is sent anywhere.
+  /// Reasons offered when cancelling. Sent verbatim as the request's `reason`
+  /// and echoed back on the contract screens, so they are the record.
   static const List<String> _cancelReasons = [
     'I found a better opportunity',
     'I found a better deal',
@@ -345,35 +349,96 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
               ),
             ),
             SizedBox(height: 8.h),
-            InkWell(
-              onTap: () {
-                Navigator.pop(ctx);
-                _showCancelContractDialog(isDark);
-              },
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 18.h),
-                child: Row(
-                  children: [
-                    Icon(Icons.cancel_outlined,
-                        size: 19.sp, color: Colors.red.shade400),
-                    SizedBox(width: 12.w),
-                    Text(
-                      'Cancel Contract',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14.5.sp,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.red.shade400,
-                      ),
-                    ),
-                  ],
-                ),
+            // The server only accepts a cancellation on a published contract
+            // (status 4), and only one at a time. Offering the action outside
+            // that window would just surface a rejection.
+            if (_chat.proposalStatus.value == 4)
+              _menuItem(
+                ctx: ctx,
+                icon: Icons.cancel_outlined,
+                label: 'Cancel Contract',
+                color: Colors.red.shade400,
+                onTap: () => _showCancelContractDialog(isDark),
               ),
-            ),
+            if (_chat.isCancellationPending)
+              _menuItem(
+                ctx: ctx,
+                icon: Icons.receipt_long_outlined,
+                label: 'View Contract Details',
+                color: isDark ? Colors.white : const Color(0xFF23262E),
+                onTap: _openContractDetails,
+              ),
             SizedBox(height: 6.h),
           ],
         ),
       ),
     );
+  }
+
+  Widget _menuItem({
+    required BuildContext ctx,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: () {
+        Navigator.pop(ctx);
+        onTap();
+      },
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 18.h),
+        child: Row(
+          children: [
+            Icon(icon, size: 19.sp, color: color),
+            SizedBox(width: 12.w),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 14.5.sp,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The owner's contract screen — countdown, agreement, withdraw.
+  ///
+  /// The live [ChatController] is handed over rather than re-fetched: it is
+  /// already subscribed to this contract's status pushes, so the countdown and
+  /// the withdraw result stay in step with the chat behind it.
+  void _openContractDetails() {
+    Get.to(() => ContractDetailsView(
+          chat: _chat,
+          announcementId: widget.announcementId,
+          brokerName: widget.brokerName,
+          // Owner side: the person on the other end of this chat is the broker.
+          brokerId: widget.peerUserId,
+        ));
+  }
+
+  /// Sends the cancellation, then hands over to the confirmation screen.
+  Future<void> _submitCancellation(String reason) async {
+    EasyLoading.show(status: 'Submitting…');
+    final error = await _chat.requestCancellation(reason);
+    EasyLoading.dismiss();
+    if (!mounted) return;
+
+    if (error != null) {
+      AppToast.error(error);
+      return;
+    }
+    Get.to(() => CancellationSubmittedView(
+          onGoToContract: () {
+            Get.back(); // leave the confirmation
+            _openContractDetails();
+          },
+        ));
   }
 
   void _showCancelContractDialog(bool isDark) {
@@ -433,7 +498,8 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                         ),
                         SizedBox(height: 5.h),
                         Text(
-                          'Select a reason :',
+                          'Canceling the contract will require a reason and '
+                          'will have a 48-hour confirmation period.',
                           style: GoogleFonts.poppins(
                             fontSize: 11.5.sp,
                             fontWeight: FontWeight.w300,
@@ -519,10 +585,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                                   borderRadius: BorderRadius.circular(12.r),
                                 ),
                               ),
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                AppToast.success('Cancellation dismissed');
-                              },
+                              onPressed: () => Navigator.pop(ctx),
                               child: Text(
                                 'Cancel',
                                 style: GoogleFonts.poppins(
@@ -555,15 +618,11 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                                           ? otherCtrl.text.trim()
                                           : selected!;
                                       Navigator.pop(ctx);
-                                      // No endpoint for this yet — the choice
-                                      // is echoed back so the flow can be
-                                      // walked through end to end.
-                                      AppToast.success(
-                                          'Contract cancellation requested: $reason');
+                                      _submitCancellation(reason);
                                     }
                                   : null,
                               child: Text(
-                                'Confirm',
+                                'Submit Request',
                                 style: GoogleFonts.poppins(
                                   fontSize: 14.sp,
                                   fontWeight: FontWeight.w600,
@@ -574,6 +633,15 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(14.w, 0, 14.w, 16.h),
+                    child: CancelTheme.notice(
+                      'After submitting, your contract will remain active for '
+                      '48 hours. You can withdraw the cancellation request '
+                      'anytime during this period.',
+                      isDark,
                     ),
                   ),
                 ],
@@ -689,7 +757,34 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     String text;
     Widget? button;
 
-    if (published) {
+    // Cancellation outranks everything else, including the sticky `published`
+    // flag: once the owner has asked to cancel, the 48-hour window is the only
+    // thing either side needs to see about this contract.
+    if (status == 5 || status == 6) {
+      if (status == 6) {
+        text = 'This contract has been cancelled.';
+        button = null;
+      } else if (isOwner) {
+        text = 'Cancellation pending. You have 48 hours to withdraw.';
+        button = _bannerButton(
+          icon: Icons.gavel_rounded,
+          label: 'Cancellation',
+          onTap: _openContractDetails,
+          color: const Color(0xFFD64545),
+        );
+      } else {
+        // The broker cannot withdraw — that is the owner's call — so this is
+        // notice, not an action.
+        text = 'The owner requested to cancel this contract. '
+            'It stays active for 48 hours.';
+        button = _bannerButton(
+          icon: Icons.fact_check_outlined,
+          label: 'Information',
+          onTap: () => _openAgreementFlow(isOwner: false),
+          color: const Color(0xFFD64545),
+        );
+      }
+    } else if (published) {
       // Published — both sides keep a persistent "Information" entry so they
       // can reopen the agreement/timeline later.
       text = 'Property published. You can review the agreement anytime.';

@@ -225,6 +225,21 @@ class AnnouncementModel {
   /// which directional lookup to perform for chat:history).
   final int? userRole;
 
+  /// Set only when a broker published this listing on an owner's behalf: the
+  /// owner's user id, and the owner's original announcement it was published
+  /// from. A property the broker posted themselves carries neither.
+  final String? ownerId;
+  final String? ownerAnnouncementId;
+
+  /// True when this listing belongs to an owner and the broker is working it
+  /// under a signed agreement — so there is a brokerage fee on it.
+  ///
+  /// False for a broker's own property, where the broker *is* the seller and
+  /// no fee is being paid to anyone.
+  bool get isBrokeredForOwner =>
+      (ownerAnnouncementId?.isNotEmpty ?? false) ||
+      (ownerId?.isNotEmpty ?? false);
+
   /// Which side of the signed-in account this listing concerns:
   /// 1 = user side, 2 = broker side.
   ///
@@ -290,6 +305,8 @@ class AnnouncementModel {
     this.isProposalSent,
     this.isChatAvailable,
     this.userRole,
+    this.ownerId,
+    this.ownerAnnouncementId,
   });
 
   static String? _timeAgoFromIso(String? iso) {
@@ -430,7 +447,18 @@ class AnnouncementModel {
       isProposalSent: json['is_proposal_sent'] as bool?,
       isChatAvailable: json['is_chat_available'] as bool?,
       userRole: (json['user_role'] as num?)?.toInt(),
+      ownerId: _idOf(json['owner_id']),
+      ownerAnnouncementId: _idOf(json['owner_announcement_id']),
     );
+  }
+
+  /// Reads an id that the API sends either as a plain string or, when the
+  /// field has been populated, as the referenced document.
+  static String? _idOf(dynamic value) {
+    if (value == null) return null;
+    if (value is Map) return value['_id']?.toString();
+    final s = value.toString().trim();
+    return s.isEmpty ? null : s;
   }
 
   Map<String, dynamic> toJson() => {

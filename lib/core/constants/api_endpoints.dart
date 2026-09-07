@@ -22,6 +22,8 @@ class ApiEndpoints {
   static const String verifyEmailOtp = 'user/profile/verify-email-otp';
   /// Another user's public profile. Append `/{user_id}`.
   static const String getUserById = 'user/profile/get-user';
+  /// Unseen counters for the nav badges: { messages: {unseen}, notifications: {unseen} }.
+  static const String profileIndicators = 'user/profile/indicators';
 
   // Guest (no auth required)
   static const String guestFetchAllAnnouncements = 'guest/announcements/fetch-all';

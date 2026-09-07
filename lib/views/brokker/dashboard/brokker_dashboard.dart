@@ -13,6 +13,7 @@ import 'package:brokkerspot/views/user/announcements/create_announcement_view.da
 // import 'package:brokkerspot/widgets/common/floating_pill_nav_bar.dart';
 import 'package:brokkerspot/widgets/common/bottom_nav/bottom_nav.dart';
 // import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
+import 'package:brokkerspot/core/controllers/indicator_controller.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:flutter/material.dart';
 // Sizing helpers (.w/.h/.r) were only used by the commented-out create button.
@@ -68,6 +69,11 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     // Re-fetch profile to trigger the listener (handles case when profile was already loaded before this screen)
     if (LocalStorageService.isLoggedIn()) {
       profileController.getProfile();
+      // Nav badges. The counters are per role on the server, so switching
+      // sides has to re-ask — a fresh refresh here covers that.
+      IndicatorController.to
+        ..startListening()
+        ..refresh();
     }
   }
 
@@ -149,6 +155,18 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
       semanticLabel: 'Account',
     ),
   ];
+
+  /// Meetings sits third on this side (Home, Projects, Meetings, Account) —
+  /// unlike the user dashboard, where it is second.
+  static const int _meetingsTab = 2;
+
+  /// The nav set with the unread count attached to Meetings.
+  List<AppNavDestination> _destinationsWithBadges(int messages) => [
+        for (var i = 0; i < _navDestinations.length; i++)
+          i == _meetingsTab
+              ? _navDestinations[i].withBadge(messages)
+              : _navDestinations[i],
+      ];
 
   // Tabs 1 (Projects) and 2 (Meeting) are gated for signed-in users that
   // haven't finished broker onboarding (no broker role / pending verification).
@@ -253,6 +271,7 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
       profileController.getProfile();
     }
 
+    if (isLoggedIn) IndicatorController.to.refreshSoon();
     controller.changeTab(index);
   }
 
@@ -276,7 +295,9 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
         //   trailing: _buildCreateButton(context),
         // ),
         bottomNavigationBar: AppBottomNavBar(
-          destinations: _navDestinations,
+          destinations: _destinationsWithBadges(
+            IndicatorController.to.messagesUnseen.value,
+          ),
           currentIndex: controller.currentIndex.value,
           onDestinationSelected: (index) => _onNavTap(context, index),
           centerAction: AppNavCenterAction(

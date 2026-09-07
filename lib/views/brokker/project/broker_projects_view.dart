@@ -418,9 +418,14 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                   // photo on every card.
                   showAvatar: !widget.showMineOnly,
                   showOwnerAvatar: true,
-                  // "My Announcements" only ever lists this broker's own
-                  // postings, and no broker is being paid on those.
-                  isPrivateDeal: widget.showMineOnly,
+                  // "My Announcements" mixes two kinds of listing, and they
+                  // do not read the same. A property the broker posted
+                  // themselves has no broker being paid on it — that is the
+                  // private deal. One they published for an owner under a
+                  // signed agreement does carry a fee, so it keeps the normal
+                  // brokerage line. The owner ids the API stamps on the
+                  // published copy are what tells them apart.
+                  isPrivateDeal: widget.showMineOnly && !a.isBrokeredForOwner,
                   onTap: () => Get.to(
                       () => BrokerAnnouncementDetailView(announcement: a)),
                 );

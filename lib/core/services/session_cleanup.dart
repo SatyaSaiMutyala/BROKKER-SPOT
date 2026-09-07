@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/controllers/common_data_controller.dart';
+import 'package:brokkerspot/core/controllers/indicator_controller.dart';
 import 'package:brokkerspot/core/services/announcement_cache.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
@@ -40,6 +41,9 @@ Future<void> clearUserSession() async {
   if (Get.isRegistered<CommonDataController>()) {
     CommonDataController.to.clearDependentCaches();
   }
+  if (Get.isRegistered<IndicatorController>()) {
+    IndicatorController.to.clear();
+  }
   SocketService.to.shutdown();
   await AnnouncementCache.clear();
 }
@@ -71,6 +75,15 @@ Future<void> clearRoleScopedCache() async {
   }
   if (Get.isRegistered<PropertySearchController>()) {
     PropertySearchController.to.clearAll();
+  }
+  // The unseen counters are counted per role on the server, so the old side's
+  // numbers are meaningless here. Blank them rather than leave a stale badge,
+  // and re-attach to the socket the role switch has just rebuilt.
+  if (Get.isRegistered<IndicatorController>()) {
+    IndicatorController.to
+      ..clear()
+      ..restartListening()
+      ..refresh();
   }
   await AnnouncementCache.clear();
 }

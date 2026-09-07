@@ -7,6 +7,7 @@ import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.d
 import 'package:brokkerspot/views/user/wishlist/wishlist_view.dart';
 import 'package:brokkerspot/widgets/common/bottom_nav/bottom_nav.dart';
 // import 'package:brokkerspot/widgets/common/location_picker_popup.dart';
+import 'package:brokkerspot/core/controllers/indicator_controller.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -26,6 +27,7 @@ class _DashboardViewState extends State<DashboardView> {
   // between Meetings and Wishlist but is an action, not a tab.
   static const int _accountTab = 3;
   static const int _wishlistTab = 2;
+  static const int _meetingsTab = 1;
 
   /// Tabs a guest cannot open.
   static const Set<int> _loginRequiredTabs = {1, 2};
@@ -42,6 +44,12 @@ class _DashboardViewState extends State<DashboardView> {
       const WishlistView(),
       const AccountView(),
     ];
+    // Nav badges: one shared controller, live for as long as a dashboard is.
+    if (LocalStorageService.isLoggedIn()) {
+      IndicatorController.to
+        ..startListening()
+        ..refresh();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Location picker popup — disabled on request.
       // if (widget.showLocationPicker) {
@@ -71,6 +79,9 @@ class _DashboardViewState extends State<DashboardView> {
     // open, or it keeps showing whatever it fetched at launch.
     if (index == _wishlistTab) WishlistController.to.reload();
     setState(() => _currentIndex = index);
+    // Opening a conversation marks its messages read on the server, so the
+    // count is stale the moment the user comes back out of Meetings.
+    if (LocalStorageService.isLoggedIn()) IndicatorController.to.refreshSoon();
   }
 
   void _onCreateTap() {
@@ -88,17 +99,28 @@ class _DashboardViewState extends State<DashboardView> {
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: AppBottomNavBar(
-        destinations: _navDestinations,
+      bottomNavigationBar: Obx(() => AppBottomNavBar(
+        destinations: _destinationsWithBadges(
+          IndicatorController.to.messagesUnseen.value,
+        ),
         currentIndex: _currentIndex,
         onDestinationSelected: _onNavTap,
         centerAction: AppNavCenterAction(
           onTap: _onCreateTap,
           semanticLabel: 'Create announcement',
         ),
-      ),
+      )),
     );
   }
+
+  /// The nav set with the unread count attached to Meetings — the only tab
+  /// that carries conversations.
+  List<AppNavDestination> _destinationsWithBadges(int messages) => [
+        for (var i = 0; i < _navDestinations.length; i++)
+          i == _meetingsTab
+              ? _navDestinations[i].withBadge(messages)
+              : _navDestinations[i],
+      ];
 
   static const _navDestinations = [
     AppNavDestination(

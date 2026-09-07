@@ -69,6 +69,48 @@ class ChatController extends GetxController {
   final RxnInt proposalStatus = RxnInt();
   final RxnString agreementUrl = RxnString();
 
+  /// The proposal's own id — the contract this conversation is about.
+  final RxnString proposalId = RxnString();
+
+  // ── Contract cancellation (proposal status 5 = requested, 6 = cancelled) ──
+  /// The reason the owner gave. Carried on both 5 and 6.
+  final RxnString cancellationReason = RxnString();
+
+  /// When the 48-hour withdrawal window closes. The server finalises the
+  /// cancellation on a cron shortly after this passes, so a client-side
+  /// countdown against it is a display of the server's own deadline.
+  final Rxn<DateTime> cancellationExpiresAt = Rxn<DateTime>();
+  final Rxn<DateTime> cancellationRequestedAt = Rxn<DateTime>();
+
+  bool get isCancellationPending => proposalStatus.value == 5;
+  bool get isContractCancelled => proposalStatus.value == 6;
+
+  /// The server's own deadline for withdrawing.
+  ///
+  /// `cancellation_expires_at` is authoritative and normally present. When it
+  /// is missing it is rebuilt from `cancellation_requested_at`, which the
+  /// server stamps at the same moment — still the server's clock, not this
+  /// device's, so the two parties still see the same deadline. Deriving the
+  /// window from the local time of the tap would drift with device clock skew
+  /// and disagree between the owner's phone and the broker's.
+  static const Duration withdrawWindow = Duration(hours: 48);
+
+  DateTime? get withdrawDeadline {
+    final expiry = cancellationExpiresAt.value;
+    if (expiry != null) return expiry;
+    final requested = cancellationRequestedAt.value;
+    return requested?.add(withdrawWindow);
+  }
+
+  /// How long the owner still has to withdraw. Zero once the window closes —
+  /// the server may not have run its cron yet, but the button is already dead.
+  Duration get withdrawTimeLeft {
+    final expiry = withdrawDeadline;
+    if (expiry == null) return Duration.zero;
+    final left = expiry.difference(DateTime.now());
+    return left.isNegative ? Duration.zero : left;
+  }
+
   /// Sticky: true once the broker has published this announcement. The proposal
   /// status may reset to null after publishing, but both sides should still be
   /// able to reopen the agreement, so the "Information" banner keys off this.
@@ -117,6 +159,10 @@ class ChatController extends GetxController {
       ..on(ChatEvents.proposalBrokerAccept, _onProposalStatus)
       ..on(ChatEvents.proposalBrokerAcceptError, _onProposalIgnore)
       ..on(ChatEvents.announcementPublish, _onAnnouncementPublished)
+      ..on(ChatEvents.agreementCancel, _onAgreementCancel)
+      ..on(ChatEvents.agreementCancelError, _onAgreementCancelError)
+      ..on(ChatEvents.agreementCancelUndo, _onAgreementCancelUndo)
+      ..on(ChatEvents.agreementCancelUndoError, _onAgreementCancelUndoError)
       // Generic server-side error (e.g. "Invalid or expired token.").
       ..on('error', _onSocketError);
     // Seed from a prior session so the "Information" banner survives reopen.
@@ -436,6 +482,23 @@ class ChatController extends GetxController {
     if (aId != null && aId != announcementId) return;
     proposalStatus.value = (map['status'] as num?)?.toInt();
     agreementUrl.value = map['agreement_url']?.toString();
+    _applyCancellationFields(map);
+  }
+
+  /// Reads the cancellation block carried by `announcement:proposal:status`
+  /// and by the cancel/undo responses. Undo sends the fields back as null, so
+  /// they are always assigned — never merged — or a withdrawn cancellation
+  /// would keep showing its old countdown.
+  void _applyCancellationFields(Map<String, dynamic> map) {
+    if (map['_id'] != null) proposalId.value = map['_id'].toString();
+    cancellationReason.value = map['reason']?.toString();
+    cancellationRequestedAt.value = _parseDate(map['cancellation_requested_at']);
+    cancellationExpiresAt.value = _parseDate(map['cancellation_expires_at']);
+  }
+
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString())?.toLocal();
   }
 
   void _onProposalIgnore(dynamic data) {
@@ -476,6 +539,114 @@ class ChatController extends GetxController {
     });
   }
 
+  // ── Contract cancellation ──
+
+  /// How long to wait for the server to answer a cancel / undo before giving
+  /// up. Generous: these round-trips write to Mongo and fan out to the broker.
+  static const Duration _actionTimeout = Duration(seconds: 15);
+
+  /// Resolves the in-flight cancel or undo. Only one runs at a time — the
+  /// buttons that trigger them are disabled while busy.
+  Completer<String?>? _cancelAction;
+
+  /// True while a cancel or withdraw request is waiting on the server.
+  final RxBool isCancelActionBusy = false.obs;
+
+  /// Asks the server to cancel this contract, opening the 48-hour window.
+  ///
+  /// Returns null on success, or the server's error message. Only the owner
+  /// may call it, and only on a published (status 4) contract — the server
+  /// enforces both and its message is passed straight through.
+  Future<String?> requestCancellation(String reason) {
+    return _runCancelAction(ChatEvents.agreementCancel, {
+      'announcement_id': announcementId,
+      'broker_id': _brokerId,
+      'reason': reason,
+    });
+  }
+
+  /// Withdraws a pending cancellation, putting the contract back to published.
+  /// Returns null on success, or the server's error message — notably
+  /// "Cancellation grace period has expired." once the 48 hours are up.
+  Future<String?> withdrawCancellation() {
+    return _runCancelAction(ChatEvents.agreementCancelUndo, {
+      'announcement_id': announcementId,
+      'broker_id': _brokerId,
+    });
+  }
+
+  Future<String?> _runCancelAction(String event, Map<String, dynamic> payload) {
+    // A second tap while one is in flight would orphan the first completer.
+    if (_cancelAction != null && !_cancelAction!.isCompleted) {
+      return _cancelAction!.future;
+    }
+    final completer = Completer<String?>();
+    _cancelAction = completer;
+    isCancelActionBusy.value = true;
+
+    _socket.emit(event, payload);
+
+    // The socket answers on the success or the error event; neither arriving
+    // must not leave the button spinning forever.
+    Future.delayed(_actionTimeout, () {
+      _finishCancelAction('The server did not respond. Please try again.');
+    });
+
+    return completer.future;
+  }
+
+  void _finishCancelAction(String? error) {
+    final completer = _cancelAction;
+    isCancelActionBusy.value = false;
+    if (completer == null || completer.isCompleted) return;
+    completer.complete(error);
+  }
+
+  /// Cancel accepted. The payload carries the whole updated proposal, so the
+  /// countdown is driven by the server's own expiry rather than a local clock
+  /// started at the moment of the tap.
+  void _onAgreementCancel(dynamic data) {
+    final map = _dataMap(data);
+    if (map == null) return;
+    proposalStatus.value = (map['status'] as num?)?.toInt() ?? 5;
+    _applyCancellationFields(map);
+    _finishCancelAction(null);
+  }
+
+  void _onAgreementCancelError(dynamic data) {
+    _finishCancelAction(_msg(data) ?? 'Failed to cancel the contract.');
+  }
+
+  /// Withdrawal accepted — the contract is live again. The server clears the
+  /// reason and both timestamps, so [_applyCancellationFields] wipes them here.
+  void _onAgreementCancelUndo(dynamic data) {
+    final map = _dataMap(data);
+    if (map == null) return;
+    proposalStatus.value = (map['status'] as num?)?.toInt() ?? 4;
+    _applyCancellationFields(map);
+    _finishCancelAction(null);
+  }
+
+  void _onAgreementCancelUndoError(dynamic data) {
+    _finishCancelAction(_msg(data) ?? 'Failed to withdraw the cancellation.');
+  }
+
+  /// Unwraps `{ success, message, data: {...} }`, which is how the cancel and
+  /// undo events reply — unlike the proposal-status events, which send the
+  /// proposal at the top level. Returns null when the event is for a different
+  /// announcement.
+  Map<String, dynamic>? _dataMap(dynamic data) {
+    if (data is! Map) return null;
+    final outer = Map<String, dynamic>.from(data);
+    final inner = outer['data'];
+    final map = inner is Map
+        ? Map<String, dynamic>.from(inner)
+        : outer;
+    final aId = map['announcement_id']?.toString();
+    if (aId != null && aId != announcementId) return null;
+    return map;
+  }
+
   // ── Helpers ──
   void _sortByTime() {
     messages.sort((a, b) {
@@ -508,6 +679,10 @@ class ChatController extends GetxController {
       ..off(ChatEvents.proposalStatusUpdateError, _onProposalIgnore)
       ..off(ChatEvents.proposalBrokerAccept, _onProposalStatus)
       ..off(ChatEvents.proposalBrokerAcceptError, _onProposalIgnore)
+      ..off(ChatEvents.agreementCancel, _onAgreementCancel)
+      ..off(ChatEvents.agreementCancelError, _onAgreementCancelError)
+      ..off(ChatEvents.agreementCancelUndo, _onAgreementCancelUndo)
+      ..off(ChatEvents.agreementCancelUndoError, _onAgreementCancelUndoError)
       ..off('error', _onSocketError);
     super.onClose();
   }

@@ -111,10 +111,15 @@ class _DestinationSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = isSelected ? theme.activeIcon : theme.inactiveIcon;
 
+    final name = destination.semanticLabel ?? destination.label;
+    final count = destination.badgeCount ?? 0;
+
     return Semantics(
       button: true,
       selected: isSelected,
-      label: destination.semanticLabel ?? destination.label,
+      label: destination.hasBadge
+          ? '$name, $count unread'
+          : name,
       child: InkResponse(
         onTap: onTap,
         radius: 32.r,
@@ -131,17 +136,34 @@ class _DestinationSlot extends StatelessWidget {
               child: TweenAnimationBuilder<Color?>(
                 tween: ColorTween(end: color),
                 duration: transition,
-                builder: (context, animatedColor, _) => Image.asset(
-                  destination.assetFor(isSelected: isSelected),
-                  width: (destination.iconSize ??
-                          AppBottomNavBar.defaultIconSize)
-                      .w,
-                  height: (destination.iconSize ??
-                          AppBottomNavBar.defaultIconSize)
-                      .w,
-                  color: animatedColor ?? color,
-                  colorBlendMode: BlendMode.srcIn,
-                ),
+                builder: (context, animatedColor, _) {
+                  final glyph = Image.asset(
+                    destination.assetFor(isSelected: isSelected),
+                    width: (destination.iconSize ??
+                            AppBottomNavBar.defaultIconSize)
+                        .w,
+                    height: (destination.iconSize ??
+                            AppBottomNavBar.defaultIconSize)
+                        .w,
+                    color: animatedColor ?? color,
+                    colorBlendMode: BlendMode.srcIn,
+                  );
+                  if (!destination.hasBadge) return glyph;
+                  // Stack does not grow for the badge, which is deliberate:
+                  // the glyph keeps the exact footprint it has on every other
+                  // tab, so one tab gaining a badge cannot shift the row.
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      glyph,
+                      Positioned(
+                        top: -5.h,
+                        right: -8.w,
+                        child: _Badge(label: destination.badgeLabel),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             if (destination.label != null) ...[
@@ -157,6 +179,41 @@ class _DestinationSlot extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Small count pill sitting on a tab's glyph.
+class _Badge extends StatelessWidget {
+  final String label;
+
+  const _Badge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(minWidth: 17.w),
+      height: 17.w,
+      padding: EdgeInsets.symmetric(horizontal: 4.w),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE04343),
+        borderRadius: BorderRadius.circular(9.r),
+        // Separates the pill from the glyph behind it, in either theme.
+        border: Border.all(
+          color: AppBottomNavBarTheme.of(context).background,
+          width: 1.5,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9.5.sp,
+          height: 1.0,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
         ),
       ),
     );

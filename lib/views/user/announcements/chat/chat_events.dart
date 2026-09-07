@@ -67,4 +67,29 @@ class ChatEvents {
   /// Response/broadcast: the published announcement object — sent back to the
   /// publishing broker AND pushed in real time to the announcement owner.
   static const String announcementPublish = 'announcement:publish';
+
+  // ── Contract cancellation (owner only, 48-hour grace period) ──
+  /// Owner requests cancellation of a published contract.
+  /// FE → BE: { announcement_id, broker_id, reason }
+  /// BE → FE (sender + the broker's room):
+  /// { success, message: 'cancel_successful', data: { _id, announcement_id,
+  ///   broker_id, status: 5, previous_status, reason,
+  ///   cancellation_requested_at, cancellation_expires_at } }
+  ///
+  /// The proposal sits at status 5 until `cancellation_expires_at`, at which
+  /// point a server cron moves it to 6 and takes the listing down. Only a
+  /// proposal at status 4 (published) can be cancelled.
+  static const String agreementCancel = 'announcement:agreement:cancel';
+  static const String agreementCancelError =
+      'announcement:agreement:cancel:error';
+
+  /// Owner withdraws the cancellation while the 48 hours are still running.
+  /// FE → BE: { announcement_id, broker_id }
+  /// BE → FE (sender + the broker's room):
+  /// { success, message: 'cancel_undo_successful',
+  ///   data: { _id, announcement_id, broker_id, status } }  // back to 4
+  static const String agreementCancelUndo =
+      'announcement:agreement:cancel:undo';
+  static const String agreementCancelUndoError =
+      'announcement:agreement:cancel:undo:error';
 }

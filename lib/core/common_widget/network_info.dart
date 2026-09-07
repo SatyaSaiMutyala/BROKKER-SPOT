@@ -1,9 +1,18 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class NetworkInfo {
+  /// Whether the device has any active network transport.
+  ///
+  /// connectivity_plus 6 changed `checkConnectivity()` to return a *list* — a
+  /// device can be on Wi-Fi and mobile at once. Comparing that list to a
+  /// single [ConnectivityResult] the way this used to is never equal, so the
+  /// check returned true unconditionally and could not report being offline.
+  ///
+  /// An offline device answers with an empty list or `[none]`; `any` covers
+  /// both, since it is false on an empty list.
   static Future<bool> isConnected() async {
-    var result = await Connectivity().checkConnectivity();
-    return result != ConnectivityResult.none;
+    final results = await Connectivity().checkConnectivity();
+    return results.any((result) => result != ConnectivityResult.none);
   }
 }
 
