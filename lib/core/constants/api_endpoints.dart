@@ -25,6 +25,11 @@ class ApiEndpoints {
   /// Unseen counters for the nav badges: { messages: {unseen}, notifications: {unseen} }.
   static const String profileIndicators = 'user/profile/indicators';
 
+  // Help requests — the same body either way; the guest route is for the
+  // Need Help screen reached from Welcome, before anyone has signed in.
+  static const String submitHelpRequest = 'user/help-requests/submit';
+  static const String guestSubmitHelpRequest = 'guest/help-requests/submit';
+
   // Guest (no auth required)
   static const String guestFetchAllAnnouncements = 'guest/announcements/fetch-all';
   static const String guestFetchAnnouncementDetail = 'guest/announcements/fetch';

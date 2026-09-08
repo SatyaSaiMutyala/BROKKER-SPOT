@@ -109,6 +109,25 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       LocalStorageService.getUser()?.data?.id ??
       '';
 
+  /// True when this listing is the viewer's own property — one a broker
+  /// republished for them under a signed agreement.
+  ///
+  /// Answered from ids first, which the feed already carries (`owner_id` is
+  /// not projected away), so it is known on the very first frame. That is the
+  /// point: `is_chat_available` only arrives with the detail request, so
+  /// deciding on it alone made the bar render one way and then change once
+  /// the response landed — the flicker on entering this screen.
+  ///
+  /// `is_chat_available == false` stays as the server's own verdict on the
+  /// same question, covering anything the ids miss.
+  bool get _viewerOwnsListing {
+    final me = _myId;
+    if (me.isEmpty) return false; // guest — never their own
+    if (_data.ownerId != null && _data.ownerId == me) return true;
+    if (_data.userId != null && _data.userId == me) return true;
+    return _data.isChatAvailable == false;
+  }
+
   /// Opens the owner's chat with a broker from the advertising section.
   void _openBrokerChat(ProposalBroker broker) {
     AnnouncementChatView.open(
@@ -974,43 +993,6 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     );
   }
 
-  /// Stands in for the chat button on a listing the viewer already owns —
-  /// published for them by a broker they have a signed contract with.
-  Widget _ownPropertyBadge(bool isDark) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 7.h),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: isDark ? 0.16 : 0.12),
-        borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            'Your Property',
-            style: GoogleFonts.poppins(
-              fontSize: 11.5.sp,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primary,
-              height: 1.3,
-            ),
-          ),
-          Text(
-            'Published by broker',
-            style: GoogleFonts.poppins(
-              fontSize: 9.5.sp,
-              fontWeight: FontWeight.w300,
-              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-              height: 1.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPageDots(int totalPages) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1143,6 +1125,11 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       // nothing left to offer — every other !isOwner entry point still gets it.
       if (widget.backOnChat) return const SizedBox.shrink();
 
+      // The viewer's own property. There is no one to chat to about it — it
+      // is theirs — so the bar is dropped entirely rather than swapped for a
+      // "Your Property" label that only restates what the screen already says.
+      if (_viewerOwnsListing) return const SizedBox.shrink();
+
       return Padding(
         padding: EdgeInsets.fromLTRB(44.w, 0, 44.w, 10.h + bottomPad),
         child: ClipRRect(
@@ -1237,22 +1224,15 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                     ),
                   ),
                   SizedBox(width: 10.w),
-                  // Once a broker publishes a listing on the owner's behalf, a
-                  // second announcement exists — the broker's — and the owner
-                  // sees it in the feed like anyone else. Chatting there would
-                  // mean messaging a broker about their own property, so the
-                  // server marks it `is_chat_available: false` (it compares the
-                  // listing's owner_id against the caller) and the button gives
-                  // way to a label saying whose property this is.
-                  if (a.isChatAvailable == false)
-                    _ownPropertyBadge(isDark)
-                  else
-                    // Chat icon button.
-                    // If backOnChat is true the chat screen is already on the
-                    // stack below (opened via BrokerAgreementView._openProperty
-                    // using Get.off), so just pop back instead of pushing a new
-                    // chat. Otherwise open a new chat as broker (userRole: 2).
-                    GestureDetector(
+                  // Chat icon button. Reached only on someone else's listing —
+                  // the viewer's own is filtered out above, before the bar is
+                  // built at all.
+                  //
+                  // If backOnChat is true the chat screen is already on the
+                  // stack below (opened via BrokerAgreementView._openProperty
+                  // using Get.off), so just pop back instead of pushing a new
+                  // chat. Otherwise open a new chat as broker (userRole: 2).
+                  GestureDetector(
                       onTap: () {
                         if (widget.backOnChat) {
                           Get.back();

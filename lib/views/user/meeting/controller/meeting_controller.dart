@@ -27,7 +27,18 @@ class MeetingController extends GetxController {
 
   /// In-memory per-filter cache so tab switches are instant.
   final Map<MeetingFilter, List<MeetingItem>> _cache = {};
-  MeetingFilter? _inflightFilter;
+
+  /// Id of the most recent load. Any response carrying an older id has been
+  /// superseded by a newer tab tap and must not touch the UI — *including*
+  /// [isLoading].
+  ///
+  /// This used to be tracked by filter alone, and the loading flag was cleared
+  /// in `finally` by whichever request happened to finish first. Tapping two
+  /// tabs quickly therefore left the list empty, not loading and without an
+  /// error — which renders as "No meetings yet" while the request the user is
+  /// actually waiting on is still in flight. That is the intermittent
+  /// "no data" on the meetings tabs.
+  int _userRequestId = 0;
 
   // ── Broker side ─────────────────────────────────────────────────────────
   // Same endpoint (backend filters by the active currentRole), but the
@@ -39,40 +50,43 @@ class MeetingController extends GetxController {
   final brokerError = RxnString();
   final brokerFilter = MeetingFilter.all.obs;
   final Map<MeetingFilter, List<MeetingItem>> _brokerCache = {};
-  MeetingFilter? _inflightBrokerFilter;
+
+  /// Broker-side counterpart of [_userRequestId].
+  int _brokerRequestId = 0;
 
   /// Loads [f]. If cached and not [force], renders instantly without network.
   Future<void> load({MeetingFilter? f, bool force = false}) async {
     final target = f ?? filter.value;
     filter.value = target;
-    _inflightFilter = target;
+    final requestId = ++_userRequestId;
+
+    // A previous filter's error must not survive into this one.
+    error.value = null;
 
     if (!force && _cache.containsKey(target)) {
-      error.value = null;
       meetings.assignAll(_cache[target]!);
+      isLoading.value = false;
       return;
     }
 
     // Drop stale rows so the shimmer can show instead of the previous filter.
-    if (!force) {
-      meetings.clear();
-      error.value = null;
-    }
+    if (!force) meetings.clear();
 
+    isLoading.value = true;
     try {
-      isLoading.value = true;
       final result = await _repo.fetchMeetings(filter: target);
+      // Cache regardless: the data is valid for its filter even if the user
+      // has moved on, so returning to that tab is still instant.
       _cache[target] = result.items;
-      // Only render if the user hasn't switched filters mid-flight.
-      if (_inflightFilter == target) {
-        meetings.assignAll(result.items);
-      }
+      if (requestId != _userRequestId) return;
+      meetings.assignAll(result.items);
     } catch (e) {
-      if (_inflightFilter == target && meetings.isEmpty) {
-        error.value = e.toString();
-      }
+      if (requestId != _userRequestId) return;
+      // Surfaced even when rows are already on screen: a pull-to-refresh that
+      // fails silently just looks like nothing happened.
+      error.value = e.toString();
     } finally {
-      isLoading.value = false;
+      if (requestId == _userRequestId) isLoading.value = false;
     }
   }
 
@@ -156,34 +170,30 @@ class MeetingController extends GetxController {
   Future<void> loadBroker({MeetingFilter? f, bool force = false}) async {
     final target = f ?? brokerFilter.value;
     brokerFilter.value = target;
-    _inflightBrokerFilter = target;
+    final requestId = ++_brokerRequestId;
+
+    brokerError.value = null;
 
     if (!force && _brokerCache.containsKey(target)) {
-      brokerError.value = null;
       brokerMeetings.assignAll(_brokerCache[target]!);
+      isLoadingBroker.value = false;
       return;
     }
 
     // Drop stale rows so the shimmer shows instead of the previous filter.
-    if (!force) {
-      brokerMeetings.clear();
-      brokerError.value = null;
-    }
+    if (!force) brokerMeetings.clear();
 
+    isLoadingBroker.value = true;
     try {
-      isLoadingBroker.value = true;
       final result = await _repo.fetchMeetings(filter: target);
       _brokerCache[target] = result.items;
-      // Only render if the user hasn't switched filters mid-flight.
-      if (_inflightBrokerFilter == target) {
-        brokerMeetings.assignAll(result.items);
-      }
+      if (requestId != _brokerRequestId) return;
+      brokerMeetings.assignAll(result.items);
     } catch (e) {
-      if (_inflightBrokerFilter == target && brokerMeetings.isEmpty) {
-        brokerError.value = e.toString();
-      }
+      if (requestId != _brokerRequestId) return;
+      brokerError.value = e.toString();
     } finally {
-      isLoadingBroker.value = false;
+      if (requestId == _brokerRequestId) isLoadingBroker.value = false;
     }
   }
 
@@ -193,11 +203,13 @@ class MeetingController extends GetxController {
     _cache.clear();
     error.value = null;
     filter.value = MeetingFilter.all;
-    _inflightFilter = null;
+    // Invalidates anything still in flight, so a response that lands after a
+    // logout cannot repopulate the next account's list.
+    _userRequestId++;
     brokerMeetings.clear();
     _brokerCache.clear();
     brokerError.value = null;
     brokerFilter.value = MeetingFilter.all;
-    _inflightBrokerFilter = null;
+    _brokerRequestId++;
   }
 }

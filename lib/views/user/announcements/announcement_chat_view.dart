@@ -11,6 +11,7 @@ import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/theme/borderless_input.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:brokkerspot/views/user/announcements/cancellation/cancellation_confirmed_view.dart';
 import 'package:brokkerspot/views/user/announcements/cancellation/cancellation_submitted_view.dart';
 import 'package:brokkerspot/views/user/announcements/cancellation/cancellation_theme.dart';
 import 'package:brokkerspot/views/user/announcements/cancellation/contract_details_view.dart';
@@ -278,10 +279,11 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
               ],
             ),
           ),
-          // Owner-only: cancelling the contract is the owner's call, and the
-          // menu holds nothing else — so the broker side keeps a clean header
-          // rather than a button that opens an empty sheet.
-          if ((widget.userRole ?? 1) == 1)
+          // Owner-only, and only while there is actually an action to offer.
+          // Once the contract is cancelled (status 6) nothing can be done to
+          // it, so the button goes rather than opening an empty sheet — the
+          // record is reached from the banner's View Details instead.
+          if ((widget.userRole ?? 1) == 1 && _hasChatMenuActions)
             CustomIconButton(
               isDark: isDark,
               size: 38,
@@ -375,6 +377,13 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     );
   }
 
+  /// Whether [_showChatMenu] would render anything. Mirrors the conditions on
+  /// its items, so the two cannot drift apart.
+  bool get _hasChatMenuActions {
+    final status = _chat.proposalStatus.value;
+    return status == 4 || status == 5;
+  }
+
   Widget _menuItem({
     required BuildContext ctx,
     required IconData icon,
@@ -420,6 +429,28 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           // Owner side: the person on the other end of this chat is the broker.
           brokerId: widget.peerUserId,
         ));
+  }
+
+  /// Opens the read-only record of a cancelled contract.
+  ///
+  /// The reason and the contract id come off the live proposal status, which
+  /// the server still returns at status 6; the property and the signing date
+  /// are looked up by the screen itself.
+  void _openCancellationRecord() {
+    Get.to(() => CancellationConfirmedView(
+          announcementId: widget.announcementId,
+          brokerId: widget.peerUserId,
+          contractId: _contractIdLabel,
+          reason: _chat.cancellationReason.value,
+        ));
+  }
+
+  /// Same reference the contract details screen shows, derived from the
+  /// proposal id — the backend has no separate contract number.
+  String? get _contractIdLabel {
+    final id = _chat.proposalId.value;
+    if (id == null || id.length < 8) return id;
+    return '#CT-${id.substring(id.length - 8).toUpperCase()}';
   }
 
   /// Sends the cancellation, then hands over to the confirmation screen.
@@ -763,7 +794,12 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     if (status == 5 || status == 6) {
       if (status == 6) {
         text = 'This contract has been cancelled.';
-        button = null;
+        button = _bannerButton(
+          icon: Icons.receipt_long_outlined,
+          label: 'View Details',
+          onTap: _openCancellationRecord,
+          color: const Color(0xFFD64545),
+        );
       } else if (isOwner) {
         text = 'Cancellation pending. You have 48 hours to withdraw.';
         button = _bannerButton(

@@ -24,38 +24,54 @@ class ChatMessage {
     this.viewedAt,
   });
 
+  /// An id the API sends either raw or as the document it references.
+  static String? _idOf(dynamic value) {
+    if (value == null) return null;
+    if (value is Map) return value['_id']?.toString();
+    final s = value.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
   factory ChatMessage.fromJson(
     Map<String, dynamic> json, {
     String? currentUserId,
-    /// The known peer's user ID (the controller's recipientId). When provided,
-    /// this is used as the primary signal for isMine: if the message's
-    /// recipient_id matches the peer, WE sent it (regardless of which account
-    /// the user_id on the message says — the server has a bug storing the
-    /// wrong user_id). Falls back to recipient_id != currentUserId, then
-    /// user_id == currentUserId.
+    /// The known peer's user ID (the controller's recipientId). Used as a
+    /// fallback signal for isMine when the sender cannot be resolved: a
+    /// message addressed to the peer is one we sent.
     String? peerUserId,
   }) {
-    // sender can be a plain id string or a populated user object.
-    final senderRaw = json['sender_id'] ?? json['user_id'] ?? json['from'];
-    final senderId = senderRaw is Map
-        ? senderRaw['_id']?.toString()
-        : senderRaw?.toString();
-
-    final recipientId =
-        (json['recipient_id'] ?? json['recipientId'])?.toString();
+    // Both ids arrive either as a plain string or as a populated user object,
+    // and which one depends on the event: `chat:message` stringifies them,
+    // while `chat:history` populates them with { _id, name, ...images }.
+    // Reading a populated object with toString() yields the whole map, which
+    // matches no id — that is what made every history message render as the
+    // peer's, since the isMine test below compares recipient ids.
+    final senderId = _idOf(json['sender_id'] ?? json['user_id'] ?? json['from']);
+    final recipientId = _idOf(json['recipient_id'] ?? json['recipientId']);
 
     final createdRaw =
         json['created_at'] ?? json['createdAt'] ?? json['timestamp'];
     final viewedRaw = json['viewed_at'] ?? json['viewedAt'];
 
-    // Determine isMine using the most reliable signal available.
-    // Priority 1: If we know the peer's ID, check if recipient == peer —
-    //   meaning WE sent the message to them. This works even when user_id is
-    //   wrong (server bug) AND when multiple accounts belong to the same person.
-    // Priority 2: recipient_id != currentUserId (correct if only 2 participants).
-    // Priority 3: user_id == currentUserId (fallback when no recipient_id).
+    // "Mine" means I am the sender. That is the direct reading of the record,
+    // so it is tried first.
+    //
+    // This used to lead with `recipient_id == peer`, an indirect test written
+    // to work around a period when the server stored the wrong `user_id`. It
+    // has two ways to fail that the sender test does not: it needs the caller
+    // to know the peer, and it needs `recipient_id` to survive parsing — so
+    // any change in that field's shape silently turns *every* message into
+    // someone else's, which is exactly what a populated `recipient_id` did.
+    //
+    // The old tests remain underneath, for the cases where the sender cannot
+    // be resolved: a payload with no `user_id`, or no signed-in id to compare.
     final bool isMine;
-    if (peerUserId != null &&
+    if (currentUserId != null &&
+        currentUserId.isNotEmpty &&
+        senderId != null &&
+        senderId.isNotEmpty) {
+      isMine = senderId == currentUserId;
+    } else if (peerUserId != null &&
         peerUserId.isNotEmpty &&
         recipientId != null &&
         recipientId.isNotEmpty) {
@@ -65,7 +81,7 @@ class ChatMessage {
         recipientId.isNotEmpty) {
       isMine = recipientId != currentUserId;
     } else {
-      isMine = currentUserId != null && senderId == currentUserId;
+      isMine = false;
     }
 
     return ChatMessage(

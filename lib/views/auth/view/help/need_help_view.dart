@@ -3,7 +3,11 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/country_codes.dart';
+import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/theme/borderless_input.dart';
+import 'package:brokkerspot/views/auth/view/help/repo/help_request_repo.dart';
+import 'package:brokkerspot/views/auth/view/login_view.dart';
+import 'package:get/get.dart';
 
 class NeedHelpView extends StatefulWidget {
   const NeedHelpView({super.key});
@@ -20,6 +24,9 @@ class _NeedHelpViewState extends State<NeedHelpView> {
 
   String _selectedCountryCode = '+971';
   bool _isFormValid = false;
+  bool _isSubmitting = false;
+
+  final _repo = HelpRequestRepository();
 
   /// Drives the underline thickness, matching the signup field.
   final FocusNode _phoneFocus = FocusNode();
@@ -118,6 +125,55 @@ class _NeedHelpViewState extends State<NeedHelpView> {
         ),
       ],
     );
+  }
+
+  /// Sends the form, then shows the success sheet — only once the server has
+  /// actually accepted it. It used to show that sheet unconditionally, so a
+  /// request that never left the device still told the user it had been sent.
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+    setState(() => _isSubmitting = true);
+    try {
+      await _repo.submit(
+        name: _nameController.text.trim(),
+        countryCode: _selectedCountryCode,
+        phoneNumber: _phoneController.text.trim(),
+        email: _emailController.text.trim(),
+        message: _messageController.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _clearForm();
+      });
+      // The sheet closes itself, then the screen is replaced — the request is
+      // done and there is nothing left to do on this form.
+      await _showSuccessBottomSheet(context);
+      if (!mounted) return;
+      Get.off(() => LoginView());
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      // The repo throws the server's own message, which is worth showing.
+      // Anything else here is a transport failure whose raw text ("Timeout
+      // Exception after 0:00:30…") means nothing to someone already asking
+      // for help, so it is replaced with the app's network wording.
+      final message = e is String
+          ? e
+          : "I'm Facing Network Issue \nPlease Try Again After Some Time";
+      AppToast.error(message);
+    }
+  }
+
+  /// Empties the form after a successful send, so a back-navigation or a
+  /// second visit does not show the message that was already submitted.
+  void _clearForm() {
+    _nameController.clear();
+    _phoneController.clear();
+    _emailController.clear();
+    _messageController.clear();
+    _selectedCountryCode = '+971';
+    _isFormValid = false;
   }
 
   void _validateForm() {
@@ -311,7 +367,7 @@ class _NeedHelpViewState extends State<NeedHelpView> {
           height: 46.h,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isFormValid
+              backgroundColor: (_isFormValid && !_isSubmitting)
                   ? AppColors.primary
                   : Colors.grey.shade300,
               disabledBackgroundColor: Colors.grey.shade300,
@@ -319,20 +375,24 @@ class _NeedHelpViewState extends State<NeedHelpView> {
                 borderRadius: BorderRadius.circular(30),
               ),
             ),
-            onPressed: _isFormValid
-                ? () {
-                    FocusScope.of(context).unfocus();
-                    _showSuccessBottomSheet(context);
-                  }
-                : null,
-            child: Text(
-              'Submit',
-              style: GoogleFonts.roboto(
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w500,
-                color: _isFormValid ? Colors.white : Colors.black54,
-              ),
-            ),
+            onPressed: (_isFormValid && !_isSubmitting) ? _submit : null,
+            child: _isSubmitting
+                ? SizedBox(
+                    width: 18.w,
+                    height: 18.w,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    'Submit',
+                    style: GoogleFonts.roboto(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: _isFormValid ? Colors.white : Colors.black54,
+                    ),
+                  ),
           ),
         ),
 
@@ -374,11 +434,29 @@ class _NeedHelpViewState extends State<NeedHelpView> {
   }
 
   // ---------------- SUCCESS BOTTOM SHEET ----------------
-  void _showSuccessBottomSheet(BuildContext context) {
-    showModalBottomSheet(
+  /// Completes once the sheet is gone, so the caller can navigate afterwards
+  /// rather than pushing a route out from under a visible sheet.
+  ///
+  /// Not dismissible: it closes on its own after [_successSheetDuration]. A
+  /// swipe-away would otherwise race the redirect and could pop this screen
+  /// instead of the sheet.
+  static const Duration _successSheetDuration = Duration(seconds: 2);
+
+  Future<void> _showSuccessBottomSheet(BuildContext context) {
+    return showModalBottomSheet<void>(
       context: context,
+      isDismissible: false,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
+      builder: (sheetContext) {
+        // Captured before the delay: reading the context after an async gap
+        // is unsafe once the sheet has gone, whereas the NavigatorState stays
+        // valid and reports its own `mounted`.
+        final navigator = Navigator.of(sheetContext);
+        Future.delayed(_successSheetDuration, () {
+          if (navigator.mounted && navigator.canPop()) navigator.pop();
+        });
+        return Container(
         height: 180.h,
         width: double.infinity,
         decoration: const BoxDecoration(
@@ -412,7 +490,8 @@ class _NeedHelpViewState extends State<NeedHelpView> {
             ),
           ],
         ),
-      ),
+        );
+      },
     );
   }
 

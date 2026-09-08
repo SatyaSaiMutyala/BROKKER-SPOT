@@ -123,7 +123,15 @@ class ChatController extends GetxController {
   // _armHistoryTimeout.
   Worker? _historyConnectWorker;
 
-  String? get _currentUserId => LocalStorageService.getUser()?.data?.id;
+  /// The signed-in user's id.
+  ///
+  /// The live token wins over the saved user blob: the blob is written at
+  /// login and can be stale or missing after a role switch or an account
+  /// change, and a null here silently pushes [ChatMessage.fromJson] onto its
+  /// weakest branch, where every bubble resolves to "not mine".
+  String? get _currentUserId =>
+      LocalStorageService.getUserIdFromToken() ??
+      LocalStorageService.getUser()?.data?.id;
 
   /// The broker's user-id in this conversation.
   /// • owner side (userRole == 1, or null when opened without explicit role):
@@ -297,6 +305,23 @@ class ChatController extends GetxController {
         .map((e) => ChatMessage.fromJson(e,
             currentUserId: _currentUserId, peerUserId: recipientId))
         .toList();
+
+    if (kDebugMode && rawList.isNotEmpty) {
+      // Prints the exact comparison behind the left/right decision, so a
+      // wrongly-sided bubble can be read off the log instead of guessed at.
+      final first = Map<String, dynamic>.from(rawList.first as Map);
+      final me = _currentUserId;
+      debugPrint('🧭 [Chat] alignment check\n'
+          '   currentUserId (me) = $me\n'
+          '   peerUserId         = $recipientId\n'
+          '   raw user_id        = ${first['user_id']}\n'
+          '   raw recipient_id   = ${first['recipient_id']}\n'
+          '   mine/total         = ${fromServer.where((m) => m.isMine).length}/${fromServer.length}');
+      for (final m in fromServer) {
+        debugPrint('   • "${m.text}" sender=${m.senderId} '
+            '${m.senderId == me ? "== me" : "!= me"} → isMine=${m.isMine}');
+      }
+    }
 
     if (_page <= 1) {
       // Merge: keep any locally-confirmed messages that aren't in the server

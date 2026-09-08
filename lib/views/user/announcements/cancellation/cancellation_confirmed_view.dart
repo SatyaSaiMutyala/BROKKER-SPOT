@@ -1,6 +1,7 @@
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/cancellation/cancellation_theme.dart';
 import 'package:brokkerspot/views/user/announcements/cancellation/contract_property_card.dart';
+import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -10,13 +11,24 @@ import 'package:google_fonts/google_fonts.dart';
 /// Terminal screen of the cancellation flow: the 48 hours elapsed, the server
 /// cron moved the proposal to status 6 and took the broker's listing down.
 ///
-/// Reached from the contract details screen once it observes status 6 — there
-/// is nothing left to act on here, only the record of what happened.
-class CancellationConfirmedView extends StatelessWidget {
+/// Reached two ways: from the contract details screen the moment it observes
+/// status 6, and from the cancelled chat's "View Details" button afterwards.
+///
+/// The first hands over everything it already loaded. The second only knows
+/// the announcement id, so anything missing is fetched here — see [_load].
+/// Either way there is nothing to act on, only the record of what happened.
+class CancellationConfirmedView extends StatefulWidget {
   final AnnouncementModel? announcement;
   final String? contractId;
   final DateTime? contractStart;
   final String? reason;
+
+  /// Lets the screen fetch the property itself when it was opened without one.
+  final String? announcementId;
+
+  /// The broker on the cancelled contract, used to pick the right proposal
+  /// when looking up the contract's start date.
+  final String? brokerId;
 
   const CancellationConfirmedView({
     super.key,
@@ -24,7 +36,58 @@ class CancellationConfirmedView extends StatelessWidget {
     this.contractId,
     this.contractStart,
     this.reason,
+    this.announcementId,
+    this.brokerId,
   });
+
+  @override
+  State<CancellationConfirmedView> createState() =>
+      _CancellationConfirmedViewState();
+}
+
+class _CancellationConfirmedViewState extends State<CancellationConfirmedView> {
+  final _repo = AnnouncementRepository();
+
+  late AnnouncementModel? announcement = widget.announcement;
+  late DateTime? contractStart = widget.contractStart;
+
+  String? get contractId => widget.contractId;
+  String? get reason => widget.reason;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  /// Fills in whatever the caller could not supply. Failures are swallowed —
+  /// the rows simply stay hidden, which is the same treatment they get when
+  /// the record genuinely has no value for them.
+  Future<void> _load() async {
+    final id = widget.announcementId;
+    if (id == null || id.isEmpty) return;
+
+    if (announcement == null) {
+      try {
+        final fetched = await _repo.fetchAnnouncementDetail(id);
+        if (mounted) setState(() => announcement = fetched);
+      } catch (_) {}
+    }
+
+    if (contractStart == null && widget.brokerId != null) {
+      try {
+        final proposals = await _repo.fetchProposals(id);
+        final match =
+            proposals.firstWhereOrNull((p) => p.brokerId == widget.brokerId);
+        final signed = match?.signedAt;
+        if (signed != null && mounted) {
+          setState(() => contractStart = DateTime.tryParse(signed)?.toLocal());
+        }
+      } catch (_) {
+        // Owner-only endpoint: a broker viewing this simply gets no start date.
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

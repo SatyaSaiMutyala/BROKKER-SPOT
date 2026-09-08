@@ -127,6 +127,14 @@ class ProposalBroker {
   /// [approvedAt] is missing.
   final String? updatedAt;
 
+  /// Server's answer to "has a conversation been started on this
+  /// announcement?" — `is_chat_available` on the proposals endpoint.
+  ///
+  /// Note it is scoped to the announcement, not to this broker, so it turns
+  /// true for every proposal once the owner has chatted with any one of them.
+  /// Treat it as one signal among several rather than the whole truth.
+  final bool? isChatAvailable;
+
   ProposalBroker({
     this.id,
     this.brokerId,
@@ -138,6 +146,7 @@ class ProposalBroker {
     this.publishedAt,
     this.approvedAt,
     this.updatedAt,
+    this.isChatAvailable,
   });
 
   /// Best available "contract signed" timestamp, most specific first.
@@ -160,6 +169,7 @@ class ProposalBroker {
       publishedAt: json['published_at']?.toString(),
       approvedAt: json['approved_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
+      isChatAvailable: json['is_chat_available'] as bool?,
     );
   }
 }

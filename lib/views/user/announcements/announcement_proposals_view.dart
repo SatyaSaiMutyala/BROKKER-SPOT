@@ -41,6 +41,28 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
       widget.proposals.where(AnnouncementRepository.isOpenProposal).toList();
   bool _loading = false;
 
+  /// Brokers this screen has opened a chat with, kept so the pill flips to
+  /// "Chat" the instant the user comes back — before, and regardless of,
+  /// whatever the server says on the next fetch.
+  ///
+  /// Needed because `is_chat_available` is only recomputed when the proposals
+  /// endpoint is called again, and because the server scopes that flag to the
+  /// announcement rather than to the individual broker.
+  final Set<String> _chattedBrokerIds = <String>{};
+
+  /// Whether the pill for [b] should read "Chat" rather than "Proposal".
+  ///
+  /// Three signals, any of which means a conversation exists:
+  ///  • this screen just opened one — instant, and correct per broker;
+  ///  • the server's `is_chat_available`;
+  ///  • a status past 0, which the owner can only have reached by replying.
+  bool _hasChat(ProposalBroker b) {
+    final id = b.brokerId;
+    if (id != null && _chattedBrokerIds.contains(id)) return true;
+    if (b.isChatAvailable == true) return true;
+    return (b.status ?? 0) != 0;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -83,13 +105,26 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
   ///
   /// Shared by the dialog's START CHAT button and the row's "Chat" pill so
   /// both land in exactly the same conversation.
-  void _openChat(ProposalBroker broker) {
-    AnnouncementChatView.open(
+  Future<void> _openChat(ProposalBroker broker) async {
+    final brokerId = broker.brokerId;
+    // Recorded before the push, not after: opening the conversation is what
+    // makes it exist, and the row behind must already be right when the chat
+    // is popped — no refresh, no waiting on a request.
+    if (brokerId != null && brokerId.isNotEmpty) {
+      setState(() => _chattedBrokerIds.add(brokerId));
+    }
+
+    await AnnouncementChatView.open(
       announcementId: widget.announcementId ?? '',
       brokerName: broker.name ?? 'Broker',
       brokerAvatar: broker.brokerProfileImage,
       peerUserId: broker.brokerId,
     );
+
+    // Back on this screen: pull the list again so statuses changed inside the
+    // chat (approve / reject) are reflected too. The pill is already correct
+    // either way, so a slow or failed refresh changes nothing on screen.
+    if (mounted) await _loadProposals();
   }
 
   void _showProposalDialog(BuildContext context, ProposalBroker broker) {
@@ -309,13 +344,11 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
                           Divider(height: 1, color: dividerColor),
                       itemBuilder: (ctx, i) {
                         final b = _brokers[i];
-                        // status 0 = proposal still pending, so the owner reads
-                        // it first via the dialog (which carries its own START
-                        // CHAT). Any other status means the conversation has
-                        // already been opened with this broker, so the pill
-                        // goes straight to that chat instead of re-showing the
-                        // proposal. A missing status is treated as pending.
-                        final isPending = (b.status ?? 0) == 0;
+                        // No conversation yet, so the owner reads the proposal
+                        // first via the dialog (which carries its own START
+                        // CHAT). Once one exists the pill goes straight to it
+                        // instead of re-showing a proposal already read.
+                        final isPending = !_hasChat(b);
                         return Padding(
                           padding: EdgeInsets.symmetric(
                               horizontal: 20.w, vertical: 14.h),
