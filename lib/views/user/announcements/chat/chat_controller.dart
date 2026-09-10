@@ -46,6 +46,11 @@ class ChatController extends GetxController {
   bool _loadingMore = false;
 
   int _historyAttempt = 0;
+
+  /// One rescue reconnect per screen: the first history deadline to expire
+  /// forces a fresh handshake and asks again, instead of going straight to an
+  /// error the user can only clear by tapping Retry.
+  bool _historyRevived = false;
   // Set to true when all chat:history attempts fail. Cleared when a sent
   // message is confirmed — at that point the server has a record for us as
   // sender, so a fresh history load should succeed.
@@ -265,19 +270,34 @@ class ChatController extends GetxController {
   }
 
   void _giveUpOnHistory() {
-    if (isLoadingHistory.value || _loadingMore) {
-      isLoadingHistory.value = false;
-      _loadingMore = false;
-      if (messages.isEmpty && error.value.isEmpty) {
-        error.value =
-            "Couldn't load chat. Please check your connection or sign in again.";
-      }
+    if (!isLoadingHistory.value && !_loadingMore) return;
+
+    // Silence rather than a server error, and this is the first time — the
+    // request most likely went into a socket that only *looks* connected
+    // after the app came back from the background (see
+    // SocketService.revalidateConnection). Rebuild the connection and ask
+    // once more; the re-emit is queued until the new handshake lands. This is
+    // what the user was doing by hand when Retry "fixed" it.
+    if (!_historyRevived && isLoadingHistory.value) {
+      _historyRevived = true;
+      debugPrint('⏱️ [Chat] history deadline hit — revalidating socket, retrying');
+      _socket.revalidateConnection();
+      _requestHistory(page: 1);
+      return;
+    }
+
+    isLoadingHistory.value = false;
+    _loadingMore = false;
+    if (messages.isEmpty && error.value.isEmpty) {
+      error.value =
+          "Couldn't load chat. Please check your connection or sign in again.";
     }
   }
 
   /// Reset and retry history from scratch — call from UI retry button.
   void reloadHistory() {
     _historyAttempt = 0;
+    _historyRevived = false;
     error.value = '';
     _requestHistory(page: 1);
   }

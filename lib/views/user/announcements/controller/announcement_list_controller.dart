@@ -121,6 +121,35 @@ class AnnouncementListController extends GetxController {
   int? _currentMineStatus;
   bool _mineLoaded = false;
 
+  /// Set when a push says the admin changed one of this user's own listings
+  /// (approved or rejected), so its card is showing a status the server no
+  /// longer agrees with.
+  ///
+  /// Only a flag — the refetch belongs to the screen, see
+  /// [refreshMineIfStale]. `/announcements/fetch` is filtered by the active
+  /// role and every status shares one cache slot, so refetching from the push
+  /// handler would fill the owner's cache with broker-side rows whenever the
+  /// push lands while the app is on the broker side.
+  final isMineStale = false.obs;
+
+  void markMineStale() => isMineStale.value = true;
+
+  /// Refetches the owner's listings when a push flagged them, then clears the
+  /// flag.
+  ///
+  /// Every status bucket is dropped, not just the visible one: an approval
+  /// moves a listing out of Pending and into another tab, so the tab it left
+  /// is as wrong as the tab it joined.
+  Future<void> refreshMineIfStale() async {
+    if (!isMineStale.value) return;
+    isMineStale.value = false;
+    // A forced load for this tab is already on its way — it will carry the
+    // new status, so a second request would only duplicate it.
+    if (isLoadingMine.value) return;
+    _mineCache.clear();
+    await loadMine(status: _currentMineStatus, force: true);
+  }
+
   // Home feed (lightweight — only 5 records) ----------------------------------
   final homeAnnouncements = <AnnouncementModel>[].obs;
   final isLoadingHome = false.obs;

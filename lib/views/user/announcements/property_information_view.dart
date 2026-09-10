@@ -25,7 +25,12 @@ class PropertyInformationView extends StatefulWidget {
 
 class _PropertyInformationViewState extends State<PropertyInformationView> {
   // ── Form state ────────────────────────────────────────────────────────────
-  bool _isCommercial = false;
+  /// Residential vs Commercial. Drives both `is_commercial_property` on the
+  /// payload and which property types the dropdown below offers, since the
+  /// backend keeps a `category` on every type.
+  String _propertyCategory = PropertyTypeController.residential;
+  bool get _isCommercial =>
+      _propertyCategory == PropertyTypeController.commercial;
   String? _propertyFor;
   String? _propertyType;
   String? _bedroom;
@@ -277,11 +282,15 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     // a cached list present this is silent — the current options stay on
     // screen and are swapped for the fresh ones when the response lands.
     _amenityCtrl.loadAmenities(force: true);
-    _propertyTypeCtrl.load(force: true);
     if (c.propertyStatus == 1) _isProperty = 'Ready';
     if (c.propertyStatus == 2) _isProperty = 'Off Plan';
     _completionDate = c.completionDate;
-    _isCommercial = c.isCommercialProperty == 1;
+    _propertyCategory = c.isCommercialProperty == 1
+        ? PropertyTypeController.commercial
+        : PropertyTypeController.residential;
+    // Loaded after the category is restored: the dropdown only ever holds the
+    // types of the category on screen.
+    _propertyTypeCtrl.load(category: _propertyCategory, force: true);
     _existingVideoUrl = c.videoUrl;
     for (int i = 0; i < c.imageUrls.length && i < _maxImages; i++) {
       _existingImageUrls[i] = c.imageUrls[i];
@@ -715,31 +724,27 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ── Commercial toggle ──────────────────────────────────
+                          // ── Property Category ──────────────────────────────────
+                          _label('Property Category',
+                              required: true, isDark: isDark),
+                          SizedBox(height: 8.h),
                           Row(
                             children: [
-                              Icon(Icons.apartment_outlined,
-                                  size: 20.sp, color: AppColors.primary),
-                              SizedBox(width: 8.w),
-                              Text(
-                                'Commercial Property',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14.sp,
-                                  color:
-                                      isDark ? Colors.white70 : Colors.black87,
+                              Expanded(
+                                child: _categoryOption(
+                                  label: 'Residential',
+                                  value: PropertyTypeController.residential,
+                                  icon: Icons.home_work_outlined,
+                                  isDark: isDark,
                                 ),
                               ),
-                              const Spacer(),
-                              Transform.scale(
-                                scale: 0.6,
-                                child: Switch(
-                                  value: _isCommercial,
-                                  onChanged: (v) =>
-                                      setState(() => _isCommercial = v),
-                                  activeTrackColor: AppColors.primary,
-                                  thumbColor: const WidgetStatePropertyAll(
-                                      Colors.white),
-                                  inactiveTrackColor: Colors.grey.shade400,
+                              SizedBox(width: 12.w),
+                              Expanded(
+                                child: _categoryOption(
+                                  label: 'Commercial',
+                                  value: PropertyTypeController.commercial,
+                                  icon: Icons.apartment_outlined,
+                                  isDark: isDark,
                                 ),
                               ),
                             ],
@@ -771,18 +776,26 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                           _label('Property Type',
                               required: true, isDark: isDark),
                           SizedBox(height: 8.h),
-                          Obx(() => OverlayDropdownField(
-                                key: _propertyTypeKey,
-                                hasError: _showErrors && _propertyType == null,
-                                hint: _propertyTypeCtrl.isLoading.value
-                                    ? 'Loading...'
-                                    : 'Select Now',
-                                value: _propertyType,
-                                items: _propertyTypeCtrl.names,
-                                onSelect: (v) =>
-                                    setState(() => _propertyType = v),
-                                prefixIcon: Icons.domain_outlined,
-                              )),
+                          Obx(() {
+                            final names = _propertyTypeCtrl.names;
+                            return OverlayDropdownField(
+                              key: _propertyTypeKey,
+                              hasError: _showErrors && _propertyType == null,
+                              hint: _propertyTypeCtrl.isLoading.value
+                                  ? 'Loading...'
+                                  : (names.isEmpty
+                                      // The category has no types configured in
+                                      // the admin panel — say so instead of
+                                      // offering an empty list.
+                                      ? 'No types for this category'
+                                      : 'Select Now'),
+                              value: _propertyType,
+                              items: names,
+                              onSelect: (v) =>
+                                  setState(() => _propertyType = v),
+                              prefixIcon: Icons.domain_outlined,
+                            );
+                          }),
                           SizedBox(height: 16.h),
 
                           // ── Property Name ──────────────────────────────────────
@@ -1345,6 +1358,95 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   }
 
   // ── Form sub-widgets ──────────────────────────────────────────────────────
+
+  /// Switches Residential/Commercial and reloads the Property Type options.
+  ///
+  /// The chosen type is cleared whenever it isn't offered by the new category —
+  /// a "Villa" picked under Residential is not a valid Commercial type, and
+  /// sending it would put a name on the payload that no `property_type_id`
+  /// matches.
+  void _onCategoryChanged(String value) {
+    if (_propertyCategory == value) return;
+    setState(() {
+      _propertyCategory = value;
+      _propertyType = null;
+    });
+    _propertyTypeCtrl.load(category: value);
+  }
+
+  /// One Residential/Commercial radio, styled like the form's other fields so
+  /// the row reads as part of the same form rather than a stray control.
+  Widget _categoryOption({
+    required String label,
+    required String value,
+    required IconData icon,
+    required bool isDark,
+  }) {
+    final selected = _propertyCategory == value;
+    final borderColor = selected
+        ? AppColors.primary
+        : (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300);
+
+    return InkWell(
+      onTap: () => _onCategoryChanged(value),
+      borderRadius: BorderRadius.circular(6.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: isDark ? 0.16 : 0.06)
+              : (isDark ? const Color(0xFF1A1A1A) : Colors.white),
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(6.r),
+        ),
+        child: Row(
+          children: [
+            // Outer ring + inner dot: a radio, not a checkbox — only one of
+            // the two categories can ever be on.
+            Container(
+              width: 18.w,
+              height: 18.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected
+                      ? AppColors.primary
+                      : (isDark ? Colors.grey.shade600 : Colors.grey.shade400),
+                  width: 1.5,
+                ),
+              ),
+              child: selected
+                  ? Center(
+                      child: Container(
+                        width: 9.w,
+                        height: 9.w,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            SizedBox(width: 8.w),
+            Icon(icon, size: 18.sp, color: AppColors.primary),
+            SizedBox(width: 6.w),
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _label(String text, {bool required = false, required bool isDark}) {
     return RichText(

@@ -18,6 +18,8 @@ import 'package:brokkerspot/views/user/announcements/controller/announcement_lis
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
+import 'package:brokkerspot/views/user/profile/repo/user_profile_repo.dart';
+import 'package:brokkerspot/models/user_profile_model.dart';
 
 class NotificationService {
   NotificationService._();
@@ -302,12 +304,41 @@ class NotificationService {
     }
   }
 
+  /// Flags the owner's "My Announcement" lists when the admin approves or
+  /// rejects one of their listings, so a card doesn't keep showing "Pending"
+  /// until the user pulls to refresh.
+  ///
+  /// Deliberately a flag and not a refetch — see
+  /// [AnnouncementListController.isMineStale] for why the network call has to
+  /// come from the screen.
+  ///
+  /// `property_published` is here too even though the `announcement:publish`
+  /// socket event already refreshes the lists: that event only arrives if the
+  /// socket was alive when the broker published, and it is dead while the app
+  /// sleeps in the background. Nothing replays it afterwards, so without the
+  /// push the listing would keep showing its old status.
+  static void _markMineStaleIfOwnerStatusChanged(RemoteMessage message) {
+    final type = message.data['type']?.toString();
+    const ownerStatusTypes = {
+      'announcement_approved',
+      'announcement_rejected',
+      'property_published',
+    };
+    if (!ownerStatusTypes.contains(type)) return;
+    try {
+      AnnouncementListController.to.markMineStale();
+    } catch (e) {
+      debugPrint('⚠️ Could not flag My Announcements after push: $e');
+    }
+  }
+
   static void _onForegroundMessage(RemoteMessage message) {
     debugPrint('🔔 Foreground message received');
     // Before the iOS early-return below, so both platforms update the badge.
     _refreshNotificationBadge();
     _markFeedStaleIfNewListing(message);
     _markMeetingsStaleIfChat(message);
+    _markMineStaleIfOwnerStatusChanged(message);
     if (Platform.isIOS) return; // iOS shows it natively via Firebase options.
 
     final notification = message.notification;
@@ -467,6 +498,27 @@ class NotificationService {
       debugPrint('⚠️ Could not resolve role for chat notification: $e');
     }
 
+    // Last resort, and the only one that works for every pairing: ask the
+    // server who this person is.
+    //
+    // The two lookups above can each only recognise one shape of peer — a
+    // broker holding a proposal, or the listing's owner. On a broker-posted
+    // listing neither fits the person messaging about it: an interested user
+    // is not the owner (the broker is), and cannot appear among the proposals
+    // either, since only brokers may send those. That left the header on a
+    // placeholder for exactly that case, while the same chat opened from the
+    // conversations list looked right — the list is handed the peer's profile
+    // by the server and never has to work it out.
+    if (peerUserId != null && peerUserId.isNotEmpty && peerAvatar == null) {
+      try {
+        final profile = await UserProfileRepository().fetchUserById(peerUserId);
+        peerAvatar = _profileImageFor(profile, viewerSide: side);
+        peerName ??= profile.name;
+      } catch (e) {
+        debugPrint('⚠️ Could not fetch peer profile for chat notification: $e');
+      }
+    }
+
     // Prefer the user_role-derived side; fall back to the old owner-based
     // guess only when the announcement carried no usable user_role.
     if (side != null) {
@@ -487,6 +539,25 @@ class NotificationService {
               ? (_isBrokerSide ? 2 : 1)
               : (isOwnerHere ? 1 : 2)),
     );
+  }
+
+  /// Picks the peer's photo for the side of the account they are on in THIS
+  /// chat, not the side they happen to be using elsewhere.
+  ///
+  /// An account can hold both pictures. When the viewer is on the user side
+  /// the person they are talking to is acting as a broker, so the broker photo
+  /// is the right face for the header, and the other way round. Either one is
+  /// still better than a placeholder, so whichever is missing falls through to
+  /// the other.
+  static String? _profileImageFor(UserProfileModel profile, {int? viewerSide}) {
+    final broker = profile.brokerProfileImage?.trim();
+    final user = profile.userProfileImage?.trim();
+    final peerIsBroker = viewerSide != 2;
+    final first = peerIsBroker ? broker : user;
+    final second = peerIsBroker ? user : broker;
+    if (first != null && first.isNotEmpty) return first;
+    if (second != null && second.isNotEmpty) return second;
+    return null;
   }
 
   /// Opens the same detail screen NotificationsView._onTap opens for the in-app

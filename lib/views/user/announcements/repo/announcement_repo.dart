@@ -228,10 +228,19 @@ class AnnouncementRepository {
     throw json['message'] ?? 'Failed to fetch amenities';
   }
 
-  Future<List<PropertyTypeModel>> fetchPropertyTypes() async {
+  /// Admin-managed property types.
+  ///
+  /// [category] is 'residential' or 'commercial' — the create-announcement
+  /// form asks for one at a time so the Property Type dropdown only offers
+  /// types that belong to the category the user picked. Omitting it returns
+  /// every type, which is what the filter screens want.
+  Future<List<PropertyTypeModel>> fetchPropertyTypes({String? category}) async {
+    final categoryQuery = (category == null || category.isEmpty)
+        ? ''
+        : '&category=${Uri.encodeQueryComponent(category)}';
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}${ApiEndpoints.fetchPropertyTypes}?page=1&perPage=100',
+          '${api.baseUrl}${ApiEndpoints.fetchPropertyTypes}?page=1&perPage=100$categoryQuery',
       headers: api.buildHeaders(),
     );
     final json = jsonDecode(response.body) as Map<String, dynamic>;

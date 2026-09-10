@@ -23,13 +23,28 @@ class PresenceService extends GetxService {
   /// userId -> isOnline. Reactive: read inside Obx to rebuild on changes.
   final RxMap<String, bool> _online = <String, bool>{}.obs;
 
+  /// Everyone this session has asked to watch.
+  ///
+  /// Kept because the server files a watcher under the watching **socket id**
+  /// (see presenceStore.addWatcher), and that id is thrown away the moment the
+  /// connection drops. After any reconnect — the app coming back from the
+  /// background, a network blip, a role switch — the old registration is gone
+  /// and nothing will ever push an update again, so the header sits on
+  /// "Offline" no matter who is actually online. The watch has to be placed
+  /// again on the new connection, and only this list knows what to re-place.
+  final Set<String> _watched = <String>{};
+
   bool _listening = false;
+
+  /// Re-registers the watches whenever the socket comes back up.
+  Worker? _reconnectWorker;
 
   /// Start watching [userId]'s presence. Idempotent.
   void watch(String userId) {
     if (userId.isEmpty) return;
     _socket.connect();
     _ensureListening();
+    _watched.add(userId);
     _socket.emit(_watchEvent, {'user_id': userId});
   }
 
@@ -39,7 +54,22 @@ class PresenceService extends GetxService {
   void _ensureListening() {
     if (_listening) return;
     _socket.on(_updateEvent, _onUpdate);
+    _reconnectWorker ??= ever<bool>(_socket.isConnected, (connected) {
+      if (connected == true) _rewatchAll();
+    });
     _listening = true;
+  }
+
+  /// Places every watch again on the current connection.
+  ///
+  /// The server answers each `presence:watch` with the target's status right
+  /// away, so this also refreshes the flags rather than only re-subscribing —
+  /// someone who came online while the app was asleep shows as online without
+  /// waiting for their next status change.
+  void _rewatchAll() {
+    for (final userId in _watched) {
+      _socket.emit(_watchEvent, {'user_id': userId});
+    }
   }
 
   /// Clears every cached presence flag and detaches the socket listener.
@@ -50,6 +80,11 @@ class PresenceService extends GetxService {
       _socket.off(_updateEvent, _onUpdate);
       _listening = false;
     }
+    _reconnectWorker?.dispose();
+    _reconnectWorker = null;
+    // Dropped with the flags: re-watching the previous account's contacts on
+    // the next account's connection would leak who they were talking to.
+    _watched.clear();
     _online.clear();
   }
 

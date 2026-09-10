@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
@@ -11,7 +12,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 /// one connection is shared everywhere.
 ///
 /// Server: https://api.dev.brokkerspot.com  (path: /socket.io)
-class SocketService extends GetxService {
+class SocketService extends GetxService with WidgetsBindingObserver {
   /// Shared instance (created once, kept for the app lifetime).
   static SocketService get to => Get.isRegistered<SocketService>()
       ? Get.find<SocketService>()
@@ -35,6 +36,75 @@ class SocketService extends GetxService {
   /// Emits requested before the socket finished connecting. Flushed on connect
   /// so nothing is silently dropped during the handshake.
   final List<MapEntry<String, dynamic>> _pending = [];
+
+  /// When the app went to the background, or null while it is in front.
+  DateTime? _backgroundedAt;
+
+  /// Below this, the OS almost certainly kept the connection alive (a quick
+  /// glance at the notification shade, a permission sheet), so a reconnect
+  /// would cost a handshake for nothing.
+  static const Duration _suspendedLongEnough = Duration(seconds: 5);
+
+  @override
+  void onInit() {
+    super.onInit();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _backgroundedAt ??= DateTime.now();
+      return;
+    }
+    if (state != AppLifecycleState.resumed) return;
+    final since = _backgroundedAt;
+    _backgroundedAt = null;
+    if (since == null) return;
+    if (DateTime.now().difference(since) < _suspendedLongEnough) return;
+    revalidateConnection();
+  }
+
+  /// Forces a fresh handshake because the current one can no longer be
+  /// trusted.
+  ///
+  /// The OS freezes the socket while the app is in the background, and the
+  /// client only finds out the connection is gone when its own ping times out
+  /// — up to ~45s later. Until then `connected` still answers true, so
+  /// [emit] takes the "socket is ready" branch and writes the packet straight
+  /// into a dead pipe: no error, no delivery, and no reply ever comes back.
+  /// That is precisely the window a notification tap lands in, which is why
+  /// chat history failed on arrival and then loaded fine on Retry a few
+  /// seconds later.
+  ///
+  /// Reconnects the SAME socket object rather than rebuilding it, so every
+  /// listener already attached through [on] survives — a rebuild would leave
+  /// screens like the chat waiting on events nobody is listening for any
+  /// more. Emits made while this is in flight are queued by [emit] and
+  /// flushed on connect.
+  void revalidateConnection() {
+    final socket = _socket;
+    if (socket == null) {
+      connect();
+      return;
+    }
+    _log('revalidateConnection() — forcing a fresh handshake');
+    isConnected.value = false;
+    try {
+      socket.disconnect();
+    } catch (e) {
+      _log('revalidate disconnect error (ignored): $e');
+    }
+    socket.connect();
+  }
 
   /// Opens the connection. Idempotent — safe to call from many screens.
   void connect() {

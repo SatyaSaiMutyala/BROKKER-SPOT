@@ -418,8 +418,23 @@ class AnnouncementController extends GetxController {
     // Selected-entry ObjectIds, sent alongside the names above. Omitted when
     // unknown — an absent key is unambiguous, `""` is not.
     if (includeLookupIds) {
-      final resolvedTypeId = _resolveMissingId(propertyTypeId, propertyType,
-          () => PropertyTypeController.to.idForName(propertyType!));
+      // Type names are not unique across categories — the dev list carries a
+      // Villa, a Building, a Floor and a Land under BOTH residential and
+      // commercial, each with its own ObjectId. So a name may only be resolved
+      // against the list of the category this announcement belongs to;
+      // resolving "Villa" against the other category's list would write the
+      // wrong id. When the loaded category doesn't match, the key is left out
+      // and the stored value stays untouched.
+      final wantedCategory = isCommercialProperty == 1
+          ? PropertyTypeController.commercial
+          : PropertyTypeController.residential;
+      final resolvedTypeId = _resolveMissingId(
+        propertyTypeId,
+        propertyType,
+        () => PropertyTypeController.to.loadedCategory == wantedCategory
+            ? PropertyTypeController.to.idForName(propertyType!)
+            : null,
+      );
       if (resolvedTypeId != null) body['property_type_id'] = resolvedTypeId;
     }
 

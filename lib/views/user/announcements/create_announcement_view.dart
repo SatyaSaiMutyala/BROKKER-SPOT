@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/utils/proposals_limit_label.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/view/verification_screen.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_controller.dart';
@@ -383,7 +384,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
   /// limit: `proposals_limit` defaults to 0 on the announcement, and the
   /// backend rejects a proposal once `totalProposals > proposals_limit` — so
   /// an uncapped listing accepted exactly one. A high ceiling is sent instead.
-  static const int _unlimitedProposals = 1000;
+  ///
+  /// Shared with the screens that read the value back, so the number written
+  /// here and the number recognised as "Unlimited" there are the same one.
+  static const int _unlimitedProposals = kUnlimitedProposalsLimit;
 
   /// The value to send for the current selection — the parsed number, or the
   /// ceiling when the user chose "No limit".

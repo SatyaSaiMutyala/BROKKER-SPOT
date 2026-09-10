@@ -1022,6 +1022,12 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           announcement: announcement!,
           isOwner: false,
           previewMode: true,
+          // The person on this screen is the broker about to sign for this
+          // listing, so they get the same fee breakdown their own detail
+          // screen shows. Without it the preview hid the commission entirely —
+          // plain `isOwner: false` reads as "someone browsing the feed", and
+          // the fee is the one number that matters right before signing.
+          viewerIsBroker: true,
           onPreviewNext: () =>
               _openAgreementFlow(isOwner: false, acceptAndPublish: true),
         ));

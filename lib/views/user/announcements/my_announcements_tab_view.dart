@@ -7,6 +7,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/services/route_observer.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
@@ -22,9 +23,19 @@ class MyAnnouncementsTabView extends StatefulWidget {
 }
 
 class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RouteAware {
   late TabController _tabController;
   final _controller = AnnouncementListController.to;
+
+  /// Watches the flag a push sets when the admin approves or rejects one of
+  /// these listings, so the status changes under the user while they are
+  /// looking at it instead of waiting for a pull-to-refresh.
+  Worker? _staleWorker;
+
+  /// False while a detail screen sits on top of this one. The refresh then
+  /// waits for [didPopNext] rather than reshuffling a list the user can't see
+  /// — and can't scroll back to the row they came from.
+  bool _isOnTop = true;
 
   final _tabs = [
     'All',
@@ -60,10 +71,36 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() => setState(() {}));
     _controller.loadMine(force: true);
+    _staleWorker = ever<bool>(_controller.isMineStale, (stale) {
+      if (stale && mounted && _isOnTop) _controller.refreshMineIfStale();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is ModalRoute<void>) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPushNext() => _isOnTop = false;
+
+  /// Back from a pushed route — the detail screen, or wherever a notification
+  /// tap led. Picks up an approval that landed while this screen was covered,
+  /// or while the app was in the background and no Dart code was running.
+  @override
+  void didPopNext() {
+    _isOnTop = true;
+    _controller.refreshMineIfStale();
   }
 
   @override
   void dispose() {
+    _staleWorker?.dispose();
+    appRouteObserver.unsubscribe(this);
     _tabController.dispose();
     super.dispose();
   }
@@ -75,7 +112,10 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
 
   Future<void> _openDetail(AnnouncementModel a) async {
     final result = await Get.to(() => AnnouncementDetailView(announcement: a));
-    if (result == true) {
+    // [didPopNext] fires before this resolves, so a stale flag has already
+    // started a forced reload of this tab — the mutation reload would be the
+    // same request twice.
+    if (result == true && !_controller.isLoadingMine.value) {
       _controller.loadMine(status: _currentStatus, force: true);
     }
   }

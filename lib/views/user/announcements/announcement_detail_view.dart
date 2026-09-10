@@ -878,7 +878,14 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                             // place that sets backOnChat) — that opens a listing
                             // the broker has just published, where saving it is
                             // meaningless.
-                            if (!widget.isOwner && !widget.backOnChat) ...[
+                            //
+                            // Hidden in previewMode for the same reason: that is
+                            // the broker reading the property one last time
+                            // before signing for it, not browsing something to
+                            // come back to later.
+                            if (!widget.isOwner &&
+                                !widget.backOnChat &&
+                                !widget.previewMode) ...[
                               Obx(() {
                                 final isWishlisted =
                                     _wishlistCtrl.isWishlisted(_data.id ?? '');
