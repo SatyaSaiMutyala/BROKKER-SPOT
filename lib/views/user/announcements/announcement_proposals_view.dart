@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
@@ -27,7 +28,6 @@ class AnnouncementProposalsView extends StatefulWidget {
 }
 
 class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
-
   /// Seeded with the preview list the detail screen already had so the rows
   /// render instantly, then replaced by the full list from the API.
   ///
@@ -41,6 +41,21 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
   late List<ProposalBroker> _brokers =
       widget.proposals.where(AnnouncementRepository.isOpenProposal).toList();
   bool _loading = false;
+
+  /// True once [_loadProposals] has resolved (win or lose) for the first
+  /// time this screen is open.
+  ///
+  /// The seed rows render instantly from the detail screen's preview, but
+  /// that preview's `is_chat_available` / `status` per broker isn't
+  /// guaranteed as current as the full fetch's — so the Proposal/Chat pill
+  /// (driven by [_hasChat]) could show "Proposal" for a frame and then flip
+  /// to "Chat" the instant the real list lands. The pill stays a neutral
+  /// placeholder until this is true, so it only ever appears holding a
+  /// confirmed label. Deliberately never reset by a later reload (e.g. after
+  /// [_openChat]) — those already have [_chattedBrokerIds] to stay correct
+  /// instantly, so re-hiding the pill there would only add a flicker of its
+  /// own.
+  bool _settled = false;
 
   /// Brokers this screen has opened a chat with, kept so the pill flips to
   /// "Chat" the instant the user comes back — before, and regardless of,
@@ -81,13 +96,20 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
       // Signed and published brokers move to the announcement detail screen's
       // "Property Advertise by Brokers" section, so they stop appearing here.
       setState(
-        () => _brokers = full.where(AnnouncementRepository.isOpenProposal).toList(),
+        () => _brokers =
+            full.where(AnnouncementRepository.isOpenProposal).toList(),
       );
     } catch (e) {
       // Keep the preview rows already on screen rather than emptying the list.
       debugPrint('⚠️ Failed to load full proposals list: $e');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          // Only the first resolution counts — see the field doc on _settled.
+          _settled = true;
+        });
+      }
     }
   }
 
@@ -240,6 +262,25 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
     );
   }
 
+  /// Same footprint as the real pill, so nothing shifts when it's swapped in
+  /// — just no label yet, since neither "Proposal" nor "Chat" is confirmed.
+  Widget _pillPlaceholder(bool isDark) {
+    final base = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300;
+    final highlight = isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade100;
+    return Shimmer.fromColors(
+      baseColor: base,
+      highlightColor: highlight,
+      child: Container(
+        width: 66.w,
+        height: 30.h,
+        decoration: BoxDecoration(
+          color: base,
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+      ),
+    );
+  }
+
   Widget _avatar(String? url, bool isDark) {
     final placeholder = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200;
     return Container(
@@ -327,88 +368,97 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
                   // rather than flashing "No proposals yet" first.
                   ? const Center(child: CircularProgressIndicator())
                   : _brokers.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No proposals yet',
-                        style: GoogleFonts.inter(
-                          fontSize: 14.sp,
-                          color: isDark
-                              ? Colors.grey.shade600
-                              : Colors.grey.shade400,
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: EdgeInsets.symmetric(vertical: 8.h),
-                      itemCount: _brokers.length,
-                      separatorBuilder: (_, __) =>
-                          Divider(height: 1, color: dividerColor),
-                      itemBuilder: (ctx, i) {
-                        final b = _brokers[i];
-                        // No conversation yet, so the owner reads the proposal
-                        // first via the dialog (which carries its own START
-                        // CHAT). Once one exists the pill goes straight to it
-                        // instead of re-showing a proposal already read.
-                        final isPending = !_hasChat(b);
-                        return Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 20.w, vertical: 14.h),
-                          child: Row(
-                            children: [
-                              // Avatar with gold border
-                              _avatar(b.brokerProfileImage, isDark),
-                              SizedBox(width: 14.w),
-                              // Name + time
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      b.name ?? 'Broker',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 14.sp,
-                                        fontWeight: FontWeight.w500,
-                                        color: nameColor,
-                                      ),
-                                    ),
-                                    SizedBox(height: 3.h),
-                                    Text(
-                                      _timeAgo(b.createdAt),
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11.sp,
-                                        color: timeColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Proposal / Chat pill button
-                              GestureDetector(
-                                onTap: () => isPending
-                                    ? _showProposalDialog(ctx, b)
-                                    : _openChat(b),
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 18.w, vertical: 8.h),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary,
-                                    borderRadius: BorderRadius.circular(20.r),
-                                  ),
-                                  child: Text(
-                                    isPending ? 'Proposal' : 'Chat',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12.sp,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                      ? Center(
+                          child: Text(
+                            'No proposals yet',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.sp,
+                              color: isDark
+                                  ? Colors.grey.shade600
+                                  : Colors.grey.shade400,
+                            ),
                           ),
-                        );
-                      },
-                    ),
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.symmetric(vertical: 8.h),
+                          itemCount: _brokers.length,
+                          separatorBuilder: (_, __) =>
+                              Divider(height: 1, color: dividerColor),
+                          itemBuilder: (ctx, i) {
+                            final b = _brokers[i];
+                            // No conversation yet, so the owner reads the proposal
+                            // first via the dialog (which carries its own START
+                            // CHAT). Once one exists the pill goes straight to it
+                            // instead of re-showing a proposal already read.
+                            final isPending = !_hasChat(b);
+                            return Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 20.w, vertical: 14.h),
+                              child: Row(
+                                children: [
+                                  // Avatar with gold border
+                                  _avatar(b.brokerProfileImage, isDark),
+                                  SizedBox(width: 14.w),
+                                  // Name + time
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          b.name ?? 'Broker',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 14.sp,
+                                            fontWeight: FontWeight.w500,
+                                            color: nameColor,
+                                          ),
+                                        ),
+                                        SizedBox(height: 3.h),
+                                        Text(
+                                          _timeAgo(b.createdAt),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11.sp,
+                                            color: timeColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Proposal / Chat pill button — a neutral
+                                  // placeholder until _settled, so it never shows
+                                  // "Proposal" for one frame and flips to "Chat"
+                                  // the instant the full fetch confirms it should
+                                  // have said that all along.
+                                  _settled
+                                      ? GestureDetector(
+                                          onTap: () => isPending
+                                              ? _showProposalDialog(ctx, b)
+                                              : _openChat(b),
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: 18.w,
+                                                vertical: 8.h),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary,
+                                              borderRadius:
+                                                  BorderRadius.circular(20.r),
+                                            ),
+                                            child: Text(
+                                              isPending ? 'Proposal' : 'Chat',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 12.sp,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : _pillPlaceholder(isDark),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
             ),
           ],
         ),

@@ -176,6 +176,10 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
           announcement: a,
           index: index,
           onTap: () => _openDetail(a),
+          // Only trust proposalCount once the network has actually confirmed
+          // it for this tab — otherwise a stale on-disk-cache count flashes
+          // the badge on and immediately off the moment the real reply lands.
+          proposalsSettled: _controller.isMineSettled(_currentStatus),
         );
       },
     );
@@ -306,10 +310,18 @@ class _CardWithStatusBadge extends StatelessWidget {
   final int index;
   final VoidCallback onTap;
 
+  /// Whether [announcement.proposalCount] is the network-confirmed value for
+  /// this tab yet, rather than whatever the on-disk cache happened to hold.
+  /// The broker-avatar-stack badge stays hidden until this is true, so it
+  /// never flashes a stale count and then disappears — see
+  /// [AnnouncementListController.isMineSettled].
+  final bool proposalsSettled;
+
   const _CardWithStatusBadge({
     required this.announcement,
     required this.index,
     required this.onTap,
+    required this.proposalsSettled,
   });
 
   Color _dotColor(String? status) {
@@ -327,6 +339,18 @@ class _CardWithStatusBadge extends StatelessWidget {
       default:
         return Colors.grey.shade500;
     }
+  }
+
+  /// Display text for the pill — distinct from the raw status string, which
+  /// stays 'Active' everywhere else (announcement_detail_view's `status ==
+  /// 'active'` check gates the Interested Brokers pill on it, and _dotColor
+  /// above keys off it too). Only the label shown here changes: an owner
+  /// reads "Active" as "the listing is live to buyers", but at this status
+  /// it has only been approved and opened up to brokers to pitch for — no
+  /// buyer sees it yet, so "Shared Broker" says what's actually true.
+  String _statusLabel(String? status) {
+    if (status?.toLowerCase() == 'active') return 'Shared Broker';
+    return status ?? '';
   }
 
   @override
@@ -373,7 +397,7 @@ class _CardWithStatusBadge extends StatelessWidget {
                           ),
                           SizedBox(width: 6.w),
                           Text(
-                            (a.status ?? '').toUpperCase(),
+                            _statusLabel(a.status).toUpperCase(),
                             style: GoogleFonts.poppins(
                               fontSize: 12.sp,
                               fontWeight: FontWeight.w600,
@@ -407,7 +431,7 @@ class _CardWithStatusBadge extends StatelessWidget {
                 ),
 
               // ── Stacked broker avatars + count badge — top right ────────
-              if (count > 0)
+              if (count > 0 && proposalsSettled)
                 Positioned(
                   top: 10.h,
                   right: 10.w,

@@ -430,14 +430,22 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     final primaryText = isDark ? Colors.white : Colors.black87;
     return Column(
       children: [
-        Expanded(
+        // Flexible (loose), not Expanded (tight): this content is short
+        // enough on most screens to not need scrolling at all, and a tight
+        // Expanded was stretching the scroll area to fill all the leftover
+        // space regardless — pushing the secure note/checkbox/button block
+        // below it down into a big dead gap under the signature box. Loose
+        // sizing lets this shrink to its own content height and sit directly
+        // above that block, only actually scrolling on a screen short enough
+        // to need it.
+        Flexible(
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(horizontal: 20.w),
             child: Column(
               children: [
-                SizedBox(height: 24.h),
+                SizedBox(height: 12.h),
                 _buildDocumentIcon(),
-                SizedBox(height: 20.h),
+                SizedBox(height: 12.h),
                 Text(
                   'Owner and Broker Agreement Summary',
                   textAlign: TextAlign.center,
@@ -448,7 +456,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                     height: 1.3,
                   ),
                 ),
-                SizedBox(height: 8.h),
+                SizedBox(height: 6.h),
                 Text(
                   'Please review the key terms of the agreement.',
                   textAlign: TextAlign.center,
@@ -458,9 +466,9 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                     height: 1.3,
                   ),
                 ),
-                SizedBox(height: 28.h),
+                SizedBox(height: 16.h),
                 _buildViewContractDetails(),
-                SizedBox(height: 28.h),
+                SizedBox(height: 16.h),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -472,15 +480,26 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
                     ),
                   ),
                 ),
-                SizedBox(height: 10.h),
+                SizedBox(height: 8.h),
                 _buildSignatureBox(),
                 SizedBox(height: 12.h),
-                _buildSecureNote(),
-                SizedBox(height: 18.h),
-                _buildConfirmCheckbox(),
-                SizedBox(height: 20.h),
               ],
             ),
+          ),
+        ),
+        // Fixed above the button rather than scrolled with the summary — the
+        // security reassurance and the one thing the user must actually act
+        // on before accepting should never be something they have to scroll
+        // to find.
+        Padding(
+          padding: EdgeInsets.fromLTRB(20.w, 10.h, 20.w, 0),
+          child: Column(
+            children: [
+              _buildSecureNote(),
+              // Same gap as "Your signature" → the signature box above.
+              SizedBox(height: 8.h),
+              _buildConfirmCheckbox(),
+            ],
           ),
         ),
         _buildAcceptButton(),
@@ -492,8 +511,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     final iconBg = _isDark ? const Color(0x14FFFFFF) : const Color(0x14000000);
     final iconColor = _isDark ? Colors.white : Colors.black87;
     return Container(
-      width: 140.w,
-      height: 140.w,
+      width: 92.w,
+      height: 92.w,
       decoration: BoxDecoration(
         color: iconBg,
         shape: BoxShape.circle,
@@ -502,23 +521,23 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Icon(Icons.description_outlined, color: iconColor, size: 56.sp),
+          Icon(Icons.description_outlined, color: iconColor, size: 36.sp),
           Positioned(
-            right: -6.w,
-            bottom: 2.h,
+            right: -4.w,
+            bottom: 1.h,
             child: Container(
-              width: 30.w,
-              height: 30.w,
+              width: 22.w,
+              height: 22.w,
               decoration: BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: _isDark ? const Color(0xFF0B0D12) : Colors.white,
-                  width: 2,
+                  width: 1.5,
                 ),
               ),
               child:
-                  Icon(Icons.verified_user, color: Colors.white, size: 16.sp),
+                  Icon(Icons.verified_user, color: Colors.white, size: 12.sp),
             ),
           ),
         ],
@@ -537,7 +556,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
       behavior: HitTestBehavior.opaque,
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 18.h),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: BorderRadius.circular(12.r),
@@ -608,7 +627,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
       behavior: HitTestBehavior.opaque,
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.all(16.w),
+        padding: EdgeInsets.all(12.w),
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: BorderRadius.circular(12.r),
@@ -663,12 +682,12 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     final containerBg = isDark ? const Color(0xFF0B0D12) : Colors.white;
     return Container(
       color: containerBg,
-      padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 12.h + bottomPad),
+      padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 8.h + bottomPad),
       child: GestureDetector(
         onTap: _isSigning ? null : _onAccept,
         child: Container(
           width: double.infinity,
-          height: 54.h,
+          height: 50.h,
           decoration: BoxDecoration(
             color: _agreed ? AppColors.primary : Colors.grey.shade400,
             borderRadius: BorderRadius.circular(30.r),

@@ -21,6 +21,9 @@ class AnnouncementCache {
   // Stable keys for each list query.
   static const String keyAll = 'all';
   static const String keyHome = 'home';
+  // Broker-side public feed (BrokerProjectsView's browse tab) — a different
+  // role filter than `keyAll`, so it needs its own slot rather than sharing.
+  static const String keyBroker = 'broker';
   // Broker-side "My Announcement" — same /user/announcements/fetch endpoint,
   // backend filters by currentRole, so the response differs from the user-side
   // /fetch response and needs its own cache slot.

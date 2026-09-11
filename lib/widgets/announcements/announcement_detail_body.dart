@@ -144,31 +144,34 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
 
   /// Whether there is a fee worth breaking down: one month's rent on a rental,
   /// a percentage of the price on a sale.
-  bool get _hasCommission => isRentListing(a)
-      ? (a.price ?? 0) > 0
-      : (a.brokkeragePercent ?? 0) > 0;
-
+  bool get _hasCommission =>
+      isRentListing(a) ? (a.price ?? 0) > 0 : (a.brokkeragePercent ?? 0) > 0;
 
   // ── Stats card ─────────────────────────────────────────────────────────────
 
   Widget _buildStatsCard(bool isDark) {
     final items = <_StatItem>[];
     if (a.bedrooms != null) {
-      items.add(_StatItem('assets/images/bed_icon.png', '${a.bedrooms}', 'Beds'));
+      items.add(
+          _StatItem('assets/images/bed_icon.png', '${a.bedrooms}', 'Beds'));
     }
     if (a.bathrooms != null) {
-      items.add(_StatItem('assets/images/baths_icon.png', '${a.bathrooms}', 'Baths'));
+      items.add(
+          _StatItem('assets/images/baths_icon.png', '${a.bathrooms}', 'Baths'));
     }
     if (a.sqft != null) {
       items.add(_StatItem('assets/images/sqft_icon.png', '${a.sqft}', 'Sqft'));
     }
     if (a.floor != null) {
-      items.add(_StatItem('assets/images/floor_icon.png', '${a.floor}', 'Floor'));
+      items.add(
+          _StatItem('assets/images/floor_icon.png', '${a.floor}', 'Floor'));
     }
     if (items.isEmpty) return const SizedBox.shrink();
 
-    final borderColor = isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
-    final dividerColor = isDark ? const Color(0xFF4A4A4A) : const Color(0xFFDDDDDD);
+    final borderColor =
+        isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
+    final dividerColor =
+        isDark ? const Color(0xFF4A4A4A) : const Color(0xFFDDDDDD);
 
     return Padding(
       padding: EdgeInsets.only(top: 4.h),
@@ -385,15 +388,13 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
                   fit: BoxFit.cover,
                   placeholder: (_, __) => Container(
                     width: 170.w,
-                    color: isDark
-                        ? const Color(0xFF2A2A2A)
-                        : Colors.grey.shade200,
+                    color:
+                        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
                   ),
                   errorWidget: (_, __, ___) => Container(
                     width: 170.w,
-                    color: isDark
-                        ? const Color(0xFF2A2A2A)
-                        : Colors.grey.shade200,
+                    color:
+                        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
                     child: Icon(Icons.broken_image_outlined,
                         color: Colors.grey.shade400),
                   ),
@@ -436,8 +437,7 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
       return _emptyTabContent('No documents available', isDark);
     }
 
-    final cardBg =
-        isDark ? const Color(0xFF1E1E1E) : const Color(0xFFFAFAFA);
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFFAFAFA);
     final textColor = isDark ? Colors.white : const Color(0xFF202020);
 
     return Column(
@@ -457,8 +457,7 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
     );
   }
 
-  Widget _docRow(
-      String label, IconData icon, Color cardBg, Color textColor) {
+  Widget _docRow(String label, IconData icon, Color cardBg, Color textColor) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
       decoration: BoxDecoration(
@@ -472,9 +471,7 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
           Text(
             label,
             style: GoogleFonts.poppins(
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w500,
-                color: textColor),
+                fontSize: 14.sp, fontWeight: FontWeight.w500, color: textColor),
           ),
           const Spacer(),
           Icon(Icons.arrow_forward_ios, size: 14.sp, color: AppColors.primary),
@@ -507,8 +504,7 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
         isLong && !_descExpanded ? '${desc.substring(0, threshold)}...' : desc;
     final outerBorder =
         isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
-    final textColor =
-        isDark ? Colors.grey.shade300 : const Color(0xFF444444);
+    final textColor = isDark ? Colors.grey.shade300 : const Color(0xFF444444);
 
     return Container(
       width: double.infinity,
@@ -525,14 +521,13 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
           SizedBox(height: 14.h),
           Text(
             displayText,
-            style:
-                GoogleFonts.inter(fontSize: 13.sp, color: textColor, height: 1.6),
+            style: GoogleFonts.inter(
+                fontSize: 13.sp, color: textColor, height: 1.6),
           ),
           if (isLong) ...[
             SizedBox(height: 6.h),
             GestureDetector(
-              onTap: () =>
-                  setState(() => _descExpanded = !_descExpanded),
+              onTap: () => setState(() => _descExpanded = !_descExpanded),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -584,8 +579,8 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
           Icons.people_outline, 'Proposal Limit', '${a.proposalsLimit}'));
     }
     if (widget.showBrokerage && a.brokkeragePercent != null) {
-      items.add(_DetailItem(
-          Icons.percent, 'Brokerage', '${a.brokkeragePercent}%'));
+      items.add(
+          _DetailItem(Icons.percent, 'Brokerage', '${a.brokkeragePercent}%'));
     }
     if (items.isEmpty) return const SizedBox.shrink();
 
@@ -625,9 +620,7 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (int j = i;
-                      j < (i + 3).clamp(0, items.length);
-                      j++) ...[
+                  for (int j = i; j < (i + 3).clamp(0, items.length); j++) ...[
                     Expanded(child: _buildDetailCard(items[j], isDark)),
                     if (j < (i + 3).clamp(0, items.length) - 1)
                       SizedBox(width: 8.w),
@@ -648,10 +641,8 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
   }
 
   Widget _buildDetailCard(_DetailItem item, bool isDark) {
-    final labelColor =
-        isDark ? Colors.grey.shade500 : const Color(0xFF6C6C6C);
-    final valueColor =
-        isDark ? AppColors.textWhite : const Color(0xFF252525);
+    final labelColor = isDark ? Colors.grey.shade500 : const Color(0xFF6C6C6C);
+    final valueColor = isDark ? AppColors.textWhite : const Color(0xFF252525);
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 12.h),
@@ -744,7 +735,9 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
         receive = oneMonth;
         pay = price;
         receiveLabel = 'You will receive 1 month';
-        payLabel = isMonthly ? 'Owner will receive Monthly' : 'Owner will receive yearly';
+        payLabel = isMonthly
+            ? 'Owner will receive Monthly'
+            : 'Owner will receive yearly';
       } else {
         receive = price;
         pay = oneMonth;
@@ -798,16 +791,16 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
             ],
           ),
           SizedBox(height: 14.h),
-          _commissionRow(receiveLabel, '$currency ${_formatPrice(receive)}',
-              labelColor),
+          _commissionRow(
+              receiveLabel, '$currency ${_formatPrice(receive)}', labelColor),
           // The second row is the other party's side of the deal. An owner
           // wants to see what the fee costs them, so theirs stays. A broker
           // only needs their own take — what the owner walks away with is not
           // their business, on a percentage or on a month's rent.
           if (!forBroker) ...[
             SizedBox(height: 10.h),
-            _commissionRow(payLabel, '$currency ${_formatPrice(pay)}',
-                labelColor),
+            _commissionRow(
+                payLabel, '$currency ${_formatPrice(pay)}', labelColor),
           ],
         ],
       ),
@@ -860,14 +853,12 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
   Widget _buildAmenitiesSection(List<String> amenities, bool isDark) {
     final borderColor =
         isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
-    final textColor =
-        isDark ? AppColors.textWhite : const Color(0xFF202020);
+    final textColor = isDark ? AppColors.textWhite : const Color(0xFF202020);
 
     const maxVisible = 4;
     final extra = amenities.length - maxVisible;
     final showAll = _amenitiesExpanded || extra <= 0;
-    final displayed =
-        showAll ? amenities : amenities.take(maxVisible).toList();
+    final displayed = showAll ? amenities : amenities.take(maxVisible).toList();
 
     Widget amenityChip(String label) => Container(
           width: (MediaQuery.of(context).size.width - 88.w) / 2,
@@ -899,8 +890,7 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
           ),
         );
 
-    Widget toggleChip(
-            {required String label, required VoidCallback onTap}) =>
+    Widget toggleChip({required String label, required VoidCallback onTap}) =>
         GestureDetector(
           onTap: onTap,
           child: Container(
@@ -944,14 +934,12 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
               if (!showAll)
                 toggleChip(
                   label: '+$extra More',
-                  onTap: () =>
-                      setState(() => _amenitiesExpanded = true),
+                  onTap: () => setState(() => _amenitiesExpanded = true),
                 ),
               if (_amenitiesExpanded && extra > 0)
                 toggleChip(
                   label: 'Show Less',
-                  onTap: () =>
-                      setState(() => _amenitiesExpanded = false),
+                  onTap: () => setState(() => _amenitiesExpanded = false),
                 ),
             ],
           ),
@@ -1105,8 +1093,7 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
   Widget _buildLocationSection(bool isDark) {
     final borderColor =
         isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED);
-    final addressColor =
-        isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final addressColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
 
     final coords = a.propertyLocation?.coordinates;
     final hasCoords = coords != null && coords.length >= 2;
@@ -1192,8 +1179,7 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
                   ),
                 ),
                 SizedBox(width: 8.w),
-                Icon(Icons.open_in_new,
-                    size: 14.sp, color: AppColors.primary),
+                Icon(Icons.open_in_new, size: 14.sp, color: AppColors.primary),
               ],
             ),
           ),

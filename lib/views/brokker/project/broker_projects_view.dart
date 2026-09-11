@@ -63,8 +63,8 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
   /// renders — either we fetched more than we show, or more pages exist.
   /// Guards against promising "more announcements" when there are none.
   bool get _hasMoreBehindLogin =>
-      _controller.allAnnouncements.length > kGuestAnnouncementLimit ||
-      _controller.hasMoreAll;
+      _controller.brokerAnnouncements.length > kGuestAnnouncementLimit ||
+      _controller.hasMoreBroker;
 
   @override
   void initState() {
@@ -75,7 +75,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       if (widget.showMineOnly) {
         _controller.loadBrokerMine();
       } else {
-        _controller.loadAll();
+        _controller.loadBroker();
       }
     });
   }
@@ -98,15 +98,17 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
   }
 
   /// Back from a pushed route — same freshness check the user-side home feed
-  /// runs, since this screen reads the same cached `allAnnouncements` list and
-  /// went stale the same way.
+  /// runs (`refreshAllIfChanged`), just against this screen's own
+  /// `brokerAnnouncements` cache instead of the user side's `allAnnouncements`
+  /// — the two are deliberately separate lists (different role filter), see
+  /// [AnnouncementListController.loadBroker]'s doc comment.
   ///
   /// "Mine" is skipped: that list only changes through this account's own
   /// actions, which already refresh it directly.
   @override
   void didPopNext() {
     if (widget.showMineOnly) return;
-    _controller.refreshAllIfChanged(atTop: _isNearTop);
+    _controller.refreshBrokerIfChanged(atTop: _isNearTop);
   }
 
   /// Near enough to the top that replacing page 1 costs no scroll context.
@@ -122,8 +124,8 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
     // nothing to interrupt the scroll with.
     if (_isGuest) return;
 
-    if (pos.pixels >= pos.maxScrollExtent - 300 && _controller.hasMoreAll) {
-      _controller.loadMoreAll();
+    if (pos.pixels >= pos.maxScrollExtent - 300 && _controller.hasMoreBroker) {
+      _controller.loadMoreBroker();
     }
   }
 
@@ -310,14 +312,14 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
 
       final isLoading = isMine
           ? _controller.isLoadingBrokerMine.value
-          : _controller.isLoadingAll.value;
+          : _controller.isLoadingBroker.value;
       final error = isMine
           ? _controller.brokerMineError.value
-          : _controller.allError.value;
+          : _controller.brokerError.value;
       final myId = _profileCtrl.currentUserId;
       final rawList = isMine
           ? _controller.brokerMineAnnouncements.toList()
-          : _controller.allAnnouncements
+          : _controller.brokerAnnouncements
               // Hide the broker's own posts from the public feed. A guest has
               // no id, so nothing gets excluded (and a null userId on a real
               // announcement is never mistaken for "mine").
@@ -327,7 +329,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
 
       Future<void> refresh() => isMine
           ? _controller.loadBrokerMine(status: _selectedStatus, force: true)
-          : _controller.loadAll(force: true);
+          : _controller.loadBroker(force: true);
 
       // Shimmer until the first fetch has actually come back. `isLoading` alone
       // is still false while this screen waits for its postFrameCallback to
@@ -335,7 +337,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       // spinner even started.
       final settled = isMine
           ? _controller.brokerMineSettled.value
-          : _controller.allSettled.value;
+          : _controller.brokerSettled.value;
       if ((isLoading || !settled) && announcements.isEmpty) {
         return _buildShimmer();
       }
@@ -384,7 +386,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       }
 
       final showLoadingMore =
-          !isMine && !_isGuest && _controller.isLoadingMoreAll.value;
+          !isMine && !_isGuest && _controller.isLoadingMoreBroker.value;
       final cardEnd = announcements.length;
       final skeletonIdx = showLoadingMore ? cardEnd : -1;
       final itemCount = cardEnd + (showLoadingMore ? 1 : 0);

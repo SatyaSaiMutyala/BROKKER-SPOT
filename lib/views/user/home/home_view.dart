@@ -256,6 +256,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
         onAvatarTap: () => widget.onAccountTap?.call(),
         onNotificationTap: () => Get.to(() => const NotificationsView()),
         onSearchTap: () => Get.to(() => const SearchView()),
+        isGuest: _profileCtrl.isGuest,
       );
     });
   }

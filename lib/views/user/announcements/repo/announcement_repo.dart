@@ -126,16 +126,26 @@ class AnnouncementRepository {
 
   /// Fetches only the total count of matching announcements (`countOnly=true`).
   /// Uses the authenticated or guest endpoint depending on login state.
-  Future<int> fetchAnnouncementCount({PropertyFilter? filter}) async {
+  ///
+  /// [userRole] matters only for a guest request — the guest endpoint has no
+  /// token to derive a role from, so it takes whatever `user_role` is on the
+  /// query (default 1) — see [fetchGuestAnnouncements]. Pass the same role the
+  /// list itself was fetched with, or the count probe compares against the
+  /// wrong side's total. Ignored (omitted from the query) when logged in, same
+  /// as the list fetch: the backend derives the role from the access token.
+  Future<int> fetchAnnouncementCount(
+      {PropertyFilter? filter, int? userRole}) async {
     final filterQuery = filter?.toQueryString() ?? '';
     final isLoggedIn = LocalStorageService.isLoggedIn();
     final endpoint = isLoggedIn
         ? ApiEndpoints.fetchAllAnnouncements
         : ApiEndpoints.guestFetchAllAnnouncements;
     final headers = isLoggedIn ? api.buildHeaders() : api.buildHeader();
+    final roleQuery =
+        (!isLoggedIn && userRole != null) ? '&user_role=$userRole' : '';
     final response = await api.getRequest(
       endPoint:
-          '${api.baseUrl}$endpoint?page=1&perPage=1&countOnly=true$filterQuery',
+          '${api.baseUrl}$endpoint?page=1&perPage=1&countOnly=true$filterQuery$roleQuery',
       headers: headers,
     );
     final json = jsonDecode(response.body) as Map<String, dynamic>;

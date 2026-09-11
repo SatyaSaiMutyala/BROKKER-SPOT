@@ -95,7 +95,11 @@ class AnnouncementListController extends GetxController {
     }
 
     try {
-      final count = await _repo.fetchAnnouncementCount();
+      // Guest-only: the guest endpoint has no token to derive a role from, so
+      // it must be told which one this probe is for. See loadAll's own
+      // fetchGuestAnnouncements call — same role, or the two would disagree.
+      final count = await _repo.fetchAnnouncementCount(
+          userRole: LocalStorageService.isLoggedIn() ? null : 2);
       _allCheckedAt = DateTime.now();
       if (count != _allTotalRecords && atTop) {
         await loadAll(force: true);
@@ -106,11 +110,60 @@ class AnnouncementListController extends GetxController {
   }
   bool get hasMoreAll => _allPage < _allTotalPages;
 
-  // Broker feed — user-role=2 (brokers) used by BrokerProjectsView -----------
+  // Broker feed (BrokerProjectsView's public browse tab) ---------------------
+  //
+  // A logged-in caller gets this role-swapped server-side same as [loadAll]
+  // (the backend derives it from the token), but a guest has no token to
+  // derive anything from — so unlike loadAll, this one really does need to
+  // send `user_role=1` on the wire itself (see [loadBroker]). Kept as an
+  // entirely separate cache/list from `allAnnouncements`: the two need
+  // different content for the same guest, and sharing one slot meant whichever
+  // screen fetched second silently overwrote the first's list with the wrong
+  // role's data — see git history on this comment for the whole story.
   final brokerAnnouncements = <AnnouncementModel>[].obs;
   final isLoadingBroker = false.obs;
+  final isLoadingMoreBroker = false.obs;
   final brokerError = Rxn<String>();
+  final brokerSettled = false.obs;
   bool _brokerLoaded = false;
+  int _brokerPage = 1;
+  int _brokerTotalPages = 1;
+  static const int _brokerPerPage = 10;
+  int _brokerTotalRecords = 0;
+  DateTime? _brokerCheckedAt;
+  final isBrokerStale = false.obs;
+
+  void markBrokerStale() => isBrokerStale.value = true;
+
+  bool get hasMoreBroker => _brokerPage < _brokerTotalPages;
+
+  /// Freshness check mirroring [refreshAllIfChanged], for the broker feed.
+  Future<void> refreshBrokerIfChanged({bool atTop = true}) async {
+    if (isLoadingBroker.value || isLoadingMoreBroker.value) return;
+    if (brokerAnnouncements.isEmpty) return;
+
+    if (isBrokerStale.value) {
+      isBrokerStale.value = false;
+      if (atTop) await loadBroker(force: true);
+      return;
+    }
+
+    final last = _brokerCheckedAt;
+    if (last != null && DateTime.now().difference(last) < _freshnessWindow) {
+      return;
+    }
+
+    try {
+      final count = await _repo.fetchAnnouncementCount(
+          userRole: LocalStorageService.isLoggedIn() ? null : 1);
+      _brokerCheckedAt = DateTime.now();
+      if (count != _brokerTotalRecords && atTop) {
+        await loadBroker(force: true);
+      }
+    } catch (_) {
+      // A failed probe is not worth surfacing — the cached feed stands.
+    }
+  }
 
   // My announcements (server-side status filter, cached per status) -----------
   // status: null=all, 0=draft, 1=submitted, 2=approved, 3=rejected.
@@ -120,6 +173,18 @@ class AnnouncementListController extends GetxController {
   final Map<int?, List<AnnouncementModel>> _mineCache = {};
   int? _currentMineStatus;
   bool _mineLoaded = false;
+
+  /// True once [status]'s list has been confirmed by a real network reply
+  /// this session — [_mineCache] is only ever written from that reply, never
+  /// from the on-disk cache, so its key set doubles as the "settled" set.
+  ///
+  /// [loadMine] renders the on-disk cache instantly (offline-first) before
+  /// the network catches up, which is fine for prices/photos but not for a
+  /// count like `proposalCount`: a stale cached "1 proposal" badge would
+  /// appear and then vanish the instant the real "0" reply lands. Screens
+  /// that render something off a count like that should gate it on this,
+  /// so it only ever appears once, holding the confirmed value.
+  bool isMineSettled(int? status) => _mineCache.containsKey(status);
 
   /// Set when a push says the admin changed one of this user's own listings
   /// (approved or rejected), so its card is showing a status the server no
@@ -196,9 +261,14 @@ class AnnouncementListController extends GetxController {
     );
   }
 
-  /// Loads the public feed (user-role=1, property owners). Shows the local-DB
-  /// cache instantly, then refreshes from the network. No network call if
-  /// already loaded this session unless [force].
+  /// Loads the user side's public feed — user-role=2 (broker-posted
+  /// listings), mirroring what the backend hands a logged-in current_role=1
+  /// caller (`user_role: current_role === 1 ? 2 : 1`, see
+  /// AnnouncementService.getAllAnnouncements server-side). A guest has no
+  /// token to derive that swap from, so it has to be said explicitly — see
+  /// [fetchGuestAnnouncements]. Shows the local-DB cache instantly, then
+  /// refreshes from the network. No network call if already loaded this
+  /// session unless [force].
   Future<void> loadAll({bool force = false}) async {
     ensurePublishListening();
     // Instant render from local DB (offline-first) when we have nothing yet.
@@ -214,7 +284,8 @@ class AnnouncementListController extends GetxController {
       allError.value = null;
       final result = LocalStorageService.isLoggedIn()
           ? await _repo.fetchAllAnnouncements(page: 1, perPage: _allPerPage)
-          : await _repo.fetchGuestAnnouncements(page: 1, perPage: _allPerPage);
+          : await _repo.fetchGuestAnnouncements(
+              page: 1, perPage: _allPerPage, userRole: 2);
       allAnnouncements.assignAll(result.items);
       _allPage = result.page;
       _allTotalPages = result.totalPages;
@@ -244,7 +315,8 @@ class AnnouncementListController extends GetxController {
       isLoadingMoreAll.value = true;
       final result = LocalStorageService.isLoggedIn()
           ? await _repo.fetchAllAnnouncements(page: next, perPage: _allPerPage)
-          : await _repo.fetchGuestAnnouncements(page: next, perPage: _allPerPage);
+          : await _repo.fetchGuestAnnouncements(
+              page: next, perPage: _allPerPage, userRole: 2);
       allAnnouncements.addAll(result.items);
       _allPage = result.page;
       _allTotalPages = result.totalPages;
@@ -255,20 +327,65 @@ class AnnouncementListController extends GetxController {
     }
   }
 
-  /// Loads user-role=2 announcements (brokers). No-op unless [force].
+  /// Loads the broker's public browse feed — user-role=1 (property owners),
+  /// mirroring the logged-in backend's own `current_role == 2 → user_role 1`
+  /// swap (see [loadAll]'s doc). Shows the local-DB cache instantly, then
+  /// refreshes from the network, same shape as [loadAll]. No network call if
+  /// already loaded this session unless [force].
   Future<void> loadBroker({bool force = false}) async {
     ensurePublishListening();
+    if (brokerAnnouncements.isEmpty) {
+      final cached = AnnouncementCache.readList(AnnouncementCache.keyBroker);
+      if (cached.isNotEmpty) {
+        brokerAnnouncements.assignAll(cached.map(AnnouncementModel.fromJson));
+      }
+    }
     if (_brokerLoaded && !force) return;
     try {
       isLoadingBroker.value = true;
       brokerError.value = null;
-      final result = await _repo.fetchAllAnnouncements();
+      final result = LocalStorageService.isLoggedIn()
+          ? await _repo.fetchAllAnnouncements(
+              page: 1, perPage: _brokerPerPage)
+          // Guest: no token to derive a role from, so it has to be said
+          // explicitly. 1 matches what a logged-in broker (current_role=2)
+          // sees server-side — see the class comment above.
+          : await _repo.fetchGuestAnnouncements(
+              page: 1, perPage: _brokerPerPage, userRole: 1);
       brokerAnnouncements.assignAll(result.items);
+      _brokerPage = result.page;
+      _brokerTotalPages = result.totalPages;
+      _brokerTotalRecords = result.totalRecords;
+      _brokerCheckedAt = DateTime.now();
+      isBrokerStale.value = false;
+      AnnouncementCache.saveList(AnnouncementCache.keyBroker, result.raw);
       _brokerLoaded = true;
     } catch (e) {
-      brokerError.value = e.toString();
+      if (brokerAnnouncements.isEmpty) brokerError.value = e.toString();
     } finally {
       isLoadingBroker.value = false;
+      brokerSettled.value = true;
+    }
+  }
+
+  /// Append the next page of the broker feed. Mirrors [loadMoreAll].
+  Future<void> loadMoreBroker() async {
+    if (isLoadingMoreBroker.value || !hasMoreBroker) return;
+    final next = _brokerPage + 1;
+    try {
+      isLoadingMoreBroker.value = true;
+      final result = LocalStorageService.isLoggedIn()
+          ? await _repo.fetchAllAnnouncements(
+              page: next, perPage: _brokerPerPage)
+          : await _repo.fetchGuestAnnouncements(
+              page: next, perPage: _brokerPerPage, userRole: 1);
+      brokerAnnouncements.addAll(result.items);
+      _brokerPage = result.page;
+      _brokerTotalPages = result.totalPages;
+    } catch (_) {
+      // Silent — keep showing the pages we already have.
+    } finally {
+      isLoadingMoreBroker.value = false;
     }
   }
 
@@ -334,7 +451,9 @@ class AnnouncementListController extends GetxController {
       homeError.value = null;
       final result = LocalStorageService.isLoggedIn()
           ? await _repo.fetchAllAnnouncements(page: 1, perPage: 5)
-          : await _repo.fetchGuestAnnouncements(page: 1, perPage: 5);
+          // User side, same role as loadAll — see its doc comment.
+          : await _repo.fetchGuestAnnouncements(
+              page: 1, perPage: 5, userRole: 2);
       homeAnnouncements.assignAll(result.items);
       AnnouncementCache.saveList(AnnouncementCache.keyHome, result.raw);
       _homeLoaded = true;
@@ -430,6 +549,7 @@ class AnnouncementListController extends GetxController {
     _mineCache.clear();
     _allLoaded = false;
     allSettled.value = false;
+    brokerSettled.value = false;
     brokerMineSettled.value = false;
     _brokerLoaded = false;
     _mineLoaded = false;
@@ -438,7 +558,12 @@ class AnnouncementListController extends GetxController {
     _currentMineStatus = null;
     _allPage = 1;
     _allTotalPages = 1;
+    _brokerPage = 1;
+    _brokerTotalPages = 1;
     isLoadingMoreAll.value = false;
+    isLoadingMoreBroker.value = false;
+    isAllStale.value = false;
+    isBrokerStale.value = false;
     allError.value = null;
     brokerError.value = null;
     myError.value = null;

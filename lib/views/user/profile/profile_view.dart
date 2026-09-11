@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:brokkerspot/core/common_widget/full_screen_image_view.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/user_profile_model.dart';
@@ -55,6 +57,24 @@ class UserProfileView extends StatefulWidget {
 class _UserProfileViewState extends State<UserProfileView> {
   late final String _tag = 'user_profile_${widget.userId}';
   late final UserProfileController _controller;
+
+  static const _avatarSize = 96.0;
+  // ── Verified badge (assets/images/v-icon.png) ─────────────────────────────
+  // Same geometry as BrokerProfileView's own header, scaled to this screen's
+  // smaller avatar (96 vs 100) — a standalone seal pinned to the avatar's rim
+  // rather than the old ribbon artwork's rotated Positioned offset.
+  static const _badgeSize = 29.0;
+
+  /// Distance from the avatar's centre to the badge's, and the bearing it
+  /// sits at. Positive angles are above the horizontal, so this one puts it
+  /// down and to the right — just past the rim, overlapping the photo rather
+  /// than floating clear of it.
+  static const _badgeDistance = 50.0;
+  static const _badgeAngle = -0.73; // ~42° below the horizontal
+
+  /// Square and centred on the avatar, wide enough for the badge's far edge —
+  /// that way the avatar itself stays put on screen.
+  static const _badgeBox = 2 * (_badgeDistance + _badgeSize / 2);
 
   String? get previewName => widget.previewName;
   String? get previewAvatarUrl => widget.previewAvatarUrl;
@@ -250,15 +270,15 @@ class _UserProfileViewState extends State<UserProfileView> {
             (url == null || url.isEmpty) ? 'assets/images/profile.jpg' : null,
       ),
       child: SizedBox(
-        width: 120.w,
-        height: 120.w,
+        width: _badgeBox.w,
+        height: _badgeBox.w,
         child: Stack(
           clipBehavior: Clip.none,
           alignment: Alignment.center,
           children: [
             Container(
-              width: 96.w,
-              height: 96.w,
+              width: _avatarSize.w,
+              height: _avatarSize.w,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
@@ -268,24 +288,33 @@ class _UserProfileViewState extends State<UserProfileView> {
                     ? CachedNetworkImage(
                         imageUrl: url,
                         fit: BoxFit.cover,
-                        width: 96.w,
-                        height: 96.w,
-                        placeholder: (_, __) => _avatarFallback(),
-                        errorWidget: (_, __, ___) => _avatarFallback(),
+                        width: _avatarSize.w,
+                        height: _avatarSize.w,
+                        placeholder: (_, __) => _avatarFallback(isDark),
+                        errorWidget: (_, __, ___) => _avatarFallback(isDark),
                       )
-                    : _avatarFallback(),
+                    : _avatarFallback(isDark),
               ),
             ),
+            // Same badge asset + geometry as the broker's own Account screen
+            // (BrokerProfileView) — a standalone seal pinned to the avatar's
+            // rim rather than floating off it, scaled to this screen's
+            // smaller avatar. Last in the stack so it sits over the photo.
             if (profile.isVerified)
               Positioned(
-                bottom: 12.h,
-                right: -8.w,
-                child: Transform.rotate(
-                  angle: -0.45,
-                  child: Image.asset(
-                    'assets/images/verified_icon.png',
-                    width: 90.w,
-                  ),
+                left: (_badgeBox / 2 +
+                        _badgeDistance * math.cos(_badgeAngle) -
+                        _badgeSize / 2)
+                    .w,
+                top: (_badgeBox / 2 -
+                        _badgeDistance * math.sin(_badgeAngle) -
+                        _badgeSize / 2)
+                    .w,
+                width: _badgeSize.w,
+                height: _badgeSize.w,
+                child: Image.asset(
+                  'assets/images/v-icon.png',
+                  fit: BoxFit.contain,
                 ),
               ),
           ],
@@ -294,11 +323,15 @@ class _UserProfileViewState extends State<UserProfileView> {
     );
   }
 
-  Widget _avatarFallback() => Image.asset(
-        'assets/images/profile.jpg',
-        fit: BoxFit.cover,
-        width: 96.w,
-        height: 96.w,
+  /// Same person-icon-on-a-circle placeholder used everywhere else in the app
+  /// (e.g. HomeAnnouncementCard's avatar) rather than a stock photo standing
+  /// in for a real one.
+  Widget _avatarFallback(bool isDark) => Center(
+        child: Icon(
+          Icons.person,
+          size: 46.sp,
+          color: isDark ? Colors.white70 : Colors.grey.shade500,
+        ),
       );
 
   /// One licence number. [value] is null whenever the broker has not supplied

@@ -16,6 +16,10 @@ class HomeAppBar extends StatelessWidget {
   final VoidCallback onNotificationTap;
   final VoidCallback onSearchTap;
 
+  /// A guest isn't signed in, so there is no account for a notification to
+  /// belong to — the bell is dropped rather than shown pointing at nothing.
+  final bool isGuest;
+
   const HomeAppBar({
     super.key,
     required this.avatarUrl,
@@ -26,6 +30,7 @@ class HomeAppBar extends StatelessWidget {
     this.onAvatarTap,
     required this.onNotificationTap,
     required this.onSearchTap,
+    this.isGuest = false,
   });
 
   @override
@@ -93,71 +98,74 @@ class HomeAppBar extends StatelessWidget {
         const Spacer(),
         // Notification pill (#FAF7F1, r:39). Was 91.w when it also held the
         // search icon — restore that width if search comes back.
-        Container(
-          width: 48.w,
-          height: 42.h,
-          decoration: BoxDecoration(
-            color: theme.brightness == Brightness.dark
-                ? const Color(0xFF2A2A2A)
-                : const Color(0xFFFAF7F1),
-            borderRadius: BorderRadius.circular(39.r),
-          ),
-          // No side padding — the single icon is centred, and 12.w each side
-          // left less room than the 26.sp bell needs.
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Notification bell — outline, 1.5px stroke #343434
-              GestureDetector(
-                onTap: onNotificationTap,
-                behavior: HitTestBehavior.opaque,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Icon(
-                      Icons.notifications_outlined,
-                      size: 26.sp,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    if (notificationCount > 0)
-                      Positioned(
-                        right: -3,
-                        top: -3,
-                        child: Container(
-                          width: 14.w,
-                          height: 14.w,
-                          decoration: const BoxDecoration(
-                              shape: BoxShape.circle, color: Colors.red),
-                          child: Center(
-                            child: Text(
-                              notificationCount > 9
-                                  ? '9+'
-                                  : '$notificationCount',
-                              style: GoogleFonts.inter(
-                                  fontSize: 7.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white),
+        // Dropped entirely for a guest — there's no account to hold
+        // notifications, so the bell would just point at nothing.
+        if (!isGuest)
+          Container(
+            width: 48.w,
+            height: 42.h,
+            decoration: BoxDecoration(
+              color: theme.brightness == Brightness.dark
+                  ? const Color(0xFF2A2A2A)
+                  : const Color(0xFFFAF7F1),
+              borderRadius: BorderRadius.circular(39.r),
+            ),
+            // No side padding — the single icon is centred, and 12.w each side
+            // left less room than the 26.sp bell needs.
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Notification bell — outline, 1.5px stroke #343434
+                GestureDetector(
+                  onTap: onNotificationTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        Icons.notifications_outlined,
+                        size: 26.sp,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      if (notificationCount > 0)
+                        Positioned(
+                          right: -3,
+                          top: -3,
+                          child: Container(
+                            width: 14.w,
+                            height: 14.w,
+                            decoration: const BoxDecoration(
+                                shape: BoxShape.circle, color: Colors.red),
+                            child: Center(
+                              child: Text(
+                                notificationCount > 9
+                                    ? '9+'
+                                    : '$notificationCount',
+                                style: GoogleFonts.inter(
+                                    fontSize: 7.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              // Search icon — parked; the home screen has its own search bar.
-              // GestureDetector(
-              //   onTap: onSearchTap,
-              //   behavior: HitTestBehavior.opaque,
-              //   child: Image.asset(
-              //     'assets/images/search_icon.png',
-              //     width: 24.w,
-              //     height: 24.w,
-              //     color: theme.colorScheme.onSurface,
-              //   ),
-              // ),
-            ],
+                // Search icon — parked; the home screen has its own search bar.
+                // GestureDetector(
+                //   onTap: onSearchTap,
+                //   behavior: HitTestBehavior.opaque,
+                //   child: Image.asset(
+                //     'assets/images/search_icon.png',
+                //     width: 24.w,
+                //     height: 24.w,
+                //     color: theme.colorScheme.onSurface,
+                //   ),
+                // ),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }

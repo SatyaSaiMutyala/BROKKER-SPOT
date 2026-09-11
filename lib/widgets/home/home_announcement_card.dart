@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/utils/brokerage_label.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 
 /// Full-image dark overlay property card used on the Home and More screens.
 class HomeAnnouncementCard extends StatelessWidget {
@@ -225,17 +226,33 @@ class HomeAnnouncementCard extends StatelessWidget {
                       Positioned(
                         top: 14.h,
                         right: 10.w,
-                        child: Container(
-                          width: 41.w,
-                          height: 41.w,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFFD0D0D0),
-                              width: 1,
-                            ),
+                        child: GestureDetector(
+                          // Both photo fields sit on the same populated
+                          // user_id — showOwnerAvatar only picks which one to
+                          // render, not a different person — so a.userId is
+                          // who this always is. Own GestureDetector so it wins
+                          // over the card's onTap for a tap landing exactly on
+                          // the avatar, without stopping the rest of the card
+                          // from still opening the listing.
+                          onTap: () => UserProfileView.open(
+                            userId: a.userId,
+                            name: a.ownerName,
+                            avatarUrl: showOwnerAvatar
+                                ? a.ownerAvatarUrl
+                                : a.brokerAvatarUrl,
                           ),
-                          child: ClipOval(child: _buildAvatar(a)),
+                          child: Container(
+                            width: 41.w,
+                            height: 41.w,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color(0xFFD0D0D0),
+                                width: 1,
+                              ),
+                            ),
+                            child: ClipOval(child: _buildAvatar(a)),
+                          ),
                         ),
                       ),
 

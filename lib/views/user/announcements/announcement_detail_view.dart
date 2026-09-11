@@ -102,6 +102,17 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   /// Proposal status 3 (signed) / 4 (published) — see [_fetchContractedBrokers].
   List<ProposalBroker> _contractedBrokers = const [];
 
+  /// True once [_fetchDetail] has resolved (win or lose) at least once.
+  ///
+  /// `_data` starts as `widget.announcement` — whatever object the caller
+  /// happened to be holding, which can carry a stale `proposalCount` from an
+  /// on-disk/in-memory list cache. The "Interested Brokers" pill used to
+  /// render off that immediately, so a listing that no longer has proposals
+  /// showed the pill for one frame and then dropped it the instant the fresh
+  /// fetch landed. Gating the pill on this instead means it only ever
+  /// appears holding a network-confirmed count.
+  bool _proposalsConfirmed = false;
+
   /// The signed-in account's id, for working out which side of it a listing
   /// concerns — see [AnnouncementModel.viewerSide].
   String get _myId =>
@@ -142,6 +153,40 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
     );
   }
 
+  /// Opens the non-owner bottom bar's chat — shared by the avatar and the
+  /// chat-icon tap so both do the same thing (including
+  /// [AnnouncementChatView.open]'s own login-required prompt for a guest;
+  /// neither tap should silently do nothing for one).
+  void _openOwnerOrBrokerChat(AnnouncementModel a) {
+    if (widget.backOnChat) {
+      Get.back();
+      return;
+    }
+    final peerName = a.ownerName?.isNotEmpty == true
+        ? a.ownerName!
+        : widget.announcement.ownerName?.isNotEmpty == true
+            ? widget.announcement.ownerName!
+            : _brokerName?.isNotEmpty == true
+                ? _brokerName!
+                : widget.ownerName ?? 'Owner';
+    final peerAvatar = a.brokerAvatarUrl?.isNotEmpty == true
+        ? a.brokerAvatarUrl!
+        : widget.announcement.brokerAvatarUrl?.isNotEmpty == true
+            ? widget.announcement.brokerAvatarUrl!
+            : _brokerAvatar?.isNotEmpty == true
+                ? _brokerAvatar!
+                : widget.ownerAvatarUrl ?? '';
+    AnnouncementChatView.open(
+      announcementId: a.id ?? '',
+      brokerName: peerName,
+      brokerAvatar: peerAvatar,
+      peerUserId: a.userId ?? widget.announcement.userId,
+      // Not always 2: on a broker-posted listing the viewer here is the
+      // owner-side party, not the broker. The announcement settles which.
+      userRole: a.viewerSide(_myId),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -167,18 +212,34 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
   Future<void> _fetchDetail() async {
     final id = widget.announcement.id;
-    if (id == null) return;
+    if (id == null) {
+      // Nothing to fetch — `_data` (== widget.announcement) is all there'll
+      // ever be, so it's as "confirmed" as it can get.
+      if (mounted) setState(() => _proposalsConfirmed = true);
+      return;
+    }
+    AnnouncementModel? fresh;
     try {
-      final fresh = LocalStorageService.isLoggedIn()
+      fresh = LocalStorageService.isLoggedIn()
           ? await _repo.fetchAnnouncementDetail(id)
           : await _repo.fetchGuestAnnouncementDetail(id);
-      if (!mounted) return;
-      setState(() => _data = fresh);
+    } catch (_) {
+      // Fetch failed — `_data` stays whatever was passed in. Still mark it
+      // confirmed rather than hiding the pill forever: the passed-in count is
+      // the best information available at that point, not a guess.
+    }
+    if (!mounted) return;
+    final resolved = fresh;
+    setState(() {
+      if (resolved != null) _data = resolved;
+      _proposalsConfirmed = true;
+    });
+    if (fresh != null) {
       _wishlistCtrl.seed(id, isWishlisted: fresh.isWishlisted ?? false);
       // Supplement broker info from cache for the !isOwner bottom bar when
       // the detail endpoint returns user_id as a plain string (no name/avatar).
       _supplementBrokerInfoFromCache();
-    } catch (_) {}
+    }
     _fetchContractedBrokers();
   }
 
@@ -1152,46 +1213,54 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               ),
               child: Row(
                 children: [
-                  // Avatar
-                  Container(
-                    width: 46.w,
-                    height: 46.w,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.primary, width: 1.5),
-                    ),
-                    child: ClipOval(
-                      child: Builder(builder: (_) {
-                        // These are broker announcements — show broker profile
-                        // image only. Never fall back to personal profile image;
-                        // use placeholder if brokerAvatarUrl is absent.
-                        final url = a.brokerAvatarUrl?.isNotEmpty == true
-                            ? a.brokerAvatarUrl
-                            : widget.announcement.brokerAvatarUrl?.isNotEmpty ==
-                                    true
-                                ? widget.announcement.brokerAvatarUrl
-                                : _brokerAvatar?.isNotEmpty == true
-                                    ? _brokerAvatar
-                                    : widget.ownerAvatarUrl?.isNotEmpty == true
-                                        ? widget.ownerAvatarUrl
-                                        : null;
-                        if (url != null) {
-                          return CachedNetworkImage(
-                            imageUrl: url,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => Container(
-                              color: const Color(0xFF2A2A2A),
-                              child: Icon(Icons.person,
-                                  size: 22.sp, color: Colors.white54),
-                            ),
+                  // Avatar — tappable like the chat icon, so a guest tapping
+                  // the profile pic gets the same login prompt instead of the
+                  // tap silently doing nothing.
+                  GestureDetector(
+                    onTap: () => _openOwnerOrBrokerChat(a),
+                    child: Container(
+                      width: 46.w,
+                      height: 46.w,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border:
+                            Border.all(color: AppColors.primary, width: 1.5),
+                      ),
+                      child: ClipOval(
+                        child: Builder(builder: (_) {
+                          // These are broker announcements — show broker profile
+                          // image only. Never fall back to personal profile image;
+                          // use placeholder if brokerAvatarUrl is absent.
+                          final url = a.brokerAvatarUrl?.isNotEmpty == true
+                              ? a.brokerAvatarUrl
+                              : widget.announcement.brokerAvatarUrl
+                                          ?.isNotEmpty ==
+                                      true
+                                  ? widget.announcement.brokerAvatarUrl
+                                  : _brokerAvatar?.isNotEmpty == true
+                                      ? _brokerAvatar
+                                      : widget.ownerAvatarUrl?.isNotEmpty ==
+                                              true
+                                          ? widget.ownerAvatarUrl
+                                          : null;
+                          if (url != null) {
+                            return CachedNetworkImage(
+                              imageUrl: url,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => Container(
+                                color: const Color(0xFF2A2A2A),
+                                child: Icon(Icons.person,
+                                    size: 22.sp, color: Colors.white54),
+                              ),
+                            );
+                          }
+                          return Container(
+                            color: const Color(0xFF2A2A2A),
+                            child: Icon(Icons.person,
+                                size: 22.sp, color: Colors.white54),
                           );
-                        }
-                        return Container(
-                          color: const Color(0xFF2A2A2A),
-                          child: Icon(Icons.person,
-                              size: 22.sp, color: Colors.white54),
-                        );
-                      }),
+                        }),
+                      ),
                     ),
                   ),
                   SizedBox(width: 12.w),
@@ -1240,52 +1309,22 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                   // using Get.off), so just pop back instead of pushing a new
                   // chat. Otherwise open a new chat as broker (userRole: 2).
                   GestureDetector(
-                      onTap: () {
-                        if (widget.backOnChat) {
-                          Get.back();
-                          return;
-                        }
-                        final peerName = a.ownerName?.isNotEmpty == true
-                            ? a.ownerName!
-                            : widget.announcement.ownerName?.isNotEmpty == true
-                                ? widget.announcement.ownerName!
-                                : _brokerName?.isNotEmpty == true
-                                    ? _brokerName!
-                                    : widget.ownerName ?? 'Owner';
-                        final peerAvatar = a.brokerAvatarUrl?.isNotEmpty == true
-                            ? a.brokerAvatarUrl!
-                            : widget.announcement.brokerAvatarUrl?.isNotEmpty ==
-                                    true
-                                ? widget.announcement.brokerAvatarUrl!
-                                : _brokerAvatar?.isNotEmpty == true
-                                    ? _brokerAvatar!
-                                    : widget.ownerAvatarUrl ?? '';
-                        AnnouncementChatView.open(
-                          announcementId: a.id ?? '',
-                          brokerName: peerName,
-                          brokerAvatar: peerAvatar,
-                          peerUserId: a.userId ?? widget.announcement.userId,
-                          // Not always 2: on a broker-posted listing the viewer
-                          // here is the owner-side party, not the broker. The
-                          // announcement settles which.
-                          userRole: a.viewerSide(_myId),
-                        );
-                      },
-                      child: Container(
-                        width: 42.w,
-                        height: 42.w,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border:
-                              Border.all(color: AppColors.primary, width: 1.5),
-                        ),
-                        child: Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          size: 18.sp,
-                          color: AppColors.primary,
-                        ),
+                    onTap: () => _openOwnerOrBrokerChat(a),
+                    child: Container(
+                      width: 42.w,
+                      height: 42.w,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border:
+                            Border.all(color: AppColors.primary, width: 1.5),
+                      ),
+                      child: Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 18.sp,
+                        color: AppColors.primary,
                       ),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -1296,6 +1335,12 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
 
     // Owner views – active: glassmorphism pill (Figma: 287×67, r:77, #E1E1E180, blur:12)
     if (status == 'active') {
+      // Not yet confirmed by _fetchDetail — `_data` is still whatever the
+      // caller happened to be holding (e.g. a stale cached proposalCount).
+      // Wait rather than show a count that may flip the instant the real
+      // reply lands — see _proposalsConfirmed.
+      if (!_proposalsConfirmed) return const SizedBox.shrink();
+
       final proposals = _data.latestProposals ?? [];
       final count = _data.proposalCount ?? proposals.length;
 
@@ -1463,7 +1508,10 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               child: _avatarCircle(shown[i], sz),
             ),
           // "4+" count – white text at left edge of rightmost avatar (Figma: Poppins w400 14sp)
-          if (count > 0)
+          // Only past a single broker: with just one, the lone avatar already
+          // says everything the number would — overlaying "1" on it is
+          // redundant clutter, not information.
+          if (count > 1)
             Positioned(
               left: (offsets[shown.length - 1] + 1).w,
               top: (sz - 21) / 2,
