@@ -93,3 +93,26 @@ class ChatEvents {
   static const String agreementCancelUndoError =
       'announcement:agreement:cancel:undo:error';
 }
+
+/// True when an `announcement:publish` broadcast is about [announcementId].
+///
+/// Publishing does not flip the owner's listing — the broker gets their own
+/// copy of it — so the payload is that NEW announcement: its `_id` is a
+/// different document, and the owner's id travels as `owner_announcement_id`.
+/// Matching on `_id` alone therefore never fired for the owner, which is the
+/// side the broadcast is sent to: the tracking screen's View Property button
+/// stayed disabled, and the chat banner stayed on the pre-publish wording,
+/// until the screen was reopened and re-fetched the proposal.
+///
+/// A payload carrying no id at all still matches — the broadcast is delivered
+/// to this user's own room, so it is already known to concern them.
+bool publishPayloadMatches(dynamic data, String announcementId) {
+  if (data is! Map) return false;
+  final ids = [
+    data['owner_announcement_id'],
+    data['announcement_id'],
+    data['_id'],
+  ].map((v) => v?.toString()).where((v) => v != null && v.isNotEmpty).toList();
+  if (ids.isEmpty) return true;
+  return ids.contains(announcementId);
+}

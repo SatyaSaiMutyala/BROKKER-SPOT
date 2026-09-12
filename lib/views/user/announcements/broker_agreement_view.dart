@@ -179,11 +179,8 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   /// The published announcement is broadcast to the owner when the broker
   /// publishes. Match on this announcement and flip [_published].
   void _onPublished(dynamic data) {
-    if (data is! Map) return;
-    final id = (data['_id'] ?? data['announcement_id'])?.toString();
-    if (id == widget.announcementId && mounted) {
-      setState(() => _published = true);
-    }
+    if (!publishPayloadMatches(data, widget.announcementId)) return;
+    if (mounted) setState(() => _published = true);
   }
 
   // ── Derived state ───────────────────────────────────────────────────────────

@@ -77,7 +77,21 @@ class HomeFilterBar extends StatelessWidget {
       onTap: () => _showCountrySheet(context, isDark),
     ));
 
-    // ── 4. Property Type ───────────────────────────────────────────────────
+    // ── 4. Residential / Commercial ────────────────────────────────────────
+    // Ahead of Property Type on purpose: it decides which types are even on
+    // offer, so picking it first is the order that makes sense.
+    chips.add(SizedBox(width: 8.w));
+    chips.add(_chip(
+      context: context,
+      label: filter.isCommercial == null
+          ? 'Category'
+          : (filter.isCommercial! ? 'Commercial' : 'Residential'),
+      isActive: filter.isCommercial != null,
+      isDark: isDark,
+      onTap: () => _showCategorySheet(context, isDark),
+    ));
+
+    // ── 5. Property Type ───────────────────────────────────────────────────
     chips.add(SizedBox(width: 8.w));
     chips.add(_chip(
       context: context,
@@ -87,7 +101,7 @@ class HomeFilterBar extends StatelessWidget {
       onTap: () => _showPropertyTypeSheet(context, isDark),
     ));
 
-    // ── 4. Bedrooms ────────────────────────────────────────────────────────
+    // ── 6. Bedrooms ────────────────────────────────────────────────────────
     final bedsLabel = filter.bedrooms == null
         ? 'Beds'
         : '${filter.bedrooms} Bed${filter.bedrooms == 1 ? '' : 's'}';
@@ -100,7 +114,7 @@ class HomeFilterBar extends StatelessWidget {
       onTap: () => _showBedsSheet(context, isDark),
     ));
 
-    // ── 5. Price ───────────────────────────────────────────────────────────
+    // ── 7. Price ───────────────────────────────────────────────────────────
     final priceLabel = (filter.minPrice != null || filter.maxPrice != null)
         ? '${_fmt(filter.minPrice ?? _priceFloor)}-${_fmt(filter.maxPrice ?? _priceCeil)}'
         : 'Price';
@@ -113,7 +127,7 @@ class HomeFilterBar extends StatelessWidget {
       onTap: () => _showPriceSheet(context, isDark),
     ));
 
-    // ── 6. Bathrooms ───────────────────────────────────────────────────────
+    // ── 8. Bathrooms ───────────────────────────────────────────────────────
     final bathsLabel = filter.bathrooms == null
         ? 'Baths'
         : '${filter.bathrooms} Bath${filter.bathrooms == 1 ? '' : 's'}';
@@ -126,7 +140,7 @@ class HomeFilterBar extends StatelessWidget {
       onTap: () => _showBathsSheet(context, isDark),
     ));
 
-    // ── 7. Reset All Filters ───────────────────────────────────────────────
+    // ── 9. Reset All Filters ───────────────────────────────────────────────
     if (!filter.hasNoFacets) {
       chips.add(SizedBox(width: 12.w));
       chips.add(GestureDetector(
@@ -382,6 +396,72 @@ class HomeFilterBar extends StatelessWidget {
     );
   }
 
+  /// All / Residential / Commercial.
+  ///
+  /// Choosing a category drops a property type that belongs to the other one:
+  /// a type lives in exactly one category, so the pair would match nothing.
+  void _showCategorySheet(BuildContext context, bool isDark) {
+    FocusScope.of(context).unfocus(); // no filter needs the keyboard
+
+    void apply(BuildContext ctx, bool? isCommercial) {
+      var next = isCommercial == null
+          ? filter.cleared(category: true)
+          : filter.copyWith(isCommercial: isCommercial);
+      if (isCommercial != null && !_typeBelongsTo(filter, isCommercial)) {
+        next = next.cleared(propertyType: true);
+      }
+      onFilterChanged(next);
+      Navigator.of(ctx).pop();
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 32.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _handle(isDark),
+            SizedBox(height: 20.h),
+            _title('Property Category', isDark),
+            SizedBox(height: 20.h),
+            Row(
+              children: [
+                _optionTile('All', filter.isCommercial == null, isDark,
+                    () => apply(ctx, null)),
+                SizedBox(width: 12.w),
+                _optionTile('Residential', filter.isCommercial == false, isDark,
+                    () => apply(ctx, false)),
+                SizedBox(width: 12.w),
+                _optionTile('Commercial', filter.isCommercial == true, isDark,
+                    () => apply(ctx, true)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// True when the chosen property type sits in [isCommercial]'s category, or
+  /// when no type is chosen at all.
+  ///
+  /// Answered against the cached reference list, which carries every type's
+  /// category. An unknown id is left alone rather than cleared — better to
+  /// keep a selection the list simply hasn't loaded yet.
+  static bool _typeBelongsTo(PropertyFilter filter, bool isCommercial) {
+    final id = filter.propertyTypeId;
+    if (id == null) return true;
+    final match = CommonDataController.to.propertyTypes
+        .firstWhereOrNull((t) => t.id == id);
+    if (match == null || match.category.isEmpty) return true;
+    return match.category == (isCommercial ? 'commercial' : 'residential');
+  }
+
   /// Placeholder chips shown while the country list loads.
   ///
   /// Shaped like the real chips — same 20r pill, same height and run spacing,
@@ -552,7 +632,19 @@ class HomeFilterBar extends StatelessWidget {
               _title('Property Type', isDark),
               SizedBox(height: 16.h),
               Obx(() {
-                final types = common.propertyTypes;
+                // Only the chosen category's types. Names repeat across the
+                // two — Villa, Building, Floor and Land each exist on both
+                // sides as separate records — so the full list showed chips
+                // that looked duplicated and picked different ids.
+                final types = filter.isCommercial == null
+                    ? common.propertyTypes
+                    : common.propertyTypes
+                        .where((t) =>
+                            t.category ==
+                            (filter.isCommercial!
+                                ? 'commercial'
+                                : 'residential'))
+                        .toList();
                 if (common.isLoadingPropertyTypes.value && types.isEmpty) {
                   return Center(
                     child: Padding(

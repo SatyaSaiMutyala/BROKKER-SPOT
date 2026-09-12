@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
+import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/login_model.dart';
 import 'package:flutter/material.dart';
@@ -71,10 +72,18 @@ class LoginController extends GetxController {
           await LocalStorageService.saveUser(loginModel);
 
           debugPrint('🔑 [Login] token saved — JWT user=${LocalStorageService.getUserIdFromToken()} name=${user.name}');
-          debugPrint('🔑 [Login] calling socket shutdown...');
-          // Restart socket with the fresh token so chat uses the correct identity.
-          SocketService.to.shutdown();
-          debugPrint('🔑 [Login] calling socket connect() — stored_user=${LocalStorageService.getUserIdFromToken()}');
+          // Wipe everything cached before this login, then restart the socket
+          // on the fresh token so chat uses the correct identity.
+          //
+          // Signing in from guest mode is an account switch like any other.
+          // The list controllers are permanent, so they survive the jump to
+          // the dashboard still holding the guest feed AND their "already
+          // loaded" flags — the new dashboard then skips its fetch and shows
+          // the guest results until the user pulls to refresh. The two feeds
+          // are different endpoints: the signed-in one hides the user's own
+          // listings and carries their wishlist state.
+          await clearUserSession(); // also tears the old socket down
+          debugPrint('🔑 [Login] session cleared, calling socket connect() — stored_user=${LocalStorageService.getUserIdFromToken()}');
           SocketService.to.connect();
           debugPrint('🔑 [Login] socket connect() returned');
 

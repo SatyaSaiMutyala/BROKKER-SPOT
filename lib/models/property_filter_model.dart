@@ -24,6 +24,13 @@ class PropertyFilter {
   /// ignored by the backend if unsupported.
   final String? rentPeriod;
 
+  /// Residential vs Commercial. `null` = both.
+  ///
+  /// Sent as `is_commercial_property=true|false`, which is the only shape the
+  /// backend reads — it compares the raw string before casting, so anything
+  /// else is ignored and the filter silently does nothing.
+  final bool? isCommercial;
+
   final String? propertyTypeId;
   final String? propertyTypeName;
 
@@ -47,6 +54,7 @@ class PropertyFilter {
     this.listingType,
     this.propertyStatus,
     this.rentPeriod,
+    this.isCommercial,
     this.propertyTypeId,
     this.propertyTypeName,
     this.countryId,
@@ -84,6 +92,7 @@ class PropertyFilter {
       listingType == null &&
       propertyStatus == null &&
       rentPeriod == null &&
+      isCommercial == null &&
       propertyTypeId == null &&
       _hasNoLocation &&
       bedrooms == null &&
@@ -99,6 +108,7 @@ class PropertyFilter {
     var n = 0;
     if (listingType != null) n++;
     if (propertyStatus != null || rentPeriod != null) n++;
+    if (isCommercial != null) n++;
     if (propertyTypeId != null) n++;
     // By name too, for the same reason as [_hasNoLocation] — otherwise the
     // filter badge under-counts a country picked without an id.
@@ -126,6 +136,7 @@ class PropertyFilter {
     add('listing_type', listingType);
     add('propertyStatus', propertyStatus);
     add('rentPeriod', rentPeriod?.toLowerCase());
+    add('is_commercial_property', isCommercial);
     add('property_type_id', propertyTypeId);
     // Location is filtered by NAME, not id: the backend stores `country_id`/
     // `city_id`/`area_id` as null on announcements and only honors the value-
@@ -147,6 +158,7 @@ class PropertyFilter {
     int? listingType,
     int? propertyStatus,
     String? rentPeriod,
+    bool? isCommercial,
     String? propertyTypeId,
     String? propertyTypeName,
     String? countryId,
@@ -165,6 +177,7 @@ class PropertyFilter {
       listingType: listingType ?? this.listingType,
       propertyStatus: propertyStatus ?? this.propertyStatus,
       rentPeriod: rentPeriod ?? this.rentPeriod,
+      isCommercial: isCommercial ?? this.isCommercial,
       propertyTypeId: propertyTypeId ?? this.propertyTypeId,
       propertyTypeName: propertyTypeName ?? this.propertyTypeName,
       countryId: countryId ?? this.countryId,
@@ -189,6 +202,7 @@ class PropertyFilter {
     bool listingType = false,
     bool propertyStatus = false,
     bool rentPeriod = false,
+    bool category = false,
     bool propertyType = false,
     bool country = false,
     bool city = false,
@@ -202,6 +216,7 @@ class PropertyFilter {
       listingType: listingType ? null : this.listingType,
       propertyStatus: propertyStatus ? null : this.propertyStatus,
       rentPeriod: rentPeriod ? null : this.rentPeriod,
+      isCommercial: category ? null : isCommercial,
       propertyTypeId: propertyType ? null : propertyTypeId,
       propertyTypeName: propertyType ? null : propertyTypeName,
       countryId: country ? null : countryId,

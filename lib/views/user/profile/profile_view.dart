@@ -24,11 +24,23 @@ class UserProfileView extends StatefulWidget {
   final String? previewName;
   final String? previewAvatarUrl;
 
+  /// Whether this person is being looked at as a broker here.
+  ///
+  /// The account's own role can't answer that: anyone may hold both (role 3),
+  /// so reading it alone showed the owner of a listing their broker card —
+  /// "Broker Info", a licence block and the professional headshot — while
+  /// they were acting purely as the client in this screen.
+  ///
+  /// Null means the caller has no context to offer, and the account role
+  /// decides as before.
+  final bool? viewAsBroker;
+
   const UserProfileView({
     super.key,
     required this.userId,
     this.previewName,
     this.previewAvatarUrl,
+    this.viewAsBroker,
   });
 
   /// Pushes the screen for [userId]. A no-op for an empty id (a chat profile
@@ -38,6 +50,7 @@ class UserProfileView extends StatefulWidget {
     required String? userId,
     String? name,
     String? avatarUrl,
+    bool? viewAsBroker,
   }) async {
     if (userId == null || userId.isEmpty) return;
     await Get.to(
@@ -45,6 +58,7 @@ class UserProfileView extends StatefulWidget {
         userId: userId,
         previewName: name,
         previewAvatarUrl: avatarUrl,
+        viewAsBroker: viewAsBroker,
       ),
       preventDuplicates: false,
     );
@@ -78,6 +92,10 @@ class _UserProfileViewState extends State<UserProfileView> {
 
   String? get previewName => widget.previewName;
   String? get previewAvatarUrl => widget.previewAvatarUrl;
+
+  /// The context the caller gave, or the account's own role when it gave none.
+  bool _asBroker(UserProfileModel profile) =>
+      widget.viewAsBroker ?? profile.isBroker;
 
   @override
   void initState() {
@@ -132,7 +150,7 @@ class _UserProfileViewState extends State<UserProfileView> {
   /// don't know which they are, so the neutral title is used.
   String _titleFor(UserProfileModel? profile) {
     if (profile == null) return 'Profile';
-    return profile.isBroker ? 'Broker Info' : 'Profile';
+    return _asBroker(profile) ? 'Broker Info' : 'Profile';
   }
 
   Widget _buildBody(
@@ -231,7 +249,7 @@ class _UserProfileViewState extends State<UserProfileView> {
                   isDark,
                 ),
                 // Licence details only mean something for a broker.
-                if (profile.isBroker) ...[
+                if (_asBroker(profile)) ...[
                   SizedBox(height: 12.h),
                   Text(
                     'License',
@@ -261,7 +279,8 @@ class _UserProfileViewState extends State<UserProfileView> {
   }
 
   Widget _buildAvatar(UserProfileModel profile, bool isDark) {
-    final url = profile.avatarUrl ?? previewAvatarUrl;
+    final url =
+        profile.avatarFor(asBroker: _asBroker(profile)) ?? previewAvatarUrl;
 
     return GestureDetector(
       onTap: () => FullScreenImageView.show(
@@ -300,7 +319,7 @@ class _UserProfileViewState extends State<UserProfileView> {
             // (BrokerProfileView) — a standalone seal pinned to the avatar's
             // rim rather than floating off it, scaled to this screen's
             // smaller avatar. Last in the stack so it sits over the photo.
-            if (profile.isVerified)
+            if (_asBroker(profile) && profile.isVerified)
               Positioned(
                 left: (_badgeBox / 2 +
                         _badgeDistance * math.cos(_badgeAngle) -

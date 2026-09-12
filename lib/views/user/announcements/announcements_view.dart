@@ -24,6 +24,7 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
 
   String? _selectedListingType; // null = all, 'Sell' = Buy, 'Rent' = Rent
   String? _selectedPropertyType; // null = all
+  bool? _selectedIsCommercial; // null = both categories
 
   @override
   void initState() {
@@ -53,6 +54,14 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
     var list = all;
     if (_selectedListingType != null) {
       list = list.where((a) => a.listingType == _selectedListingType).toList();
+    }
+    if (_selectedIsCommercial != null) {
+      // Listings created before the category existed default to false on the
+      // backend, so they read as Residential rather than dropping out of both
+      // sides of the filter.
+      list = list
+          .where((a) => (a.isCommercialProperty ?? false) == _selectedIsCommercial)
+          .toList();
     }
     if (_selectedPropertyType != null) {
       list = list
@@ -130,6 +139,9 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
     return AnnouncementFilterBar(
       selectedListingType: _selectedListingType,
       selectedPropertyType: _selectedPropertyType,
+      selectedIsCommercial: _selectedIsCommercial,
+      onIsCommercialChanged: (val) =>
+          setState(() => _selectedIsCommercial = val),
       onListingTypeChanged: (val) =>
           setState(() => _selectedListingType = val),
       onPropertyTypeChanged: (type) =>

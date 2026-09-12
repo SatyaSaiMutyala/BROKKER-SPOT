@@ -89,12 +89,25 @@ class UserProfileModel {
 
   /// The photo to show. A broker has two on file and the broker-side one is the
   /// professional headshot, so it wins when they have one.
-  String? get avatarUrl {
+  String? get avatarUrl => avatarFor(asBroker: isBroker);
+
+  /// The photo for the side this person is being looked at from.
+  ///
+  /// An account can hold both pictures, and which one is right depends on the
+  /// context, not on the roles the account happens to carry: the same person
+  /// is a broker in one conversation and a property owner in another. Pass
+  /// [asBroker] false to see the owner of a listing as themselves, even when
+  /// they also broker on the side.
+  ///
+  /// Whichever is missing falls through to the other — either photo beats a
+  /// placeholder.
+  String? avatarFor({required bool asBroker}) {
     final broker = brokerProfileImage;
     final user = userProfileImage;
-    if (isBroker && broker != null && broker.isNotEmpty) return broker;
-    if (user != null && user.isNotEmpty) return user;
-    if (broker != null && broker.isNotEmpty) return broker;
+    final first = asBroker ? broker : user;
+    final second = asBroker ? user : broker;
+    if (first != null && first.isNotEmpty) return first;
+    if (second != null && second.isNotEmpty) return second;
     return null;
   }
 

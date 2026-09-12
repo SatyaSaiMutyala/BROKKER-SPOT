@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/models/property_filter_model.dart';
+import 'package:brokkerspot/models/property_type_model.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/overlay_dropdown_field.dart';
@@ -36,12 +37,17 @@ class _FilterViewState extends State<FilterView> {
   static const double _priceCeil = 10000000; // 10M
 
   static const _propertyForOptions = ['All', 'Buy', 'Rent'];
+  static const _categoryOptions = ['All', 'Residential', 'Commercial'];
   static const _buyStatusOptions = ['Ready', 'Off Plan'];
   static const _rentPeriodOptions = ['Yearly', 'Monthly'];
   static const _countOptions = ['1', '2', '3', '4', '5+'];
 
   late String _propertyFor; // 'All' | 'Buy' | 'Rent'
   String? _propertySub; // Ready/Off Plan (Buy) or Yearly/Monthly (Rent)
+
+  /// 'All' | 'Residential' | 'Commercial' — the same split the create form
+  /// records on every listing.
+  late String _category;
 
   String? _propertyTypeId, _propertyTypeName;
   String? _countryId, _countryName;
@@ -99,6 +105,9 @@ class _FilterViewState extends State<FilterView> {
     } else if (f.listingType == 2) {
       _propertySub = f.rentPeriod;
     }
+    _category = f.isCommercial == null
+        ? 'All'
+        : (f.isCommercial! ? 'Commercial' : 'Residential');
     _propertyTypeId = f.propertyTypeId;
     _propertyTypeName = f.propertyTypeName;
     _countryId = f.countryId;
@@ -177,6 +186,7 @@ class _FilterViewState extends State<FilterView> {
                   : null)
           : null,
       rentPeriod: _propertyFor == 'Rent' ? _propertySub : null,
+      isCommercial: _category == 'All' ? null : _category == 'Commercial',
       propertyTypeId: _propertyTypeId,
       propertyTypeName: _propertyTypeName,
       countryId: _countryId,
@@ -208,6 +218,34 @@ class _FilterViewState extends State<FilterView> {
   }
 
   // ── Selection handlers ───────────────────────────────────────────────────────
+
+  /// Switches Residential/Commercial and keeps the type chips honest.
+  ///
+  /// A type only belongs to one category, so a selection made under the other
+  /// one has to go — leaving it would send a `property_type_id` that cannot
+  /// co-exist with the category and always return nothing.
+  void _onCategoryChanged(String value) {
+    _updateAndCount(() {
+      _category = value;
+      if (_propertyTypeId != null &&
+          !_typesForCategory(value).any((t) => t.id == _propertyTypeId)) {
+        _propertyTypeId = null;
+        _propertyTypeName = null;
+      }
+    });
+  }
+
+  /// The reference list narrowed to [category].
+  ///
+  /// Names repeat across the two — the dev data carries a Villa, a Building, a
+  /// Floor and a Land on both sides, each its own record — so showing the full
+  /// list produced duplicate-looking chips that picked different ids.
+  List<PropertyTypeModel> _typesForCategory(String category) {
+    final all = _common.propertyTypes;
+    if (category == 'All') return all;
+    final wanted = category.toLowerCase();
+    return all.where((t) => t.category == wanted).toList();
+  }
 
   void _onPropertyForChanged(String value) {
     _updateAndCount(() {
@@ -314,6 +352,14 @@ class _FilterViewState extends State<FilterView> {
                             _updateAndCount(() => _propertySub = v),
                       ),
                     ],
+
+                    _divider(isDark),
+                    _section('Property Category'),
+                    FilterPillGroup(
+                      options: _categoryOptions,
+                      selected: _category,
+                      onSelect: _onCategoryChanged,
+                    ),
 
                     _divider(isDark),
                     _section('Property Type'),
@@ -498,7 +544,7 @@ class _FilterViewState extends State<FilterView> {
 
   Widget _propertyTypeChips(bool isDark) {
     return Obx(() {
-      final types = _common.propertyTypes;
+      final types = _typesForCategory(_category);
       if (_common.isLoadingPropertyTypes.value && types.isEmpty) {
         return SizedBox(
           height: 40.h,

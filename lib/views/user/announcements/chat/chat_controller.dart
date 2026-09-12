@@ -553,13 +553,10 @@ class ChatController extends GetxController {
   /// The published announcement is broadcast to both parties when the broker
   /// publishes. Once seen, keep the agreement reachable from the chat banner.
   void _onAnnouncementPublished(dynamic data) {
-    if (data is! Map) return;
-    final id = (data['_id'] ?? data['announcement_id'])?.toString();
-    if (id == null || id == announcementId) {
-      published.value = true;
-      LocalStorageService.markAnnouncementPublished(announcementId,
-          brokerId: _brokerId);
-    }
+    if (!publishPayloadMatches(data, announcementId)) return;
+    published.value = true;
+    LocalStorageService.markAnnouncementPublished(announcementId,
+        brokerId: _brokerId);
   }
 
   void approveProposal() {
@@ -724,6 +721,10 @@ class ChatController extends GetxController {
       ..off(ChatEvents.proposalStatusUpdateError, _onProposalIgnore)
       ..off(ChatEvents.proposalBrokerAccept, _onProposalStatus)
       ..off(ChatEvents.proposalBrokerAcceptError, _onProposalIgnore)
+      // Was registered in onInit but never removed — now that listeners
+      // survive a socket rebuild, a leaked one would outlive every chat this
+      // session opens instead of dying with its socket.
+      ..off(ChatEvents.announcementPublish, _onAnnouncementPublished)
       ..off(ChatEvents.agreementCancel, _onAgreementCancel)
       ..off(ChatEvents.agreementCancelError, _onAgreementCancelError)
       ..off(ChatEvents.agreementCancelUndo, _onAgreementCancelUndo)

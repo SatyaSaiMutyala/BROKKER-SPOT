@@ -18,6 +18,15 @@ class AnnouncementFilterBar extends StatelessWidget {
   final ValueChanged<String?> onListingTypeChanged;
   final ValueChanged<String?> onPropertyTypeChanged;
 
+  /// Residential vs Commercial — the split every listing carries from the
+  /// create form. `null` shows both.
+  ///
+  /// Optional: the chip only appears for hosts that pass
+  /// [onIsCommercialChanged], so a screen with nothing to do with it is not
+  /// forced to grow a filter it cannot honour.
+  final bool? selectedIsCommercial;
+  final ValueChanged<bool?>? onIsCommercialChanged;
+
   /// Side inset, so a host screen can line the chips up with its own gutter.
   final double? horizontalPadding;
 
@@ -37,6 +46,8 @@ class AnnouncementFilterBar extends StatelessWidget {
     required this.selectedPropertyType,
     required this.onListingTypeChanged,
     required this.onPropertyTypeChanged,
+    this.selectedIsCommercial,
+    this.onIsCommercialChanged,
     this.horizontalPadding,
     this.showDraftChip = false,
     this.draftSelected = false,
@@ -65,6 +76,14 @@ class AnnouncementFilterBar extends StatelessWidget {
             isSelected: selectedListingType != null,
             isDark: isDark,
           ),
+          // Next to the listing chip and ahead of the property types, for the
+          // same reason the Draft chip sits there: it narrows the whole list
+          // rather than picking one kind of property.
+          if (onIsCommercialChanged != null)
+            Padding(
+              padding: EdgeInsets.only(left: 8.w),
+              child: _categoryChip(isDark: isDark),
+            ),
           // Sits right after the listing chip, ahead of the property types —
           // it narrows the whole list rather than picking a kind of property.
           if (showDraftChip)
@@ -94,6 +113,37 @@ class AnnouncementFilterBar extends StatelessWidget {
     );
   }
 
+  /// All / Residential / Commercial, as a menu rather than three chips — the
+  /// bar is already a long scroll and the three are mutually exclusive.
+  Widget _categoryChip({required bool isDark}) {
+    final label = selectedIsCommercial == null
+        ? 'Category'
+        : (selectedIsCommercial! ? 'Commercial' : 'Residential');
+
+    return PopupMenuButton<String>(
+      onSelected: (val) => onIsCommercialChanged!(
+        val.isEmpty ? null : val == 'commercial',
+      ),
+      offset: const Offset(0, 42),
+      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+      itemBuilder: (_) => [
+        _menuItem('', 'All', isDark, isActive: selectedIsCommercial == null),
+        _menuItem('residential', 'Residential', isDark,
+            isActive: selectedIsCommercial == false),
+        _menuItem('commercial', 'Commercial', isDark,
+            isActive: selectedIsCommercial == true),
+      ],
+      child: _chipShell(
+        label: label,
+        isSelected: selectedIsCommercial != null,
+        isDark: isDark,
+        showChevron: true,
+      ),
+    );
+  }
+
   Widget _listingChip({
     required BuildContext context,
     required String label,
@@ -107,64 +157,80 @@ class AnnouncementFilterBar extends StatelessWidget {
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
       itemBuilder: (_) => [
-        _menuItem('', 'All', isDark),
-        _menuItem('Sell', 'Buy', isDark),
-        _menuItem('Rent', 'Rent', isDark),
+        _menuItem('', 'All', isDark, isActive: selectedListingType == null),
+        _menuItem('Sell', 'Buy', isDark,
+            isActive: selectedListingType == 'Sell'),
+        _menuItem('Rent', 'Rent', isDark,
+            isActive: selectedListingType == 'Rent'),
       ],
-      child: Container(
-        height: 38.h,
-        padding: EdgeInsets.symmetric(horizontal: 14.w),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary
-              : isDark
-                  ? const Color(0xFF2A2A2A)
-                  : Colors.white,
-          borderRadius: BorderRadius.circular(25.r),
-          border: isSelected
-              ? null
-              : Border.all(
-                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-                ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w400,
-                color: isSelected
-                    ? Colors.white
-                    : isDark
-                        ? Colors.white70
-                        : Colors.black87,
-                height: 1.0,
-                letterSpacing: 0,
-              ),
-            ),
-            SizedBox(width: 4.w),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 14.sp,
-              color: isSelected
-                  ? Colors.white
-                  : isDark
-                      ? Colors.white70
-                      : Colors.black87,
-            ),
-          ],
-        ),
+      child: _chipShell(
+        label: label,
+        isSelected: isSelected,
+        isDark: isDark,
+        showChevron: true,
       ),
     );
   }
 
-  PopupMenuItem<String> _menuItem(String value, String label, bool isDark) {
-    final isActive = value.isEmpty
-        ? selectedListingType == null
-        : selectedListingType == value;
+  /// The pill every menu-backed chip in this bar wears, so the category chip
+  /// and the listing chip can't drift apart.
+  Widget _chipShell({
+    required String label,
+    required bool isSelected,
+    required bool isDark,
+    bool showChevron = false,
+  }) {
+    final foreground = isSelected
+        ? Colors.white
+        : isDark
+            ? Colors.white70
+            : Colors.black87;
+
+    return Container(
+      height: 38.h,
+      padding: EdgeInsets.symmetric(horizontal: 14.w),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isSelected
+            ? AppColors.primary
+            : isDark
+                ? const Color(0xFF2A2A2A)
+                : Colors.white,
+        borderRadius: BorderRadius.circular(25.r),
+        border: isSelected
+            ? null
+            : Border.all(
+                color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+              ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w400,
+              color: foreground,
+              height: 1.0,
+              letterSpacing: 0,
+            ),
+          ),
+          if (showChevron) ...[
+            SizedBox(width: 4.w),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 14.sp,
+              color: foreground,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _menuItem(String value, String label, bool isDark,
+      {required bool isActive}) {
     return PopupMenuItem<String>(
       value: value,
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),

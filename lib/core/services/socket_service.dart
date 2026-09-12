@@ -37,6 +37,20 @@ class SocketService extends GetxService with WidgetsBindingObserver {
   /// so nothing is silently dropped during the handshake.
   final List<MapEntry<String, dynamic>> _pending = [];
 
+  /// Every listener features have registered through [on].
+  ///
+  /// socket_io_client binds listeners to one Socket object, and this service
+  /// throws that object away and builds a new one whenever the account behind
+  /// it changes — including from inside `onConnect`, long after screens have
+  /// subscribed. Those screens were then listening to a socket nobody was
+  /// using any more: the server answered, no handler ran, and the request
+  /// looked like it had timed out. Reopening the screen appeared to "fix" it
+  /// only because a fresh controller subscribed to the current socket.
+  ///
+  /// Keeping the list here means a rebuild re-attaches everything instead, and
+  /// a handler registered before the socket exists is no longer dropped.
+  final List<MapEntry<String, void Function(dynamic)>> _handlers = [];
+
   /// When the app went to the background, or null while it is in front.
   DateTime? _backgroundedAt;
 
@@ -164,6 +178,7 @@ class SocketService extends GetxService with WidgetsBindingObserver {
           .build(),
     );
 
+    _attachRegisteredHandlers();
     _socket!
       ..onConnect((_) {
         // Guard: if the stored token changed while we were connecting (e.g.
@@ -221,18 +236,36 @@ class SocketService extends GetxService with WidgetsBindingObserver {
   }
 
   /// Subscribes [handler] to [event]. Remember to [off] the same handler.
+  ///
+  /// Survives a socket rebuild — see [_handlers].
   void on(String event, void Function(dynamic data) handler) {
+    _handlers.add(MapEntry(event, handler));
     _socket?.on(event, handler);
   }
 
   /// Removes a listener (or all listeners for [event] if [handler] is null).
   void off(String event, [void Function(dynamic data)? handler]) {
     if (handler != null) {
+      _handlers.removeWhere((e) => e.key == event && e.value == handler);
       _socket?.off(event, handler);
     } else {
+      _handlers.removeWhere((e) => e.key == event);
       _socket?.off(event);
     }
   }
+
+  /// Puts every registered listener onto the socket that has just been built.
+  void _attachRegisteredHandlers() {
+    if (_handlers.isEmpty) return;
+    _log('re-attaching ${_handlers.length} listener(s) to the new socket');
+    for (final entry in _handlers) {
+      _socket!.on(entry.key, entry.value);
+    }
+  }
+
+  /// How many listeners would be carried onto a rebuilt socket.
+  @visibleForTesting
+  int get registeredHandlerCount => _handlers.length;
 
   void disconnect() => _socket?.disconnect();
 
@@ -242,6 +275,10 @@ class SocketService extends GetxService with WidgetsBindingObserver {
     // Discard any queued emits from the old session so they are never sent on
     // the next account's connection (wrong recipient IDs, stale auth context).
     _pending.clear();
+    // Listeners go too: this is a session ending, and the screens that
+    // registered them are on their way out. A rebuild uses [_forceShutdown]
+    // directly and deliberately keeps them.
+    _handlers.clear();
   }
 
   /// Nulls the socket pointer BEFORE calling dispose so that if dispose()

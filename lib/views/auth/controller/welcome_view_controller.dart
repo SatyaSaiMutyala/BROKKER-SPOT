@@ -8,6 +8,7 @@ import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
+import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/login_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
@@ -413,9 +414,14 @@ class WelcomeViewController extends GetxController {
   /// and socket reconnect are skipped in the Firebase-fallback case because
   /// the stored token is a Firebase ID token the backend won't accept.
   void _navigateByRole(int currentRole, {required bool backendSaved}) async {
+    // Every social sign-in lands here, so this is where the pre-login cache
+    // goes. Coming from guest mode the permanent list controllers still hold
+    // the guest feed and their "already loaded" flags, and the dashboard
+    // opened below would skip its fetch and show it. Also tears the old
+    // socket down.
+    await clearUserSession();
     if (backendSaved) {
-      // Restart socket with the fresh backend token (same fix as email login).
-      SocketService.to.shutdown();
+      // Reconnect on the fresh backend token (same fix as email login).
       SocketService.to.connect();
       DeviceService.registerDevice();
     }

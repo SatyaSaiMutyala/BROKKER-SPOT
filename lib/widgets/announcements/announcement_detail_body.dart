@@ -12,6 +12,7 @@ import 'dart:math' show pi;
 import 'dart:ui' as ui show Gradient;
 
 import 'package:brokkerspot/core/common_widget/fullscreen_media_viewer.dart';
+import 'package:brokkerspot/core/utils/proposals_limit_label.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/utils/brokerage_label.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
@@ -575,8 +576,8 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
       items.add(_DetailItem(Icons.square_foot, 'Area', '${a.sqft} sqft'));
     }
     if (widget.showProposalLimit && a.proposalsLimit != null) {
-      items.add(_DetailItem(
-          Icons.people_outline, 'Proposal Limit', '${a.proposalsLimit}'));
+      items.add(_DetailItem(Icons.people_outline, 'Proposal Limit',
+          proposalsLimitLabel(a.proposalsLimit)));
     }
     if (widget.showBrokerage && a.brokkeragePercent != null) {
       items.add(
