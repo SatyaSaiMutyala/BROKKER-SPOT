@@ -101,7 +101,10 @@ class _MeetingViewState extends State<MeetingView> with RouteAware {
     UserProfileView.open(
       userId: p.id,
       name: p.name,
+      // The owner's list: the person on the row is the broker on their
+      // listing, so the professional photo and the Broker Info card.
       avatarUrl: p.brokerProfileImageUrl ?? p.profileImageUrl,
+      viewAsBroker: true,
     );
   }
 

@@ -405,6 +405,7 @@ class _ContractDetailsViewState extends State<ContractDetailsView> {
               : () => UserProfileView.open(
                     userId: widget.brokerId,
                     name: widget.brokerName,
+                    viewAsBroker: true,
                   ),
         ),
         // Rows the API has no value for are omitted, not shown blank. The

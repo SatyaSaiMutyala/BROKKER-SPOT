@@ -240,6 +240,10 @@ class HomeAnnouncementCard extends StatelessWidget {
                             avatarUrl: showOwnerAvatar
                                 ? a.ownerAvatarUrl
                                 : a.brokerAvatarUrl,
+                            // The listing says which hat its poster was
+                            // wearing: user_role 2 is a broker-posted
+                            // property, 1 is an owner's own.
+                            viewAsBroker: a.userRole == 2,
                           ),
                           child: Container(
                             width: 41.w,

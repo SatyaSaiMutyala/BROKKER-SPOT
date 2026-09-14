@@ -307,6 +307,9 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
         userId: peerId,
         name: widget.brokerName,
         avatarUrl: widget.brokerAvatar,
+        // Mirrors the peer pill above: on the owner's side of the chat the
+        // other party is the broker, on the broker's side they are the client.
+        viewAsBroker: (widget.userRole ?? 1) == 1,
       ),
       behavior: HitTestBehavior.opaque,
       child: child,
