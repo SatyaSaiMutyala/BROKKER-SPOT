@@ -42,7 +42,11 @@ Future<void> clearUserSession() async {
     CommonDataController.to.clearDependentCaches();
   }
   if (Get.isRegistered<IndicatorController>()) {
-    IndicatorController.to.clear();
+    // Before the shutdown below, which drops every socket listener — see
+    // IndicatorController.stopListening for what leaving it subscribed did.
+    IndicatorController.to
+      ..stopListening()
+      ..clear();
   }
   SocketService.to.shutdown();
   await AnnouncementCache.clear();

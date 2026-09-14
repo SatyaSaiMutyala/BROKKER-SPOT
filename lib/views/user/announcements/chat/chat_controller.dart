@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/controllers/indicator_controller.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/chat_message.dart';
 import 'package:brokkerspot/views/user/announcements/chat/chat_events.dart';
@@ -706,6 +707,12 @@ class ChatController extends GetxController {
 
   @override
   void onClose() {
+    // Opening this chat marked its messages read on the server, and nothing
+    // on the server pushes the lower count — so the badge would keep counting
+    // them until something else asked. Ask on the way out.
+    if (Get.isRegistered<IndicatorController>()) {
+      IndicatorController.to.refreshSoon();
+    }
     _typingTimer?.cancel();
     _historyTimeout?.cancel();
     _historyConnectWorker?.dispose();

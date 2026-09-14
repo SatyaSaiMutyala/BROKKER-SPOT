@@ -22,8 +22,6 @@ class ApiEndpoints {
   static const String verifyEmailOtp = 'user/profile/verify-email-otp';
   /// Another user's public profile. Append `/{user_id}`.
   static const String getUserById = 'user/profile/get-user';
-  /// Unseen counters for the nav badges: { messages: {unseen}, notifications: {unseen} }.
-  static const String profileIndicators = 'user/profile/indicators';
 
   // Help requests — the same body either way; the guest route is for the
   // Need Help screen reached from Welcome, before anyone has signed in.
