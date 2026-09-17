@@ -1,6 +1,7 @@
 import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/login_return.dart';
 import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:brokkerspot/views/user/wishlist/wishlist_view.dart';
@@ -301,6 +302,9 @@ void showLoginRequiredDialog(
   String title = 'Please Login.',
   String message = 'Without login you cannot use all features in this app.',
 }) {
+  // Before the dialog opens — once it is up, it is the top route. Logging in
+  // from here returns to this screen instead of a bare dashboard.
+  LoginReturn.capture();
   showDialog(
     context: context,
     builder: (_) => Dialog(

@@ -10,10 +10,9 @@ import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
 import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
+import 'package:brokkerspot/core/services/login_return.dart';
 import 'package:brokkerspot/models/login_model.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
-import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
-import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -428,10 +427,7 @@ class WelcomeViewController extends GetxController {
     final goBroker = currentRole == 2 ||
         (currentRole != 1 && LocalStorageService.getLastSide() == 'broker');
     await LocalStorageService.saveLastSide(goBroker ? 'broker' : 'user');
-    if (goBroker) {
-      Get.offAll(() => BrokerDashBoardView(showLocationPicker: true));
-    } else {
-      Get.offAll(() => const DashboardView(showLocationPicker: true));
-    }
+    // Back to wherever a login prompt was raised, if one was.
+    LoginReturn.goToDashboardAfterLogin(goBroker: goBroker);
   }
 }

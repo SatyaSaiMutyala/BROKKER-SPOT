@@ -7,7 +7,6 @@ import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart
 import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
 import 'package:brokkerspot/views/user/meeting/controller/meeting_controller.dart';
 import 'package:brokkerspot/views/user/meeting/repo/meeting_repo.dart';
-import 'package:brokkerspot/views/user/profile/profile_view.dart';
 import 'package:brokkerspot/widgets/meeting/broker_meeting_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -126,27 +125,17 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> with RouteAware {
         ));
   }
 
-  /// Tapping the round client avatar opens that person's profile instead of
-  /// the chat.
-  void _openProfile(ChatProfileSummary p) {
-    UserProfileView.open(
-      userId: p.id,
-      name: p.name,
-      // This is the broker's own list, so the person on the row is the client
-      // — their personal photo, and their client profile. Many of them broker
-      // as well, and reading the account role alone opened their Broker Info.
-      avatarUrl: p.profileImageUrl ?? p.brokerProfileImageUrl,
-      viewAsBroker: false,
-    );
-  }
-
   Future<void> _onTap(MeetingItem m) async {
     final myId = LocalStorageService.getUserIdFromToken() ??
         LocalStorageService.getUser()?.data?.id ??
         '';
-    final isOwner = myId.isNotEmpty &&
-        m.announcement.userId == myId &&
-        (m.announcement.userRole ?? 1) == 1;
+    // Mine, whichever side I posted it from. This list holds the broker's own
+    // listings (posted from the broker side, user_role 2) alongside the
+    // owners' listings the broker works on. Requiring user_role 1 sent every
+    // one of the broker's own listings down the non-owner path, straight into
+    // a chat with whoever came first in chatProfiles — so everyone else who
+    // had messaged about it could only be reached through a notification.
+    final isOwner = myId.isNotEmpty && m.announcement.userId == myId;
 
     debugPrint('📋 [BrokerMeeting] tap ann=${m.announcementId}');
     debugPrint(
@@ -350,7 +339,11 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> with RouteAware {
               isOwn: _isOwn(m),
               onTap: () => _onTap(m),
               onPropertyTap: () => _openProperty(m),
-              onProfileTap: _openProfile,
+              // No profile screen for the person on this row: they are the
+              // client here, and a client has nothing to show — the screen
+              // exists for a broker's licence, experience and areas. Tapping
+              // the avatar opens the chat, same as the rest of the row.
+              onProfileTap: null,
             );
           },
         ),

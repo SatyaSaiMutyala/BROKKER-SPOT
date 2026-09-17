@@ -101,6 +101,9 @@ class _SplashViewState extends State<SplashView>
     } else {
       // No token - go directly to welcome screen, no splash animation
       Get.offAll(() => const WelcomeView());
+      // Nothing to open without a session, but taps from now on must not be
+      // parked for a splash that has already finished.
+      NotificationService.markStartupRouted();
     }
   }
 

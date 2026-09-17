@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/controllers/common_data_controller.dart';
+import 'package:brokkerspot/core/services/active_dashboard.dart';
 import 'package:brokkerspot/models/property_filter_model.dart';
 import 'package:brokkerspot/models/property_type_model.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
@@ -157,7 +158,12 @@ class _FilterViewState extends State<FilterView> {
     setState(() => _isCountLoading = true);
     try {
       final count =
-          await _repo.fetchAnnouncementCount(filter: _buildCurrentFilter());
+          await _repo.fetchAnnouncementCount(
+        filter: _buildCurrentFilter(),
+        // Guests only — see ActiveDashboard.guestListingRole. Without it the
+        // count came from the other side and disagreed with the list.
+        userRole: ActiveDashboard.guestListingRole,
+      );
       if (mounted) {
         setState(() {
           _resultCount = count;

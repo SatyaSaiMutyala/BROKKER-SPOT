@@ -169,7 +169,7 @@ class ChatController extends GetxController {
       ..on(ChatEvents.proposalStatus, _onProposalStatus)
       ..on(ChatEvents.proposalStatusError, _onProposalIgnore)
       ..on(ChatEvents.proposalStatusUpdate, _onProposalStatus)
-      ..on(ChatEvents.proposalStatusUpdateError, _onProposalIgnore)
+      ..on(ChatEvents.proposalStatusUpdateError, _onProposalStatusUpdateError)
       ..on(ChatEvents.proposalBrokerAccept, _onProposalStatus)
       ..on(ChatEvents.proposalBrokerAcceptError, _onProposalIgnore)
       ..on(ChatEvents.announcementPublish, _onAnnouncementPublished)
@@ -559,6 +559,33 @@ class ChatController extends GetxController {
     LocalStorageService.markAnnouncementPublished(announcementId,
         brokerId: _brokerId);
   }
+
+  /// The owner's approval was refused because the listing already has its
+  /// full set of published contracts.
+  ///
+  /// Every other failure here stays quiet, as before: the ones that matter to
+  /// the user arrive on their own events, and a proposal status that simply
+  /// could not be read is not worth a dialog.
+  void _onProposalStatusUpdateError(dynamic data) {
+    final message = _msg(data) ?? '';
+    if (!_isContractLimitMessage(message)) return;
+    contractLimitReached.value = true;
+  }
+
+  /// True once the server has said this listing is at its contract limit.
+  /// The screen watching it shows the dialog and clears it.
+  final RxBool contractLimitReached = false.obs;
+
+  /// The server phrases this as "Limit exhausted. Already 3 brokers published
+  /// this announcement." — matched loosely so a reworded message still lands.
+  static bool _isContractLimitMessage(String message) {
+    final m = message.toLowerCase();
+    return m.contains('limit exhausted') || m.contains('brokers published');
+  }
+
+  @visibleForTesting
+  static bool debugIsContractLimitMessage(String message) =>
+      _isContractLimitMessage(message);
 
   void approveProposal() {
     _socket.emit(ChatEvents.proposalStatusUpdate, {

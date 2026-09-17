@@ -2,14 +2,13 @@ import 'dart:convert';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
+import 'package:brokkerspot/core/services/login_return.dart';
 import 'package:brokkerspot/models/login_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:brokkerspot/core/common_widget/api_service.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/device_service.dart';
-import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
-import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 
 class LoginController extends GetxController {
   final emailController = TextEditingController();
@@ -98,11 +97,8 @@ class LoginController extends GetxController {
               (currentRole == 0 && LocalStorageService.getLastSide() == 'broker');
           // Persist for the splash path (already-logged-in app re-opens).
           await LocalStorageService.saveLastSide(goBroker ? 'broker' : 'user');
-          if (goBroker) {
-            Get.offAll(() => BrokerDashBoardView());
-          } else {
-            Get.offAll(() => const DashboardView(showLocationPicker: true));
-          }
+          // Back to wherever a login prompt was raised, if one was.
+          LoginReturn.goToDashboardAfterLogin(goBroker: goBroker);
         } else {
           AppToast.error(loginModel.message);
         }

@@ -4,6 +4,7 @@ import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/models/property_filter_model.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
+import 'package:brokkerspot/core/services/active_dashboard.dart';
 import 'package:get/get.dart';
 
 /// Drives the Search screen's **server-side** filtered results.
@@ -124,8 +125,16 @@ class PropertySearchController extends GetxController {
     return LocalStorageService.isLoggedIn()
         ? _repo.fetchAllAnnouncements(
             page: page, perPage: _perPage, filter: f)
+        // The guest endpoint filters by whatever `user_role` the query
+        // names, and it must be the side being browsed — the unfiltered feed
+        // asks for the same one. Left at the default, applying Buy or Rent
+        // swapped the whole list for the other side's listings, which read as
+        // the filter returning unrelated properties.
         : _repo.fetchGuestAnnouncements(
-            page: page, perPage: _perPage, filter: f);
+            page: page,
+            perPage: _perPage,
+            filter: f,
+            userRole: ActiveDashboard.guestListingRole);
   }
 
   /// Wipe all state — called on logout so the next account starts clean.

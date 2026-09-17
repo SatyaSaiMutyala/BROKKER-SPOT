@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/active_dashboard.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/home/home_view.dart';
@@ -33,11 +34,16 @@ class _DashboardViewState extends State<DashboardView> {
   static const Set<int> _loginRequiredTabs = {1, 2};
 
   late int _currentIndex = widget.initialIndex;
+
+  /// Read through [ActiveDashboard] — by the login prompt, and by guest
+  /// requests that need to name the side they are browsing.
+  int _activeTab() => _currentIndex;
   late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
+    ActiveDashboard.register(isBroker: false, currentTab: _activeTab);
     _screens = [
       HomeView(onAccountTap: () => _onNavTap(_accountTab)),
       const MeetingView(),
@@ -65,6 +71,12 @@ class _DashboardViewState extends State<DashboardView> {
       // Prompts only until the user has actually answered it.
       await DeviceService.ensureNotificationPermission();
     });
+  }
+
+  @override
+  void dispose() {
+    ActiveDashboard.unregister(_activeTab);
+    super.dispose();
   }
 
   void _onNavTap(int index) {

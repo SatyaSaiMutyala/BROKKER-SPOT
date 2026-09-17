@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/utils/brokerage_label.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/core/utils/proposal_badge.dart';
 import 'package:brokkerspot/views/user/profile/profile_view.dart';
 
 /// Full-image dark overlay property card used on the Home and More screens.
@@ -46,6 +47,15 @@ class HomeAnnouncementCard extends StatelessWidget {
   /// about a listing they posted themselves.
   final bool isPrivateDeal;
 
+  /// Shows where this broker stands on the listing — Proposal Sent, Mandate
+  /// to Sign, Contract Signed — in the corner the FOR SELL / FOR RENT badge
+  /// uses elsewhere.
+  ///
+  /// For the broker feed only, which drops the listing badge altogether: the
+  /// corner belongs to the status, and "SELL • Apartment" already reads in the
+  /// text below. Off by default, so every other card is unchanged.
+  final bool showProposalBadge;
+
   const HomeAnnouncementCard({
     super.key,
     required this.announcement,
@@ -59,6 +69,7 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.isWishlisted = false,
     this.onWishlistTap,
     this.isPrivateDeal = false,
+    this.showProposalBadge = false,
   });
 
   // Strip sits flush below the image card — no overlap.
@@ -89,10 +100,54 @@ class HomeAnnouncementCard extends StatelessWidget {
     return announcement.listingType ?? '';
   }
 
+  Widget _proposalBadge(ProposalBadge badge) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(14.w, 6.h, 22.w, 7.h),
+      decoration: BoxDecoration(
+        color: badge.color,
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(26),
+          bottomRight: Radius.circular(26),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            badge.title,
+            style: GoogleFonts.poppins(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+              height: 1.2,
+              letterSpacing: 0,
+            ),
+          ),
+          if (badge.subtitle != null) ...[
+            SizedBox(height: 1.h),
+            Text(
+              badge.subtitle!,
+              style: GoogleFonts.poppins(
+                fontSize: 10.sp,
+                fontWeight: FontWeight.w400,
+                color: Colors.white,
+                height: 1.2,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final a = announcement;
     final imgCount = a.imageUrls?.length ?? 0;
+    final proposalBadge =
+        showProposalBadge ? proposalBadgeFor(a.myProposalStatus) : null;
 
     final imageCardHeight = cardHeight ?? 263.h;
     final stripExtra = showBrokerageRow ? _brokerageRowHeight.h : 0.0;
@@ -192,8 +247,16 @@ class HomeAnnouncementCard extends StatelessWidget {
                       ),
                     ),
 
+                    // Proposal status — same corner and shape as the listing
+                    // badge it replaces, with a second line for the detail.
+                    if (proposalBadge != null)
+                      Positioned(
+                        top: 21.h,
+                        left: 0,
+                        child: _proposalBadge(proposalBadge),
+                      )
                     // "FOR SELL / FOR RENT" badge — flush left, right-rounded only
-                    if (_listingBadge.isNotEmpty)
+                    else if (_listingBadge.isNotEmpty && !showProposalBadge)
                       Positioned(
                         top: 21.h,
                         left: 0,
@@ -227,6 +290,10 @@ class HomeAnnouncementCard extends StatelessWidget {
                         top: 14.h,
                         right: 10.w,
                         child: GestureDetector(
+                          // A listing posted from the user side belongs to a
+                          // client, and a client has no profile screen — only
+                          // a broker's licence and areas are worth opening.
+                          // Null lets the tap fall through to the card.
                           // Both photo fields sit on the same populated
                           // user_id — showOwnerAvatar only picks which one to
                           // render, not a different person — so a.userId is
@@ -234,15 +301,16 @@ class HomeAnnouncementCard extends StatelessWidget {
                           // over the card's onTap for a tap landing exactly on
                           // the avatar, without stopping the rest of the card
                           // from still opening the listing.
-                          onTap: () => UserProfileView.open(
+                          onTap: a.userRole != 2
+                              ? null
+                              : () => UserProfileView.open(
                             userId: a.userId,
                             name: a.ownerName,
                             avatarUrl: showOwnerAvatar
                                 ? a.ownerAvatarUrl
                                 : a.brokerAvatarUrl,
-                            // The listing says which hat its poster was
-                            // wearing: user_role 2 is a broker-posted
-                            // property, 1 is an owner's own.
+                            // Reached only for a broker-posted listing, so
+                            // its poster is being viewed as a broker.
                             viewAsBroker: a.userRole == 2,
                           ),
                           child: Container(

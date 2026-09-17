@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/login_return.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_filter_bar.dart';
@@ -440,6 +441,11 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                   // brokerage line. The owner ids the API stamps on the
                   // published copy are what tells them apart.
                   isPrivateDeal: widget.showMineOnly && !a.isBrokeredForOwner,
+                  // Where this broker stands on someone else's listing. Their
+                  // own listings carry no proposal of theirs to report, and a
+                  // guest has none at all — without the guard every card would
+                  // read New Opportunity to someone who cannot act on it.
+                  showProposalBadge: !widget.showMineOnly && !_isGuest,
                   onTap: () => Get.to(
                       () => BrokerAnnouncementDetailView(announcement: a)),
                 );
@@ -448,7 +454,10 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                   child: RepaintBoundary(
                     child: _isLockedForGuest(i, cardEnd)
                         ? GuestLockedCard(
-                            onLoginTap: () => Get.to(() => LoginView()),
+                            onLoginTap: () {
+                              LoginReturn.capture();
+                              Get.to(() => LoginView());
+                            },
                             child: card,
                           )
                         : card,

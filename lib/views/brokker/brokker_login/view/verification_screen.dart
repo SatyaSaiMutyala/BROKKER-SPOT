@@ -155,33 +155,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 ],
               ),
             ),
-            // Last in the Stack so it paints and hit-tests above the centred
-            // content, which fills the whole area.
-            if (widget.isAnnouncement)
-              SafeArea(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(14.w, 8.h, 14.w, 0),
-                  child: Align(
-                    alignment: Alignment.topLeft,
-                    child: GestureDetector(
-                      onTap: _startNewAnnouncement,
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        width: 38.w,
-                        height: 38.w,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isDark
-                              ? const Color(0xFF2A2A2A)
-                              : Colors.grey.shade100,
-                        ),
-                        child: Icon(Icons.arrow_back_ios_new,
-                            size: 14.sp, color: textColor),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/utils/proposal_badge.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
@@ -37,6 +38,10 @@ class BrokerAgreementView extends StatefulWidget {
   final VoidCallback onSign;
   final RxnInt proposalStatus;
   final RxnString agreementUrl;
+
+  /// Set by the chat controller when the server refuses the owner's approval
+  /// because the listing already has its full set of published contracts.
+  final RxBool contractLimitReached;
   final String? counterpartyName;
   final String? counterpartyAvatar;
 
@@ -58,6 +63,7 @@ class BrokerAgreementView extends StatefulWidget {
     required this.onSign,
     required this.proposalStatus,
     required this.agreementUrl,
+    required this.contractLimitReached,
     this.isOwner = true,
     this.counterpartyName,
     this.counterpartyAvatar,
@@ -105,6 +111,11 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   /// the announcement's owner.
   int _restStatus = 0;
 
+  /// Watches for the server refusing the owner's signature — see
+  /// [_showContractLimitDialog].
+  Worker? _limitWorker;
+  bool _limitDialogOpen = false;
+
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
   @override
@@ -116,6 +127,14 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     _published = LocalStorageService.isAnnouncementPublished(
         widget.announcementId,
         brokerId: widget.brokerId);
+    // The owner's signature can be refused by the server when another broker
+    // published first. Watched rather than awaited: the call goes out over the
+    // socket and the refusal comes back on its own event.
+    _limitWorker = ever<bool>(widget.contractLimitReached, (reached) {
+      if (reached != true || !mounted) return;
+      widget.contractLimitReached.value = false;
+      _showContractLimitDialog();
+    });
     _loadAnnouncement();
     // Pull the current status so a broker signature that landed while this
     // owner was away shows the completed timeline on open.
@@ -126,6 +145,7 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
 
   @override
   void dispose() {
+    _limitWorker?.dispose();
     SocketService.to.off(ChatEvents.announcementPublish, _onPublished);
     super.dispose();
   }
@@ -248,6 +268,15 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
       setState(() => _highlightCheckbox = true);
       return;
     }
+    // The owner is the one taking a broker on, and the listing can only carry
+    // so many at once. Checked here from the detail the screen already
+    // loaded, so the dialog comes up without a round trip; the server refuses
+    // it too, and [_showContractLimitDialog] catches that as well — a broker
+    // could have published in the meantime.
+    if (widget.isOwner && _publishedContracts >= kMaxPublishedContracts) {
+      _showContractLimitDialog();
+      return;
+    }
     setState(() => _isSigning = true);
     widget.onSign();
     await Future.delayed(const Duration(milliseconds: 500));
@@ -286,6 +315,82 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     setState(() {
       _isSigning = false;
       _signedLocally = true;
+    });
+  }
+
+  int get _publishedContracts => _announcement?.publishedCount ?? 0;
+
+  /// Tells the owner why the signature was refused, and what frees it up.
+  ///
+  /// Shaped like the app's other message popups — see showLoginRequiredDialog:
+  /// 20r card, centred Poppins title, muted body, one full-width pill button.
+  void _showContractLimitDialog() {
+    if (_limitDialogOpen) return;
+    _limitDialogOpen = true;
+    final isDark = _isDark;
+
+    Get.dialog(
+      Dialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Contract Limit Reached.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                'This property is already with $kMaxPublishedContracts '
+                'brokers. Cancel one of those contracts before signing with '
+                'another broker.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              SizedBox(height: 24.h),
+              SizedBox(
+                width: double.infinity,
+                height: 46.h,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30.r),
+                    ),
+                  ),
+                  onPressed: Get.back,
+                  child: Text(
+                    'OK',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    ).whenComplete(() {
+      _limitDialogOpen = false;
+      if (mounted) setState(() => _isSigning = false);
     });
   }
 

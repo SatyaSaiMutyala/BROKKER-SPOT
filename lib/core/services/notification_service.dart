@@ -65,6 +65,72 @@ class NotificationService {
   /// hands over, instead of dropping the user on a dashboard first.
   static bool get hasPendingTap => _pendingTapData != null;
 
+  /// Push messages already routed, by FCM message id.
+  ///
+  /// A tap that launches the app from closed arrives TWICE on some Android
+  /// devices: through [FirebaseMessaging.onMessageOpenedApp] *and* through
+  /// [FirebaseMessaging.getInitialMessage]. Both used to be routed, so one tap
+  /// opened two chat screens for the same conversation, 45 ms apart. They
+  /// share a controller slot, so the second deleted the first one's
+  /// controller, and the screen left behind sat on its loading spinner for
+  /// good — no timer, no listener, no error. Seen on an OPPO CPH1933; a tap
+  /// from the background only fires the first stream, which is why that case
+  /// always worked.
+  static final Set<String> _handledMessageIds = <String>{};
+
+  /// Whether SplashView has picked the first route. Until then there is
+  /// nothing sensible to navigate on top of, so a tap is parked in
+  /// [_pendingTapData] for the splash to route instead.
+  static bool _startupRouted = false;
+
+  /// Records [messageId] as routed. False when it already was — the caller
+  /// must drop the tap. A message without an id can't be told apart, so it is
+  /// let through as before.
+  static bool _claimMessage(String? messageId) {
+    if (messageId == null || messageId.isEmpty) return true;
+    return _handledMessageIds.add(messageId);
+  }
+
+  /// One route for every tap delivered while the app is (or is becoming)
+  /// alive, whichever stream it came from.
+  static void _onTapFromSystem(RemoteMessage message) {
+    if (!_claimMessage(message.messageId)) {
+      debugPrint('🔔 Duplicate tap for ${message.messageId} ignored');
+      return;
+    }
+    final data = _dataWithTitle(message);
+    if (!_startupRouted) {
+      // Still launching — SplashView prefetches and routes it once the
+      // dashboard exists. Handling it here raced the splash's own
+      // Get.offAll, which could wipe the chat it had just pushed.
+      _pendingTapData = data;
+      return;
+    }
+    _handleNotificationData(data);
+  }
+
+  /// For the splash's logged-out branch, which routes to Welcome and has no
+  /// tap to act on: marks start-up as done so taps from here on are handled
+  /// straight away instead of parked forever.
+  static void markStartupRouted() {
+    _startupRouted = true;
+    _pendingTapData = null;
+  }
+
+  @visibleForTesting
+  static bool debugClaimMessage(String? messageId) => _claimMessage(messageId);
+
+  @visibleForTesting
+  static void debugTapFromSystem(RemoteMessage message) =>
+      _onTapFromSystem(message);
+
+  @visibleForTesting
+  static void debugResetTapState() {
+    _handledMessageIds.clear();
+    _startupRouted = false;
+    _pendingTapData = null;
+  }
+
   /// Announcement already loaded for the pending tap — see
   /// [prefetchPendingTap].
   static AnnouncementModel? _prefetched;
@@ -252,15 +318,15 @@ class NotificationService {
 
     // App was backgrounded (not killed) and the user tapped the push — the
     // navigator is already up, so handle it immediately.
-    FirebaseMessaging.onMessageOpenedApp.listen(
-      (message) => _handleNotificationData(_dataWithTitle(message)),
-    );
+    FirebaseMessaging.onMessageOpenedApp.listen(_onTapFromSystem);
 
     // App was launched cold by tapping the push — there's no navigator yet
     // at this point in main(), so stash it for SplashView to consume once
     // it has picked the initial route.
+    // The same tap may already have come in through onMessageOpenedApp above;
+    // [_onTapFromSystem] drops the repeat.
     final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-    if (initialMessage != null) _pendingTapData = _dataWithTitle(initialMessage);
+    if (initialMessage != null) _onTapFromSystem(initialMessage);
 
     debugPrint('✅ NotificationService initialised');
   }
@@ -380,6 +446,7 @@ class NotificationService {
   /// Call once the app has settled on its first real screen post-splash
   /// (only meaningful when the app was launched cold via a notification tap).
   static void consumePendingTap() {
+    _startupRouted = true;
     final data = _pendingTapData;
     _pendingTapData = null;
     if (data != null) _handleNotificationData(data);

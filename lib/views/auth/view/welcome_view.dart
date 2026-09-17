@@ -5,6 +5,7 @@ import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:brokkerspot/core/services/login_return.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/constants/app_colors.dart';
 
@@ -201,7 +202,12 @@ class _WelcomeViewState extends State<WelcomeView>
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: () => Get.to(() => LoginView()),
+                              onTap: () {
+                                // A login started from here, not from a prompt
+                                // somewhere in the app — nothing to return to.
+                                LoginReturn.clear();
+                                Get.to(() => LoginView());
+                              },
                               borderRadius: BorderRadius.circular(30.r),
                               splashColor: Colors.white24,
                               highlightColor: Colors.white12,

@@ -55,6 +55,17 @@ class AnnouncementChatView extends StatefulWidget {
     // pictureless account look like the same stranger; empty falls through to
     // the neutral placeholder [_headerAvatar] already draws.
     final avatar = brokerAvatar?.trim() ?? '';
+
+    // One screen per conversation. Two of them share a controller tag, so
+    // whichever opened second deleted the first one's controller (initState),
+    // and closing either deleted the other's (dispose) — leaving a screen
+    // stuck on its loading spinner. Reserved before the push, so two calls
+    // arriving milliseconds apart can't both get through.
+    final tag = openTagFor(announcementId, peerUserId);
+    if (!_openTags.add(tag)) {
+      debugPrint('💬 [Chat] $tag is already open — not opening it twice');
+      return;
+    }
     try {
       await Get.to(() => AnnouncementChatView(
             announcementId: announcementId,
@@ -66,8 +77,20 @@ class AnnouncementChatView extends StatefulWidget {
     } catch (e) {
       Get.snackbar('Chat', "Couldn't open chat. Please try again.",
           snackPosition: SnackPosition.BOTTOM);
+    } finally {
+      // Get.to completes when the screen is popped, so this frees the slot
+      // exactly when the conversation stops being on screen.
+      _openTags.remove(tag);
     }
   }
+
+  /// Conversations with a chat screen on the stack right now — see [open].
+  static final Set<String> _openTags = <String>{};
+
+  /// The key [open] reserves, matching the controller tag the screen uses.
+  @visibleForTesting
+  static String openTagFor(String announcementId, String? peerUserId) =>
+      '$announcementId:${peerUserId ?? ''}';
 
   @override
   State<AnnouncementChatView> createState() => _AnnouncementChatViewState();
@@ -302,6 +325,10 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
   Widget _opensProfile(Widget child) {
     final peerId = widget.peerUserId ?? '';
     if (peerId.isEmpty) return child;
+    // Only the broker in this conversation has a profile worth opening. With
+    // userRole 2 the viewer IS the broker, so the person in the header is
+    // their client — nothing to show, so no tap target.
+    if ((widget.userRole ?? 1) != 1) return child;
     return GestureDetector(
       onTap: () => UserProfileView.open(
         userId: peerId,
@@ -1050,6 +1077,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           onSign: isOwner ? _chat.approveProposal : _chat.brokerAcceptProposal,
           proposalStatus: _chat.proposalStatus,
           agreementUrl: _chat.agreementUrl,
+          contractLimitReached: _chat.contractLimitReached,
           counterpartyName: widget.brokerName,
           counterpartyAvatar: widget.brokerAvatar,
           onRefreshStatus: _chat.refreshProposal,

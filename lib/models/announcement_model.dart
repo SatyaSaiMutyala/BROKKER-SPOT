@@ -228,6 +228,21 @@ class AnnouncementModel {
   // they've already sent a proposal on it.
   final bool? isOwner;
   final bool? isProposalSent;
+
+  /// Brokers who have published this listing, and so hold a live contract on
+  /// it. Sent on the announcement detail only (`published_count`).
+  ///
+  /// The server caps these at [kMaxPublishedContracts]: the owner cannot take
+  /// a new broker on until one of them is cancelled.
+  final int? publishedCount;
+
+  /// This broker's own proposal on the listing — 0 pending, 1 approved by the
+  /// owner, 2 rejected, 3 signed by the broker, 4 published, 5 cancellation
+  /// requested, 6 cancelled. Null when they have not sent one.
+  ///
+  /// Only the broker-role `fetch-all` sends it (`proposal_details.status`);
+  /// every other list leaves it null.
+  final int? myProposalStatus;
   final bool? isChatAvailable;
 
   /// Which side created this announcement: 1 = user side, 2 = broker side.
@@ -313,6 +328,8 @@ class AnnouncementModel {
     this.latestProposals,
     this.isOwner,
     this.isProposalSent,
+    this.myProposalStatus,
+    this.publishedCount,
     this.isChatAvailable,
     this.userRole,
     this.ownerId,
@@ -455,6 +472,10 @@ class AnnouncementModel {
           .toList(),
       isOwner: json['is_owner'] as bool?,
       isProposalSent: json['is_proposal_sent'] as bool?,
+      publishedCount: (json['published_count'] as num?)?.toInt(),
+      myProposalStatus: json['proposal_details'] is Map
+          ? ((json['proposal_details'] as Map)['status'] as num?)?.toInt()
+          : null,
       isChatAvailable: json['is_chat_available'] as bool?,
       userRole: (json['user_role'] as num?)?.toInt(),
       ownerId: _idOf(json['owner_id']),

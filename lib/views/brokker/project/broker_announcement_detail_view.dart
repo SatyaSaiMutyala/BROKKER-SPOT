@@ -302,6 +302,10 @@ class _BrokerAnnouncementDetailViewState
     );
     if (sent == true && mounted) {
       setState(() => _proposalSent = true);
+      // The feed card underneath still says New Opportunity. Returning to it
+      // only reloads when the listing count moved, and a proposal doesn't move
+      // it — so say the feed is out of date.
+      AnnouncementListController.to.markBrokerStale();
     }
   }
 

@@ -94,8 +94,12 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
         greetingName: _profileCtrl.userName.value.isNotEmpty
             ? _profileCtrl.userName.value.split(' ').first
             : 'Guest',
-        isGreetingLoading: isLoading,
+        isGreetingLoading: isLoading,
+
         notificationCount: _notificationCtrl.unseenCount.value,
+        // Hides the bell for a guest, same as the user-side home — there is
+        // no account to hold notifications.
+        isGuest: _profileCtrl.isGuest,
         onAvatarTap: () {
           if (LocalStorageService.isLoggedIn()) {
             Get.find<BottomNavController>().currentIndex.value = 3;

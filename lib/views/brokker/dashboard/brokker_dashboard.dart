@@ -1,6 +1,7 @@
 // Only the old floating-pill create button needed ImageFilter.
 // import 'dart:ui' show ImageFilter;
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/active_dashboard.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
 import 'package:brokkerspot/views/brokker/brokker_account/brokker_profile_view.dart';
@@ -43,6 +44,7 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
   @override
   void initState() {
     super.initState();
+    ActiveDashboard.register(isBroker: true, currentTab: _activeTab);
     controller.currentIndex.value = widget.initialIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Location picker popup — disabled on request.
@@ -77,8 +79,13 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
     }
   }
 
+  /// Read through [ActiveDashboard] — by the login prompt, and by guest
+  /// requests that need to name the side they are browsing.
+  int _activeTab() => controller.currentIndex.value;
+
   @override
   void dispose() {
+    ActiveDashboard.unregister(_activeTab);
     _profileWorker?.dispose();
     super.dispose();
   }
