@@ -23,6 +23,7 @@ import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_detail_body.dart';
+import 'package:brokkerspot/widgets/announcements/send_proposal_bar.dart';
 import 'package:brokkerspot/widgets/common/custom_back_button.dart';
 
 class BrokerAnnouncementDetailView extends StatefulWidget {
@@ -814,137 +815,13 @@ class _BrokerAnnouncementDetailViewState
   /// the listing pays a fee, what the broker earns beside it, so the number
   /// behind the decision is on screen at the moment it is made.
   Widget _buildSendProposalBar(bool isDark, double bottomPad) {
-    final commission = brokerCommissionAmount(_data);
-    final pill = _sendProposalPill();
-
-    if (commission == null) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 10.h + bottomPad),
-        child: Center(child: pill),
-      );
-    }
-
-    final currency = _data.currency ?? 'AED';
     return Padding(
       padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 10.h + bottomPad),
-      child: Container(
-        padding: EdgeInsets.fromLTRB(16.w, 8.h, 8.w, 8.h),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(22.r),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.10),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Broker Commission',
-                      style: GoogleFonts.poppins(
-                        fontSize: 11.sp,
-                        fontWeight: FontWeight.w500,
-                        color:
-                            isDark ? Colors.white60 : const Color(0xFF555555),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  // Large amounts shrink rather than wrap or clip.
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '$currency ${groupedPrice(commission)}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20.sp,
-                        fontWeight: FontWeight.w600,
-                        color:
-                            isDark ? Colors.white : const Color(0xFF444444),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 1,
-              height: 44.h,
-              margin: EdgeInsets.symmetric(horizontal: 12.w),
-              color: isDark ? Colors.white12 : const Color(0xFFE3E3E3),
-            ),
-            pill,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _sendProposalPill() {
-    final avatar = _resolvedOwnerAvatar;
-    final avatarSize = 54.h;
-    return GestureDetector(
-      onTap: _showProposalSheet,
-      child: Container(
-        height: 62.h,
-        padding: EdgeInsets.fromLTRB(16.w, 4.h, 4.h, 4.h),
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(40.r),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Paper plane, pointing up and right.
-            Transform.rotate(
-              angle: -0.6,
-              child: Icon(Icons.send_outlined,
-                  size: 24.sp, color: Colors.white),
-            ),
-            SizedBox(width: 10.w),
-            Text(
-              'Send Proposal\nto Owner',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-                height: 1.35,
-              ),
-            ),
-            SizedBox(width: 10.w),
-            Container(
-              width: avatarSize,
-              height: avatarSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFE9E1CC),
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: ClipOval(
-                child: avatar != null && avatar.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: avatar,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Icon(Icons.person,
-                            size: 28.sp, color: Colors.white),
-                      )
-                    : Icon(Icons.person, size: 28.sp, color: Colors.white),
-              ),
-            ),
-          ],
-        ),
+      child: SendProposalBar(
+        commission: brokerCommissionAmount(_data),
+        currency: _data.currency ?? 'AED',
+        ownerAvatarUrl: _resolvedOwnerAvatar,
+        onTap: _showProposalSheet,
       ),
     );
   }
