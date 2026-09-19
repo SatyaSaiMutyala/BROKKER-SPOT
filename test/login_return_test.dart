@@ -74,6 +74,60 @@ void main() {
     expect(LoginReturn.debugHasPending, isFalse);
   });
 
+  group('switching sides after login', () {
+    test('guest on the broker side, broker-capable account on the user side '
+        '— switch to broker', () {
+      for (final role in [2, 3]) {
+        expect(
+          LoginReturn.sideToSwitchTo(
+              targetIsBroker: true, goBroker: false, accountRole: role),
+          isTrue,
+          reason: 'role $role',
+        );
+      }
+    });
+
+    test('guest on the broker side, plain user account — stay on user side',
+        () {
+      // No broker role to switch onto; lands on the user dashboard as before.
+      expect(
+        LoginReturn.sideToSwitchTo(
+            targetIsBroker: true, goBroker: false, accountRole: 1),
+        isNull,
+      );
+    });
+
+    test('guest on the user side, account left on the broker side '
+        '— switch to user', () {
+      expect(
+        LoginReturn.sideToSwitchTo(
+            targetIsBroker: false, goBroker: true, accountRole: 3),
+        isFalse,
+      );
+    });
+
+    test('already on the right side — no switch', () {
+      expect(
+        LoginReturn.sideToSwitchTo(
+            targetIsBroker: true, goBroker: true, accountRole: 3),
+        isNull,
+      );
+      expect(
+        LoginReturn.sideToSwitchTo(
+            targetIsBroker: false, goBroker: false, accountRole: 1),
+        isNull,
+      );
+    });
+
+    test('no prompt was captured — no switch', () {
+      expect(
+        LoginReturn.sideToSwitchTo(
+            targetIsBroker: null, goBroker: false, accountRole: 3),
+        isNull,
+      );
+    });
+  });
+
   group('guest listing role', () {
     tearDown(() => ActiveDashboard.unregister(_tab));
 

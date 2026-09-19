@@ -282,23 +282,36 @@ class _BrokerAnnouncementDetailViewState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sent = await showDialog<bool>(
       context: context,
-      builder: (_) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.r),
-        ),
-        insetPadding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 60.h),
-        // The sheet shows the listing and its owner beside the message box, so
-        // it needs the model rather than just the id. The fallback name covers
-        // a detail response that returned `user_id` as a bare string.
-        child: _ProposalSheet(
-          announcement: _data,
-          ownerNameFallback: _ownerName ?? widget.ownerName,
-          ownerAvatarFallback: _ownerAvatar ?? widget.ownerAvatarUrl,
-          isLoading: !_detailLoaded || _ownerResolving,
-          isDark: isDark,
-        ),
-      ),
+      builder: (ctx) {
+        // With the keyboard up the dialog kept its 60h margins, so it shrank
+        // into a band in the middle: the Send button was cut off at its
+        // bottom edge, and the strip between it and the keyboard showed the
+        // page behind — its own Send Proposal button included. Keyboard open,
+        // it drops the margins and sits right on top of the keyboard, using
+        // all the height there is. Read from ctx so it follows the keyboard
+        // in and out; Dialog animates the change.
+        final keyboardOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0;
+        return Dialog(
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          alignment: keyboardOpen ? Alignment.bottomCenter : Alignment.center,
+          insetPadding: keyboardOpen
+              ? EdgeInsets.fromLTRB(24.w, 12.h, 24.w, 10.h)
+              : EdgeInsets.symmetric(horizontal: 24.w, vertical: 60.h),
+          // The sheet shows the listing and its owner beside the message box, so
+          // it needs the model rather than just the id. The fallback name covers
+          // a detail response that returned `user_id` as a bare string.
+          child: _ProposalSheet(
+            announcement: _data,
+            ownerNameFallback: _ownerName ?? widget.ownerName,
+            ownerAvatarFallback: _ownerAvatar ?? widget.ownerAvatarUrl,
+            isLoading: !_detailLoaded || _ownerResolving,
+            isDark: isDark,
+          ),
+        );
+      },
     );
     if (sent == true && mounted) {
       setState(() => _proposalSent = true);
@@ -797,6 +810,145 @@ class _BrokerAnnouncementDetailViewState
   /// Same action the user side puts on a draft — reopens the create form with
   /// this announcement loaded, and pops back to the list once it is saved so
   /// the row reflects whatever it became.
+  /// "Send Proposal to Owner", with the owner's photo on the pill — and, when
+  /// the listing pays a fee, what the broker earns beside it, so the number
+  /// behind the decision is on screen at the moment it is made.
+  Widget _buildSendProposalBar(bool isDark, double bottomPad) {
+    final commission = brokerCommissionAmount(_data);
+    final pill = _sendProposalPill();
+
+    if (commission == null) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 10.h + bottomPad),
+        child: Center(child: pill),
+      );
+    }
+
+    final currency = _data.currency ?? 'AED';
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 10.h + bottomPad),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(16.w, 8.h, 8.w, 8.h),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(22.r),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.10),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Broker Commission',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w500,
+                        color:
+                            isDark ? Colors.white60 : const Color(0xFF555555),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  // Large amounts shrink rather than wrap or clip.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '$currency ${groupedPrice(commission)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.w600,
+                        color:
+                            isDark ? Colors.white : const Color(0xFF444444),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 44.h,
+              margin: EdgeInsets.symmetric(horizontal: 12.w),
+              color: isDark ? Colors.white12 : const Color(0xFFE3E3E3),
+            ),
+            pill,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sendProposalPill() {
+    final avatar = _resolvedOwnerAvatar;
+    final avatarSize = 54.h;
+    return GestureDetector(
+      onTap: _showProposalSheet,
+      child: Container(
+        height: 62.h,
+        padding: EdgeInsets.fromLTRB(16.w, 4.h, 4.h, 4.h),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(40.r),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Paper plane, pointing up and right.
+            Transform.rotate(
+              angle: -0.6,
+              child: Icon(Icons.send_outlined,
+                  size: 24.sp, color: Colors.white),
+            ),
+            SizedBox(width: 10.w),
+            Text(
+              'Send Proposal\nto Owner',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                height: 1.35,
+              ),
+            ),
+            SizedBox(width: 10.w),
+            Container(
+              width: avatarSize,
+              height: avatarSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFE9E1CC),
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: ClipOval(
+                child: avatar != null && avatar.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: avatar,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Icon(Icons.person,
+                            size: 28.sp, color: Colors.white),
+                      )
+                    : Icon(Icons.person, size: 28.sp, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildResumeDraftBar(bool isDark, double bottomPad) {
     final barBg = isDark ? const Color(0xFF15181F) : Colors.white;
 
@@ -844,6 +996,17 @@ class _BrokerAnnouncementDetailViewState
 
   // ── Bottom bar (broker-specific) ───────────────────────────────────────────
 
+  /// The owner's personal photo, from whichever source has it — the detail
+  /// response, the card the screen was opened from, or the owner lookup.
+  String? get _resolvedOwnerAvatar =>
+      _data.ownerAvatarUrl?.isNotEmpty == true
+          ? _data.ownerAvatarUrl
+          : widget.announcement.ownerAvatarUrl?.isNotEmpty == true
+              ? widget.announcement.ownerAvatarUrl
+              : _ownerAvatar?.isNotEmpty == true
+                  ? _ownerAvatar
+                  : widget.ownerAvatarUrl;
+
   Widget _buildBottomBar(bool isDark, double bottomPad) {
     if (!_detailLoaded) {
       // Transparent shimmer pill — no solid bar background.
@@ -890,13 +1053,7 @@ class _BrokerAnnouncementDetailViewState
                   ? _ownerName!
                   : widget.ownerName ?? 'User';
       // Show the owner's user profile image (ownerAvatarUrl = userProfileImage).
-      final ownerAvatar = _data.ownerAvatarUrl?.isNotEmpty == true
-          ? _data.ownerAvatarUrl
-          : widget.announcement.ownerAvatarUrl?.isNotEmpty == true
-              ? widget.announcement.ownerAvatarUrl
-              : _ownerAvatar?.isNotEmpty == true
-                  ? _ownerAvatar
-                  : widget.ownerAvatarUrl;
+      final ownerAvatar = _resolvedOwnerAvatar;
 
       button = GestureDetector(
         onTap: _openChat,
@@ -1028,46 +1185,7 @@ class _BrokerAnnouncementDetailViewState
         ),
       );
     } else {
-      // Glassmorphism "Send Proposal" pill — same style as the user-side
-      // "Interested Brokers" tile.
-      return Padding(
-        padding: EdgeInsets.fromLTRB(44.w, 0, 44.w, 10.h + bottomPad),
-        child: GestureDetector(
-          onTap: _showProposalSheet,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(77.r),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                height: 67.h,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0x80333333)
-                      : const Color(0x80E1E1E1),
-                  borderRadius: BorderRadius.circular(77.r),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.handshake_outlined,
-                        size: 20.sp, color: AppColors.primary),
-                    SizedBox(width: 8.w),
-                    Text(
-                      'Send Proposal',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
+      return _buildSendProposalBar(isDark, bottomPad);
     }
 
     return Padding(
@@ -1524,6 +1642,10 @@ class _ProposalSheetState extends State<_ProposalSheet> {
       child: TextField(
         controller: _controller,
         maxLines: 6,
+        // Focusing scrolls the field into view; this much extra room below it
+        // brings the counter and the Send button along, so on a short screen
+        // the button isn't left under the dialog's bottom edge.
+        scrollPadding: EdgeInsets.only(bottom: 110.h),
         maxLength: _maxLength,
         buildCounter: (_,
                 {required currentLength, required isFocused, maxLength}) =>

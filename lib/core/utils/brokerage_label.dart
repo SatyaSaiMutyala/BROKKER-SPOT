@@ -24,6 +24,23 @@ String brokerageLabel(AnnouncementModel a) {
   return 'Brokerage $percent% ~ $currency ${groupedPrice(price * percent / 100)}';
 }
 
+/// What the broker is paid on this listing, or null when there is no fee.
+///
+/// The number behind [brokerageLabel], on the same rules so the two never
+/// disagree: a rental pays one month's rent, a sale its brokerage percentage
+/// of the price. Null exactly where that label reads "No Owner Brokerage" /
+/// "No Seller Brokerage".
+double? brokerCommissionAmount(AnnouncementModel a) {
+  final price = a.price ?? 0;
+  if (isRentListing(a)) {
+    if (price <= 0) return null;
+    return isMonthlyRent(a) ? price : price / 12;
+  }
+  final percent = a.brokkeragePercent;
+  if (percent == null || percent <= 0 || price <= 0) return null;
+  return price * percent / 100;
+}
+
 /// `Monthly` / `Yearly` for a rental, null for anything else — the suffix that
 /// sits beside a rent price so the figure isn't ambiguous.
 String? rentPeriodLabel(AnnouncementModel a) {

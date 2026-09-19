@@ -217,7 +217,7 @@ class ChatController extends GetxController {
       'perPage': _perPage,
       if (roleToSend != null) 'user_role': roleToSend,
     };
-    debugPrint('🔄 [Chat] chat:history attempt=$_historyAttempt user_role=$roleToSend recipient=$recipientId ann=$announcementId');
+    debugPrint('🔄 [Chat] chat:history attempt=$_historyAttempt user_role=$roleToSend recipient=$recipientId ann=$announcementId socketReady=${_socket.isReady}');
     _socket.emit(ChatEvents.history, payload);
     _armHistoryTimeout();
   }
@@ -266,6 +266,7 @@ class ChatController extends GetxController {
   /// only once the socket is actually connected and the request has really
   /// gone out.
   void _startHistoryDeadline() {
+    debugPrint('⏳ [Chat] socket up — waiting up to 8s for chat:history');
     _historyTimeout?.cancel();
     _historyTimeout = Timer(const Duration(seconds: 8), _giveUpOnHistory);
   }
@@ -287,6 +288,8 @@ class ChatController extends GetxController {
       return;
     }
 
+    debugPrint('❌ [Chat] gave up on chat:history — socketReady=${_socket.isReady} '
+        'connected=${_socket.isConnected.value}');
     isLoadingHistory.value = false;
     _loadingMore = false;
     if (messages.isEmpty && error.value.isEmpty) {
@@ -314,7 +317,12 @@ class ChatController extends GetxController {
     if (data is! Map) return;
     final map = Map<String, dynamic>.from(data);
     final aId = (map['announcement_id'])?.toString();
-    if (aId != null && aId != announcementId) return;
+    final count = (map['messages'] as List?)?.length;
+    if (aId != null && aId != announcementId) {
+      debugPrint('📥 [Chat] chat:history for ann=$aId dropped — this chat is ann=$announcementId');
+      return;
+    }
+    debugPrint('📥 [Chat] chat:history received ann=$aId page=${map['page']} messages=$count');
 
     _page = (map['page'] as num?)?.toInt() ?? _page;
     _hasMore = map['has_more'] == true;

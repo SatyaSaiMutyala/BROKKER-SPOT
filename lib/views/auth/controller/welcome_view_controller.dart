@@ -426,8 +426,14 @@ class WelcomeViewController extends GetxController {
     }
     final goBroker = currentRole == 2 ||
         (currentRole != 1 && LocalStorageService.getLastSide() == 'broker');
-    await LocalStorageService.saveLastSide(goBroker ? 'broker' : 'user');
-    // Back to wherever a login prompt was raised, if one was.
-    LoginReturn.goToDashboardAfterLogin(goBroker: goBroker);
+    // Back to wherever a login prompt was raised, if one was — which may
+    // mean switching to the side the guest was browsing. Also persists the
+    // side it lands on. getProfile has run by now, so the roles are known.
+    await LoginReturn.goToDashboardAfterLogin(
+      goBroker: goBroker,
+      accountRole: Get.isRegistered<ProfileController>()
+          ? Get.find<ProfileController>().role.value
+          : null,
+    );
   }
 }

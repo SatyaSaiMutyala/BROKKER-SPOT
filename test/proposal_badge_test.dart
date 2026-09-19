@@ -43,6 +43,35 @@ void main() {
     });
   });
 
+  group('contractBadgeFor — broker My Announcements', () {
+    test('a listing published for an owner reads Contract Signed', () {
+      final b =
+          contractBadgeFor(brokeredForOwner: true, status: 2)!;
+      expect(b.title, 'Contract Signed');
+      expect(b.subtitle, isNull);
+    });
+
+    test('status 4 on a published copy reads Contract Cancelled', () {
+      // Only the owner's finalised cancellation moves a copy to 4.
+      final b =
+          contractBadgeFor(brokeredForOwner: true, status: 4)!;
+      expect(b.title, 'Contract Cancelled');
+    });
+
+    test('own listings of the broker get no status badge', () {
+      for (final status in [0, 2, 4, null]) {
+        expect(contractBadgeFor(brokeredForOwner: false, status: status),
+            isNull,
+            reason: 'status $status');
+      }
+    });
+
+    test('the raw status code survives parsing alongside its label', () {
+      final a = AnnouncementModel.fromJson({'_id': 'a', 'status': 4});
+      expect(a.statusCode, 4);
+    });
+  });
+
   group('AnnouncementModel.myProposalStatus', () {
     test('reads the broker\'s proposal status off proposal_details', () {
       final a = AnnouncementModel.fromJson({

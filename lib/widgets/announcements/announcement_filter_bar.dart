@@ -1,18 +1,12 @@
 import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:brokkerspot/core/controllers/common_data_controller.dart';
+import 'package:brokkerspot/widgets/common/property_type_picker.dart';
+import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AnnouncementFilterBar extends StatelessWidget {
-  static const propertyTypes = [
-    'Apartment',
-    'Villa',
-    'Studio',
-    'Penthouse',
-    'Townhouse',
-    'Office',
-  ];
-
   final String? selectedListingType; // null | 'Sell' | 'Rent'
   final String? selectedPropertyType;
   final ValueChanged<String?> onListingTypeChanged;
@@ -76,14 +70,13 @@ class AnnouncementFilterBar extends StatelessWidget {
             isSelected: selectedListingType != null,
             isDark: isDark,
           ),
-          // Next to the listing chip and ahead of the property types, for the
-          // same reason the Draft chip sits there: it narrows the whole list
-          // rather than picking one kind of property.
-          if (onIsCommercialChanged != null)
-            Padding(
-              padding: EdgeInsets.only(left: 8.w),
-              child: _categoryChip(isDark: isDark),
-            ),
+          // Category and type in one chip, one sheet — see
+          // showPropertyTypeSheet. Replaces a fixed row of six type chips
+          // that knew nothing of the admin-managed list or its categories.
+          Padding(
+            padding: EdgeInsets.only(left: 8.w),
+            child: _propertyTypeChip(context, isDark),
+          ),
           // Sits right after the listing chip, ahead of the property types —
           // it narrows the whole list rather than picking a kind of property.
           if (showDraftChip)
@@ -96,52 +89,47 @@ class AnnouncementFilterBar extends StatelessWidget {
                 onTap: () => onDraftChanged?.call(!draftSelected),
               ),
             ),
-          ...propertyTypes.map((type) {
-            final isSelected = selectedPropertyType == type;
-            return Padding(
-              padding: EdgeInsets.only(left: 8.w),
-              child: _chip(
-                label: type,
-                isSelected: isSelected,
-                isDark: isDark,
-                onTap: () => onPropertyTypeChanged(isSelected ? null : type),
-              ),
-            );
-          }),
         ],
       ),
     );
   }
 
-  /// All / Residential / Commercial, as a menu rather than three chips — the
-  /// bar is already a long scroll and the three are mutually exclusive.
-  Widget _categoryChip({required bool isDark}) {
-    final label = selectedIsCommercial == null
-        ? 'Category'
-        : (selectedIsCommercial! ? 'Commercial' : 'Residential');
-
-    return PopupMenuButton<String>(
-      onSelected: (val) => onIsCommercialChanged!(
-        val.isEmpty ? null : val == 'commercial',
-      ),
-      offset: const Offset(0, 42),
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-      itemBuilder: (_) => [
-        _menuItem('', 'All', isDark, isActive: selectedIsCommercial == null),
-        _menuItem('residential', 'Residential', isDark,
-            isActive: selectedIsCommercial == false),
-        _menuItem('commercial', 'Commercial', isDark,
-            isActive: selectedIsCommercial == true),
-      ],
+  Widget _propertyTypeChip(BuildContext context, bool isDark) {
+    final active = selectedIsCommercial != null || selectedPropertyType != null;
+    return GestureDetector(
+      onTap: () => _openPropertyTypeSheet(context),
       child: _chipShell(
-        label: label,
-        isSelected: selectedIsCommercial != null,
+        label: propertyTypeChipLabel(
+          isCommercial: selectedIsCommercial,
+          typeName: selectedPropertyType,
+        ),
+        isSelected: active,
         isDark: isDark,
         showChevron: true,
       ),
     );
+  }
+
+  /// The host screens filter by type *name*, so the sheet's pre-selection is
+  /// looked up by name — within the chosen category, since a name can exist
+  /// in both.
+  Future<void> _openPropertyTypeSheet(BuildContext context) async {
+    final category = selectedIsCommercial == null
+        ? null
+        : (selectedIsCommercial! ? 'commercial' : 'residential');
+    final current = CommonDataController.to.propertyTypes.firstWhereOrNull(
+        (t) =>
+            t.name == selectedPropertyType &&
+            (category == null || t.category == category));
+
+    final picked = await showPropertyTypeSheet(
+      context,
+      isCommercial: selectedIsCommercial,
+      typeId: current?.id,
+    );
+    if (picked == null) return; // dismissed
+    onIsCommercialChanged?.call(picked.isCommercial);
+    onPropertyTypeChanged(picked.typeName);
   }
 
   Widget _listingChip({

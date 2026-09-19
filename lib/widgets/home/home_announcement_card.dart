@@ -56,6 +56,12 @@ class HomeAnnouncementCard extends StatelessWidget {
   /// text below. Off by default, so every other card is unchanged.
   final bool showProposalBadge;
 
+  /// A status badge the caller has already worked out, for the same corner —
+  /// the broker's own list uses it for the contract behind each listing.
+  /// Null keeps the FOR SELL / FOR RENT badge. Ignored when
+  /// [showProposalBadge] is on.
+  final ProposalBadge? statusBadge;
+
   const HomeAnnouncementCard({
     super.key,
     required this.announcement,
@@ -70,6 +76,7 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.onWishlistTap,
     this.isPrivateDeal = false,
     this.showProposalBadge = false,
+    this.statusBadge,
   });
 
   // Strip sits flush below the image card — no overlap.
@@ -146,8 +153,9 @@ class HomeAnnouncementCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final a = announcement;
     final imgCount = a.imageUrls?.length ?? 0;
-    final proposalBadge =
-        showProposalBadge ? proposalBadgeFor(a.myProposalStatus) : null;
+    final proposalBadge = showProposalBadge
+        ? proposalBadgeFor(a.myProposalStatus)
+        : statusBadge;
 
     final imageCardHeight = cardHeight ?? 263.h;
     final stripExtra = showBrokerageRow ? _brokerageRowHeight.h : 0.0;

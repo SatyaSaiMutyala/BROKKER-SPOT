@@ -1,5 +1,7 @@
 import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/core/services/active_dashboard.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/user/dashboard/dashboard_view.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
@@ -56,15 +58,27 @@ class LoginReturn {
   /// Forgets any captured screen — for a login the user started on their own.
   static void clear() => _pending = null;
 
-  /// The dashboard for [goBroker], on the captured tab, with the captured
-  /// screen re-opened on top.
+  /// The dashboard on the side the guest was browsing, on the captured tab,
+  /// with the captured screen re-opened on top.
   ///
-  /// Only when the account lands on the side the guest was browsing: a screen
-  /// from the other side would open with the wrong role behind it, so that
-  /// case keeps today's behaviour and lands on the dashboard's first tab.
-  static void goToDashboardAfterLogin({required bool goBroker}) {
-    final target = _resolve(goBroker: goBroker);
-    Get.offAll(() => goBroker
+  /// [goBroker] is the side the backend has the account on; [accountRole] is
+  /// the roles it holds (1 user, 2 broker, 3 both). When the guest was
+  /// browsing the other side, the account is switched over first — the same
+  /// switch as the Account screen's button. Without it a guest on the broker
+  /// side never came back: a fresh or user-side account lands on the user
+  /// side, the target was for the broker side, and the mismatch sent them to
+  /// the first tab. An account with no broker role cannot be switched to the
+  /// broker side, so that case still lands on the user dashboard.
+  static Future<void> goToDashboardAfterLogin({
+    required bool goBroker,
+    int? accountRole,
+  }) async {
+    final landOnBroker =
+        await _sideToLandOn(goBroker: goBroker, accountRole: accountRole);
+    final target = _resolve(goBroker: landOnBroker);
+    // Persisted for the splash path, which re-opens the last side.
+    await LocalStorageService.saveLastSide(landOnBroker ? 'broker' : 'user');
+    Get.offAll(() => landOnBroker
         ? BrokerDashBoardView(
             initialIndex: target.tab, showLocationPicker: true)
         : DashboardView(initialIndex: target.tab, showLocationPicker: true));
@@ -78,14 +92,55 @@ class LoginReturn {
     });
   }
 
+  /// The side to land on: the one the guest was browsing when the account can
+  /// be put there, otherwise the one the backend already has it on.
+  static Future<bool> _sideToLandOn({
+    required bool goBroker,
+    int? accountRole,
+  }) async {
+    final target = _pending;
+    final switchTo = sideToSwitchTo(
+      targetIsBroker:
+          (target == null || _isStale(target)) ? null : target.isBroker,
+      goBroker: goBroker,
+      accountRole: accountRole,
+    );
+    if (switchTo == null) return goBroker;
+
+    final profile = Get.isRegistered<ProfileController>()
+        ? Get.find<ProfileController>()
+        : Get.put(ProfileController());
+    final switched = await profile.switchRole(switchTo ? 2 : 1);
+    return switched ? switchTo : goBroker;
+  }
+
+  /// The side to switch the account to after login — true broker, false user
+  /// — or null to stay where the backend put it.
+  ///
+  /// Switches only when the guest was browsing the other side, and only onto
+  /// a side the account holds: the broker side needs the broker role, the
+  /// user side is open to every account.
+  @visibleForTesting
+  static bool? sideToSwitchTo({
+    required bool? targetIsBroker,
+    required bool goBroker,
+    int? accountRole,
+  }) {
+    if (targetIsBroker == null || targetIsBroker == goBroker) return null;
+    final canBeBroker = ((accountRole ?? 1) & 2) != 0;
+    if (targetIsBroker && !canBeBroker) return null;
+    return targetIsBroker;
+  }
+
+  static bool _isStale(_ReturnTarget target) =>
+      DateTime.now().difference(target.at) > _maxAge;
+
   /// Takes the captured target, if it is still fresh and for [goBroker]'s side.
   static ({int tab, GetPageBuilder? page}) _resolve({required bool goBroker}) {
     final target = _pending;
     _pending = null;
     if (target == null) return (tab: 0, page: null);
-    if (DateTime.now().difference(target.at) > _maxAge) {
-      return (tab: 0, page: null);
-    }
+    if (_isStale(target)) return (tab: 0, page: null);
     if (target.isBroker != goBroker) return (tab: 0, page: null);
     return (tab: target.tab, page: target.page);
   }

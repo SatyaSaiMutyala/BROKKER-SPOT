@@ -28,6 +28,34 @@ class ProposalBadge {
   });
 }
 
+/// The badge on a broker's "My Announcements" card: the contract behind a
+/// listing they published for an owner.
+///
+/// Null for the broker's own listings — no contract behind them, they keep
+/// the plain FOR SELL / FOR RENT badge.
+///
+/// A published copy stays at status 2 while the contract stands. The only
+/// thing that moves it to 4 is the owner's cancellation being finalised (the
+/// backend cron, once the 48-hour window closes), so 4 reads as cancelled.
+/// During that window it still reads as signed: the response carries no
+/// sign of a pending cancellation.
+ProposalBadge? contractBadgeFor({
+  required bool brokeredForOwner,
+  required int? status,
+}) {
+  if (!brokeredForOwner) return null;
+  if (status == 4) {
+    return const ProposalBadge(
+      title: 'Contract Cancelled',
+      color: Color(0xFFE5484D),
+    );
+  }
+  return const ProposalBadge(
+    title: 'Contract Signed',
+    color: Color(0xFF2E8B22),
+  );
+}
+
 /// The badge for a proposal [status], or null when there is nothing to show.
 ///
 /// No proposal yet (null) is a New Opportunity. The design's "Not Viewed" line

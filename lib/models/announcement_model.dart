@@ -221,6 +221,12 @@ class AnnouncementModel {
   final String? timeAgo;
   final bool? isWishlisted;
   final String? status;         // 'Active' | 'Pending' | 'Rejected' | 'Draft'
+
+  /// The server's `status` as sent — 0 draft, 1 submitted, 2 approved,
+  /// 3 rejected, 4 cancelled after going live. [status] is the display label,
+  /// which calls 4 "Live" for the user-side tab; on a broker's published copy
+  /// the same 4 means the owner cancelled the contract, so read the code.
+  final int? statusCode;
   final int? proposalCount;
   // Latest (up to 3) brokers who sent a proposal, for the avatar stack on cards.
   final List<ProposalBroker>? latestProposals;
@@ -324,6 +330,7 @@ class AnnouncementModel {
     this.timeAgo,
     this.isWishlisted,
     this.status,
+    this.statusCode,
     this.proposalCount,
     this.latestProposals,
     this.isOwner,
@@ -465,6 +472,7 @@ class AnnouncementModel {
       sqft: size?.sqft.toInt(),
       location: locationStr.isEmpty ? null : locationStr,
       status: _statusLabel(statusCode),
+      statusCode: statusCode,
       proposalCount: json['proposals_count'] as int?,
       latestProposals: (json['latest_proposals'] as List?)
           ?.whereType<Map<String, dynamic>>()

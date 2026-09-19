@@ -2,6 +2,7 @@ import 'package:brokkerspot/core/common_widget/shimmer_box.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/models/property_filter_model.dart';
+import 'package:brokkerspot/widgets/common/property_type_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -77,31 +78,20 @@ class HomeFilterBar extends StatelessWidget {
       onTap: () => _showCountrySheet(context, isDark),
     ));
 
-    // ── 4. Residential / Commercial ────────────────────────────────────────
-    // Ahead of Property Type on purpose: it decides which types are even on
-    // offer, so picking it first is the order that makes sense.
+    // ── 4. Property type: category and kind, picked together ──────────────
     chips.add(SizedBox(width: 8.w));
     chips.add(_chip(
       context: context,
-      label: filter.isCommercial == null
-          ? 'Category'
-          : (filter.isCommercial! ? 'Commercial' : 'Residential'),
-      isActive: filter.isCommercial != null,
+      label: propertyTypeChipLabel(
+        isCommercial: filter.isCommercial,
+        typeName: filter.propertyTypeName,
+      ),
+      isActive: filter.isCommercial != null || filter.propertyTypeId != null,
       isDark: isDark,
-      onTap: () => _showCategorySheet(context, isDark),
+      onTap: () => _openPropertyTypeSheet(context),
     ));
 
-    // ── 5. Property Type ───────────────────────────────────────────────────
-    chips.add(SizedBox(width: 8.w));
-    chips.add(_chip(
-      context: context,
-      label: filter.propertyTypeName ?? 'Type',
-      isActive: filter.propertyTypeId != null,
-      isDark: isDark,
-      onTap: () => _showPropertyTypeSheet(context, isDark),
-    ));
-
-    // ── 6. Bedrooms ────────────────────────────────────────────────────────
+    // ── 5. Bedrooms ────────────────────────────────────────────────────────
     final bedsLabel = filter.bedrooms == null
         ? 'Beds'
         : '${filter.bedrooms} Bed${filter.bedrooms == 1 ? '' : 's'}';
@@ -114,7 +104,7 @@ class HomeFilterBar extends StatelessWidget {
       onTap: () => _showBedsSheet(context, isDark),
     ));
 
-    // ── 7. Price ───────────────────────────────────────────────────────────
+    // ── 6. Price ───────────────────────────────────────────────────────────
     final priceLabel = (filter.minPrice != null || filter.maxPrice != null)
         ? '${_fmt(filter.minPrice ?? _priceFloor)}-${_fmt(filter.maxPrice ?? _priceCeil)}'
         : 'Price';
@@ -127,7 +117,7 @@ class HomeFilterBar extends StatelessWidget {
       onTap: () => _showPriceSheet(context, isDark),
     ));
 
-    // ── 8. Bathrooms ───────────────────────────────────────────────────────
+    // ── 7. Bathrooms ───────────────────────────────────────────────────────
     final bathsLabel = filter.bathrooms == null
         ? 'Baths'
         : '${filter.bathrooms} Bath${filter.bathrooms == 1 ? '' : 's'}';
@@ -140,7 +130,7 @@ class HomeFilterBar extends StatelessWidget {
       onTap: () => _showBathsSheet(context, isDark),
     ));
 
-    // ── 9. Reset All Filters ───────────────────────────────────────────────
+    // ── 8. Reset All Filters ───────────────────────────────────────────────
     if (!filter.hasNoFacets) {
       chips.add(SizedBox(width: 12.w));
       chips.add(GestureDetector(
@@ -396,72 +386,6 @@ class HomeFilterBar extends StatelessWidget {
     );
   }
 
-  /// All / Residential / Commercial.
-  ///
-  /// Choosing a category drops a property type that belongs to the other one:
-  /// a type lives in exactly one category, so the pair would match nothing.
-  void _showCategorySheet(BuildContext context, bool isDark) {
-    FocusScope.of(context).unfocus(); // no filter needs the keyboard
-
-    void apply(BuildContext ctx, bool? isCommercial) {
-      var next = isCommercial == null
-          ? filter.cleared(category: true)
-          : filter.copyWith(isCommercial: isCommercial);
-      if (isCommercial != null && !_typeBelongsTo(filter, isCommercial)) {
-        next = next.cleared(propertyType: true);
-      }
-      onFilterChanged(next);
-      Navigator.of(ctx).pop();
-    }
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 32.h),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _handle(isDark),
-            SizedBox(height: 20.h),
-            _title('Property Category', isDark),
-            SizedBox(height: 20.h),
-            Row(
-              children: [
-                _optionTile('All', filter.isCommercial == null, isDark,
-                    () => apply(ctx, null)),
-                SizedBox(width: 12.w),
-                _optionTile('Residential', filter.isCommercial == false, isDark,
-                    () => apply(ctx, false)),
-                SizedBox(width: 12.w),
-                _optionTile('Commercial', filter.isCommercial == true, isDark,
-                    () => apply(ctx, true)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// True when the chosen property type sits in [isCommercial]'s category, or
-  /// when no type is chosen at all.
-  ///
-  /// Answered against the cached reference list, which carries every type's
-  /// category. An unknown id is left alone rather than cleared — better to
-  /// keep a selection the list simply hasn't loaded yet.
-  static bool _typeBelongsTo(PropertyFilter filter, bool isCommercial) {
-    final id = filter.propertyTypeId;
-    if (id == null) return true;
-    final match = CommonDataController.to.propertyTypes
-        .firstWhereOrNull((t) => t.id == id);
-    if (match == null || match.category.isEmpty) return true;
-    return match.category == (isCommercial ? 'commercial' : 'residential');
-  }
-
   /// Placeholder chips shown while the country list loads.
   ///
   /// Shaped like the real chips — same 20r pill, same height and run spacing,
@@ -605,118 +529,20 @@ class HomeFilterBar extends StatelessWidget {
     );
   }
 
-  void _showPropertyTypeSheet(BuildContext context, bool isDark) {
-    FocusScope.of(context).unfocus(); // no filter needs the keyboard
-    final common = CommonDataController.to;
-    common.loadPropertyTypes();
-
-    String? selId = filter.propertyTypeId;
-    String? selName = filter.propertyTypeName;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
-      ),
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: _handle(isDark)),
-              SizedBox(height: 20.h),
-              _title('Property Type', isDark),
-              SizedBox(height: 16.h),
-              Obx(() {
-                // Only the chosen category's types. Names repeat across the
-                // two — Villa, Building, Floor and Land each exist on both
-                // sides as separate records — so the full list showed chips
-                // that looked duplicated and picked different ids.
-                final types = filter.isCommercial == null
-                    ? common.propertyTypes
-                    : common.propertyTypes
-                        .where((t) =>
-                            t.category ==
-                            (filter.isCommercial!
-                                ? 'commercial'
-                                : 'residential'))
-                        .toList();
-                if (common.isLoadingPropertyTypes.value && types.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24.h),
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.primary),
-                    ),
-                  );
-                }
-                return Wrap(
-                  spacing: 8.w,
-                  runSpacing: 8.h,
-                  children: types.map((t) {
-                    final isSel = selId == t.id;
-                    return GestureDetector(
-                      onTap: () => setSheet(() {
-                        if (isSel) {
-                          selId = null;
-                          selName = null;
-                        } else {
-                          selId = t.id;
-                          selName = t.name;
-                        }
-                      }),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 16.w, vertical: 9.h),
-                        decoration: BoxDecoration(
-                          color: isSel ? AppColors.primary : Colors.transparent,
-                          borderRadius: BorderRadius.circular(20.r),
-                          border: Border.all(
-                            color: isSel
-                                ? AppColors.primary
-                                : isDark
-                                    ? Colors.grey.shade600
-                                    : Colors.grey.shade300,
-                          ),
-                        ),
-                        child: Text(
-                          t.name,
-                          style: GoogleFonts.poppins(
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.w400,
-                            color: isSel
-                                ? Colors.white
-                                : isDark
-                                    ? Colors.white70
-                                    : Colors.black87,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                );
-              }),
-              SizedBox(height: 20.h),
-              _applyBtn(() {
-                onFilterChanged(
-                  selId == null
-                      ? filter.cleared(propertyType: true)
-                      : filter.copyWith(
-                          propertyTypeId: selId,
-                          propertyTypeName: selName,
-                        ),
-                );
-                Navigator.of(ctx).pop();
-              }, isDark),
-              SizedBox(height: 20.h),
-            ],
+  /// Category and type in one sheet — see [showPropertyTypeSheet].
+  Future<void> _openPropertyTypeSheet(BuildContext context) async {
+    final picked = await showPropertyTypeSheet(
+      context,
+      isCommercial: filter.isCommercial,
+      typeId: filter.propertyTypeId,
+    );
+    if (picked == null) return; // dismissed
+    onFilterChanged(
+      filter.cleared(category: true, propertyType: true).copyWith(
+            isCommercial: picked.isCommercial,
+            propertyTypeId: picked.typeId,
+            propertyTypeName: picked.typeName,
           ),
-        ),
-      ),
     );
   }
 

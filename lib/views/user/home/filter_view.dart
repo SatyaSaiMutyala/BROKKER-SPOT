@@ -3,11 +3,11 @@ import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/core/services/active_dashboard.dart';
 import 'package:brokkerspot/models/property_filter_model.dart';
-import 'package:brokkerspot/models/property_type_model.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:brokkerspot/widgets/common/overlay_dropdown_field.dart';
 import 'package:brokkerspot/widgets/search/filter_pill_group.dart';
+import 'package:brokkerspot/widgets/common/property_type_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -38,7 +38,6 @@ class _FilterViewState extends State<FilterView> {
   static const double _priceCeil = 10000000; // 10M
 
   static const _propertyForOptions = ['All', 'Buy', 'Rent'];
-  static const _categoryOptions = ['All', 'Residential', 'Commercial'];
   static const _buyStatusOptions = ['Ready', 'Off Plan'];
   static const _rentPeriodOptions = ['Yearly', 'Monthly'];
   static const _countOptions = ['1', '2', '3', '4', '5+'];
@@ -225,34 +224,6 @@ class _FilterViewState extends State<FilterView> {
 
   // ── Selection handlers ───────────────────────────────────────────────────────
 
-  /// Switches Residential/Commercial and keeps the type chips honest.
-  ///
-  /// A type only belongs to one category, so a selection made under the other
-  /// one has to go — leaving it would send a `property_type_id` that cannot
-  /// co-exist with the category and always return nothing.
-  void _onCategoryChanged(String value) {
-    _updateAndCount(() {
-      _category = value;
-      if (_propertyTypeId != null &&
-          !_typesForCategory(value).any((t) => t.id == _propertyTypeId)) {
-        _propertyTypeId = null;
-        _propertyTypeName = null;
-      }
-    });
-  }
-
-  /// The reference list narrowed to [category].
-  ///
-  /// Names repeat across the two — the dev data carries a Villa, a Building, a
-  /// Floor and a Land on both sides, each its own record — so showing the full
-  /// list produced duplicate-looking chips that picked different ids.
-  List<PropertyTypeModel> _typesForCategory(String category) {
-    final all = _common.propertyTypes;
-    if (category == 'All') return all;
-    final wanted = category.toLowerCase();
-    return all.where((t) => t.category == wanted).toList();
-  }
-
   void _onPropertyForChanged(String value) {
     _updateAndCount(() {
       _propertyFor = value;
@@ -360,16 +331,20 @@ class _FilterViewState extends State<FilterView> {
                     ],
 
                     _divider(isDark),
-                    _section('Property Category'),
-                    FilterPillGroup(
-                      options: _categoryOptions,
-                      selected: _category,
-                      onSelect: _onCategoryChanged,
-                    ),
-
-                    _divider(isDark),
                     _section('Property Type'),
-                    _propertyTypeChips(isDark),
+                    PropertyTypePicker(
+                      isCommercial: _category == 'All'
+                          ? null
+                          : _category == 'Commercial',
+                      selectedTypeId: _propertyTypeId,
+                      onChanged: (picked) => _updateAndCount(() {
+                        _category = picked.isCommercial == null
+                            ? 'All'
+                            : (picked.isCommercial! ? 'Commercial' : 'Residential');
+                        _propertyTypeId = picked.typeId;
+                        _propertyTypeName = picked.typeName;
+                      }),
+                    ),
 
                     // ── Country / City / Area — hidden for now (not needed) ──
                     /*
@@ -547,74 +522,6 @@ class _FilterViewState extends State<FilterView> {
           color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFEDEDED),
         ),
       );
-
-  Widget _propertyTypeChips(bool isDark) {
-    return Obx(() {
-      final types = _typesForCategory(_category);
-      if (_common.isLoadingPropertyTypes.value && types.isEmpty) {
-        return SizedBox(
-          height: 40.h,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: SizedBox(
-              width: 20.w,
-              height: 20.w,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.primary),
-            ),
-          ),
-        );
-      }
-      return SizedBox(
-        height: 40.h,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.zero,
-          itemCount: types.length,
-          separatorBuilder: (_, __) => SizedBox(width: 10.w),
-          itemBuilder: (_, i) {
-            final t = types[i];
-            final isSelected = _propertyTypeId == t.id;
-            return GestureDetector(
-              onTap: () => _updateAndCount(() {
-                if (isSelected) {
-                  _propertyTypeId = null;
-                  _propertyTypeName = null;
-                } else {
-                  _propertyTypeId = t.id;
-                  _propertyTypeName = t.name;
-                }
-              }),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 18.w),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.primary
-                      : isDark
-                          ? const Color(0xFF2A2A2A)
-                          : const Color(0xFFF0EEE9),
-                  borderRadius: BorderRadius.circular(22.r),
-                ),
-                child: Text(
-                  t.name,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w500,
-                    color: isSelected
-                        ? Colors.white
-                        : isDark
-                            ? Colors.white70
-                            : Colors.black87,
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    });
-  }
 
   Widget _priceRange(bool isDark) {
     final borderColor = isDark ? Colors.grey.shade700 : Colors.grey.shade300;

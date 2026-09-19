@@ -192,15 +192,16 @@ class SocketService extends GetxService with WidgetsBindingObserver {
           return;
         }
         isConnected.value = true;
+        debugPrint('🔌 [Socket] connected, flushing ${_pending.length} queued emit(s)');
         _log('connected (${_socket!.id})  socket_user=${_uid(_socketToken)}');
         _flushPending();
       })
-      ..onDisconnect((_) {
+      ..onDisconnect((reason) {
         isConnected.value = false;
-        _log('disconnected');
+        debugPrint('🔌 [Socket] disconnected: $reason');
       })
-      ..onConnectError((e) => _log('connect_error: $e'))
-      ..onError((e) => _log('error: $e'))
+      ..onConnectError((e) => debugPrint('🔌 [Socket] connect_error: $e'))
+      ..onError((e) => debugPrint('🔌 [Socket] error: $e'))
       // Logs EVERY incoming event so you can see what the server pushes back.
       ..onAny((event, data) => _log('recv "$event" <- $data'));
 

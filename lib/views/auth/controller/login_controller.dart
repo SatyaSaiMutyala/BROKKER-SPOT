@@ -95,10 +95,13 @@ class LoginController extends GetxController {
           final currentRole = user.currentRole;
           final goBroker = currentRole == 2 ||
               (currentRole == 0 && LocalStorageService.getLastSide() == 'broker');
-          // Persist for the splash path (already-logged-in app re-opens).
-          await LocalStorageService.saveLastSide(goBroker ? 'broker' : 'user');
-          // Back to wherever a login prompt was raised, if one was.
-          LoginReturn.goToDashboardAfterLogin(goBroker: goBroker);
+          // Back to wherever a login prompt was raised, if one was — which
+          // may mean switching to the side the guest was browsing. Also
+          // persists the side it lands on for the splash path.
+          await LoginReturn.goToDashboardAfterLogin(
+            goBroker: goBroker,
+            accountRole: user.role,
+          );
         } else {
           AppToast.error(loginModel.message);
         }

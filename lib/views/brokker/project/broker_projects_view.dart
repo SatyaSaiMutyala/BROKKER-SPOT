@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/utils/proposal_badge.dart';
 import 'package:brokkerspot/core/services/login_return.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
@@ -446,6 +447,15 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                   // guest has none at all — without the guard every card would
                   // read New Opportunity to someone who cannot act on it.
                   showProposalBadge: !widget.showMineOnly && !_isGuest,
+                  // On the broker's own list: the contract behind a listing
+                  // they published for an owner. Their own listings get
+                  // nothing and keep FOR SELL / FOR RENT.
+                  statusBadge: widget.showMineOnly
+                      ? contractBadgeFor(
+                          brokeredForOwner: a.isBrokeredForOwner,
+                          status: a.statusCode,
+                        )
+                      : null,
                   onTap: () => Get.to(
                       () => BrokerAnnouncementDetailView(announcement: a)),
                 );
