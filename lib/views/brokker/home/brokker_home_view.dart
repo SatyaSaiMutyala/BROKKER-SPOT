@@ -1,4 +1,8 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/constants/app_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:brokkerspot/views/brokker/home/controller/broker_dashboard_controller.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/dashboard/bottom_nav_controller.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
@@ -25,15 +29,7 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
   final _profileCtrl = Get.put(ProfileController());
   final _notificationCtrl = NotificationListController.to;
 
-  // TODO: replace with the real dashboard-stats API response once available.
-  final int _leadsOwn = 25;
-  final int _leadsUser = 2;
-  final int _storyOwn = 5;
-  final int _storyUser = 12;
-  final int _announcementOwn = 4;
-  final int _announcementUser = 8;
-  final int _commissionReceived = 2;
-  final int _commissionPending = 3;
+  final _dashboardCtrl = BrokerDashboardController.to;
 
   static const _stories = [
     {'name': 'Brokkerspot', 'image': 'assets/images/brocker-icon.png'},
@@ -48,6 +44,7 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
     super.initState();
     // Cache-first; powers the bell badge.
     _notificationCtrl.load();
+    _dashboardCtrl.load();
   }
 
   @override
@@ -135,59 +132,147 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
   }
 
   // ─── GRID CARDS ───
+  ///
+  /// The counters from `user/dashboard`. Nothing yet and still loading shows
+  /// the cards as shimmer; nothing and a failure shows a retry, since empty
+  /// cards would read as "you have no deals" rather than "this didn't load".
   Widget _buildGridCards() {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: StatInfoCard(
-                  title: 'LEADS',
-                  rows: [
-                    StatInfoCardRow(value: '$_leadsOwn', label: 'OWN'),
-                    StatInfoCardRow(value: '$_leadsUser', label: 'USER'),
-                  ],
+      child: Obx(() {
+        final stats = _dashboardCtrl.stats.value;
+        if (stats == null) {
+          return _dashboardCtrl.error.value != null
+              ? _buildStatsRetry()
+              : _buildStatsShimmer();
+        }
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: StatInfoCard(
+                    title: 'DEALS',
+                    rows: [
+                      StatInfoCardRow(
+                          value: '${stats.dealsSeen}', label: 'SEEN'),
+                      StatInfoCardRow(
+                          value: '${stats.dealsUnseen}', label: 'UNSEEN'),
+                    ],
+                  ),
                 ),
-              ),
-              SizedBox(width: 10.w),
-              Expanded(
-                child: StatInfoCard(
-                  title: 'STORY',
-                  rows: [
-                    StatInfoCardRow(value: '$_storyOwn', label: 'OWN'),
-                    StatInfoCardRow(value: '$_storyUser', label: 'USER'),
-                  ],
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: StatInfoCard(
+                    title: 'PROPOSALS',
+                    rows: [
+                      StatInfoCardRow(
+                          value: '${stats.proposalsPending}', label: 'PENDING'),
+                      StatInfoCardRow(
+                          value: '${stats.proposalsAccepted}',
+                          label: 'ACCEPTED'),
+                    ],
+                  ),
                 ),
+              ],
+            ),
+            SizedBox(height: 10.h),
+            Row(
+              children: [
+                Expanded(
+                  child: StatInfoCard(
+                    title: 'CONTRACTS',
+                    rows: [
+                      StatInfoCardRow(
+                          value: '${stats.contractsUserSigned}',
+                          label: 'SIGNED'),
+                      StatInfoCardRow(
+                          value: '${stats.contractsBrokerSigned}',
+                          label: 'PUBLISHED'),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: StatInfoCard(
+                    title: 'CANCELLATIONS',
+                    rows: [
+                      StatInfoCardRow(
+                          value: '${stats.cancellationsRequested}',
+                          label: 'REQUESTED'),
+                      StatInfoCardRow(
+                          value: '${stats.cancellationsCancelled}',
+                          label: 'CANCELLED'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  /// Four cards' worth of shimmer, the same size and spacing as the real
+  /// grid, so nothing shifts when the numbers land.
+  Widget _buildStatsShimmer() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    Widget block() => Expanded(
+          child: Shimmer.fromColors(
+            baseColor: isDark ? const Color(0xFF242833) : Colors.grey.shade200,
+            highlightColor:
+                isDark ? const Color(0xFF2F3440) : Colors.grey.shade100,
+            child: Container(
+              height: 141.h,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF242833) : Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
               ),
-            ],
+            ),
           ),
-          SizedBox(height: 10.h),
-          Row(
-            children: [
-              Expanded(
-                child: StatInfoCard(
-                  title: 'ANNOUNCEMENTS',
-                  rows: [
-                    StatInfoCardRow(value: '$_announcementOwn', label: 'OWN'),
-                    StatInfoCardRow(value: '$_announcementUser', label: 'USER'),
-                  ],
-                ),
+        );
+
+    return Column(
+      children: [
+        Row(children: [block(), SizedBox(width: 10.w), block()]),
+        SizedBox(height: 10.h),
+        Row(children: [block(), SizedBox(width: 10.w), block()]),
+      ],
+    );
+  }
+
+  Widget _buildStatsRetry() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: 141.h,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF242833) : Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "Couldn't load your dashboard",
+            style: GoogleFonts.poppins(
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          GestureDetector(
+            onTap: () => _dashboardCtrl.load(force: true),
+            child: Text(
+              'Retry',
+              style: GoogleFonts.poppins(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
               ),
-              SizedBox(width: 10.w),
-              Expanded(
-                child: StatInfoCard(
-                  title: 'COMMISSION',
-                  rows: [
-                    StatInfoCardRow(
-                        value: '$_commissionReceived', label: 'RECEIVED'),
-                    StatInfoCardRow(
-                        value: '$_commissionPending', label: 'PENDING'),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),

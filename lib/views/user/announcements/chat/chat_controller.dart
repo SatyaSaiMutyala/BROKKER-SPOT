@@ -172,6 +172,8 @@ class ChatController extends GetxController {
       ..on(ChatEvents.proposalStatusUpdateError, _onProposalStatusUpdateError)
       ..on(ChatEvents.proposalBrokerAccept, _onProposalStatus)
       ..on(ChatEvents.proposalBrokerAcceptError, _onProposalIgnore)
+      ..on(ChatEvents.proposalAgreement, _onProposalAgreement)
+      ..on(ChatEvents.proposalAgreementError, _onProposalAgreementError)
       ..on(ChatEvents.announcementPublish, _onAnnouncementPublished)
       ..on(ChatEvents.agreementCancel, _onAgreementCancel)
       ..on(ChatEvents.agreementCancelError, _onAgreementCancelError)
@@ -595,6 +597,66 @@ class ChatController extends GetxController {
   static bool debugIsContractLimitMessage(String message) =>
       _isContractLimitMessage(message);
 
+  /// Feeds a `announcement:proposal:agreement` reply through, as the socket
+  /// would.
+  @visibleForTesting
+  void debugHandleAgreement(dynamic data) => _onProposalAgreement(data);
+
+  @visibleForTesting
+  void debugHandleAgreementError(dynamic data) =>
+      _onProposalAgreementError(data);
+
+  // ── Agreement document ──
+  Completer<String?>? _agreementRequest;
+  Timer? _agreementTimeout;
+
+  /// Asks the server for this proposal's agreement url and resolves with it.
+  ///
+  /// Signing does not produce the document there and then: the server answers
+  /// straight away and renders the PDF afterwards, so the url it returned at
+  /// that moment still points at the copy without the new signature. This
+  /// reads the proposal again, which is where the finished document lands.
+  ///
+  /// Falls back to the url already held — on error, on timeout, or when the
+  /// proposal id isn't known — so the button always has something to open.
+  Future<String?> requestAgreementUrl() {
+    final id = proposalId.value;
+    if (id == null || id.isEmpty) return Future.value(agreementUrl.value);
+
+    final inFlight = _agreementRequest;
+    if (inFlight != null && !inFlight.isCompleted) return inFlight.future;
+
+    final completer = Completer<String?>();
+    _agreementRequest = completer;
+    _agreementTimeout = Timer(
+      const Duration(seconds: 6),
+      () => _completeAgreementRequest(agreementUrl.value),
+    );
+    _socket.emit(ChatEvents.proposalAgreement, {'proposal_id': id});
+    return completer.future;
+  }
+
+  void _onProposalAgreement(dynamic data) {
+    if (data is! Map) return;
+    final map = Map<String, dynamic>.from(data);
+    final url = map['agreement_url']?.toString();
+    if (url != null && url.isNotEmpty) agreementUrl.value = url;
+    _completeAgreementRequest(agreementUrl.value);
+  }
+
+  void _onProposalAgreementError(dynamic data) {
+    debugPrint('❌ [Chat] agreement url failed: ${_msg(data)}');
+    _completeAgreementRequest(agreementUrl.value);
+  }
+
+  void _completeAgreementRequest(String? url) {
+    _agreementTimeout?.cancel();
+    _agreementTimeout = null;
+    final completer = _agreementRequest;
+    _agreementRequest = null;
+    if (completer != null && !completer.isCompleted) completer.complete(url);
+  }
+
   void approveProposal() {
     _socket.emit(ChatEvents.proposalStatusUpdate, {
       'announcement_id': announcementId,
@@ -748,6 +810,7 @@ class ChatController extends GetxController {
     if (Get.isRegistered<IndicatorController>()) {
       IndicatorController.to.refreshSoon();
     }
+    _completeAgreementRequest(agreementUrl.value);
     _typingTimer?.cancel();
     _historyTimeout?.cancel();
     _historyConnectWorker?.dispose();
@@ -763,6 +826,8 @@ class ChatController extends GetxController {
       ..off(ChatEvents.proposalStatusUpdateError, _onProposalIgnore)
       ..off(ChatEvents.proposalBrokerAccept, _onProposalStatus)
       ..off(ChatEvents.proposalBrokerAcceptError, _onProposalIgnore)
+      ..off(ChatEvents.proposalAgreement, _onProposalAgreement)
+      ..off(ChatEvents.proposalAgreementError, _onProposalAgreementError)
       // Was registered in onInit but never removed — now that listeners
       // survive a socket rebuild, a leaked one would outlive every chat this
       // session opens instead of dying with its socket.

@@ -282,17 +282,24 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 0),
       child: Row(
         children: [
-          Text(
-            'Announcements',
-            style: GoogleFonts.poppins(
-              fontSize: 20.sp,
-              fontWeight: FontWeight.w500,
-              color: theme.colorScheme.onSurface,
-              height: 1.0,
-              letterSpacing: 0,
+          // Expanded rather than a Text plus a Spacer: the title is long
+          // enough that sharing the row's free space with a Spacer would
+          // clip it on a narrow device. This way it takes what it needs and
+          // the create icon stays pinned to the end.
+          Expanded(
+            child: Text(
+              'Business Announcements',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: 20.sp,
+                fontWeight: FontWeight.w500,
+                color: theme.colorScheme.onSurface,
+                height: 1.0,
+                letterSpacing: 0,
+              ),
             ),
           ),
-          const Spacer(),
           // GestureDetector(
           //   onTap: () => Get.to(() => const SearchView()),
           //   behavior: HitTestBehavior.opaque,

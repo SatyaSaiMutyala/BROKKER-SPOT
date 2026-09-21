@@ -23,6 +23,9 @@ class ApiEndpoints {
   /// Another user's public profile. Append `/{user_id}`.
   static const String getUserById = 'user/profile/get-user';
 
+  /// Broker-only counters for the broker home screen.
+  static const String brokerDashboard = 'user/dashboard';
+
   // Help requests — the same body either way; the guest route is for the
   // Need Help screen reached from Welcome, before anyone has signed in.
   static const String submitHelpRequest = 'user/help-requests/submit';
@@ -39,6 +42,10 @@ class ApiEndpoints {
   static const String fetchAnnouncements = 'user/announcements/fetch';
   static const String fetchAnnouncementDetail = 'user/announcements/fetch';
   static const String fetchAllAnnouncements = 'user/announcements/fetch-all';
+
+  /// Just the images of one person's listings — the grid on their profile.
+  static const String fetchAnnouncementsMedia =
+      'user/announcements/fetch-media';
   static const String sendProposal = 'user/announcements/sent-proposal';
   static const String fetchProposals = 'user/announcements/fetch-proposals';
   static const String addToWishlist = 'user/announcements/wishlist/add';

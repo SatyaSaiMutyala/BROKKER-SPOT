@@ -1081,6 +1081,7 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           counterpartyName: widget.brokerName,
           counterpartyAvatar: widget.brokerAvatar,
           onRefreshStatus: _chat.refreshProposal,
+          onFetchAgreementUrl: _chat.requestAgreementUrl,
           acceptAndPublish: acceptAndPublish,
         ));
   }

@@ -154,7 +154,10 @@ class HomeAnnouncementCard extends StatelessWidget {
     final a = announcement;
     final imgCount = a.imageUrls?.length ?? 0;
     final proposalBadge = showProposalBadge
-        ? proposalBadgeFor(a.myProposalStatus)
+        ? feedBadgeFor(
+            proposalStatus: a.myProposalStatus,
+            isViewed: a.isViewed,
+          )
         : statusBadge;
 
     final imageCardHeight = cardHeight ?? 263.h;

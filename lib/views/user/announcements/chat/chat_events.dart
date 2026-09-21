@@ -79,6 +79,16 @@ class ChatEvents {
   /// The proposal sits at status 5 until `cancellation_expires_at`, at which
   /// point a server cron moves it to 6 and takes the listing down. Only a
   /// proposal at status 4 (published) can be cancelled.
+  // ── Agreement document ──
+  /// FE → BE: { proposal_id }. BE → FE: { _id, announcement_id,
+  /// agreement_url } — read fresh, so it carries the signed copy once the
+  /// server has finished making it.
+  static const String proposalAgreement = 'announcement:proposal:agreement';
+
+  /// BE → FE. Payload: { message }
+  static const String proposalAgreementError =
+      'announcement:proposal:agreement:error';
+
   static const String agreementCancel = 'announcement:agreement:cancel';
   static const String agreementCancelError =
       'announcement:agreement:cancel:error';

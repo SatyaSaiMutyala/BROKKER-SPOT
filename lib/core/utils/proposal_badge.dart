@@ -56,43 +56,67 @@ ProposalBadge? contractBadgeFor({
   );
 }
 
-/// The badge for a proposal [status], or null when there is nothing to show.
+/// The badge on a broker feed card: where this broker stands on the listing.
 ///
-/// No proposal yet (null) is a New Opportunity. The design's "Not Viewed" line
-/// is left off: it needs to know whether the broker has opened the listing,
-/// and the backend does not record that — so the badge stays until they send
-/// a proposal, opened or not.
+/// [proposalStatus] is their own proposal (`proposal_details.status`), null
+/// when they have not sent one; [isViewed] is the server's `is_viewed` for
+/// this listing, recorded the first time they open its detail screen.
 ///
-/// Null covers the states the design has no badge for: 2 (rejected by the
-/// owner), 5 (cancellation requested), 6 (cancelled).
+/// The wording follows the design; the states are the server's, and they are
+/// not always the same thing. Signatures in particular: the owner's approval
+/// IS their signature (status 1), which leaves the broker's own signature
+/// outstanding — so 1 is what reads "Mediate to Sign", and 3, the broker's
+/// signature, is the point where both sides have agreed.
 ///
-/// Published (4) reads as signed: a broker can only publish a proposal that
-/// has already reached 3, so the contract is signed either way.
-ProposalBadge? proposalBadgeFor(int? status) {
-  switch (status) {
+/// Null for a rejected proposal (2), which the design has no badge for.
+ProposalBadge? feedBadgeFor({int? proposalStatus, bool? isViewed}) {
+  switch (proposalStatus) {
     case null:
-      return const ProposalBadge(
+      return ProposalBadge(
         title: 'NEW OPPORTUNITY',
-        color: Color(0xFF2E8B22),
+        // Off an older listing the server has no view record for, this reads
+        // "Unseen" — which is what it means: not opened since views began.
+        subtitle: isViewed == true ? 'Seen' : 'Unseen',
+        color: const Color(0xFF1FA02A),
       );
     case 0:
       return const ProposalBadge(
-        title: 'PROPOSAL SENT',
-        subtitle: 'Awaiting Owner Response',
-        color: Color(0xFFC9A23A),
+        title: 'SENT PROPOSAL',
+        subtitle: 'Awaiting',
+        color: Color(0xFFE0A21B),
       );
     case 1:
+      // The owner has signed; the broker's signature is the one outstanding.
       return const ProposalBadge(
-        title: 'MANDATE TO SIGN',
-        subtitle: 'Offer Accepted',
-        color: Color(0xFF8B4A1C),
+        title: 'MEDIATE TO SIGN',
+        subtitle: 'Pending',
+        color: Color(0xFF8B2FE8),
       );
     case 3:
+      // Both sides signed. Publishing is what is left.
+      return const ProposalBadge(
+        title: 'ACCEPTED PROPOSAL',
+        subtitle: 'Confirmed',
+        color: Color(0xFF1E7BE8),
+      );
     case 4:
       return const ProposalBadge(
         title: 'CONTRACT SIGNED',
-        subtitle: 'Deal Started',
-        color: Color(0xFF0B3A8C),
+        subtitle: 'Published',
+        color: Color(0xFF1A3D9E),
+      );
+    case 5:
+      // The owner asked to cancel; the 48-hour window is still open.
+      return const ProposalBadge(
+        title: 'PENDING CANCELLATION',
+        subtitle: '48h Pending',
+        color: Color(0xFFF26A1B),
+      );
+    case 6:
+      return const ProposalBadge(
+        title: 'CANCELLED',
+        subtitle: 'Closed',
+        color: Color(0xFFF5254A),
       );
     default:
       return null;

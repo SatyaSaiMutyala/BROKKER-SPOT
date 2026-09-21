@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:brokkerspot/core/common_widget/full_screen_image_view.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/user_profile_model.dart';
+import 'package:brokkerspot/views/user/profile/profile_announcements_view.dart';
+import 'package:brokkerspot/widgets/profile/profile_announcement_grid.dart';
 import 'package:brokkerspot/views/user/profile/controller/user_profile_controller.dart';
 import 'package:brokkerspot/widgets/common/custom_header.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -11,6 +13,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/views/user/account/account_view.dart';
 
 /// Read-only profile of *another* user, loaded from
 /// `GET /user/profile/get-user/:id`.
@@ -53,6 +57,14 @@ class UserProfileView extends StatefulWidget {
     bool? viewAsBroker,
   }) async {
     if (userId == null || userId.isEmpty) return;
+    // Both this screen's endpoints are behind the access token, so a guest
+    // would only reach an error. Ask them to log in instead, and bring them
+    // back here afterwards.
+    if (!LocalStorageService.isLoggedIn()) {
+      final context = Get.context;
+      if (context != null) showLoginRequiredDialog(context);
+      return;
+    }
     await Get.to(
       () => UserProfileView(
         userId: userId,
@@ -107,7 +119,10 @@ class _UserProfileViewState extends State<UserProfileView> {
       Get.delete<UserProfileController>(tag: _tag, force: true);
     }
     _controller = Get.put(
-      UserProfileController(userId: widget.userId),
+      UserProfileController(
+        userId: widget.userId,
+        viewAsBroker: widget.viewAsBroker,
+      ),
       tag: _tag,
     );
   }
@@ -202,8 +217,97 @@ class _UserProfileViewState extends State<UserProfileView> {
                 : 'Not added yet',
             isDark,
           ),
+          _buildAnnouncements(controller, isDark),
         ],
       ),
+    );
+  }
+
+  // ── All Announcement ────────────────────────────────────────────────────
+
+  /// Their listings, as a grid of photos.
+  ///
+  /// Left out entirely when they have none — an empty "All Announcement"
+  /// heading on a profile says nothing worth the space. The first
+  /// [UserProfileController.previewCount] are shown here; "More" opens the
+  /// rest.
+  Widget _buildAnnouncements(
+    UserProfileController controller,
+    bool isDark,
+  ) {
+    return Obx(() {
+      final all = controller.announcements;
+      if (all.isEmpty) {
+        if (!controller.announcementsLoading.value) {
+          return const SizedBox.shrink();
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 24.h),
+            _buildSectionHeading('All Announcement', isDark, onMore: null),
+            SizedBox(height: 12.h),
+            ProfileAnnouncementGridShimmer(isDark: isDark),
+          ],
+        );
+      }
+
+      final preview =
+          all.take(UserProfileController.previewCount).toList(growable: false);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 24.h),
+          _buildSectionHeading(
+            'All Announcement',
+            isDark,
+            onMore:
+                controller.hasMoreAnnouncements || all.length > preview.length
+                    ? () => ProfileAnnouncementsView.open(
+                          controller,
+                          'All Announcement',
+                        )
+                    : null,
+          ),
+          SizedBox(height: 12.h),
+          ProfileAnnouncementGrid(announcements: preview, isDark: isDark),
+        ],
+      );
+    });
+  }
+
+  /// A section title with an optional "More" on the right.
+  Widget _buildSectionHeading(
+    String title,
+    bool isDark, {
+    VoidCallback? onMore,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        if (onMore != null)
+          GestureDetector(
+            onTap: onMore,
+            behavior: HitTestBehavior.opaque,
+            child: Text(
+              'More',
+              style: GoogleFonts.poppins(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+          ),
+      ],
     );
   }
 

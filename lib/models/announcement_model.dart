@@ -242,6 +242,11 @@ class AnnouncementModel {
   /// a new broker on until one of them is cancelled.
   final int? publishedCount;
 
+  /// Whether the signed-in account has opened this listing before, for the
+  /// side it is browsing from (`is_viewed`). Sent on the feed; the server
+  /// records the view when the detail screen fetches the listing.
+  final bool? isViewed;
+
   /// This broker's own proposal on the listing — 0 pending, 1 approved by the
   /// owner, 2 rejected, 3 signed by the broker, 4 published, 5 cancellation
   /// requested, 6 cancelled. Null when they have not sent one.
@@ -336,6 +341,7 @@ class AnnouncementModel {
     this.isOwner,
     this.isProposalSent,
     this.myProposalStatus,
+    this.isViewed,
     this.publishedCount,
     this.isChatAvailable,
     this.userRole,
@@ -481,6 +487,7 @@ class AnnouncementModel {
       isOwner: json['is_owner'] as bool?,
       isProposalSent: json['is_proposal_sent'] as bool?,
       publishedCount: (json['published_count'] as num?)?.toInt(),
+      isViewed: json['is_viewed'] as bool?,
       myProposalStatus: json['proposal_details'] is Map
           ? ((json['proposal_details'] as Map)['status'] as num?)?.toInt()
           : null,

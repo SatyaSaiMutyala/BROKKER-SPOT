@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 
 /// Middle screen between the Meeting list and 1:1 chat.
 ///
@@ -171,6 +172,15 @@ class _AnnouncementConversationsViewState
             return ConversationTile(
               conversation: c,
               onTap: () => _openChat(c),
+              // This list is the owner's, so the person on every row is a
+              // broker on their listing.
+              onAvatarTap: () => UserProfileView.open(
+                userId: c.user.id,
+                name: c.user.name,
+                avatarUrl:
+                    c.user.brokerProfileImageUrl ?? c.user.profileImageUrl,
+                viewAsBroker: true,
+              ),
             );
           },
         ),
@@ -182,11 +192,15 @@ class _AnnouncementConversationsViewState
     final peer = c.user;
     final peerId = peer.id ?? '';
     final myId = LocalStorageService.getUserIdFromToken() ??
-        LocalStorageService.getUser()?.data?.id ?? '';
+        LocalStorageService.getUser()?.data?.id ??
+        '';
 
-    debugPrint('💬 [Conversations] _openChat ann=${widget.meeting.announcementId}');
-    debugPrint('💬 [Conversations]   myId=$myId  peerId=$peerId  peerName=${peer.name}');
-    debugPrint('💬 [Conversations]   ann.userId=${widget.meeting.announcement.userId}');
+    debugPrint(
+        '💬 [Conversations] _openChat ann=${widget.meeting.announcementId}');
+    debugPrint(
+        '💬 [Conversations]   myId=$myId  peerId=$peerId  peerName=${peer.name}');
+    debugPrint(
+        '💬 [Conversations]   ann.userId=${widget.meeting.announcement.userId}');
 
     if (peerId.isEmpty) {
       debugPrint('💬 [Conversations]   ✗ peerId empty, aborting');
@@ -224,5 +238,4 @@ class _AnnouncementConversationsViewState
     await Future.delayed(const Duration(milliseconds: 350));
     if (mounted) _ctrl.reload();
   }
-
 }

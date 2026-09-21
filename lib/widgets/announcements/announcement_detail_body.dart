@@ -23,6 +23,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main body widget
@@ -1008,46 +1009,63 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
     final avatar = broker.brokerProfileImage;
     final name = (broker.name ?? '').trim();
 
+    // Photo and name open the broker; the chat circle on the right keeps
+    // its own tap, so neither swallows the other.
+    void openProfile() => UserProfileView.open(
+          userId: broker.brokerId,
+          name: broker.name,
+          avatarUrl: avatar,
+          viewAsBroker: true,
+        );
+
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8.h),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 24.r,
-            backgroundColor:
-                isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED),
-            backgroundImage: (avatar != null && avatar.trim().isNotEmpty)
-                ? CachedNetworkImageProvider(avatar)
-                : null,
-            child: (avatar == null || avatar.trim().isEmpty)
-                ? Icon(Icons.person, size: 22.sp, color: subColor)
-                : null,
+          GestureDetector(
+            onTap: openProfile,
+            behavior: HitTestBehavior.opaque,
+            child: CircleAvatar(
+              radius: 24.r,
+              backgroundColor:
+                  isDark ? const Color(0xFF252525) : const Color(0xFFEDEDED),
+              backgroundImage: (avatar != null && avatar.trim().isNotEmpty)
+                  ? CachedNetworkImageProvider(avatar)
+                  : null,
+              child: (avatar == null || avatar.trim().isEmpty)
+                  ? Icon(Icons.person, size: 22.sp, color: subColor)
+                  : null,
+            ),
           ),
           SizedBox(width: 12.w),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name.isEmpty ? 'Broker' : name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w500,
-                    color: textColor,
+            child: GestureDetector(
+              onTap: openProfile,
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name.isEmpty ? 'Broker' : name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
                   ),
-                ),
-                SizedBox(height: 3.h),
-                Text(
-                  'Sign Contract ${_signedAgo(broker)}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w300,
-                    color: subColor,
+                  SizedBox(height: 3.h),
+                  Text(
+                    'Sign Contract ${_signedAgo(broker)}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w300,
+                      color: subColor,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           if (widget.onBrokerChatTap != null) ...[

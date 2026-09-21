@@ -10,10 +10,16 @@ class ConversationTile extends StatelessWidget {
   final ConversationItem conversation;
   final VoidCallback onTap;
 
+  /// Tapping the photo opens the broker rather than the conversation. Its own
+  /// gesture, inside the row's: a tap landing on the avatar goes here, and
+  /// everywhere else on the row still opens the chat.
+  final VoidCallback? onAvatarTap;
+
   const ConversationTile({
     super.key,
     required this.conversation,
     required this.onTap,
+    this.onAvatarTap,
   });
 
   @override
@@ -35,24 +41,28 @@ class ConversationTile extends StatelessWidget {
         child: Row(
           children: [
             // Avatar with gold border
-            Container(
-              width: 54.w,
-              height: 54.w,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.goldAccent, width: 1.5),
-              ),
-              child: ClipOval(
-                child: url.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: url,
-                        fit: BoxFit.cover,
-                        fadeInDuration: Duration.zero,
-                        placeholderFadeInDuration: Duration.zero,
-                        errorWidget: (_, __, ___) => _avatarFallback(isDark),
-                        placeholder: (_, __) => _avatarFallback(isDark),
-                      )
-                    : _avatarFallback(isDark),
+            GestureDetector(
+              onTap: onAvatarTap,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 54.w,
+                height: 54.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.goldAccent, width: 1.5),
+                ),
+                child: ClipOval(
+                  child: url.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: url,
+                          fit: BoxFit.cover,
+                          fadeInDuration: Duration.zero,
+                          placeholderFadeInDuration: Duration.zero,
+                          errorWidget: (_, __, ___) => _avatarFallback(isDark),
+                          placeholder: (_, __) => _avatarFallback(isDark),
+                        )
+                      : _avatarFallback(isDark),
+                ),
               ),
             ),
             SizedBox(width: 14.w),

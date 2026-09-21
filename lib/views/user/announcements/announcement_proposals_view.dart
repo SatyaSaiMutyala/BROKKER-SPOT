@@ -9,6 +9,7 @@ import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 
 class AnnouncementProposalsView extends StatefulWidget {
   final List<ProposalBroker> proposals;
@@ -396,8 +397,20 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
                                   horizontal: 20.w, vertical: 14.h),
                               child: Row(
                                 children: [
-                                  // Avatar with gold border
-                                  _avatar(b.brokerProfileImage, isDark),
+                                  // Avatar with gold border. Its own tap:
+                                  // the row itself opens the proposal, the
+                                  // photo opens the broker behind it.
+                                  GestureDetector(
+                                    onTap: () => UserProfileView.open(
+                                      userId: b.brokerId,
+                                      name: b.name,
+                                      avatarUrl: b.brokerProfileImage,
+                                      viewAsBroker: true,
+                                    ),
+                                    behavior: HitTestBehavior.opaque,
+                                    child:
+                                        _avatar(b.brokerProfileImage, isDark),
+                                  ),
                                   SizedBox(width: 14.w),
                                   // Name + time
                                   Expanded(

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
+import 'package:brokkerspot/views/brokker/home/controller/broker_dashboard_controller.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
@@ -120,6 +121,11 @@ class NotificationService {
   @visibleForTesting
   static bool debugClaimMessage(String? messageId) => _claimMessage(messageId);
 
+  /// Whether a notification of this type opens an announcement — the gate on
+  /// the cold-start prefetch and on taps from the in-app list.
+  @visibleForTesting
+  static bool debugOpensAnnouncement(String? type) => _opensAnnouncement(type);
+
   @visibleForTesting
   static void debugTapFromSystem(RemoteMessage message) =>
       _onTapFromSystem(message);
@@ -158,6 +164,10 @@ class NotificationService {
 
   static const _announcementTypes = {
     'chat_message',
+    // The agreement cancellation flow, all three addressed to the broker.
+    'agreement_cancellation_requested',
+    'agreement_cancellation_withdrawn',
+    'agreement_cancelled',
     'announcement_approved',
     'announcement_rejected',
     'property_published',
@@ -398,6 +408,28 @@ class NotificationService {
     }
   }
 
+  /// Flags the broker feed when an agreement changes: its cards carry the
+  /// proposal's state — Pending Cancellation, Cancelled — so the badge is
+  /// wrong until the list is asked again.
+  static void _markBrokerFeedStaleIfAgreementChanged(RemoteMessage message) {
+    const agreementTypes = {
+      'agreement_cancellation_requested',
+      'agreement_cancellation_withdrawn',
+      'agreement_cancelled',
+      'proposal_accepted',
+    };
+    if (!agreementTypes.contains(message.data['type']?.toString())) return;
+    try {
+      AnnouncementListController.to.markBrokerStale();
+      // The same events move the broker home counters.
+      if (Get.isRegistered<BrokerDashboardController>()) {
+        BrokerDashboardController.to.invalidate();
+      }
+    } catch (e) {
+      debugPrint('⚠️ Could not flag the broker feed after push: $e');
+    }
+  }
+
   static void _onForegroundMessage(RemoteMessage message) {
     debugPrint('🔔 Foreground message received');
     // Before the iOS early-return below, so both platforms update the badge.
@@ -405,6 +437,7 @@ class NotificationService {
     _markFeedStaleIfNewListing(message);
     _markMeetingsStaleIfChat(message);
     _markMineStaleIfOwnerStatusChanged(message);
+    _markBrokerFeedStaleIfAgreementChanged(message);
     if (Platform.isIOS) return; // iOS shows it natively via Firebase options.
 
     final notification = message.notification;
@@ -459,11 +492,18 @@ class NotificationService {
   static Future<void> _handleNotificationData(Map<String, dynamic> data) async {
     final type = data['type']?.toString();
     final announcementId = data['announcement_id']?.toString();
-    debugPrint('🔔 Notification tapped — type=$type announcement_id=$announcementId');
+    debugPrint(
+        '🔔 Notification tapped — type=$type announcement_id=$announcementId');
     if (type == null) return;
 
     switch (type) {
       case 'chat_message':
+      // The agreement's own chat is where its state is: the cancellation
+      // banner, the 48-hour countdown and the way into the contract. All
+      // three of these go to the broker, about an owner's listing.
+      case 'agreement_cancellation_requested':
+      case 'agreement_cancellation_withdrawn':
+      case 'agreement_cancelled':
         if (announcementId == null || announcementId.isEmpty) return;
         await _openChatFromNotification(announcementId, data);
         break;
@@ -532,13 +572,20 @@ class NotificationService {
     String? peerAvatar;
     String? peerName;
 
-    final peerUserId = data['sender_user_id']?.toString();
+    var peerUserId = data['sender_user_id']?.toString();
 
     try {
       final a = await _fetchAnnouncement(announcementId);
       if (a == null) return;
       isOwnerHere = a.isOwner;
       side = _sideForViewer(a);
+
+      // Only a chat message names its sender. The agreement notifications
+      // don't, so the other side of the conversation is read off the
+      // listing: whoever posted it, when that isn't this account.
+      if ((peerUserId == null || peerUserId.isEmpty) && a.isOwner != true) {
+        peerUserId = a.userId;
+      }
 
       // Pull the counterparty's profile image from the proposal list.
       // When the viewer is the owner, the peer is the broker — their
@@ -594,8 +641,8 @@ class NotificationService {
       await _ensureSide(wantBroker: !isOwnerHere);
     }
 
-    final senderName = peerName ??
-        _extractChatSenderName(data['_title']?.toString()) ?? '';
+    final senderName =
+        peerName ?? _extractChatSenderName(data['_title']?.toString()) ?? '';
     await AnnouncementChatView.open(
       announcementId: announcementId,
       brokerName: senderName,

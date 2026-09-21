@@ -1,6 +1,7 @@
 import 'package:brokkerspot/core/controllers/common_data_controller.dart';
 import 'package:brokkerspot/core/controllers/indicator_controller.dart';
 import 'package:brokkerspot/core/services/announcement_cache.dart';
+import 'package:brokkerspot/views/brokker/home/controller/broker_dashboard_controller.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
@@ -48,6 +49,9 @@ Future<void> clearUserSession() async {
       ..stopListening()
       ..clear();
   }
+  if (Get.isRegistered<BrokerDashboardController>()) {
+    BrokerDashboardController.to.clear();
+  }
   SocketService.to.shutdown();
   await AnnouncementCache.clear();
 }
@@ -79,6 +83,10 @@ Future<void> clearRoleScopedCache() async {
   }
   if (Get.isRegistered<PropertySearchController>()) {
     PropertySearchController.to.clearAll();
+  }
+  // Counted for the broker side only, and from the account that was active.
+  if (Get.isRegistered<BrokerDashboardController>()) {
+    BrokerDashboardController.to.clear();
   }
   // The unseen counters are counted per role on the server, so the old side's
   // numbers are meaningless here. Blank them rather than leave a stale badge,

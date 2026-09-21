@@ -6,40 +6,55 @@ import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('proposalBadgeFor', () {
-    test('pending proposal reads Proposal Sent', () {
-      final b = proposalBadgeFor(0)!;
-      expect(b.title, 'PROPOSAL SENT');
-      expect(b.subtitle, 'Awaiting Owner Response');
+  group('feedBadgeFor — broker feed', () {
+    test('no proposal yet reads New Opportunity, Unseen until opened', () {
+      final fresh = feedBadgeFor(proposalStatus: null, isViewed: false)!;
+      expect(fresh.title, 'NEW OPPORTUNITY');
+      expect(fresh.subtitle, 'Unseen');
+
+      final opened = feedBadgeFor(proposalStatus: null, isViewed: true)!;
+      expect(opened.title, 'NEW OPPORTUNITY');
+      expect(opened.subtitle, 'Seen');
     });
 
-    test('owner approval reads Mandate to Sign', () {
-      final b = proposalBadgeFor(1)!;
-      expect(b.title, 'MANDATE TO SIGN');
-      expect(b.subtitle, 'Offer Accepted');
+    test('an older listing with no view record reads Unseen', () {
+      // is_viewed missing entirely — the feature is newer than the listing.
+      expect(feedBadgeFor(proposalStatus: null)!.subtitle, 'Unseen');
     });
 
-    test('signed and published both read Contract Signed', () {
-      // A proposal can only be published once it has been signed.
-      for (final status in [3, 4]) {
-        final b = proposalBadgeFor(status)!;
-        expect(b.title, 'CONTRACT SIGNED', reason: 'status $status');
-        expect(b.subtitle, 'Deal Started', reason: 'status $status');
-      }
+    test('each proposal state reads as the design names it', () {
+      const expected = {
+        0: ['SENT PROPOSAL', 'Awaiting'],
+        1: ['MEDIATE TO SIGN', 'Pending'],
+        3: ['ACCEPTED PROPOSAL', 'Confirmed'],
+        4: ['CONTRACT SIGNED', 'Published'],
+        5: ['PENDING CANCELLATION', '48h Pending'],
+        6: ['CANCELLED', 'Closed'],
+      };
+      expected.forEach((status, text) {
+        final b = feedBadgeFor(proposalStatus: status)!;
+        expect(b.title, text[0], reason: 'status $status');
+        expect(b.subtitle, text[1], reason: 'status $status');
+      });
     });
 
-    test('no proposal yet reads New Opportunity, on one line', () {
-      final b = proposalBadgeFor(null)!;
-      expect(b.title, 'NEW OPPORTUNITY');
-      // "Not Viewed" needs a viewed flag the backend does not send.
-      expect(b.subtitle, isNull);
+    test('the signature states follow the server, not the wording', () {
+      // The owner's approval is their signature (1), so the signature still
+      // outstanding there is the broker's. 3 is the broker's own.
+      expect(feedBadgeFor(proposalStatus: 1)!.title, 'MEDIATE TO SIGN');
+      expect(feedBadgeFor(proposalStatus: 3)!.title, 'ACCEPTED PROPOSAL');
     });
 
-    test('no badge for the states the design leaves out', () {
-      // 2 rejected, 5 cancellation requested, 6 cancelled, and anything unknown.
-      for (final status in [2, 5, 6, 99]) {
-        expect(proposalBadgeFor(status), isNull, reason: 'status $status');
-      }
+    test('a rejected proposal has no badge', () {
+      expect(feedBadgeFor(proposalStatus: 2), isNull);
+      expect(feedBadgeFor(proposalStatus: 99), isNull);
+    });
+
+    test('every badge is a distinct colour, as the legend shows', () {
+      final colours = [null, 0, 1, 3, 4, 5, 6]
+          .map((s) => feedBadgeFor(proposalStatus: s)!.color)
+          .toList();
+      expect(colours.toSet().length, colours.length);
     });
   });
 
@@ -69,6 +84,13 @@ void main() {
     test('the raw status code survives parsing alongside its label', () {
       final a = AnnouncementModel.fromJson({'_id': 'a', 'status': 4});
       expect(a.statusCode, 4);
+    });
+
+    test('is_viewed is read off the feed item', () {
+      expect(
+          AnnouncementModel.fromJson({'_id': 'a', 'is_viewed': true}).isViewed,
+          isTrue);
+      expect(AnnouncementModel.fromJson({'_id': 'a'}).isViewed, isNull);
     });
   });
 

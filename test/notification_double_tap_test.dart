@@ -43,6 +43,27 @@ void main() {
     });
   });
 
+  group('agreement cancellation notifications', () {
+    test('all three open an announcement, so they are prefetched and routed',
+        () {
+      // The in-app list and the cold-start prefetch both gate on this.
+      for (final type in const [
+        'agreement_cancellation_requested',
+        'agreement_cancellation_withdrawn',
+        'agreement_cancelled',
+      ]) {
+        expect(NotificationService.debugOpensAnnouncement(type), isTrue,
+            reason: type);
+      }
+    });
+
+    test('an unrelated type is still left alone', () {
+      expect(NotificationService.debugOpensAnnouncement('broker_approved'),
+          isFalse);
+      expect(NotificationService.debugOpensAnnouncement(null), isFalse);
+    });
+  });
+
   group('cold-start tap', () {
     test('is parked for the splash while the app is still starting', () {
       NotificationService.debugTapFromSystem(_chatTap('0:cold'));

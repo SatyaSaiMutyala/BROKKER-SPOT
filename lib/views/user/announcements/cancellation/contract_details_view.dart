@@ -190,7 +190,9 @@ class _ContractDetailsViewState extends State<ContractDetailsView> {
   }
 
   Future<void> _openAgreement() async {
-    final url = _chat.agreementUrl.value;
+    // Asked for fresh, same as the agreement screen: the copy held here can
+    // predate the last signature.
+    final url = await _chat.requestAgreementUrl();
     if (url == null || url.isEmpty) {
       AppToast.error('Agreement document is not available yet.');
       return;

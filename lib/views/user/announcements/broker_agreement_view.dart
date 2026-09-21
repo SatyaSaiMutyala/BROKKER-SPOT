@@ -48,6 +48,10 @@ class BrokerAgreementView extends StatefulWidget {
   /// Re-fetches the live proposal status when the screen opens.
   final VoidCallback? onRefreshStatus;
 
+  /// Asks the server for the agreement url as it stands now — see
+  /// ChatController.requestAgreementUrl.
+  final Future<String?> Function()? onFetchAgreementUrl;
+
   /// When true the button reads "Accept & Publish" and signing immediately
   /// triggers publish — no separate publish screen.
   final bool acceptAndPublish;
@@ -68,6 +72,7 @@ class BrokerAgreementView extends StatefulWidget {
     this.counterpartyName,
     this.counterpartyAvatar,
     this.onRefreshStatus,
+    this.onFetchAgreementUrl,
     this.acceptAndPublish = false,
     this.brokerId = '',
   });
@@ -110,6 +115,10 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   /// Owner side only — the backend returns `latest_proposals` exclusively to
   /// the announcement's owner.
   int _restStatus = 0;
+
+  /// True while the agreement url is being fetched, so the button says so
+  /// instead of looking dead.
+  bool _openingContract = false;
 
   /// Watches for the server refusing the owner's signature — see
   /// [_showContractLimitDialog].
@@ -318,6 +327,29 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
     });
   }
 
+  /// The agreement url to open, asked for fresh.
+  ///
+  /// Just after signing, the document is still being made and the server
+  /// still holds the previous copy — the one without the new signature. That
+  /// shows up as the url coming back unchanged, so it is asked for again a
+  /// couple of times before giving up and opening what there is.
+  Future<String?> _currentAgreementUrl() async {
+    final fetch = widget.onFetchAgreementUrl;
+    if (fetch == null) return widget.agreementUrl.value;
+
+    final before = widget.agreementUrl.value;
+    var url = await fetch();
+    if (!_signedLocally) return url;
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (url != null && url.isNotEmpty && url != before) break;
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return url;
+      url = await fetch();
+    }
+    return url;
+  }
+
   int get _publishedContracts => _announcement?.publishedCount ?? 0;
 
   /// Tells the owner why the signature was refused, and what frees it up.
@@ -395,7 +427,12 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
   }
 
   Future<void> _openContract() async {
-    final url = widget.agreementUrl.value;
+    if (_openingContract) return;
+    setState(() => _openingContract = true);
+    final url = await _currentAgreementUrl();
+    if (!mounted) return;
+    setState(() => _openingContract = false);
+
     if (url == null || url.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -850,9 +887,9 @@ class _BrokerAgreementViewState extends State<BrokerAgreementView> {
             children: [
               Expanded(
                 child: CustomPrimaryButton(
-                  title: 'View Contract',
+                  title: _openingContract ? 'Preparing…' : 'View Contract',
                   onPressed: _openContract,
-                  isDisabled: !step2Done,
+                  isDisabled: !step2Done || _openingContract,
                   backgroundColor: AppColors.primary,
                   radius: 30.r,
                   height: 50.h,
