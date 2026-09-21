@@ -44,11 +44,14 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
     super.initState();
     // Cache-first; powers the bell badge.
     _notificationCtrl.load();
-    _dashboardCtrl.load();
+    _dashboardCtrl
+      ..setVisible(true)
+      ..load();
   }
 
   @override
   void dispose() {
+    _dashboardCtrl.setVisible(false);
     _bannerController.dispose();
     super.dispose();
   }

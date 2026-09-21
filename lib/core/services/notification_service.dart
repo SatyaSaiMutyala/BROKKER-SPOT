@@ -113,9 +113,16 @@ class NotificationService {
   /// For the splash's logged-out branch, which routes to Welcome and has no
   /// tap to act on: marks start-up as done so taps from here on are handled
   /// straight away instead of parked forever.
+  /// Drops anything loaded for a tap that is no longer going to be routed.
+  static void _dropPrefetched() {
+    _prefetched = null;
+    _prefetchedChat = null;
+  }
+
   static void markStartupRouted() {
     _startupRouted = true;
     _pendingTapData = null;
+    _dropPrefetched();
   }
 
   @visibleForTesting
@@ -126,6 +133,11 @@ class NotificationService {
   @visibleForTesting
   static bool debugOpensAnnouncement(String? type) => _opensAnnouncement(type);
 
+  /// Whether a notification of this type opens a conversation — the gate on
+  /// the cold-start chat prefetch.
+  @visibleForTesting
+  static bool debugIsChatType(String? type) => _chatTypes.contains(type);
+
   @visibleForTesting
   static void debugTapFromSystem(RemoteMessage message) =>
       _onTapFromSystem(message);
@@ -135,11 +147,25 @@ class NotificationService {
     _handledMessageIds.clear();
     _startupRouted = false;
     _pendingTapData = null;
+    _dropPrefetched();
   }
 
   /// Announcement already loaded for the pending tap — see
   /// [prefetchPendingTap].
   static AnnouncementModel? _prefetched;
+
+  /// Chat destination already resolved for the pending tap — see
+  /// [prefetchPendingTap].
+  static _ChatDestination? _prefetchedChat;
+
+  /// The notification types that open a conversation. Chat costs a second
+  /// request the other types don't, so it is prefetched differently.
+  static const _chatTypes = {
+    'chat_message',
+    'agreement_cancellation_requested',
+    'agreement_cancellation_withdrawn',
+    'agreement_cancelled',
+  };
 
   /// Loads what a cold-start tap is going to open, while the splash is still
   /// on screen.
@@ -156,9 +182,21 @@ class NotificationService {
     // work out which side of the conversation the viewer is on. Types that
     // don't (broker_approved, say) are skipped so nothing is fetched for a
     // screen that will never ask for it.
-    if (!_opensAnnouncement(data['type']?.toString())) return;
+    final type = data['type']?.toString();
+    if (!_opensAnnouncement(type)) return;
     final id = data['announcement_id']?.toString();
     if (id == null || id.isEmpty) return;
+
+    // Chat needs a second request on top of the listing — who the other
+    // person is — and that one was still being made after the dashboard had
+    // replaced the splash, which is what made the app look like it had gone
+    // to the dashboard and only then jumped to the conversation. Resolving
+    // it here leaves nothing to await once the shell is up, so the chat goes
+    // on top of it within the same frame.
+    if (_chatTypes.contains(type)) {
+      _prefetchedChat = await _resolveChatDestination(id, data);
+      return;
+    }
     _prefetched = await _fetchAnnouncement(id);
   }
 
@@ -421,14 +459,43 @@ class NotificationService {
     if (!agreementTypes.contains(message.data['type']?.toString())) return;
     try {
       AnnouncementListController.to.markBrokerStale();
-      // The same events move the broker home counters.
-      if (Get.isRegistered<BrokerDashboardController>()) {
-        BrokerDashboardController.to.invalidate();
-      }
     } catch (e) {
       debugPrint('⚠️ Could not flag the broker feed after push: $e');
     }
   }
+
+  /// Pushes that move a number on the broker's home screen.
+  ///
+  /// Most of what those counters follow also arrives as a socket event, which
+  /// the dashboard listens for directly and is the faster path. This covers
+  /// the rest — above all `new_announcement`, which has no socket event at
+  /// all and is the only thing that moves the unseen deals count.
+  static const _dashboardTypes = {
+    'new_announcement',
+    'chat_message',
+    'announcement_proposal',
+    'proposal_accepted',
+    'property_published',
+    'agreement_completed',
+    'agreement_cancellation_requested',
+    'agreement_cancellation_withdrawn',
+    'agreement_cancelled',
+  };
+
+  static void _markDashboardStale(RemoteMessage message) {
+    if (!_dashboardTypes.contains(message.data['type']?.toString())) return;
+    // Only if the broker side has one — this is the broker's screen, and
+    // registering the controller from a push on the user side would have it
+    // fetching an endpoint that side never shows.
+    if (!Get.isRegistered<BrokerDashboardController>()) return;
+    BrokerDashboardController.to.markChanged();
+  }
+
+  /// Whether this type moves a broker home counter — the gate on
+  /// [_markDashboardStale].
+  @visibleForTesting
+  static bool debugMovesDashboard(String? type) =>
+      _dashboardTypes.contains(type);
 
   static void _onForegroundMessage(RemoteMessage message) {
     debugPrint('🔔 Foreground message received');
@@ -438,6 +505,7 @@ class NotificationService {
     _markMeetingsStaleIfChat(message);
     _markMineStaleIfOwnerStatusChanged(message);
     _markBrokerFeedStaleIfAgreementChanged(message);
+    _markDashboardStale(message);
     if (Platform.isIOS) return; // iOS shows it natively via Firebase options.
 
     final notification = message.notification;
@@ -567,6 +635,46 @@ class NotificationService {
   /// broker into the user side when they tapped a reply from the user.
   static Future<void> _openChatFromNotification(
       String announcementId, Map<String, dynamic> data) async {
+    // Resolved under the splash when the app was launched by this tap, so
+    // there is nothing left to wait for here — see [prefetchPendingTap].
+    final ready = _prefetchedChat;
+    _prefetchedChat = null;
+    final dest = (ready != null && ready.announcementId == announcementId)
+        ? ready
+        : await _resolveChatDestination(announcementId, data);
+    if (dest == null) return;
+
+    // Prefer the user_role-derived side; fall back to the old owner-based
+    // guess only when the announcement carried no usable user_role.
+    if (dest.side != null) {
+      await _ensureSide(wantBroker: dest.side == 2);
+    } else if (dest.isOwner != null) {
+      await _ensureSide(wantBroker: !dest.isOwner!);
+    }
+
+    final senderName = dest.peerName ??
+        _extractChatSenderName(data['_title']?.toString()) ??
+        '';
+    await AnnouncementChatView.open(
+      announcementId: announcementId,
+      brokerName: senderName,
+      brokerAvatar: dest.peerAvatar,
+      peerUserId: dest.peerId,
+      userRole: dest.side ??
+          (dest.isOwner == null
+              ? (_isBrokerSide ? 2 : 1)
+              : (dest.isOwner! ? 1 : 2)),
+    );
+  }
+
+  /// Works out who the conversation is with and which side of it the viewer
+  /// is on. Up to two requests — the announcement, then the peer's profile —
+  /// which is why it is run ahead of time on a cold start.
+  /// Null when the listing itself could not be loaded — there is then no
+  /// way to tell which side of the conversation the viewer is on, so the
+  /// chat is not opened at all rather than opened wrong.
+  static Future<_ChatDestination?> _resolveChatDestination(
+      String announcementId, Map<String, dynamic> data) async {
     bool? isOwnerHere;
     int? side;
     String? peerAvatar;
@@ -576,7 +684,7 @@ class NotificationService {
 
     try {
       final a = await _fetchAnnouncement(announcementId);
-      if (a == null) return;
+      if (a == null) return null;
       isOwnerHere = a.isOwner;
       side = _sideForViewer(a);
 
@@ -633,25 +741,13 @@ class NotificationService {
       }
     }
 
-    // Prefer the user_role-derived side; fall back to the old owner-based
-    // guess only when the announcement carried no usable user_role.
-    if (side != null) {
-      await _ensureSide(wantBroker: side == 2);
-    } else if (isOwnerHere != null) {
-      await _ensureSide(wantBroker: !isOwnerHere);
-    }
-
-    final senderName =
-        peerName ?? _extractChatSenderName(data['_title']?.toString()) ?? '';
-    await AnnouncementChatView.open(
+    return (
       announcementId: announcementId,
-      brokerName: senderName,
-      brokerAvatar: peerAvatar,
-      peerUserId: peerUserId,
-      userRole: side ??
-          (isOwnerHere == null
-              ? (_isBrokerSide ? 2 : 1)
-              : (isOwnerHere ? 1 : 2)),
+      peerId: peerUserId,
+      peerName: peerName,
+      peerAvatar: peerAvatar,
+      side: side,
+      isOwner: isOwnerHere,
     );
   }
 
@@ -823,3 +919,14 @@ class NotificationService {
     }
   }
 }
+
+/// What [NotificationService] needs to open a conversation: who it is with,
+/// how they should be shown, and which side of it the viewer is on.
+typedef _ChatDestination = ({
+  String announcementId,
+  String? peerId,
+  String? peerName,
+  String? peerAvatar,
+  int? side,
+  bool? isOwner,
+});

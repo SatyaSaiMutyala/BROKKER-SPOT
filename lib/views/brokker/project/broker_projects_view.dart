@@ -22,6 +22,8 @@ import 'package:brokkerspot/views/user/account/account_view.dart'
     show showLoginRequiredDialog;
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:get/get.dart';
+import 'package:brokkerspot/views/brokker/brokker_login/view/complete_profile_screen.dart';
+import 'package:brokkerspot/views/user/account/account_view.dart';
 
 /// How many announcements a guest (no token) may browse before being asked to
 /// sign in. The feed itself is fetched via the public `/guest/announcements`
@@ -62,10 +64,29 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
 
   bool get _isGuest => !LocalStorageService.isLoggedIn();
 
-  /// Whether the backend actually holds more announcements than the guest cap
+  /// Signed in, on the broker side, but the broker profile was skipped.
+  ///
+  /// The feed itself is theirs to read — the server has them on `currentRole`
+  /// 2 either way, so it returns the same listings — but only as far as the
+  /// cap. Tapping the tab used to be answered with a dialog and nothing else;
+  /// showing the feed and frosting the card past the cap says the same thing
+  /// while letting them see what they are being asked to finish for.
+  ///
+  /// `role` is 0 until the profile request comes back, and 0 carries no
+  /// broker bit — reading it straight would cap a real broker's feed for the
+  /// moment before their profile lands, frosting a card and then unfrosting
+  /// it. Unknown counts as "not capped": a cap appearing a beat late is
+  /// better than a broker seeing one at all.
+  bool get _needsBrokerProfile =>
+      !_isGuest && _profileCtrl.role.value != 0 && !_profileCtrl.hasBrokerRole;
+
+  /// Whether the feed is capped for whoever is looking.
+  bool get _isCapped => _isGuest || _needsBrokerProfile;
+
+  /// Whether the backend actually holds more announcements than the cap
   /// renders — either we fetched more than we show, or more pages exist.
   /// Guards against promising "more announcements" when there are none.
-  bool get _hasMoreBehindLogin =>
+  bool get _hasMoreBehindGate =>
       _controller.brokerAnnouncements.length > kGuestAnnouncementLimit ||
       _controller.hasMoreBroker;
 
@@ -122,29 +143,35 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
     if (!_scrollController.hasClients || widget.showMineOnly) return;
     final pos = _scrollController.position;
 
-    // Guests get a fixed, capped list instead of pagination — the last card is
-    // frosted over with a login prompt, so there is nothing to page in and
+    // A capped viewer gets a fixed list instead of pagination — the last card
+    // is frosted over with a prompt, so there is nothing to page in and
     // nothing to interrupt the scroll with.
-    if (_isGuest) return;
+    if (_isCapped) return;
 
     if (pos.pixels >= pos.maxScrollExtent - 300 && _controller.hasMoreBroker) {
       _controller.loadMoreBroker();
     }
   }
 
-  /// The last card of a guest's capped feed is frosted over with a login
-  /// prompt instead of a dialog. Only when the backend really does hold more
-  /// than we render — otherwise a guest whose whole feed fits under the cap
-  /// would be teased with listings that don't exist.
-  bool _isLockedForGuest(int index, int cardEnd) =>
-      _isGuest &&
+  /// The last card of a capped feed is frosted over with a prompt instead of
+  /// a dialog. Only when the backend really does hold more than we render —
+  /// otherwise someone whose whole feed fits under the cap would be teased
+  /// with listings that don't exist.
+  bool _isLocked(int index, int cardEnd) =>
+      _isCapped &&
       !widget.showMineOnly &&
-      _hasMoreBehindLogin &&
+      _hasMoreBehindGate &&
       index == cardEnd - 1;
 
   void _onCreateTap() {
     if (_isGuest) {
       showLoginRequiredDialog(context);
+      return;
+    }
+    // Reading the feed is now allowed without a finished broker profile;
+    // posting to it is not.
+    if (_needsBrokerProfile) {
+      showCompleteProfileDialog(context);
       return;
     }
     Get.to(() => const CreateAnnouncementView(fromBroker: true));
@@ -160,7 +187,8 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       // backend, so they read as Residential rather than dropping out of both
       // sides of the filter.
       list = list
-          .where((a) => (a.isCommercialProperty ?? false) == _selectedIsCommercial)
+          .where(
+              (a) => (a.isCommercialProperty ?? false) == _selectedIsCommercial)
           .toList();
     }
     if (_selectedPropertyType != null) {
@@ -170,7 +198,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
               _selectedPropertyType!.toLowerCase())
           .toList();
     }
-    if (_isGuest && list.length > kGuestAnnouncementLimit) {
+    if (_isCapped && list.length > kGuestAnnouncementLimit) {
       list = list.take(kGuestAnnouncementLimit).toList();
     }
     return list;
@@ -407,7 +435,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       }
 
       final showLoadingMore =
-          !isMine && !_isGuest && _controller.isLoadingMoreBroker.value;
+          !isMine && !_isCapped && _controller.isLoadingMoreBroker.value;
       final cardEnd = announcements.length;
       final skeletonIdx = showLoadingMore ? cardEnd : -1;
       final itemCount = cardEnd + (showLoadingMore ? 1 : 0);
@@ -453,7 +481,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                   // own listings carry no proposal of theirs to report, and a
                   // guest has none at all — without the guard every card would
                   // read New Opportunity to someone who cannot act on it.
-                  showProposalBadge: !widget.showMineOnly && !_isGuest,
+                  showProposalBadge: !widget.showMineOnly && !_isCapped,
                   // On the broker's own list: the contract behind a listing
                   // they published for an owner. Their own listings get
                   // nothing and keep FOR SELL / FOR RENT.
@@ -469,14 +497,24 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                 return Padding(
                   padding: EdgeInsets.only(bottom: 16.h),
                   child: RepaintBoundary(
-                    child: _isLockedForGuest(i, cardEnd)
-                        ? GuestLockedCard(
-                            onLoginTap: () {
-                              LoginReturn.capture();
-                              Get.to(() => LoginView());
-                            },
-                            child: card,
-                          )
+                    child: _isLocked(i, cardEnd)
+                        ? (_isGuest
+                            ? GuestLockedCard(
+                                onTap: () {
+                                  LoginReturn.capture();
+                                  Get.to(() => LoginView());
+                                },
+                                child: card,
+                              )
+                            : GuestLockedCard(
+                                // Same line as the guest sees — what is
+                                // behind the frost is the same listings.
+                                // Only the way through to them differs.
+                                buttonLabel: 'Complete Profile',
+                                onTap: () =>
+                                    Get.to(() => const CompleteProfileScreen()),
+                                child: card,
+                              ))
                         : card,
                   ),
                 );
@@ -506,5 +544,4 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       ),
     );
   }
-
 }

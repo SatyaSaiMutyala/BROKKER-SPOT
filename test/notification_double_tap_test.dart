@@ -64,6 +64,41 @@ void main() {
     });
   });
 
+  group('cold-start prefetch', () {
+    // Captured on an OPPO CPH1933: the tap landed, the dashboard replaced the
+    // splash, and only 500ms later did the chat open on top of it — long
+    // enough to look like the app had gone to the wrong screen.
+    //
+    //   20:59:08.849  🔔 Notification tapped
+    //   20:59:09.344  🔌 [Chat] init          ← 495ms of dashboard
+    //
+    // That gap was the peer's profile being fetched after the shell was
+    // already up. Every type that opens a conversation has to go through the
+    // prefetch, or it comes back for that type alone.
+    test('every chat type is prefetched under the splash', () {
+      for (final type in const [
+        'chat_message',
+        'agreement_cancellation_requested',
+        'agreement_cancellation_withdrawn',
+        'agreement_cancelled',
+      ]) {
+        expect(NotificationService.debugIsChatType(type), isTrue, reason: type);
+        // The prefetch is gated on this first, so a chat type missing from it
+        // would never reach the chat-specific branch at all.
+        expect(NotificationService.debugOpensAnnouncement(type), isTrue,
+            reason: type);
+      }
+    });
+
+    test('a type that opens a listing is not treated as chat', () {
+      // These prefetch the announcement instead — one request, not two.
+      expect(NotificationService.debugIsChatType('announcement_approved'),
+          isFalse);
+      expect(NotificationService.debugIsChatType('proposal_accepted'), isFalse);
+      expect(NotificationService.debugIsChatType(null), isFalse);
+    });
+  });
+
   group('cold-start tap', () {
     test('is parked for the splash while the app is still starting', () {
       NotificationService.debugTapFromSystem(_chatTap('0:cold'));

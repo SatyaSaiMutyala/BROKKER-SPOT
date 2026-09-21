@@ -25,6 +25,7 @@ import 'package:brokkerspot/views/user/announcements/announcement_proposals_view
 import 'package:brokkerspot/views/user/account/account_view.dart'
     show showLoginRequiredDialog;
 import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 
 class AnnouncementDetailView extends StatefulWidget {
   final AnnouncementModel announcement;
@@ -1213,11 +1214,26 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
               ),
               child: Row(
                 children: [
-                  // Avatar — tappable like the chat icon, so a guest tapping
-                  // the profile pic gets the same login prompt instead of the
-                  // tap silently doing nothing.
+                  // Avatar — opens the broker behind the listing, not the
+                  // chat: the chat has its own icon at the end of this bar,
+                  // so the photo is free to do what a photo reads as. A guest
+                  // tapping it still gets the login prompt, from
+                  // UserProfileView.open.
                   GestureDetector(
-                    onTap: () => _openOwnerOrBrokerChat(a),
+                    onTap: () => UserProfileView.open(
+                      userId: a.userId ?? widget.announcement.userId,
+                      name: a.ownerName ??
+                          widget.announcement.ownerName ??
+                          _brokerName ??
+                          widget.ownerName,
+                      avatarUrl: a.brokerAvatarUrl ??
+                          widget.announcement.brokerAvatarUrl ??
+                          _brokerAvatar ??
+                          widget.ownerAvatarUrl,
+                      // This bar is only built for a broker-posted listing,
+                      // so its poster is being looked at as a broker.
+                      viewAsBroker: true,
+                    ),
                     child: Container(
                       width: 46.w,
                       height: 46.w,

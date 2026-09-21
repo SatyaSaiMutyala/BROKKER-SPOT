@@ -14,6 +14,7 @@ import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card_shimmer.dart';
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/views/user/announcements/announcement_detail_view.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 
 class MyAnnouncementsTabView extends StatefulWidget {
   const MyAnnouncementsTabView({super.key});
@@ -468,8 +469,21 @@ class _CardWithStatusBadge extends StatelessWidget {
             Positioned(
               left: (i * step).w,
               bottom: 0,
-              child: _buildSingleAvatar(
-                  proposals[i].brokerProfileImage, avatarSize.w),
+              // Each face opens its own broker. They overlap almost
+              // completely, so a tap lands on whichever is drawn on top —
+              // the one the eye picks — and the slivers behind it take only
+              // the few pixels they actually show.
+              child: GestureDetector(
+                onTap: () => UserProfileView.open(
+                  userId: proposals[i].brokerId,
+                  name: proposals[i].name,
+                  avatarUrl: proposals[i].brokerProfileImage,
+                  viewAsBroker: true,
+                ),
+                behavior: HitTestBehavior.opaque,
+                child: _buildSingleAvatar(
+                    proposals[i].brokerProfileImage, avatarSize.w),
+              ),
             ),
           // Count badge — top-right, partially outside the avatar
           Positioned(

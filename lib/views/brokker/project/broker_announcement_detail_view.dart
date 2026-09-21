@@ -25,6 +25,7 @@ import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart
 import 'package:brokkerspot/widgets/announcements/announcement_detail_body.dart';
 import 'package:brokkerspot/widgets/announcements/send_proposal_bar.dart';
 import 'package:brokkerspot/widgets/common/custom_back_button.dart';
+import 'package:brokkerspot/views/brokker/home/controller/broker_dashboard_controller.dart';
 
 class BrokerAnnouncementDetailView extends StatefulWidget {
   final AnnouncementModel announcement;
@@ -157,6 +158,12 @@ class _BrokerAnnouncementDetailViewState
           _data = fresh;
           _detailLoaded = true;
         });
+        // Opening a user's listing is what records the view server-side
+        // (logAnnouncementView), so the seen/unseen split on the broker's
+        // home screen has just moved. Nothing is broadcast back for it.
+        if (fresh.userRole == 1 && fresh.isOwner != true) {
+          BrokerDashboardController.to.markChanged();
+        }
         // Supplement owner info from the list cache when the detail endpoint
         // returned user_id as a plain string (no name/avatar on fresh model).
         // This is awaited so the UI updates before the frame settles.
@@ -875,14 +882,13 @@ class _BrokerAnnouncementDetailViewState
 
   /// The owner's personal photo, from whichever source has it — the detail
   /// response, the card the screen was opened from, or the owner lookup.
-  String? get _resolvedOwnerAvatar =>
-      _data.ownerAvatarUrl?.isNotEmpty == true
-          ? _data.ownerAvatarUrl
-          : widget.announcement.ownerAvatarUrl?.isNotEmpty == true
-              ? widget.announcement.ownerAvatarUrl
-              : _ownerAvatar?.isNotEmpty == true
-                  ? _ownerAvatar
-                  : widget.ownerAvatarUrl;
+  String? get _resolvedOwnerAvatar => _data.ownerAvatarUrl?.isNotEmpty == true
+      ? _data.ownerAvatarUrl
+      : widget.announcement.ownerAvatarUrl?.isNotEmpty == true
+          ? widget.announcement.ownerAvatarUrl
+          : _ownerAvatar?.isNotEmpty == true
+              ? _ownerAvatar
+              : widget.ownerAvatarUrl;
 
   Widget _buildBottomBar(bool isDark, double bottomPad) {
     if (!_detailLoaded) {
@@ -1148,6 +1154,9 @@ class _ProposalSheetState extends State<_ProposalSheet> {
     });
     try {
       await AnnouncementRepository().sendProposal(a.id ?? '', message: text);
+      // A proposal with no conversation yet — the pending count on the
+      // broker's home screen. Their own action, so no event announces it.
+      BrokerDashboardController.to.markChanged();
       if (!mounted) return;
       setState(() {
         _submitted = true;
@@ -1540,7 +1549,8 @@ class _ProposalSheetState extends State<_ProposalSheet> {
             fontWeight: FontWeight.w300,
             color: isDark ? Colors.grey.shade600 : Colors.grey.shade500,
           ),
-          contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
+          contentPadding:
+              EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
         ),
       ),
     );

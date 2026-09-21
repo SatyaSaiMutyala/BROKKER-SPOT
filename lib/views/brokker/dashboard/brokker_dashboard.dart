@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 // Sizing helpers (.w/.h/.r) were only used by the commented-out create button.
 // import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:brokkerspot/views/brokker/home/controller/broker_dashboard_controller.dart';
 
 class BrokerDashBoardView extends StatefulWidget {
   final bool showLocationPicker;
@@ -76,6 +77,10 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
       IndicatorController.to
         ..startListening()
         ..refresh();
+      // The home counters move on the same proposal events, so they listen
+      // for as long as the broker shell is up rather than only while the
+      // Home tab happens to be built.
+      BrokerDashboardController.to.startListening();
     }
   }
 
@@ -179,6 +184,10 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
   // haven't finished broker onboarding (no broker role / pending verification).
   static const _loginRequiredTabs = {1, 2};
 
+  /// The announcements feed — see [_onNavTap], where it is the one gated tab
+  /// that opens for an unfinished broker profile instead of a dialog.
+  static const int _announcementsTab = 1;
+
   // Tabs a guest (no token) may browse read-only instead of being pushed into
   // the login dialog.
   //
@@ -204,7 +213,7 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
   //     final pillBg = isDark ? const Color(0x30FFFFFF) : const Color(0x80DBDBDB);
   //     final iconColor =
   //         isDark ? const Color(0xFFCCCCCC) : const Color(0xFF444444);
-  // 
+  //
   //     return GestureDetector(
   //       onTap: () => _onCreateTap(context),
   //       behavior: HitTestBehavior.opaque,
@@ -259,14 +268,23 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
           return;
         }
       } else {
-        // Step 2: Logged in but not a broker yet → must complete profile
+        // Step 2: Logged in but not a broker yet → must complete profile.
+        //
+        // The announcements tab is the exception: it opens, capped, with the
+        // card past the cap frosted over and carrying the same ask. Being
+        // told "complete your profile" while looking at the listings it
+        // unlocks says more than a dialog in front of a tab that never
+        // opened — and it is what a guest already sees.
         if (!profileController.hasBrokerRole) {
-          showCompleteProfileDialog(context);
-          return;
+          if (index != _announcementsTab) {
+            showCompleteProfileDialog(context);
+            return;
+          }
         }
-
-        // Step 3: Broker, but verification still pending
-        if (verificationStatus == 'pending') {
+        // Step 3: Broker, but verification still pending. Only for an account
+        // that actually holds the role — one that skipped the profile has no
+        // verification to be waiting on, and step 2 has already answered it.
+        else if (verificationStatus == 'pending') {
           showPendingVerificationDialog(context);
           return;
         }

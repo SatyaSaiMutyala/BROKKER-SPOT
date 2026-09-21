@@ -7,6 +7,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 
 class AnnouncementPropertyCard extends StatefulWidget {
   final AnnouncementModel announcement;
@@ -154,7 +155,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
       padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
       child: Row(
         children: [
-          ClipOval(child: _avatarWidget(a.ownerAvatarUrl, 36.w)),
+          _opensPoster(
+              a, ClipOval(child: _avatarWidget(a.ownerAvatarUrl, 36.w))),
           SizedBox(width: 8.w),
           Expanded(
             child: Text(
@@ -222,7 +224,8 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                     muted: true,
                     loop: true,
                     tapToTogglePlay: true,
-                    placeholder: _videoThumb(thumb ?? fallback, cacheWidth, isDark),
+                    placeholder:
+                        _videoThumb(thumb ?? fallback, cacheWidth, isDark),
                   ),
                 );
               }
@@ -231,7 +234,6 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
             },
           ),
         ),
-
         if (!widget.ownerRowAboveImage) ...[
           Positioned(
             top: 0,
@@ -256,11 +258,15 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
             left: 14.w,
             child: Row(
               children: [
-                Container(
-                  width: 55.w,
-                  height: 55.h,
-                  decoration: const BoxDecoration(shape: BoxShape.circle),
-                  child: ClipOval(child: _avatarWidget(a.ownerAvatarUrl, 55.w)),
+                _opensPoster(
+                  a,
+                  Container(
+                    width: 55.w,
+                    height: 55.h,
+                    decoration: const BoxDecoration(shape: BoxShape.circle),
+                    child:
+                        ClipOval(child: _avatarWidget(a.ownerAvatarUrl, 55.w)),
+                  ),
                 ),
                 SizedBox(width: 8.w),
                 Text(
@@ -317,7 +323,6 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
               ),
             ),
         ],
-
         Positioned(
           bottom: 10.h,
           left: 0,
@@ -524,8 +529,7 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
                 ),
               ),
             ),
-            VerticalDivider(
-                width: 1, thickness: 0.8, color: AppColors.primary),
+            VerticalDivider(width: 1, thickness: 0.8, color: AppColors.primary),
             Expanded(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -573,7 +577,19 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
           for (int i = shown.length - 1; i >= 0; i--)
             Positioned(
               left: i * 18.w,
-              child: _avatar(shown[i].brokerProfileImage, avatarSize, isDark),
+              // Each face opens its own broker. They overlap, so a tap on a
+              // covered part goes to whichever is drawn on top — the same
+              // one the eye picks.
+              child: GestureDetector(
+                onTap: () => UserProfileView.open(
+                  userId: shown[i].brokerId,
+                  name: shown[i].name,
+                  avatarUrl: shown[i].brokerProfileImage,
+                  viewAsBroker: true,
+                ),
+                behavior: HitTestBehavior.opaque,
+                child: _avatar(shown[i].brokerProfileImage, avatarSize, isDark),
+              ),
             ),
           Positioned(
             top: -4.h,
@@ -668,6 +684,26 @@ class _AnnouncementPropertyCardState extends State<AnnouncementPropertyCard>
       highlightColor: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade100,
       child: Container(
           color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade300),
+    );
+  }
+
+  /// Wraps a photo so it opens the person it shows.
+  ///
+  /// Only for a broker-posted listing (`user_role` 2): on the owner's own
+  /// listing the face is their own, and a client has no profile screen worth
+  /// opening. Returned untouched otherwise, so the tap falls through to the
+  /// card and still opens the listing.
+  Widget _opensPoster(AnnouncementModel a, Widget child) {
+    if (a.userRole != 2) return child;
+    return GestureDetector(
+      onTap: () => UserProfileView.open(
+        userId: a.userId,
+        name: a.ownerName,
+        avatarUrl: a.brokerAvatarUrl ?? a.ownerAvatarUrl,
+        viewAsBroker: true,
+      ),
+      behavior: HitTestBehavior.opaque,
+      child: child,
     );
   }
 

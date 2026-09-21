@@ -50,7 +50,9 @@ Future<void> clearUserSession() async {
       ..clear();
   }
   if (Get.isRegistered<BrokerDashboardController>()) {
-    BrokerDashboardController.to.clear();
+    BrokerDashboardController.to
+      ..stopListening()
+      ..clear();
   }
   SocketService.to.shutdown();
   await AnnouncementCache.clear();
@@ -85,8 +87,11 @@ Future<void> clearRoleScopedCache() async {
     PropertySearchController.to.clearAll();
   }
   // Counted for the broker side only, and from the account that was active.
+  // Re-attached to the rebuilt socket the same way the badges are.
   if (Get.isRegistered<BrokerDashboardController>()) {
-    BrokerDashboardController.to.clear();
+    BrokerDashboardController.to
+      ..clear()
+      ..restartListening();
   }
   // The unseen counters are counted per role on the server, so the old side's
   // numbers are meaningless here. Blank them rather than leave a stale badge,
