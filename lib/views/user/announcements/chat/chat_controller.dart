@@ -536,9 +536,24 @@ class ChatController extends GetxController {
     final map = Map<String, dynamic>.from(data);
     final aId = map['announcement_id']?.toString();
     if (aId != null && aId != announcementId) return;
-    proposalStatus.value = (map['status'] as num?)?.toInt();
+    final status = (map['status'] as num?)?.toInt();
+    proposalStatus.value = status;
     agreementUrl.value = map['agreement_url']?.toString();
     _applyCancellationFields(map);
+    // 4 (published) / 5 (cancellation pending) / 6 (cancelled) are only
+    // reachable by way of a publish — the backend refuses to cancel a
+    // proposal that isn't already at 4. So a fresh status fetch reporting any
+    // of them is proof the property was published, even on a device that was
+    // offline for the live `announcement:publish` broadcast and never seeded
+    // `published` from local storage (e.g. opening the chat for the first
+    // time from the Meeting list, on this device, after someone else
+    // published it). Without this, Cancel Contract only ever showed up on
+    // whichever device happened to be online at the moment of publishing.
+    if (status != null && status >= 4) {
+      published.value = true;
+      LocalStorageService.markAnnouncementPublished(announcementId,
+          brokerId: _brokerId);
+    }
   }
 
   /// Reads the cancellation block carried by `announcement:proposal:status`

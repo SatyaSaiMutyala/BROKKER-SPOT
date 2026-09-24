@@ -408,13 +408,13 @@ class HomeFilterBar extends StatelessWidget {
 
   /// Country picker — one filter, browsing the whole list from
   /// `user/common/fetch-countries` so listings can be viewed country by
-  /// country. Tapping the selected one again clears the filter.
+  /// country. Single-select: tapping a country applies it and closes the
+  /// sheet immediately (no separate Apply step), and tapping the selected
+  /// one again clears the filter the same way.
   void _showCountrySheet(BuildContext context, bool isDark) {
     FocusScope.of(context).unfocus();
     final common = CommonDataController.to;
     common.loadCountries();
-
-    String? selName = filter.countryName;
 
     showModalBottomSheet(
       context: context,
@@ -423,107 +423,81 @@ class HomeFilterBar extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
       ),
       isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: _handle(isDark)),
-              SizedBox(height: 20.h),
-              _title('Country', isDark),
-              SizedBox(height: 16.h),
-              Obx(() {
-                final countries = common.countries;
-                if (common.isLoadingCountries.value && countries.isEmpty) {
-                  return _countryShimmer(isDark);
-                }
-                // The list runs long, so it scrolls inside a capped height
-                // rather than pushing the Apply button off screen.
-                return ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: 320.h),
-                  child: SingleChildScrollView(
-                    child: Wrap(
-                      spacing: 8.w,
-                      runSpacing: 8.h,
-                      children: countries.map((c) {
-                        final isSel = selName == c.name;
-                        return GestureDetector(
-                          onTap: () => setSheet(
-                              () => selName = isSel ? null : c.name),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 16.w, vertical: 9.h),
-                            decoration: BoxDecoration(
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 24.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: _handle(isDark)),
+            SizedBox(height: 20.h),
+            _title('Country', isDark),
+            SizedBox(height: 16.h),
+            Obx(() {
+              final countries = common.countries;
+              if (common.isLoadingCountries.value && countries.isEmpty) {
+                return _countryShimmer(isDark);
+              }
+              // The list runs long, so it scrolls inside a capped height.
+              return ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: 360.h),
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 8.w,
+                    runSpacing: 8.h,
+                    children: countries.map((c) {
+                      final isSel = filter.countryName == c.name;
+                      return GestureDetector(
+                        onTap: () {
+                          onFilterChanged(
+                            isSel
+                                // Country sits above city/area, so clearing
+                                // it drops those with it rather than
+                                // leaving an orphaned city.
+                                ? filter.cleared(
+                                    country: true, city: true, area: true)
+                                : filter
+                                    .copyWith(countryName: c.name)
+                                    .cleared(city: true, area: true),
+                          );
+                          Navigator.of(ctx).pop();
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 16.w, vertical: 9.h),
+                          decoration: BoxDecoration(
+                            color: isSel
+                                ? AppColors.primary
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(20.r),
+                            border: Border.all(
                               color: isSel
                                   ? AppColors.primary
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20.r),
-                              border: Border.all(
-                                color: isSel
-                                    ? AppColors.primary
-                                    : isDark
-                                        ? Colors.grey.shade600
-                                        : Colors.grey.shade300,
-                              ),
-                            ),
-                            child: Text(
-                              c.name,
-                              style: GoogleFonts.poppins(
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.w400,
-                                color: isSel
-                                    ? Colors.white
-                                    : isDark
-                                        ? Colors.white70
-                                        : Colors.black87,
-                              ),
+                                  : isDark
+                                      ? Colors.grey.shade600
+                                      : Colors.grey.shade300,
                             ),
                           ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                );
-              }),
-              SizedBox(height: 20.h),
-              Row(
-                children: [
-                  // Drops the country filter outright, so the feed goes back to
-                  // listings from every country. Only offered when there is
-                  // something to clear.
-                  if (selName != null || filter.countryName != null) ...[
-                    Expanded(
-                      child: _clearBtn(() {
-                        onFilterChanged(filter.cleared(
-                            country: true, city: true, area: true));
-                        Navigator.of(ctx).pop();
-                      }, isDark),
-                    ),
-                    SizedBox(width: 12.w),
-                  ],
-                  Expanded(
-                    child: _applyBtn(() {
-                      onFilterChanged(
-                        selName == null
-                            // Country sits above city/area, so clearing it
-                            // drops those with it rather than leaving an
-                            // orphaned city.
-                            ? filter.cleared(
-                                country: true, city: true, area: true)
-                            : filter
-                                .copyWith(countryName: selName)
-                                .cleared(city: true, area: true),
+                          child: Text(
+                            c.name,
+                            style: GoogleFonts.poppins(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w400,
+                              color: isSel
+                                  ? Colors.white
+                                  : isDark
+                                      ? Colors.white70
+                                      : Colors.black87,
+                            ),
+                          ),
+                        ),
                       );
-                      Navigator.of(ctx).pop();
-                    }, isDark),
+                    }).toList(),
                   ),
-                ],
-              ),
-              SizedBox(height: 20.h),
-            ],
-          ),
+                ),
+              );
+            }),
+          ],
         ),
       ),
     );
@@ -546,10 +520,13 @@ class HomeFilterBar extends StatelessWidget {
     );
   }
 
+  /// Single-select: tapping a count applies it and closes the sheet
+  /// immediately, same as [_showCountrySheet]. Tapping the selected one
+  /// again clears the filter.
   void _showBedsSheet(BuildContext context, bool isDark) {
     FocusScope.of(context).unfocus(); // no filter needs the keyboard
     const opts = ['1', '2', '3', '4', '5+'];
-    int? sel = filter.bedrooms;
+    final sel = filter.bedrooms;
 
     showModalBottomSheet(
       context: context,
@@ -557,43 +534,38 @@ class HomeFilterBar extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: _handle(isDark)),
-              SizedBox(height: 20.h),
-              _title('Bedrooms', isDark),
-              SizedBox(height: 16.h),
-              Wrap(
-                spacing: 10.w,
-                runSpacing: 10.h,
-                children: opts.map((opt) {
-                  final val = opt == '5+' ? 5 : int.parse(opt);
-                  final isSel = sel == val;
-                  return _countChip(
-                    opt,
-                    isSel,
-                    isDark,
-                    () => setSheet(() => sel = isSel ? null : val),
-                  );
-                }).toList(),
-              ),
-              SizedBox(height: 20.h),
-              _applyBtn(() {
-                onFilterChanged(
-                  sel == null
-                      ? filter.cleared(bedrooms: true)
-                      : filter.copyWith(bedrooms: sel),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 24.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: _handle(isDark)),
+            SizedBox(height: 20.h),
+            _title('Bedrooms', isDark),
+            SizedBox(height: 16.h),
+            Wrap(
+              spacing: 10.w,
+              runSpacing: 10.h,
+              children: opts.map((opt) {
+                final val = opt == '5+' ? 5 : int.parse(opt);
+                final isSel = sel == val;
+                return _countChip(
+                  opt,
+                  isSel,
+                  isDark,
+                  () {
+                    onFilterChanged(
+                      isSel
+                          ? filter.cleared(bedrooms: true)
+                          : filter.copyWith(bedrooms: val),
+                    );
+                    Navigator.of(ctx).pop();
+                  },
                 );
-                Navigator.of(ctx).pop();
-              }, isDark),
-              SizedBox(height: 20.h),
-            ],
-          ),
+              }).toList(),
+            ),
+          ],
         ),
       ),
     );
@@ -875,10 +847,13 @@ class HomeFilterBar extends StatelessWidget {
     );
   }
 
+  /// Single-select: tapping a count applies it and closes the sheet
+  /// immediately, same as [_showCountrySheet]. Tapping the selected one
+  /// again clears the filter.
   void _showBathsSheet(BuildContext context, bool isDark) {
     FocusScope.of(context).unfocus(); // no filter needs the keyboard
     const opts = ['1', '2', '3', '4', '5+'];
-    int? sel = filter.bathrooms;
+    final sel = filter.bathrooms;
 
     showModalBottomSheet(
       context: context,
@@ -886,43 +861,38 @@ class HomeFilterBar extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: _handle(isDark)),
-              SizedBox(height: 20.h),
-              _title('Bathrooms', isDark),
-              SizedBox(height: 16.h),
-              Wrap(
-                spacing: 10.w,
-                runSpacing: 10.h,
-                children: opts.map((opt) {
-                  final val = opt == '5+' ? 5 : int.parse(opt);
-                  final isSel = sel == val;
-                  return _countChip(
-                    opt,
-                    isSel,
-                    isDark,
-                    () => setSheet(() => sel = isSel ? null : val),
-                  );
-                }).toList(),
-              ),
-              SizedBox(height: 20.h),
-              _applyBtn(() {
-                onFilterChanged(
-                  sel == null
-                      ? filter.cleared(bathrooms: true)
-                      : filter.copyWith(bathrooms: sel),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 24.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: _handle(isDark)),
+            SizedBox(height: 20.h),
+            _title('Bathrooms', isDark),
+            SizedBox(height: 16.h),
+            Wrap(
+              spacing: 10.w,
+              runSpacing: 10.h,
+              children: opts.map((opt) {
+                final val = opt == '5+' ? 5 : int.parse(opt);
+                final isSel = sel == val;
+                return _countChip(
+                  opt,
+                  isSel,
+                  isDark,
+                  () {
+                    onFilterChanged(
+                      isSel
+                          ? filter.cleared(bathrooms: true)
+                          : filter.copyWith(bathrooms: val),
+                    );
+                    Navigator.of(ctx).pop();
+                  },
                 );
-                Navigator.of(ctx).pop();
-              }, isDark),
-              SizedBox(height: 20.h),
-            ],
-          ),
+              }).toList(),
+            ),
+          ],
         ),
       ),
     );
@@ -1021,33 +991,6 @@ class HomeFilterBar extends StatelessWidget {
                 : isDark
                     ? Colors.white70
                     : Colors.black87,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Secondary action beside Apply — outlined so the filled Apply stays the
-  /// primary one.
-  Widget _clearBtn(VoidCallback onTap, bool isDark) {
-    return SizedBox(
-      height: 50.h,
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(
-            color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30.r),
-          ),
-        ),
-        child: Text(
-          'Clear',
-          style: GoogleFonts.poppins(
-            fontSize: 15.sp,
-            fontWeight: FontWeight.w500,
-            color: isDark ? Colors.white70 : Colors.black87,
           ),
         ),
       ),

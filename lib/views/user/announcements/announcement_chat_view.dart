@@ -381,10 +381,17 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
               ),
             ),
             SizedBox(height: 8.h),
-            // The server only accepts a cancellation on a published contract
-            // (status 4), and only one at a time. Offering the action outside
-            // that window would just surface a rejection.
-            if (_chat.proposalStatus.value == 4)
+            // The server only accepts a cancellation on a published contract,
+            // and only one at a time. Gated on `published` rather than
+            // `proposalStatus == 4` directly: ChatController.published is the
+            // sticky flag that exists *because* proposalStatus can reset to
+            // null right after a publish (see its own doc comment) — reading
+            // status directly here made the option (and the "⋯" menu icon
+            // that holds it) vanish the moment that happened, which is why it
+            // stopped showing up after signing.
+            if (_chat.published.value &&
+                !_chat.isCancellationPending &&
+                !_chat.isContractCancelled)
               _menuItem(
                 ctx: ctx,
                 icon: Icons.cancel_outlined,
@@ -410,8 +417,8 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
   /// Whether [_showChatMenu] would render anything. Mirrors the conditions on
   /// its items, so the two cannot drift apart.
   bool get _hasChatMenuActions {
-    final status = _chat.proposalStatus.value;
-    return status == 4 || status == 5;
+    if (_chat.isContractCancelled) return false;
+    return _chat.published.value || _chat.isCancellationPending;
   }
 
   Widget _menuItem({

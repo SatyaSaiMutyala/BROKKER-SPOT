@@ -388,6 +388,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
                   index: i,
                   cardWidth: double.infinity,
                   cardHeight: _cardHeight,
+                  showListingTypeText: false,
                   onTap: () => Get.to(() => AnnouncementDetailView(
                         announcement: a,
                         isOwner: false,
@@ -493,6 +494,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
                   // cards stay flush with the header and filter rows.
                   cardWidth: double.infinity,
                   cardHeight: _cardHeight,
+                  showListingTypeText: false,
                   onTap: () => Get.to(() => AnnouncementDetailView(
                         announcement: a,
                         isOwner: false,
@@ -537,6 +539,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
               announcement: items[i],
               index: i,
               showAvatar: false,
+              showListingTypeText: false,
               onTap: () => Get.to(() => AnnouncementDetailView(
                     announcement: items[i],
                     isOwner: false,

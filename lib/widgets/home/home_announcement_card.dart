@@ -62,6 +62,13 @@ class HomeAnnouncementCard extends StatelessWidget {
   /// [showProposalBadge] is on.
   final ProposalBadge? statusBadge;
 
+  /// Shows the "For Sell / For Rent • " prefix on the property-type line
+  /// below the price. Off by default everywhere — redundant with the yellow
+  /// FOR SELL / FOR RENT corner badge, which stays and is now the only place
+  /// that says it. Left as a switch (rather than deleted) in case a future
+  /// caller drops the corner badge and needs the text to say it instead.
+  final bool showListingTypeText;
+
   const HomeAnnouncementCard({
     super.key,
     required this.announcement,
@@ -77,6 +84,7 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.isPrivateDeal = false,
     this.showProposalBadge = false,
     this.statusBadge,
+    this.showListingTypeText = false,
   });
 
   // Strip sits flush below the image card — no overlap.
@@ -107,45 +115,77 @@ class HomeAnnouncementCard extends StatelessWidget {
     return announcement.listingType ?? '';
   }
 
+  /// Red for an unseen "New Opportunity" card, grey once it's been seen — the
+  /// only two subtitles this applies to (every other badge's subtitle, e.g.
+  /// "Awaiting" or "Pending", isn't a seen/unseen state).
+  Color? _dotColorFor(String? subtitle) {
+    switch (subtitle) {
+      case 'Unseen':
+        return Colors.red;
+      case 'Seen':
+        return Colors.grey.shade400;
+      default:
+        return null;
+    }
+  }
+
   Widget _proposalBadge(ProposalBadge badge) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(14.w, 6.h, 22.w, 7.h),
-      decoration: BoxDecoration(
-        color: badge.color,
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(26),
-          bottomRight: Radius.circular(26),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            badge.title,
-            style: GoogleFonts.poppins(
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
-              height: 1.2,
-              letterSpacing: 0,
+    final dotColor = _dotColorFor(badge.subtitle);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: EdgeInsets.fromLTRB(14.w, 6.h, 22.w, 7.h),
+          decoration: BoxDecoration(
+            color: badge.color,
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(26),
+              bottomRight: Radius.circular(26),
             ),
           ),
-          if (badge.subtitle != null) ...[
-            SizedBox(height: 1.h),
-            Text(
-              badge.subtitle!,
-              style: GoogleFonts.poppins(
-                fontSize: 10.sp,
-                fontWeight: FontWeight.w400,
-                color: Colors.white,
-                height: 1.2,
-                letterSpacing: 0,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                badge.title,
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                  height: 1.2,
+                  letterSpacing: 0,
+                ),
               ),
+              if (badge.subtitle != null) ...[
+                SizedBox(height: 1.h),
+                Text(
+                  badge.subtitle!,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white,
+                    height: 1.2,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        // Sits in the padding reserved to its right, level with the title.
+        if (dotColor != null)
+          Positioned(
+            top: 11.h,
+            right: 8.w,
+            child: Container(
+              width: 8.w,
+              height: 8.w,
+              decoration:
+                  BoxDecoration(shape: BoxShape.circle, color: dotColor),
             ),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -315,15 +355,15 @@ class HomeAnnouncementCard extends StatelessWidget {
                           onTap: a.userRole != 2
                               ? null
                               : () => UserProfileView.open(
-                            userId: a.userId,
-                            name: a.ownerName,
-                            avatarUrl: showOwnerAvatar
-                                ? a.ownerAvatarUrl
-                                : a.brokerAvatarUrl,
-                            // Reached only for a broker-posted listing, so
-                            // its poster is being viewed as a broker.
-                            viewAsBroker: a.userRole == 2,
-                          ),
+                                    userId: a.userId,
+                                    name: a.ownerName,
+                                    avatarUrl: showOwnerAvatar
+                                        ? a.ownerAvatarUrl
+                                        : a.brokerAvatarUrl,
+                                    // Reached only for a broker-posted listing, so
+                                    // its poster is being viewed as a broker.
+                                    viewAsBroker: a.userRole == 2,
+                                  ),
                           child: Container(
                             width: 41.w,
                             height: 41.w,
@@ -416,7 +456,8 @@ class HomeAnnouncementCard extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                     text: TextSpan(
                                       children: [
-                                        if (a.listingType != null)
+                                        if (a.listingType != null &&
+                                            showListingTypeText)
                                           TextSpan(
                                             text: 'For ${a.listingType} • ',
                                             style: GoogleFonts.poppins(
