@@ -464,6 +464,10 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                   cardWidth: 344.w,
                   cardHeight: 263.h,
                   showBrokerageRow: true,
+                  // The announcements feed follows its own design for where
+                  // each piece of text sits. "My Announcements" keeps the
+                  // original arrangement, which its corner badge relies on.
+                  brokerFeedLayout: !widget.showMineOnly,
                   // "My Announcements" lists this broker's own listings, so
                   // the owner avatar in the corner would just be their own
                   // photo on every card.

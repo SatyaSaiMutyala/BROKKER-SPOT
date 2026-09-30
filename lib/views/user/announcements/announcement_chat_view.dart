@@ -467,18 +467,21 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
     );
   }
 
-  /// The owner's contract screen — countdown, agreement, withdraw.
+  /// The contract screen — countdown and agreement for both sides, withdraw
+  /// for the owner only.
   ///
   /// The live [ChatController] is handed over rather than re-fetched: it is
   /// already subscribed to this contract's status pushes, so the countdown and
   /// the withdraw result stay in step with the chat behind it.
   void _openContractDetails() {
+    final viewerIsBroker = (widget.userRole ?? 1) == 2;
     Get.to(() => ContractDetailsView(
           chat: _chat,
           announcementId: widget.announcementId,
           brokerName: widget.brokerName,
           // Owner side: the person on the other end of this chat is the broker.
-          brokerId: widget.peerUserId,
+          brokerId: viewerIsBroker ? null : widget.peerUserId,
+          viewerIsBroker: viewerIsBroker,
         ));
   }
 
@@ -488,11 +491,15 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
   /// the server still returns at status 6; the property and the signing date
   /// are looked up by the screen itself.
   void _openCancellationRecord() {
+    final viewerIsBroker = (widget.userRole ?? 1) == 2;
     Get.to(() => CancellationConfirmedView(
           announcementId: widget.announcementId,
-          brokerId: widget.peerUserId,
+          // Only the owner's peer is the broker; it keys the start-date
+          // lookup, which is an owner-only endpoint anyway.
+          brokerId: viewerIsBroker ? null : widget.peerUserId,
           contractId: _contractIdLabel,
           reason: _chat.cancellationReason.value,
+          viewerIsBroker: viewerIsBroker,
         ));
   }
 
@@ -861,13 +868,14 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
         );
       } else {
         // The broker cannot withdraw — that is the owner's call — so this is
-        // notice, not an action.
+        // notice, not an action. Same button and same screen as the owner's,
+        // which opens read-only for a broker.
         text = 'The owner requested to cancel this contract. '
             'It stays active for 48 hours.';
         button = _bannerButton(
-          icon: Icons.fact_check_outlined,
-          label: 'Information',
-          onTap: () => _openAgreementFlow(isOwner: false),
+          icon: Icons.gavel_rounded,
+          label: 'Cancellation',
+          onTap: _openContractDetails,
           color: const Color(0xFFD64545),
         );
       }

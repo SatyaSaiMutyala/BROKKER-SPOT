@@ -15,8 +15,12 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// The owner's view of one signed contract, and the only place a pending
-/// cancellation can be withdrawn.
+/// One signed contract, and the only place a pending cancellation can be
+/// withdrawn.
+///
+/// Shared by both parties. The owner can withdraw from here; the broker gets
+/// the same record read-only ([viewerIsBroker]) — whether the cancellation
+/// goes ahead is the owner's call, so there is nothing for them to act on.
 ///
 /// State comes from the live [ChatController] rather than a fetch of its own:
 /// the socket pushes every status change to both parties, so the countdown and
@@ -30,12 +34,18 @@ class ContractDetailsView extends StatefulWidget {
   final String brokerName;
   final String? brokerId;
 
+  /// True when the broker on the contract is the one looking at it. Hides the
+  /// withdraw action and names the other party — [brokerName] is then the
+  /// owner's name, since it is whoever is on the other end of the chat.
+  final bool viewerIsBroker;
+
   const ContractDetailsView({
     super.key,
     required this.chat,
     required this.announcementId,
     required this.brokerName,
     this.brokerId,
+    this.viewerIsBroker = false,
   });
 
   @override
@@ -147,7 +157,8 @@ class _ContractDetailsViewState extends State<ContractDetailsView> {
     }
 
     // The proposal list is the only place carrying the signing date. It is an
-    // owner-only endpoint, which is fine — only the owner reaches this screen.
+    // owner-only endpoint, so a broker goes without the start date.
+    if (widget.viewerIsBroker) return;
     try {
       final proposals = await _repo.fetchProposals(widget.announcementId);
       final brokerId = widget.brokerId;
@@ -176,6 +187,7 @@ class _ContractDetailsViewState extends State<ContractDetailsView> {
         contractId: _contractId,
         contractStart: _contractStart,
         reason: _chat.cancellationReason.value,
+        viewerIsBroker: widget.viewerIsBroker,
       ),
     );
   }
@@ -280,8 +292,11 @@ class _ContractDetailsViewState extends State<ContractDetailsView> {
               // `now < cancellation_expires_at` and status is 5, and is
               // *hidden* once the window closes — not left greyed out. Past
               // that point the cron owns the outcome and there is nothing the
-              // owner can still do.
-              if (isPending && _chat.withdrawTimeLeft > Duration.zero)
+              // owner can still do. Never shown to the broker: withdrawing is
+              // the owner's decision alone.
+              if (!widget.viewerIsBroker &&
+                  isPending &&
+                  _chat.withdrawTimeLeft > Duration.zero)
                 _withdrawFooter(isDark),
             ],
           );
@@ -321,8 +336,12 @@ class _ContractDetailsViewState extends State<ContractDetailsView> {
                 ),
                 SizedBox(height: 3.h),
                 Text(
-                  'Your cancellation request is pending. You have 48 hours '
-                  'to withdraw the request.',
+                  widget.viewerIsBroker
+                      ? 'The owner requested to cancel this contract. It '
+                          'stays active for 48 hours, unless the owner '
+                          'withdraws the request.'
+                      : 'Your cancellation request is pending. You have 48 '
+                          'hours to withdraw the request.',
                   style: GoogleFonts.poppins(
                     fontSize: 11.5.sp,
                     fontWeight: FontWeight.w300,
@@ -359,7 +378,9 @@ class _ContractDetailsViewState extends State<ContractDetailsView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'TIME REMAINING TO WITHDRAW',
+                  widget.viewerIsBroker
+                      ? 'TIME REMAINING UNTIL CANCELLATION'
+                      : 'TIME REMAINING TO WITHDRAW',
                   style: GoogleFonts.poppins(
                     fontSize: 10.5.sp,
                     fontWeight: FontWeight.w500,
@@ -394,15 +415,17 @@ class _ContractDetailsViewState extends State<ContractDetailsView> {
     final a = _announcement;
     final commission = a?.brokkeragePercent;
     final contractId = _contractId;
+    final reason = _chat.cancellationReason.value?.trim();
 
     return Column(
       children: [
         CancelTheme.detailRow(
           icon: Icons.person_outline,
-          label: 'Broker',
+          label: widget.viewerIsBroker ? 'Owner' : 'Broker',
           value: widget.brokerName,
           isDark: isDark,
-          onTap: widget.brokerId == null
+          // Only a broker has a profile to open — same rule as the chat header.
+          onTap: widget.viewerIsBroker || widget.brokerId == null
               ? null
               : () => UserProfileView.open(
                     userId: widget.brokerId,
@@ -432,6 +455,15 @@ class _ContractDetailsViewState extends State<ContractDetailsView> {
             icon: Icons.description_outlined,
             label: 'Contract ID',
             value: contractId,
+            isDark: isDark,
+          ),
+        // The owner picked the reason a moment ago; the broker is reading it
+        // for the first time, and it is the one thing they came here to learn.
+        if (widget.viewerIsBroker && reason != null && reason.isNotEmpty)
+          CancelTheme.detailRow(
+            icon: Icons.info_outline,
+            label: 'Reason',
+            value: reason,
             isDark: isDark,
           ),
         Divider(height: 20.h, color: CancelTheme.hairline(isDark)),

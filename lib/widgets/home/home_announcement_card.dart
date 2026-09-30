@@ -69,6 +69,15 @@ class HomeAnnouncementCard extends StatelessWidget {
   /// caller drops the corner badge and needs the text to say it instead.
   final bool showListingTypeText;
 
+  /// Arranges the card's text the way the broker feed's design does, without
+  /// touching its size, badge or strip:
+  ///  • "RENT • Villa" first, then the price with its currency (and rent
+  ///    period) after it, then the location;
+  ///  • the listing's age under the avatar instead of beside the type;
+  ///  • the photo count alone in the bottom-right corner.
+  /// Off by default, so every other screen keeps the original arrangement.
+  final bool brokerFeedLayout;
+
   const HomeAnnouncementCard({
     super.key,
     required this.announcement,
@@ -85,6 +94,7 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.showProposalBadge = false,
     this.statusBadge,
     this.showListingTypeText = false,
+    this.brokerFeedLayout = false,
   });
 
   // Strip sits flush below the image card — no overlap.
@@ -335,47 +345,31 @@ class HomeAnnouncementCard extends StatelessWidget {
                         ),
                       ),
 
-                    // Owner avatar — top right, 41×41, 1px #D0D0D0 border, no inner gap
-                    if (showAvatar)
+                    // Owner avatar — top right. The broker feed puts the
+                    // listing's age under it.
+                    if (showAvatar || (brokerFeedLayout && a.timeAgo != null))
                       Positioned(
                         top: 14.h,
                         right: 10.w,
-                        child: GestureDetector(
-                          // A listing posted from the user side belongs to a
-                          // client, and a client has no profile screen — only
-                          // a broker's licence and areas are worth opening.
-                          // Null lets the tap fall through to the card.
-                          // Both photo fields sit on the same populated
-                          // user_id — showOwnerAvatar only picks which one to
-                          // render, not a different person — so a.userId is
-                          // who this always is. Own GestureDetector so it wins
-                          // over the card's onTap for a tap landing exactly on
-                          // the avatar, without stopping the rest of the card
-                          // from still opening the listing.
-                          onTap: a.userRole != 2
-                              ? null
-                              : () => UserProfileView.open(
-                                    userId: a.userId,
-                                    name: a.ownerName,
-                                    avatarUrl: showOwnerAvatar
-                                        ? a.ownerAvatarUrl
-                                        : a.brokerAvatarUrl,
-                                    // Reached only for a broker-posted listing, so
-                                    // its poster is being viewed as a broker.
-                                    viewAsBroker: a.userRole == 2,
-                                  ),
-                          child: Container(
-                            width: 41.w,
-                            height: 41.w,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFFD0D0D0),
-                                width: 1,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            if (showAvatar) _avatarButton(a),
+                            if (brokerFeedLayout && a.timeAgo != null) ...[
+                              if (showAvatar) SizedBox(height: 5.h),
+                              Text(
+                                a.timeAgo!,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w400,
+                                  color: Colors.white,
+                                  height: 1.2,
+                                  letterSpacing: 0,
+                                ),
                               ),
-                            ),
-                            child: ClipOval(child: _buildAvatar(a)),
-                          ),
+                            ],
+                          ],
                         ),
                       ),
 
@@ -384,7 +378,9 @@ class HomeAnnouncementCard extends StatelessWidget {
                       left: 14.w,
                       right: 10.w,
                       bottom: 16.h,
-                      child: Column(
+                      child: brokerFeedLayout
+                          ? _brokerFeedInfo(a, imgCount)
+                          : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -532,6 +528,179 @@ class HomeAnnouncementCard extends StatelessWidget {
           ], // outer Stack children
         ), // outer Stack
       ), // SizedBox
+    );
+  }
+
+  /// Owner avatar — 41×41, 1px #D0D0D0 border, no inner gap.
+  Widget _avatarButton(AnnouncementModel a) {
+    return GestureDetector(
+      // A listing posted from the user side belongs to a client, and a client
+      // has no profile screen — only a broker's licence and areas are worth
+      // opening. Null lets the tap fall through to the card.
+      // Both photo fields sit on the same populated user_id — showOwnerAvatar
+      // only picks which one to render, not a different person — so a.userId
+      // is who this always is. Own GestureDetector so it wins over the card's
+      // onTap for a tap landing exactly on the avatar, without stopping the
+      // rest of the card from still opening the listing.
+      onTap: a.userRole != 2
+          ? null
+          : () => UserProfileView.open(
+                userId: a.userId,
+                name: a.ownerName,
+                avatarUrl:
+                    showOwnerAvatar ? a.ownerAvatarUrl : a.brokerAvatarUrl,
+                // Reached only for a broker-posted listing, so its poster is
+                // being viewed as a broker.
+                viewAsBroker: a.userRole == 2,
+              ),
+      child: Container(
+        width: 41.w,
+        height: 41.w,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFD0D0D0), width: 1),
+        ),
+        child: ClipOval(child: _buildAvatar(a)),
+      ),
+    );
+  }
+
+  /// "YEAR" / "MONTH" for the price suffix, from the API's yearly / monthly.
+  static String _periodUnit(String period) {
+    final p = period.trim().toLowerCase();
+    final unit = p.endsWith('ly') ? p.substring(0, p.length - 2) : p;
+    return unit.toUpperCase();
+  }
+
+  /// What follows the price on the broker feed: "AED" on a sale,
+  /// "AED / YEAR" on a rental.
+  @visibleForTesting
+  static String priceSuffix(AnnouncementModel a) {
+    final period = a.rentPeriod?.trim() ?? '';
+    return [
+      a.currency ?? 'AED',
+      if (a.listingType == 'Rent' && period.isNotEmpty) _periodUnit(period),
+    ].join(' / ');
+  }
+
+  /// The bottom block in the broker feed's order — see [brokerFeedLayout].
+  Widget _brokerFeedInfo(AnnouncementModel a, int imgCount) {
+    final location = _resolveLocation(a);
+    final listing = a.listingType?.trim() ?? '';
+    final type = a.propertyType?.trim() ?? '';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // "RENT • Villa"
+              if (listing.isNotEmpty || type.isNotEmpty)
+                RichText(
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  text: TextSpan(
+                    children: [
+                      if (listing.isNotEmpty)
+                        TextSpan(
+                          text: listing.toUpperCase(),
+                          style: GoogleFonts.poppins(
+                            fontSize: 17.sp,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                            height: _lineHeight,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      if (listing.isNotEmpty && type.isNotEmpty)
+                        TextSpan(
+                          text: ' • ',
+                          style: GoogleFonts.poppins(
+                            fontSize: 17.sp,
+                            fontWeight: FontWeight.w300,
+                            color: const Color(0xFFC8C8C8),
+                            height: _lineHeight,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      if (type.isNotEmpty)
+                        TextSpan(
+                          text: type,
+                          style: GoogleFonts.poppins(
+                            fontSize: 17.sp,
+                            fontWeight: FontWeight.w300,
+                            color: Colors.white,
+                            height: _lineHeight,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              // "150,000 AED / YEAR"
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    _formatPrice(a.price ?? 0),
+                    style: GoogleFonts.poppins(
+                      fontSize: 27.sp,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFDBC483),
+                      height: 1.15,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  SizedBox(width: 6.w),
+                  Flexible(
+                    child: Text(
+                      priceSuffix(a),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white70,
+                        height: _lineHeight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (location.isNotEmpty)
+                Row(
+                  children: [
+                    Icon(Icons.location_on_rounded,
+                        size: 14.sp, color: AppColors.primary),
+                    SizedBox(width: 4.w),
+                    Expanded(
+                      child: Text(
+                        location,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w300,
+                          color: const Color(0xFF9E9E9E),
+                          height: _lineHeight,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+        if (imgCount > 1) ...[
+          SizedBox(width: 6.w),
+          _imageCountCircle(imgCount),
+        ],
+      ],
     );
   }
 

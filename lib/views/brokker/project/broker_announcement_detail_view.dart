@@ -17,12 +17,16 @@ import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
 import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/models/meeting_item_model.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart'
     show showLoginRequiredDialog;
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
+import 'package:brokkerspot/views/user/meeting/announcement_conversations_view.dart';
+import 'package:brokkerspot/views/user/meeting/controller/announcement_conversations_controller.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_detail_body.dart';
+import 'package:brokkerspot/widgets/announcements/conversations_bar.dart';
 import 'package:brokkerspot/widgets/announcements/send_proposal_bar.dart';
 import 'package:brokkerspot/widgets/common/custom_back_button.dart';
 import 'package:brokkerspot/views/brokker/home/controller/broker_dashboard_controller.dart';
@@ -74,6 +78,12 @@ class _BrokerAnnouncementDetailViewState
   /// string (e.g. opened from a notification for a brand-new announcement).
   String? _ownerName;
   String? _ownerAvatar;
+
+  /// The people who have written to the broker about this listing — their
+  /// own announcement only, and only once the detail says there are any.
+  /// See [_loadConversationsIfAny].
+  AnnouncementConversationsController? _conversations;
+  String? _conversationsTag;
 
   static const List<String> _fallbackImages = [
     'assets/images/rent1.png',
@@ -135,6 +145,10 @@ class _BrokerAnnouncementDetailViewState
   void dispose() {
     _videoKey.currentState?.forceStop();
     _pageController.dispose();
+    final conversationsTag = _conversationsTag;
+    if (conversationsTag != null) {
+      Get.delete<AnnouncementConversationsController>(tag: conversationsTag);
+    }
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
@@ -158,6 +172,7 @@ class _BrokerAnnouncementDetailViewState
           _data = fresh;
           _detailLoaded = true;
         });
+        _loadConversationsIfAny();
         // Opening a user's listing is what records the view server-side
         // (logAnnouncementView), so the seen/unseen split on the broker's
         // feed has just moved. Nothing is broadcast back for it, and
@@ -182,6 +197,44 @@ class _BrokerAnnouncementDetailViewState
         });
       }
     }
+  }
+
+  /// Asks for the people behind `conversations_count`, once.
+  ///
+  /// The count is sent only to the broker who posted the listing, and the
+  /// list behind it comes over the socket (`chat:announcement:conversations`)
+  /// — asked for only when the count says there is someone to list.
+  void _loadConversationsIfAny() {
+    if (_conversations != null || !mounted) return;
+    final id = _data.id;
+    if (id == null || id.isEmpty) return;
+    if (!_isOwnAnnouncement || (_data.conversationsCount ?? 0) <= 0) return;
+
+    // Tagged per screen. The conversations screen registers its own controller
+    // under the bare announcement id and deletes it on the way out, which
+    // would take this one with it.
+    final tag = 'detail:$id:${identityHashCode(this)}';
+    final controller = Get.put(
+      AnnouncementConversationsController(announcementId: id),
+      tag: tag,
+    );
+    setState(() {
+      _conversationsTag = tag;
+      _conversations = controller;
+    });
+  }
+
+  void _openConversations(List<ChatProfileSummary> people) {
+    final id = _data.id;
+    if (id == null || id.isEmpty) return;
+    Get.to(() => AnnouncementConversationsView(
+          meeting: MeetingItem(
+            announcementId: id,
+            announcement: _data,
+            chatProfiles: people,
+            chatProfilesCount: people.length,
+          ),
+        ));
   }
 
   /// Looks up owner name / avatar to populate [_ownerName] / [_ownerAvatar]
@@ -916,13 +969,16 @@ class _BrokerAnnouncementDetailViewState
 
     // The bar's actions — chat with the owner, or send them a proposal — are
     // both about someone else's listing. On the broker's own announcement
-    // there is no counterparty, so the bar is dropped entirely — except for a
-    // draft, which is unfinished work and needs the way back into the form
-    // that the user side already offers.
+    // the counterparties are whoever has written in about it: with any, the
+    // bar lists them, the way the owner's detail screen lists its brokers;
+    // with none it is dropped. A draft is unfinished work and gets the way
+    // back into the form instead, as on the user side.
     if (_isOwnAnnouncement) {
       if ((_data.status ?? '').toLowerCase() == 'draft') {
         return _buildResumeDraftBar(isDark, bottomPad);
       }
+      final count = _data.conversationsCount ?? 0;
+      if (count > 0) return _buildConversationsBar(isDark, bottomPad, count);
       return const SizedBox.shrink();
     }
 
@@ -1078,6 +1134,27 @@ class _BrokerAnnouncementDetailViewState
     return Padding(
       padding: EdgeInsets.fromLTRB(44.w, 0, 44.w, 10.h + bottomPad),
       child: SizedBox(width: double.infinity, child: button),
+    );
+  }
+
+  Widget _buildConversationsBar(bool isDark, double bottomPad, int count) {
+    final controller = _conversations;
+
+    Widget bar(List<ChatProfileSummary> people) => ConversationsBar(
+          // Someone new can write in while the screen is open, taking the
+          // list past the count it loaded with.
+          count: people.length > count ? people.length : count,
+          people: people,
+          isDark: isDark,
+          onTap: () => _openConversations(people),
+        );
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(44.w, 0, 44.w, 10.h + bottomPad),
+      child: controller == null
+          ? bar(const [])
+          : Obx(() =>
+              bar(controller.conversations.map((c) => c.user).toList())),
     );
   }
 

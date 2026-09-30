@@ -242,6 +242,11 @@ class AnnouncementModel {
   /// a new broker on until one of them is cancelled.
   final int? publishedCount;
 
+  /// How many people have a chat going with the broker about this listing
+  /// (`conversations_count`). Sent on the announcement detail only, and only
+  /// to the broker who posted it — null everywhere else.
+  final int? conversationsCount;
+
   /// Whether the signed-in account has opened this listing before, for the
   /// side it is browsing from (`is_viewed`). Sent on the feed; the server
   /// records the view when the detail screen fetches the listing — but does
@@ -351,6 +356,7 @@ class AnnouncementModel {
     this.myProposalStatus,
     this.isViewed,
     this.publishedCount,
+    this.conversationsCount,
     this.isChatAvailable,
     this.userRole,
     this.ownerId,
@@ -495,6 +501,7 @@ class AnnouncementModel {
       isOwner: json['is_owner'] as bool?,
       isProposalSent: json['is_proposal_sent'] as bool?,
       publishedCount: (json['published_count'] as num?)?.toInt(),
+      conversationsCount: (json['conversations_count'] as num?)?.toInt(),
       isViewed: json['is_viewed'] as bool?,
       myProposalStatus: json['proposal_details'] is Map
           ? ((json['proposal_details'] as Map)['status'] as num?)?.toInt()

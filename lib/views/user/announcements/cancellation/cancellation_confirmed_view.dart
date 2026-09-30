@@ -1,4 +1,5 @@
 import 'package:brokkerspot/models/announcement_model.dart';
+import 'package:brokkerspot/views/brokker/dashboard/brokker_dashboard.dart';
 import 'package:brokkerspot/views/user/announcements/cancellation/cancellation_theme.dart';
 import 'package:brokkerspot/views/user/announcements/cancellation/contract_property_card.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
@@ -30,6 +31,11 @@ class CancellationConfirmedView extends StatefulWidget {
   /// when looking up the contract's start date.
   final String? brokerId;
 
+  /// True when the broker on the contract is the one looking at this record.
+  /// Decides which dashboard "Back to Home" lands on — the screen is shared by
+  /// both sides, and home for a broker is the broker dashboard.
+  final bool viewerIsBroker;
+
   const CancellationConfirmedView({
     super.key,
     this.announcement,
@@ -38,6 +44,7 @@ class CancellationConfirmedView extends StatefulWidget {
     this.reason,
     this.announcementId,
     this.brokerId,
+    this.viewerIsBroker = false,
   });
 
   @override
@@ -166,8 +173,11 @@ class _CancellationConfirmedViewState extends State<CancellationConfirmedView> {
                 label: 'Back to Home',
                 // Everything below this screen describes a contract that no
                 // longer exists — the chat banner, the details screen — so the
-                // stack is dropped rather than popped back through.
-                onPressed: () => Get.offAll(() => const DashboardView()),
+                // stack is dropped rather than popped back through. Each side
+                // goes back to its own home.
+                onPressed: () => Get.offAll(() => widget.viewerIsBroker
+                    ? BrokerDashBoardView()
+                    : const DashboardView()),
               ),
             ),
           ],
