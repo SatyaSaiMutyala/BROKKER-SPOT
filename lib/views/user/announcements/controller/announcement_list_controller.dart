@@ -524,6 +524,33 @@ class AnnouncementListController extends GetxController {
     ]);
   }
 
+  /// Flips a cached item's `isViewed` to true in place, so its Seen/Unseen
+  /// badge (the broker feed's NEW OPPORTUNITY pill) updates the moment the
+  /// viewer comes back from the detail screen.
+  ///
+  /// The server records the view when the detail screen fetches the listing
+  /// (`logAnnouncementView`), but never announces it — no push, and the
+  /// count-based staleness check in [refreshBrokerIfChanged] can't catch it
+  /// either, since the item count on the feed hasn't changed, only one
+  /// item's field. A patch-in-place is the only thing that actually updates
+  /// the badge without an unconditional refetch on every return trip.
+  ///
+  /// Only [brokerAnnouncements] carries this badge today (see
+  /// BrokerProjectsView's `showProposalBadge`), but every cached list the id
+  /// could appear in is patched so this keeps working if that changes.
+  void markAnnouncementViewed(String id) {
+    void patch(RxList<AnnouncementModel> list) {
+      final idx = list.indexWhere((a) => a.id == id);
+      if (idx == -1 || list[idx].isViewed == true) return;
+      list[idx].isViewed = true;
+      list.refresh();
+    }
+
+    patch(allAnnouncements);
+    patch(brokerAnnouncements);
+    patch(homeAnnouncements);
+  }
+
   /// Remove a deleted item from the cached lists immediately (optimistic),
   /// so the UI updates without waiting for a network round-trip.
   void removeLocally(String id) {

@@ -306,13 +306,27 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           // Once the contract is cancelled (status 6) nothing can be done to
           // it, so the button goes rather than opening an empty sheet — the
           // record is reached from the banner's View Details instead.
-          if ((widget.userRole ?? 1) == 1 && _hasChatMenuActions)
-            CustomIconButton(
+          //
+          // Wrapped in its own Obx: _hasChatMenuActions reads `published` and
+          // `proposalStatus`, both of which land asynchronously (the socket
+          // round-trip from _loadProposal) after this header has already
+          // built once, synchronously, with published still false. Without
+          // this the icon just never appeared on a first-time open from the
+          // Meeting list — reopening the chat "fixed" it only because that
+          // was a fresh build running after the round-trip had already
+          // landed, not because anything was actually different the second
+          // time.
+          Obx(() {
+            if ((widget.userRole ?? 1) != 1 || !_hasChatMenuActions) {
+              return const SizedBox.shrink();
+            }
+            return CustomIconButton(
               isDark: isDark,
               size: 38,
               onTap: () => _showChatMenu(isDark),
               child: Icon(Icons.more_horiz, size: 20.sp, color: iconColor),
-            ),
+            );
+          }),
         ],
       ),
     );

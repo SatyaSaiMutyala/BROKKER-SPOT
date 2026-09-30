@@ -337,6 +337,29 @@ class ChatController extends GetxController {
             currentUserId: _currentUserId, peerUserId: recipientId))
         .toList();
 
+    // The proposal that opened this conversation carries its own message,
+    // stored on the proposal document rather than as a real chat row — the
+    // server started returning it here (`proposal.message`) instead of
+    // duplicating it into the chat collection. Surface it as the
+    // conversation's first message. Page-1 only, so a loadMore for older
+    // pages doesn't re-add it every time; the null createdAt sorts it ahead
+    // of everything else in _sortByTime, which is where it belongs — nothing
+    // in the conversation predates it.
+    if (_page <= 1) {
+      final proposalMap = map['proposal'];
+      if (proposalMap is Map) {
+        final p = Map<String, dynamic>.from(proposalMap);
+        final proposalText = p['message']?.toString().trim();
+        if (proposalText != null && proposalText.isNotEmpty) {
+          fromServer.add(ChatMessage.fromJson(
+            {...p, 'announcement_id': announcementId},
+            currentUserId: _currentUserId,
+            peerUserId: recipientId,
+          ));
+        }
+      }
+    }
+
     if (kDebugMode && rawList.isNotEmpty) {
       // Prints the exact comparison behind the left/right decision, so a
       // wrongly-sided bubble can be read off the log instead of guessed at.

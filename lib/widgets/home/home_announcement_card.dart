@@ -176,11 +176,11 @@ class HomeAnnouncementCard extends StatelessWidget {
         // Sits in the padding reserved to its right, level with the title.
         if (dotColor != null)
           Positioned(
-            top: 11.h,
-            right: 8.w,
+            top: 10.h,
+            right: 7.w,
             child: Container(
-              width: 8.w,
-              height: 8.w,
+              width: 10.w,
+              height: 10.w,
               decoration:
                   BoxDecoration(shape: BoxShape.circle, color: dotColor),
             ),

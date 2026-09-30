@@ -244,8 +244,16 @@ class AnnouncementModel {
 
   /// Whether the signed-in account has opened this listing before, for the
   /// side it is browsing from (`is_viewed`). Sent on the feed; the server
-  /// records the view when the detail screen fetches the listing.
-  final bool? isViewed;
+  /// records the view when the detail screen fetches the listing — but does
+  /// not push that back out, so nothing else learns a view just happened.
+  ///
+  /// Deliberately not `final`: [AnnouncementListController.markAnnouncementViewed]
+  /// flips this in place on the cached feed item right after the detail
+  /// screen confirms the view, so the card's Seen/Unseen badge updates the
+  /// moment the user comes back — without it, the only way to see it change
+  /// would be a full refetch, and nothing here is currently wired to ask for
+  /// one just because a view happened.
+  bool? isViewed;
 
   /// This broker's own proposal on the listing — 0 pending, 1 approved by the
   /// owner, 2 rejected, 3 signed by the broker, 4 published, 5 cancellation

@@ -117,9 +117,7 @@ class _DestinationSlot extends StatelessWidget {
     return Semantics(
       button: true,
       selected: isSelected,
-      label: destination.hasBadge
-          ? '$name, $count unread'
-          : name,
+      label: destination.hasBadge ? '$name, $count unread' : name,
       child: InkResponse(
         onTap: onTap,
         radius: 32.r,

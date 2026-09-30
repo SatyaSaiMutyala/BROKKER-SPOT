@@ -160,9 +160,13 @@ class _BrokerAnnouncementDetailViewState
         });
         // Opening a user's listing is what records the view server-side
         // (logAnnouncementView), so the seen/unseen split on the broker's
-        // home screen has just moved. Nothing is broadcast back for it.
+        // feed has just moved. Nothing is broadcast back for it, and
+        // BrokerDashboardController tracks the Home tab's proposal counters
+        // — a different thing than this card's badge — so it alone never
+        // moved the feed. Patch the cached feed item directly instead.
         if (fresh.userRole == 1 && fresh.isOwner != true) {
           BrokerDashboardController.to.markChanged();
+          AnnouncementListController.to.markAnnouncementViewed(id);
         }
         // Supplement owner info from the list cache when the detail endpoint
         // returned user_id as a plain string (no name/avatar on fresh model).
@@ -1154,6 +1158,11 @@ class _ProposalSheetState extends State<_ProposalSheet> {
     });
     try {
       await AnnouncementRepository().sendProposal(a.id ?? '', message: text);
+      // The proposal message used to have nowhere to show up in the
+      // conversation — the backend now returns it as `proposal.message` on
+      // `chat:history` instead, and ChatController surfaces that as the
+      // conversation's first message itself. Nothing to send here anymore;
+      // doing so would duplicate it as a second, real chat row.
       // A proposal with no conversation yet — the pending count on the
       // broker's home screen. Their own action, so no event announces it.
       BrokerDashboardController.to.markChanged();

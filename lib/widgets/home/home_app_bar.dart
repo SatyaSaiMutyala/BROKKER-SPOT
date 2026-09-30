@@ -38,64 +38,73 @@ class HomeAppBar extends StatelessWidget {
     final theme = Theme.of(context);
     return Row(
       children: [
-        GestureDetector(
-          onTap: onAvatarTap,
-          child: Row(
-            // The greeting is a single line now that the country came out, so
-            // it lines up on the avatar's middle instead of its top edge.
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Avatar — 41×41 with 1px #DBC483 border
-              Container(
-                width: 41.w,
-                height: 41.w,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFFDBC483),
-                    width: 1,
+        Expanded(
+          child: GestureDetector(
+            onTap: onAvatarTap,
+            child: Row(
+              // The greeting is a single line now that the country came out, so
+              // it lines up on the avatar's middle instead of its top edge.
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Avatar — 41×41 with 1px #DBC483 border
+                Container(
+                  width: 41.w,
+                  height: 41.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFDBC483),
+                      width: 1,
+                    ),
+                    color: Colors.grey.shade200,
                   ),
-                  color: Colors.grey.shade200,
-                ),
-                child: ClipOval(
-                  child: isAvatarLoading
-                      ? ShimmerCircle(radius: 19.w)
-                      : avatarUrl.isNotEmpty
-                          ? Image.network(
-                              avatarUrl,
-                              key: ValueKey(avatarUrl),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  _avatarPlaceholder(),
-                            )
-                          : _avatarPlaceholder(),
-                ),
-              ),
-              SizedBox(width: 12.w),
-              if (isGreetingLoading)
-                // Tracks the text's own box: 18sp on a 1.35 line.
-                ShimmerBox(
-                  width: 140.w,
-                  height: 24.h,
-                  borderRadius: BorderRadius.circular(4.r),
-                )
-              else
-                Text(
-                  'Hi, $greetingName',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.w500,
-                    color: theme.colorScheme.onSurface,
-                    letterSpacing: 18 * 0.05,
-                    // Poppins needs 1.4em for its glyphs; a tight box shears
-                    // the tops off once a long name ellipsises.
-                    height: 1.35,
+                  child: ClipOval(
+                    child: isAvatarLoading
+                        ? ShimmerCircle(radius: 19.w)
+                        : avatarUrl.isNotEmpty
+                            ? Image.network(
+                                avatarUrl,
+                                key: ValueKey(avatarUrl),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _avatarPlaceholder(),
+                              )
+                            : _avatarPlaceholder(),
                   ),
                 ),
-            ],
+                SizedBox(width: 12.w),
+                if (isGreetingLoading)
+                  // Tracks the text's own box: 18sp on a 1.35 line.
+                  ShimmerBox(
+                    width: 140.w,
+                    height: 24.h,
+                    borderRadius: BorderRadius.circular(4.r),
+                  )
+                else
+                  // Flexible so a long name shrinks to one ellipsised line
+                  // instead of overflowing past the notification pill —
+                  // shared by both the user and broker home screens (see
+                  // class doc), so this covers a long name on either side.
+                  Flexible(
+                    child: Text(
+                      'Hi, $greetingName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w500,
+                        color: theme.colorScheme.onSurface,
+                        letterSpacing: 18 * 0.05,
+                        // Poppins needs 1.4em for its glyphs; a tight box shears
+                        // the tops off once a long name ellipsises.
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
-        const Spacer(),
         // Notification pill (#FAF7F1, r:39). Was 91.w when it also held the
         // search icon — restore that width if search comes back.
         // Dropped entirely for a guest — there's no account to hold
