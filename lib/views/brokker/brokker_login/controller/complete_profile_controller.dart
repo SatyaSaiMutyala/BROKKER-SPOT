@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
 import 'package:brokkerspot/core/constants/flutter_toast.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/model/complete_profile_model.dart';
 import 'package:brokkerspot/views/brokker/brokker_login/repo/complete_profile_repo.dart';
 import 'package:flutter/material.dart';
@@ -238,6 +239,16 @@ class CompleteProfileController extends GetxController {
         AppToast.success(result.message.isNotEmpty
             ? result.message
             : 'Profile updated successfully');
+        // Submitting flips verificationStatus inactive → pending server-side
+        // (ProfileService.updateBrokerDetails), but nothing here told the
+        // shared ProfileController that — it kept showing whatever
+        // verificationStatus the last /me fetch had, which on a first
+        // submission was the pre-submit "inactive". Re-fetch so the broker
+        // home app bar's status badge reflects the real state right away
+        // instead of only after the next unrelated profile refresh.
+        if (Get.isRegistered<ProfileController>()) {
+          await ProfileController.to.getProfile();
+        }
         return true;
       } else {
         AppToast.error(result.message);

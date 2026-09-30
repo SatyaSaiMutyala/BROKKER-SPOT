@@ -114,15 +114,23 @@ class _BackBtnPainter extends CustomPainter {
 
     // Top-left: 180° → 270° (9 o'clock → 12 o'clock)
     arcPaint.shader = ui.Gradient.sweep(
-      center, [fade, peak, fade], [0.0, 0.5, 1.0],
-      TileMode.clamp, pi, 3 * pi / 2,
+      center,
+      [fade, peak, fade],
+      [0.0, 0.5, 1.0],
+      TileMode.clamp,
+      pi,
+      3 * pi / 2,
     );
     canvas.drawArc(arcRect, pi, pi / 2, false, arcPaint);
 
     // Bottom-right: 0° → 90° (3 o'clock → 6 o'clock)
     arcPaint.shader = ui.Gradient.sweep(
-      center, [fade, peak, fade], [0.0, 0.5, 1.0],
-      TileMode.clamp, 0, pi / 2,
+      center,
+      [fade, peak, fade],
+      [0.0, 0.5, 1.0],
+      TileMode.clamp,
+      0,
+      pi / 2,
     );
     canvas.drawArc(arcRect, 0, pi / 2, false, arcPaint);
   }

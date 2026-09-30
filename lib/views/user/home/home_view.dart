@@ -192,7 +192,8 @@ class _HomeViewState extends State<HomeView> with RouteAware {
                         AppSearchBar(
                           controller: _searchTextCtrl,
                           horizontalPadding: _gutter,
-                          filterBadgeCount: _searchCtrl.filter.value.activeCount,
+                          filterBadgeCount:
+                              _searchCtrl.filter.value.activeCount,
                           onChanged: _searchCtrl.onSearchChanged,
                           onFilterTap: () async {
                             final result = await Get.to<PropertyFilter>(
@@ -389,6 +390,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
                   cardWidth: double.infinity,
                   cardHeight: _cardHeight,
                   showListingTypeText: false,
+                  brokerFeedLayout: true,
                   onTap: () => Get.to(() => AnnouncementDetailView(
                         announcement: a,
                         isOwner: false,
@@ -495,6 +497,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
                   cardWidth: double.infinity,
                   cardHeight: _cardHeight,
                   showListingTypeText: false,
+                  brokerFeedLayout: true,
                   onTap: () => Get.to(() => AnnouncementDetailView(
                         announcement: a,
                         isOwner: false,
@@ -540,6 +543,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
               index: i,
               showAvatar: false,
               showListingTypeText: false,
+              brokerFeedLayout: true,
               onTap: () => Get.to(() => AnnouncementDetailView(
                     announcement: items[i],
                     isOwner: false,

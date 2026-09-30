@@ -20,6 +20,10 @@ class HomeAppBar extends StatelessWidget {
   /// belong to — the bell is dropped rather than shown pointing at nothing.
   final bool isGuest;
 
+  /// Optional pill shown right after the greeting (e.g. the broker side's
+  /// verification status) — same row, not a separate line underneath.
+  final Widget? statusBadge;
+
   const HomeAppBar({
     super.key,
     required this.avatarUrl,
@@ -31,6 +35,7 @@ class HomeAppBar extends StatelessWidget {
     required this.onNotificationTap,
     required this.onSearchTap,
     this.isGuest = false,
+    this.statusBadge,
   });
 
   @override
@@ -101,6 +106,10 @@ class HomeAppBar extends StatelessWidget {
                       ),
                     ),
                   ),
+                if (statusBadge != null) ...[
+                  SizedBox(width: 8.w),
+                  statusBadge!,
+                ],
               ],
             ),
           ),

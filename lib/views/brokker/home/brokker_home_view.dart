@@ -100,6 +100,13 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
         // Hides the bell for a guest, same as the user-side home — there is
         // no account to hold notifications.
         isGuest: _profileCtrl.isGuest,
+        // Read in the SAME Obx as the rest of the header rather than in a
+        // nested Obx of its own — a nested Obx here previously caused a
+        // "[Get] the improper use of a GetX has been detected" crash plus a
+        // massive RenderFlex overflow elsewhere in this app (see
+        // announcement_chat_view.dart's header icon), so any reactive read
+        // for this row goes through this one Obx instead.
+        statusBadge: _verificationBadge(_profileCtrl.verificationStatus),
         onAvatarTap: () {
           if (LocalStorageService.isLoggedIn()) {
             Get.find<BottomNavController>().currentIndex.value = 3;
@@ -111,6 +118,62 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
         onSearchTap: () => Get.to(() => const SearchView()),
       );
     });
+  }
+
+  /// "Inactive" in skip mode (profile never submitted), "Pending" while admin
+  /// review is outstanding, "Broker" once approved.
+  ///
+  /// Reads ProfileController.verificationStatus, which `/user/auth/me`
+  /// returns directly. No badge for "rejected" (not asked for yet). Pure
+  /// function of [status] — the reactive read happens in [_buildHeader]'s
+  /// Obx, not here, so this never creates a nested Obx.
+  Widget? _verificationBadge(String? status) {
+    final String label;
+    final Color color;
+    switch (status) {
+      case 'inactive':
+        label = 'Inactive';
+        color = Colors.grey.shade600;
+        break;
+      case 'pending':
+        label = 'Pending';
+        color = Colors.orange.shade600;
+        break;
+      case 'approved':
+        label = 'Broker';
+        color = Colors.green.shade600;
+        break;
+      default:
+        return null;
+    }
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: color, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6.w,
+            height: 6.w,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+          ),
+          SizedBox(width: 6.w),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w600,
+              color: color,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ─── STORIES SECTION ───
@@ -143,6 +206,20 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
       child: Obx(() {
+        // Guest, or a broker who tapped Skip past completing their profile —
+        // /user/dashboard needs a real, finished broker account either way,
+        // so the request just fails for them. That used to surface as
+        // "Couldn't load your dashboard" with a Retry that could never
+        // succeed; a static, zeroed grid reads as "nothing yet" instead of
+        // "broken". `role.value != 0` waits for the profile fetch to
+        // actually answer before calling someone "skipped" — while it is
+        // still the default 0, hasBrokerRole would read false for anyone,
+        // including a real broker whose profile just hasn't landed yet.
+        final skippedProfile =
+            _profileCtrl.role.value != 0 && !_profileCtrl.hasBrokerRole;
+        if (_profileCtrl.isGuest || skippedProfile) {
+          return _buildStaticStats();
+        }
         final stats = _dashboardCtrl.stats.value;
         if (stats == null) {
           return _dashboardCtrl.error.value != null
@@ -155,7 +232,7 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
               children: [
                 Expanded(
                   child: StatInfoCard(
-                    title: 'DEALS',
+                    title: 'OPPORTUNITY',
                     rows: [
                       StatInfoCardRow(
                           value: '${stats.dealsSeen}', label: 'SEEN'),
@@ -188,7 +265,7 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
                     rows: [
                       StatInfoCardRow(
                           value: '${stats.contractsUserSigned}',
-                          label: 'SIGNED'),
+                          label: 'MANDATE SIGN'),
                       StatInfoCardRow(
                           value: '${stats.contractsBrokerSigned}',
                           label: 'PUBLISHED'),
@@ -214,6 +291,41 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
           ],
         );
       }),
+    );
+  }
+
+  /// Same four cards as the real grid, held at zero — for a guest or a
+  /// broker who skipped their profile, where there is nothing real to fetch
+  /// rather than something that failed to load. See [_buildGridCards].
+  Widget _buildStaticStats() {
+    Widget zero(String title, String label1, String label2) => Expanded(
+          child: StatInfoCard(
+            title: title,
+            rows: [
+              StatInfoCardRow(value: '0', label: label1),
+              StatInfoCardRow(value: '0', label: label2),
+            ],
+          ),
+        );
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            zero('OPPORTUNITY', 'SEEN', 'UNSEEN'),
+            SizedBox(width: 10.w),
+            zero('PROPOSALS', 'PENDING', 'ACCEPTED'),
+          ],
+        ),
+        SizedBox(height: 10.h),
+        Row(
+          children: [
+            zero('CONTRACTS', 'MANDATE SIGN', 'PUBLISHED'),
+            SizedBox(width: 10.w),
+            zero('CANCELLATIONS', 'REQUESTED', 'CANCELLED'),
+          ],
+        ),
+      ],
     );
   }
 

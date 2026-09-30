@@ -30,6 +30,7 @@ import 'package:brokkerspot/widgets/announcements/conversations_bar.dart';
 import 'package:brokkerspot/widgets/announcements/send_proposal_bar.dart';
 import 'package:brokkerspot/widgets/common/custom_back_button.dart';
 import 'package:brokkerspot/views/brokker/home/controller/broker_dashboard_controller.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 
 class BrokerAnnouncementDetailView extends StatefulWidget {
   final AnnouncementModel announcement;
@@ -104,6 +105,21 @@ class _BrokerAnnouncementDetailViewState
   }
 
   final _wishlistCtrl = WishlistController.to;
+  final _profileCtrl = Get.isRegistered<ProfileController>()
+      ? Get.find<ProfileController>()
+      : Get.put(ProfileController());
+
+  /// A guest, or a broker who skipped completing their profile — neither has
+  /// a real conversation or proposal to start, so the chat/proposal pill at
+  /// the bottom is dropped for them rather than shown and then blocked with
+  /// a login prompt or a "complete your profile" dialog on tap. `role.value
+  /// != 0` waits for the profile fetch to actually answer before calling a
+  /// logged-in broker "skipped" — while it is still the unset default,
+  /// hasBrokerRole reads false for a real broker too, whose profile just
+  /// hasn't landed yet.
+  bool get _isGuestOrSkipped =>
+      !LocalStorageService.isLoggedIn() ||
+      (_profileCtrl.role.value != 0 && !_profileCtrl.hasBrokerRole);
 
   /// Whether this listing belongs to the signed-in account.
   ///
@@ -981,6 +997,10 @@ class _BrokerAnnouncementDetailViewState
       if (count > 0) return _buildConversationsBar(isDark, bottomPad, count);
       return const SizedBox.shrink();
     }
+
+    // A guest or a skipped-profile broker has no real conversation or
+    // proposal behind this listing to open — see _isGuestOrSkipped.
+    if (_isGuestOrSkipped) return const SizedBox.shrink();
 
     final alreadySent = _proposalSent || _data.isProposalSent == true;
     final chatReady = _data.isChatAvailable == true;

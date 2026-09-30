@@ -176,16 +176,28 @@ class NotificationService {
   /// detail can be pushed in the same breath as the shell beneath it.
   static Future<void> prefetchPendingTap() async {
     final data = _pendingTapData;
-    if (data == null) return;
+    if (data == null) {
+      debugPrint('🔔 prefetchPendingTap — nothing pending');
+      return;
+    }
     // Every announcement-shaped notification resolves through
     // [_fetchAnnouncement], including chat — which reads the announcement to
     // work out which side of the conversation the viewer is on. Types that
     // don't (broker_approved, say) are skipped so nothing is fetched for a
     // screen that will never ask for it.
     final type = data['type']?.toString();
-    if (!_opensAnnouncement(type)) return;
+    debugPrint('🔔 prefetchPendingTap — type=$type data=$data');
+    if (!_opensAnnouncement(type)) {
+      debugPrint(
+          '🔔 prefetchPendingTap — type "$type" opens nothing, skipping fetch');
+      return;
+    }
     final id = data['announcement_id']?.toString();
-    if (id == null || id.isEmpty) return;
+    if (id == null || id.isEmpty) {
+      debugPrint(
+          '🔔 prefetchPendingTap — no announcement_id in payload, skipping fetch');
+      return;
+    }
 
     // Chat needs a second request on top of the listing — who the other
     // person is — and that one was still being made after the dashboard had
@@ -195,9 +207,13 @@ class NotificationService {
     // on top of it within the same frame.
     if (_chatTypes.contains(type)) {
       _prefetchedChat = await _resolveChatDestination(id, data);
+      debugPrint('🔔 prefetchPendingTap — chat destination resolved: '
+          '${_prefetchedChat == null ? "NULL (failed)" : "peer=${_prefetchedChat!.peerId} side=${_prefetchedChat!.side}"}');
       return;
     }
     _prefetched = await _fetchAnnouncement(id);
+    debugPrint('🔔 prefetchPendingTap — announcement fetched: '
+        '${_prefetched == null ? "NULL (failed)" : _prefetched!.id}');
   }
 
   static const _announcementTypes = {
@@ -228,9 +244,12 @@ class NotificationService {
       return ready;
     }
     try {
-      return await AnnouncementRepository().fetchAnnouncementDetail(id);
-    } catch (e) {
-      debugPrint('⚠️ Failed to load announcement $id from notification: $e');
+      final a = await AnnouncementRepository().fetchAnnouncementDetail(id);
+      debugPrint('🔔 _fetchAnnouncement($id) succeeded');
+      return a;
+    } catch (e, st) {
+      debugPrint(
+          '⚠️ Failed to load announcement $id from notification: $e\n$st');
       return null;
     }
   }
@@ -315,6 +334,7 @@ class NotificationService {
   }
 
   static Future<void> init() async {
+    debugPrint('🔔 NotificationService.init() starting');
     // On iOS, firebase_messaging and flutter_local_notifications both compete
     // for UNUserNotificationCenterDelegate, causing local notification calls
     // to be silently dropped in foreground. Use Firebase's native presentation
@@ -374,9 +394,12 @@ class NotificationService {
     // The same tap may already have come in through onMessageOpenedApp above;
     // [_onTapFromSystem] drops the repeat.
     final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    debugPrint('🔔 getInitialMessage() -> '
+        '${initialMessage == null ? "null (not a cold-start tap)" : "type=${initialMessage.data['type']} id=${initialMessage.messageId}"}');
     if (initialMessage != null) _onTapFromSystem(initialMessage);
 
-    debugPrint('✅ NotificationService initialised');
+    debugPrint(
+        '✅ NotificationService initialised — hasPendingTap=$hasPendingTap');
   }
 
   /// Pulls the notification list (and with it the bell badge's unseen count)

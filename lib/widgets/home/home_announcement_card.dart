@@ -381,145 +381,150 @@ class HomeAnnouncementCard extends StatelessWidget {
                       child: brokerFeedLayout
                           ? _brokerFeedInfo(a, imgCount)
                           : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // AED label
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4.r),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                              child: Text(
-                                a.currency ?? 'AED',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 19.sp,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w300,
-                                  height: 1.0,
-                                  letterSpacing: 0,
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 8.h),
-                          // Price row — gold price + optional rent period suffix
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                _formatPrice(a.price ?? 0),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 27.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFFDBC483),
-                                  height: 0.5,
-                                  letterSpacing: 0,
-                                ),
-                              ),
-                              if (a.rentPeriod != null &&
-                                  a.listingType == 'Rent') ...[
-                                SizedBox(width: 6.w),
-                                Padding(
-                                  padding: EdgeInsets.only(bottom: 2.h),
-                                  child: Text(
-                                    a.rentPeriod!
-                                            .substring(0, 1)
-                                            .toUpperCase() +
-                                        a.rentPeriod!
-                                            .substring(1)
-                                            .toLowerCase(),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 15.sp,
-                                      fontWeight: FontWeight.w400,
-                                      color: Colors.white70,
-                                      height: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          // Type row: "For Sell • Apartment" left | pill + circle right
-                          Transform.translate(
-                            offset: Offset(0, -0.h),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                // "For Sell • " (#C8C8C8) + "Apartment" (white)
-                                Expanded(
-                                  child: RichText(
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    text: TextSpan(
-                                      children: [
-                                        if (a.listingType != null &&
-                                            showListingTypeText)
-                                          TextSpan(
-                                            text: 'For ${a.listingType} • ',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 17.sp,
-                                              fontWeight: FontWeight.w300,
-                                              color: const Color(0xFFC8C8C8),
-                                              height: _lineHeight,
-                                              letterSpacing: 0,
-                                            ),
-                                          ),
-                                        if (a.propertyType != null)
-                                          TextSpan(
-                                            text: a.propertyType,
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 17.sp,
-                                              fontWeight: FontWeight.w300,
-                                              color: Colors.white,
-                                              height: _lineHeight,
-                                              letterSpacing: 0,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                // Time-ago pill
-                                if (a.timeAgo != null) ...[
-                                  SizedBox(width: 6.w),
-                                  _pill(a.timeAgo!.toUpperCase()),
-                                ],
-                                // Image count circle
-                                if (imgCount > 1) ...[
-                                  SizedBox(width: 6.w),
-                                  _imageCountCircle(imgCount),
-                                ],
-                              ],
-                            ),
-                          ),
-                          // Location
-                          if (_resolveLocation(a).isNotEmpty)
-                            Transform.translate(
-                              offset: Offset(0, -5.h),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.location_on_rounded,
-                                      size: 14.sp, color: AppColors.primary),
-                                  SizedBox(width: 4.w),
-                                  Expanded(
+                                // AED label
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4.r),
+                                  child: BackdropFilter(
+                                    filter:
+                                        ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                                     child: Text(
-                                      _resolveLocation(a),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                      a.currency ?? 'AED',
                                       style: GoogleFonts.poppins(
-                                        fontSize: 14.sp,
+                                        fontSize: 19.sp,
+                                        color: Colors.white,
                                         fontWeight: FontWeight.w300,
-                                        color: const Color(0xFF9E9E9E),
-                                        height: _lineHeight,
+                                        height: 1.0,
                                         letterSpacing: 0,
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                                SizedBox(height: 8.h),
+                                // Price row — gold price + optional rent period suffix
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      _formatPrice(a.price ?? 0),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 27.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFFDBC483),
+                                        height: 0.5,
+                                        letterSpacing: 0,
+                                      ),
+                                    ),
+                                    if (a.rentPeriod != null &&
+                                        a.listingType == 'Rent') ...[
+                                      SizedBox(width: 6.w),
+                                      Padding(
+                                        padding: EdgeInsets.only(bottom: 2.h),
+                                        child: Text(
+                                          a.rentPeriod!
+                                                  .substring(0, 1)
+                                                  .toUpperCase() +
+                                              a.rentPeriod!
+                                                  .substring(1)
+                                                  .toLowerCase(),
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 15.sp,
+                                            fontWeight: FontWeight.w400,
+                                            color: Colors.white70,
+                                            height: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                // Type row: "For Sell • Apartment" left | pill + circle right
+                                Transform.translate(
+                                  offset: Offset(0, -0.h),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      // "For Sell • " (#C8C8C8) + "Apartment" (white)
+                                      Expanded(
+                                        child: RichText(
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          text: TextSpan(
+                                            children: [
+                                              if (a.listingType != null &&
+                                                  showListingTypeText)
+                                                TextSpan(
+                                                  text:
+                                                      'For ${a.listingType} • ',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 17.sp,
+                                                    fontWeight: FontWeight.w300,
+                                                    color:
+                                                        const Color(0xFFC8C8C8),
+                                                    height: _lineHeight,
+                                                    letterSpacing: 0,
+                                                  ),
+                                                ),
+                                              if (a.propertyType != null)
+                                                TextSpan(
+                                                  text: a.propertyType,
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 17.sp,
+                                                    fontWeight: FontWeight.w300,
+                                                    color: Colors.white,
+                                                    height: _lineHeight,
+                                                    letterSpacing: 0,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      // Time-ago pill
+                                      if (a.timeAgo != null) ...[
+                                        SizedBox(width: 6.w),
+                                        _pill(a.timeAgo!.toUpperCase()),
+                                      ],
+                                      // Image count circle
+                                      if (imgCount > 1) ...[
+                                        SizedBox(width: 6.w),
+                                        _imageCountCircle(imgCount),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                // Location
+                                if (_resolveLocation(a).isNotEmpty)
+                                  Transform.translate(
+                                    offset: Offset(0, -5.h),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.location_on_rounded,
+                                            size: 14.sp,
+                                            color: AppColors.primary),
+                                        SizedBox(width: 4.w),
+                                        Expanded(
+                                          child: Text(
+                                            _resolveLocation(a),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 14.sp,
+                                              fontWeight: FontWeight.w300,
+                                              color: const Color(0xFF9E9E9E),
+                                              height: _lineHeight,
+                                              letterSpacing: 0,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
                             ),
-                        ],
-                      ),
                     ),
                   ], // inner Stack children
                 ), // inner Stack
@@ -586,7 +591,11 @@ class HomeAnnouncementCard extends StatelessWidget {
   /// The bottom block in the broker feed's order — see [brokerFeedLayout].
   Widget _brokerFeedInfo(AnnouncementModel a, int imgCount) {
     final location = _resolveLocation(a);
-    final listing = a.listingType?.trim() ?? '';
+    // Respects showListingTypeText same as the non-broker-feed layout does —
+    // the corner FOR SELL / FOR RENT badge already says this, so a caller
+    // that wants the word left out of this line too (the user-side
+    // dashboard) can turn it off here exactly the same way.
+    final listing = showListingTypeText ? (a.listingType?.trim() ?? '') : '';
     final type = a.propertyType?.trim() ?? '';
 
     return Row(
@@ -597,6 +606,25 @@ class HomeAnnouncementCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // The listing's own title, e.g. "Wooden Home" — one line,
+              // ellipsised, so a long name stays inside the card instead of
+              // pushing everything below it around.
+              if (a.propertyName?.trim().isNotEmpty == true)
+                Padding(
+                  padding: EdgeInsets.only(bottom: 2.h),
+                  child: Text(
+                    a.propertyName!.trim(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      height: _lineHeight,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
               // "RENT • Villa"
               if (listing.isNotEmpty || type.isNotEmpty)
                 RichText(
@@ -744,8 +772,7 @@ class HomeAnnouncementCard extends StatelessWidget {
     );
   }
 
-  /// Same priority as `_shortLocation` in AnnouncementDetailView:
-  /// 1. city + country (both present)
+  /// 1. city + country (both present) — area joins in too, when there is one
   /// 2. city missing  → area + country
   /// 3. country missing → area + city
   /// 4. all three missing → address
@@ -755,7 +782,9 @@ class HomeAnnouncementCard extends StatelessWidget {
     final country = a.propertyCountry?.trim() ?? '';
     final address = a.propertyAddress?.trim() ?? '';
 
-    if (city.isNotEmpty && country.isNotEmpty) return '$city, $country';
+    if (city.isNotEmpty && country.isNotEmpty) {
+      return [area, city, country].where((s) => s.isNotEmpty).join(', ');
+    }
     if (city.isEmpty && country.isNotEmpty) {
       return [area, country].where((s) => s.isNotEmpty).join(', ');
     }

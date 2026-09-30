@@ -372,6 +372,7 @@ class _CardWithStatusBadge extends StatelessWidget {
                 cardWidth: constraints.maxWidth,
                 cardHeight: 263.h,
                 showAvatar: false,
+                brokerFeedLayout: true,
                 onTap: onTap,
               ),
 

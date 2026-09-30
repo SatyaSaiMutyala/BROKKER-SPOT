@@ -23,6 +23,7 @@ import 'package:brokkerspot/views/user/announcements/announcement_detail_view.da
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart';
+import 'package:brokkerspot/views/auth/view/login_view.dart';
 
 class AnnouncementChatView extends StatefulWidget {
   final String announcementId;
@@ -306,27 +307,13 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
           // Once the contract is cancelled (status 6) nothing can be done to
           // it, so the button goes rather than opening an empty sheet — the
           // record is reached from the banner's View Details instead.
-          //
-          // Wrapped in its own Obx: _hasChatMenuActions reads `published` and
-          // `proposalStatus`, both of which land asynchronously (the socket
-          // round-trip from _loadProposal) after this header has already
-          // built once, synchronously, with published still false. Without
-          // this the icon just never appeared on a first-time open from the
-          // Meeting list — reopening the chat "fixed" it only because that
-          // was a fresh build running after the round-trip had already
-          // landed, not because anything was actually different the second
-          // time.
-          Obx(() {
-            if ((widget.userRole ?? 1) != 1 || !_hasChatMenuActions) {
-              return const SizedBox.shrink();
-            }
-            return CustomIconButton(
+          if ((widget.userRole ?? 1) == 1 && _hasChatMenuActions)
+            CustomIconButton(
               isDark: isDark,
               size: 38,
               onTap: () => _showChatMenu(isDark),
               child: Icon(Icons.more_horiz, size: 20.sp, color: iconColor),
-            );
-          }),
+            ),
         ],
       ),
     );
@@ -1140,14 +1127,36 @@ class _AnnouncementChatViewState extends State<AnnouncementChatView> {
                 ),
               ),
               SizedBox(height: 12.h),
-              TextButton.icon(
-                onPressed: _chat.reloadHistory,
-                icon: const Icon(Icons.refresh, size: 16),
-                label: Text(
-                  'Retry',
-                  style: GoogleFonts.inter(
-                      fontSize: 13.sp, color: AppColors.primary),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton.icon(
+                    onPressed: _chat.reloadHistory,
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: Text(
+                      'Retry',
+                      style: GoogleFonts.inter(
+                          fontSize: 13.sp, color: AppColors.primary),
+                    ),
+                  ),
+                  // The error text itself already tells the user to sign in
+                  // again when loading fails — this makes that an action
+                  // instead of a dead end, for a session the server has
+                  // actually stopped honouring (Retry alone can't fix that).
+                  TextButton.icon(
+                    onPressed: () => Get.to(() => LoginView()),
+                    icon: const Icon(Icons.login, size: 16),
+                    label: Text(
+                      'Sign In',
+                      style: GoogleFonts.inter(
+                        fontSize: 13.sp,
+                        color: isDark
+                            ? Colors.grey.shade300
+                            : Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

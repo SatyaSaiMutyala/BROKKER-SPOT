@@ -70,6 +70,11 @@ class _FilterViewState extends State<FilterView> {
   Timer? _countDebounce;
   final _repo = AnnouncementRepository();
 
+  // True once the user changes something after opening (or after the last
+  // Apply) — drives the Apply button's active/inactive look so re-tapping it
+  // with nothing new to apply isn't mistaken for a required action.
+  bool _hasUnappliedChanges = false;
+
   @override
   void initState() {
     super.initState();
@@ -143,7 +148,10 @@ class _FilterViewState extends State<FilterView> {
   /// setState + schedule a debounced count refresh. Use instead of bare setState
   /// for every filter change so the Apply button stays in sync.
   void _updateAndCount(VoidCallback fn) {
-    setState(fn);
+    setState(() {
+      fn();
+      _hasUnappliedChanges = true;
+    });
     _scheduleCountFetch();
   }
 
@@ -156,8 +164,7 @@ class _FilterViewState extends State<FilterView> {
     if (!mounted) return;
     setState(() => _isCountLoading = true);
     try {
-      final count =
-          await _repo.fetchAnnouncementCount(
+      final count = await _repo.fetchAnnouncementCount(
         filter: _buildCurrentFilter(),
         // Guests only — see ActiveDashboard.guestListingRole. Without it the
         // count came from the other side and disagreed with the list.
@@ -214,11 +221,15 @@ class _FilterViewState extends State<FilterView> {
       _price.start > _priceFloor || _price.end < _priceCeil;
 
   void _reset() {
-    setState(() => _hydrateFromFilter(PropertyFilter.empty));
+    setState(() {
+      _hydrateFromFilter(PropertyFilter.empty);
+      _hasUnappliedChanges = true;
+    });
     _scheduleCountFetch();
   }
 
   void _apply() {
+    _hasUnappliedChanges = false;
     Get.back(result: _buildCurrentFilter());
   }
 
@@ -333,14 +344,15 @@ class _FilterViewState extends State<FilterView> {
                     _divider(isDark),
                     _section('Property Type'),
                     PropertyTypePicker(
-                      isCommercial: _category == 'All'
-                          ? null
-                          : _category == 'Commercial',
+                      isCommercial:
+                          _category == 'All' ? null : _category == 'Commercial',
                       selectedTypeId: _propertyTypeId,
                       onChanged: (picked) => _updateAndCount(() {
                         _category = picked.isCommercial == null
                             ? 'All'
-                            : (picked.isCommercial! ? 'Commercial' : 'Residential');
+                            : (picked.isCommercial!
+                                ? 'Commercial'
+                                : 'Residential');
                         _propertyTypeId = picked.typeId;
                         _propertyTypeName = picked.typeName;
                       }),
@@ -463,9 +475,16 @@ class _FilterViewState extends State<FilterView> {
                   width: double.infinity,
                   height: 52.h,
                   child: ElevatedButton(
-                    onPressed: _apply,
+                    onPressed: _hasUnappliedChanges ? _apply : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: _hasUnappliedChanges
+                          ? AppColors.primary
+                          : (isDark
+                              ? const Color(0xFF2A2A2A)
+                              : const Color(0xFFE4E4E4)),
+                      disabledBackgroundColor: isDark
+                          ? const Color(0xFF2A2A2A)
+                          : const Color(0xFFE4E4E4),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30.r),
@@ -475,9 +494,9 @@ class _FilterViewState extends State<FilterView> {
                         ? SizedBox(
                             width: 22.w,
                             height: 22.w,
-                            child: const CircularProgressIndicator(
+                            child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: _applyTextColor(isDark),
                             ),
                           )
                         : Text(
@@ -487,7 +506,7 @@ class _FilterViewState extends State<FilterView> {
                             style: GoogleFonts.poppins(
                               fontSize: 15.sp,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              color: _applyTextColor(isDark),
                             ),
                           ),
                   ),
@@ -542,6 +561,7 @@ class _FilterViewState extends State<FilterView> {
       setState(() {
         _price = snapped;
         _priceRangeError = false;
+        _hasUnappliedChanges = true;
       });
       _minPriceCtrl?.text =
           snapped.start > _priceFloor ? snapped.start.round().toString() : '';
@@ -558,6 +578,7 @@ class _FilterViewState extends State<FilterView> {
       setState(() {
         _price = RangeValues(clamped, _price.end);
         _priceRangeError = false;
+        _hasUnappliedChanges = true;
       });
       _scheduleCountFetch();
     }
@@ -571,6 +592,7 @@ class _FilterViewState extends State<FilterView> {
       setState(() {
         _price = RangeValues(_price.start, clamped);
         _priceRangeError = hasError;
+        _hasUnappliedChanges = true;
       });
       _scheduleCountFetch();
     }
@@ -693,6 +715,10 @@ class _FilterViewState extends State<FilterView> {
       ],
     );
   }
+
+  Color _applyTextColor(bool isDark) => _hasUnappliedChanges
+      ? Colors.white
+      : (isDark ? Colors.grey.shade500 : Colors.grey.shade600);
 
   /// Formats a count for the Apply button: 75346 → "75.3K", 1200000 → "1.2M".
   String _fmtCount(int n) {

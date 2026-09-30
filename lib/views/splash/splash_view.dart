@@ -17,8 +17,7 @@ class SplashView extends StatefulWidget {
   State<SplashView> createState() => _SplashViewState();
 }
 
-class _SplashViewState extends State<SplashView>
-    with TickerProviderStateMixin {
+class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _moveController;
   late Animation<double> _logoFade;
@@ -67,10 +66,13 @@ class _SplashViewState extends State<SplashView>
   }
 
   Future<void> _checkAndNavigate() async {
+    final sw = Stopwatch()..start();
     final token = LocalStorageService.getAccessToken();
     final user = LocalStorageService.getUser();
     final firebaseUser = FirebaseAuth.instance.currentUser;
     final isLoggedIn = token != null && (user != null || firebaseUser != null);
+    debugPrint('🚀 [Splash] _checkAndNavigate start — isLoggedIn=$isLoggedIn '
+        'hasToken=${token != null} hasPendingTap=${NotificationService.hasPendingTap}');
 
     if (isLoggedIn) {
       // User has token - show splash briefly then navigate based on last side
@@ -84,12 +86,17 @@ class _SplashViewState extends State<SplashView>
         // destination here, while the splash still covers the screen — the
         // dashboard below is only ever a backdrop for the Back button, and
         // shouldn't be sat on while a request goes out.
+        debugPrint(
+            '🚀 [Splash] pending tap — prefetching at ${sw.elapsedMilliseconds}ms');
         await NotificationService.prefetchPendingTap();
+        debugPrint('🚀 [Splash] prefetch done at ${sw.elapsedMilliseconds}ms');
       } else {
         await Future.delayed(const Duration(milliseconds: 1500));
       }
       if (!mounted) return;
       final lastSide = LocalStorageService.getLastSide();
+      debugPrint(
+          '🚀 [Splash] routing to dashboard (side=$lastSide) at ${sw.elapsedMilliseconds}ms');
       if (lastSide == 'broker') {
         Get.offAll(() => BrokerDashBoardView());
       } else {
@@ -97,9 +104,12 @@ class _SplashViewState extends State<SplashView>
       }
       // If the app was launched cold by tapping a push notification, the
       // dashboard shell now exists to navigate on top of — process it.
+      debugPrint(
+          '🚀 [Splash] consuming pending tap at ${sw.elapsedMilliseconds}ms');
       NotificationService.consumePendingTap();
     } else {
       // No token - go directly to welcome screen, no splash animation
+      debugPrint('🚀 [Splash] not logged in — routing to Welcome');
       Get.offAll(() => const WelcomeView());
       // Nothing to open without a session, but taps from now on must not be
       // parked for a splash that has already finished.

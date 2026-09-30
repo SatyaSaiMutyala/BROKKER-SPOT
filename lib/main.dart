@@ -1,4 +1,5 @@
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/connectivity_service.dart';
 import 'package:brokkerspot/core/services/notification_service.dart';
 import 'package:brokkerspot/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -12,6 +13,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:brokkerspot/core/services/announcement_cache.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
+import 'package:brokkerspot/widgets/common/connectivity_banner.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'views/splash/splash_view.dart';
@@ -38,6 +41,19 @@ void main() async {
     SocketService.to.connect();
   }
 
+  // Registered up-front (not left to its lazy `.to` getter) so it already
+  // exists by the time a cold-start notification tap is handled. A tap that
+  // needs to flip broker/user side calls NotificationService._ensureSide,
+  // which reads this controller right after SplashView's Get.offAll — before
+  // the new dashboard route has actually mounted and could have triggered
+  // the lazy Get.put itself. Found via device logs: "Notification wanted
+  // user side but ProfileController is not registered — side left
+  // unchanged" — the switch silently no-opped and the account was left on
+  // the wrong side after the tap.
+  if (LocalStorageService.isLoggedIn()) {
+    Get.put(ProfileController(), permanent: true);
+  }
+
   // Show a local notification banner when a push arrives while the app is open.
   await NotificationService.init();
 
@@ -54,6 +70,7 @@ void main() async {
   );
 
   Get.put(ThemeController(), permanent: true);
+  Get.put(ConnectivityService(), permanent: true);
   runApp(const MyApp());
 }
 
@@ -84,7 +101,14 @@ class MyApp extends StatelessWidget {
                 data: MediaQuery.of(context).copyWith(
                   textScaler: TextScaler.noScaling,
                 ),
-                child: child,
+                child: Stack(
+                  children: [
+                    child,
+                    const Positioned.fill(
+                      child: ConnectivityBanner(),
+                    ),
+                  ],
+                ),
               ),
             );
           },

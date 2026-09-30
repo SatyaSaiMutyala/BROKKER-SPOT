@@ -121,6 +121,12 @@ class ProfileController extends GetxController {
 
   bool get isBroker => hasBrokerRole;
 
+  /// "inactive" (never submitted) | "pending" | "approved" | "rejected" — the
+  /// broker verification workflow, as `/user/auth/me` returns it. Null for a
+  /// guest, or before the first fetch lands.
+  String? get verificationStatus =>
+      (profileData.value?['verificationStatus'] as String?)?.trim();
+
   @override
   void onInit() {
     super.onInit();
