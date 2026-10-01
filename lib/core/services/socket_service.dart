@@ -99,25 +99,58 @@ class SocketService extends GetxService with WidgetsBindingObserver {
   /// chat history failed on arrival and then loaded fine on Retry a few
   /// seconds later.
   ///
-  /// Reconnects the SAME socket object rather than rebuilding it, so every
-  /// listener already attached through [on] survives — a rebuild would leave
-  /// screens like the chat waiting on events nobody is listening for any
-  /// more. Emits made while this is in flight are queued by [emit] and
-  /// flushed on connect.
+  /// Builds a new socket rather than reconnecting the old one. Calling
+  /// `disconnect()` then `connect()` on the same object raced the library
+  /// against itself: the old transport's close event arrived after the new
+  /// one had started opening and tore the new one down ("forced close"),
+  /// leaving a second reconnect to finish the job. Listeners registered
+  /// through [on] are re-attached to the new socket, and emits made while
+  /// this is in flight stay queued and are flushed on connect.
   void revalidateConnection() {
-    final socket = _socket;
-    if (socket == null) {
+    if (_socket == null) {
       connect();
       return;
     }
     _log('revalidateConnection() — forcing a fresh handshake');
-    isConnected.value = false;
-    try {
-      socket.disconnect();
-    } catch (e) {
-      _log('revalidate disconnect error (ignored): $e');
-    }
-    socket.connect();
+    _forceShutdown();
+    connect();
+  }
+
+  /// True after the server refused the namespace connect (`connect_error`)
+  /// and nothing has been tried since — see [shouldOpenExisting].
+  bool _connectRefused = false;
+
+  /// Whether calling `connect()` on a socket that already exists would do
+  /// anything useful.
+  ///
+  /// The library's `Socket.connect()` is not idempotent. Once the transport
+  /// is open it sends the namespace CONNECT packet again on every call until
+  /// the server's answer lands — and the server treats a second CONNECT as an
+  /// invalid state and closes the connection. This service is asked to
+  /// connect from many places (every dashboard, every chat, every queued
+  /// [emit]), so on a cold start from a notification, where the chat opens
+  /// inside that handshake window, the connection was killed the moment it
+  /// came up and the chat history request went down with it. The library
+  /// reconnected by itself a second later, but nothing re-sent the request.
+  ///
+  /// So: only when nothing is under way.
+  ///  • connected — nothing to do;
+  ///  • reconnecting, or the transport still opening — the library sends
+  ///    CONNECT itself once the transport is up;
+  ///  • transport open but not connected — CONNECT is already in flight,
+  ///    unless the server [refused] the last one, which is worth one retry;
+  ///  • closed — open it.
+  @visibleForTesting
+  static bool shouldOpenExisting({
+    required bool connected,
+    required String managerState,
+    required bool reconnecting,
+    required bool refused,
+  }) {
+    if (connected || reconnecting) return false;
+    if (managerState == 'opening') return false;
+    if (managerState == 'open') return refused;
+    return true;
   }
 
   /// Opens the connection. Idempotent — safe to call from many screens.
@@ -147,12 +180,22 @@ class SocketService extends GetxService with WidgetsBindingObserver {
       } else {
         _log('connect() reusing existing socket for user=${_uid(currentToken)}');
         _logTokenPayload(currentToken); // log payload on reuse too for diagnosis
-        if (!_socket!.connected) _socket!.connect();
+        final socket = _socket!;
+        if (shouldOpenExisting(
+          connected: socket.connected,
+          managerState: socket.io.readyState,
+          reconnecting: socket.io.reconnecting,
+          refused: _connectRefused,
+        )) {
+          _connectRefused = false;
+          socket.connect();
+        }
         return;
       }
     }
 
     _socketToken = currentToken;
+    _connectRefused = false;
     _logTokenPayload(currentToken); // print full JWT payload for backend diagnosis
     _socket = io.io(
       _baseUrl,
@@ -192,6 +235,7 @@ class SocketService extends GetxService with WidgetsBindingObserver {
           return;
         }
         isConnected.value = true;
+        _connectRefused = false;
         debugPrint('🔌 [Socket] connected, flushing ${_pending.length} queued emit(s)');
         _log('connected (${_socket!.id})  socket_user=${_uid(_socketToken)}');
         _flushPending();
@@ -200,7 +244,10 @@ class SocketService extends GetxService with WidgetsBindingObserver {
         isConnected.value = false;
         debugPrint('🔌 [Socket] disconnected: $reason');
       })
-      ..onConnectError((e) => debugPrint('🔌 [Socket] connect_error: $e'))
+      ..onConnectError((e) {
+        _connectRefused = true;
+        debugPrint('🔌 [Socket] connect_error: $e');
+      })
       ..onError((e) => debugPrint('🔌 [Socket] error: $e'))
       // Logs EVERY incoming event so you can see what the server pushes back.
       ..onAny((event, data) => _log('recv "$event" <- $data'));

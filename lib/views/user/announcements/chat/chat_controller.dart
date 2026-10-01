@@ -129,6 +129,15 @@ class ChatController extends GetxController {
   // _armHistoryTimeout.
   Worker? _historyConnectWorker;
 
+  /// Watches the connection for the whole life of the chat — see
+  /// [_onConnectionChanged].
+  Worker? _connectionWorker;
+
+  /// Set when the connection drops while a history request is still waiting
+  /// on its answer. That answer is never coming: the server replies on the
+  /// connection the request arrived on.
+  bool _replyLost = false;
+
   /// The signed-in user's id.
   ///
   /// The live token wins over the saved user blob: the blob is written at
@@ -187,6 +196,29 @@ class ChatController extends GetxController {
     published.value = LocalStorageService.isAnnouncementPublished(
         announcementId, brokerId: _brokerId);
     _requestHistory(page: 1);
+    _loadProposal();
+    _connectionWorker =
+        ever<bool>(_socket.isConnected, _onConnectionChanged);
+  }
+
+  /// Asks again for whatever was still unanswered when the connection
+  /// dropped, the moment it is back.
+  ///
+  /// A request that has gone out is not re-sent by anyone when the transport
+  /// closes under it — the socket reconnects on its own a second or two
+  /// later, and the chat used to sit through the whole 8-second deadline (and
+  /// then a rebuild, and another deadline) for an answer it could have had
+  /// straight away. The proposal status travels the same way and has no
+  /// deadline of its own, so it is asked for again too.
+  void _onConnectionChanged(bool connected) {
+    if (!connected) {
+      if (isLoadingHistory.value || _loadingMore) _replyLost = true;
+      return;
+    }
+    if (!_replyLost) return;
+    _replyLost = false;
+    debugPrint('🔁 [Chat] reconnected with history unanswered — asking again');
+    _requestHistory(page: _loadingMore ? _page + 1 : 1);
     _loadProposal();
   }
 
@@ -286,6 +318,9 @@ class ChatController extends GetxController {
       _historyRevived = true;
       debugPrint('⏱️ [Chat] history deadline hit — revalidating socket, retrying');
       _socket.revalidateConnection();
+      // The request below is queued for the new connection already; the
+      // drop this rebuild just caused is not one to answer a second time.
+      _replyLost = false;
       _requestHistory(page: 1);
       return;
     }
@@ -852,6 +887,7 @@ class ChatController extends GetxController {
     _typingTimer?.cancel();
     _historyTimeout?.cancel();
     _historyConnectWorker?.dispose();
+    _connectionWorker?.dispose();
     _socket
       ..off(ChatEvents.message, _onMessage)
       ..off(ChatEvents.messageError, _onMessageError)
