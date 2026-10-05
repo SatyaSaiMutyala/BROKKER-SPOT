@@ -148,7 +148,7 @@ class MeetingCard extends StatelessWidget {
               _AvatarCluster(
                 first: first,
                 second: second,
-                count: meeting.chatProfilesCount,
+                showSecond: meeting.chatProfilesCount > 1,
                 onProfileTap: onProfileTap,
               ),
             ],
@@ -213,19 +213,22 @@ class _PropertyThumb extends StatelessWidget {
       );
 }
 
-// ── Overlapping broker avatars + count badge ──────────────────────────────────
+// ── Overlapping broker avatars ────────────────────────────────────────────────
 
 class _AvatarCluster extends StatelessWidget {
   final ChatProfileSummary? first;
   final ChatProfileSummary? second;
-  final int count;
+  /// Whether a second face is stacked behind the first — more than one broker
+  /// has written in. No number rides on top any more; the second face says
+  /// "several" on its own, and the list behind the row has the rest.
+  final bool showSecond;
 
   final void Function(ChatProfileSummary profile)? onProfileTap;
 
   const _AvatarCluster({
     required this.first,
     required this.second,
-    required this.count,
+    required this.showSecond,
     this.onProfileTap,
   });
 
@@ -237,7 +240,7 @@ class _AvatarCluster extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final showTwo = second != null && count > 1;
+    final showTwo = second != null && showSecond;
 
     return SizedBox(
       width: 47.w,
@@ -255,29 +258,6 @@ class _AvatarCluster extends StatelessWidget {
             left: 0,
             child: _tappable(first, _circle(_imgUrl(first), isDark)),
           ),
-          if (count > 0)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                width: 22.w,
-                height: 22.w,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  count > 9 ? '9+' : '$count',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.white,
-                    height: 1.0,
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );

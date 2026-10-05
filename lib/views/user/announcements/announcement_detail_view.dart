@@ -1199,12 +1199,9 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       // "Your Property" label that only restates what the screen already says.
       if (_viewerOwnsListing) return const SizedBox.shrink();
 
-      // A guest has no conversation to open — tapping this used to fall
-      // through to a login prompt, which is exactly what the pill itself
-      // should have been saying instead of pretending there's a chat to
-      // start.
-      if (!LocalStorageService.isLoggedIn()) return const SizedBox.shrink();
-
+      // A guest sees the pill too — the screen then reads the same as it
+      // does signed in — and the tap asks them to sign in, from
+      // AnnouncementChatView.open.
       return Padding(
         padding: EdgeInsets.fromLTRB(44.w, 0, 44.w, 10.h + bottomPad),
         child: ClipRRect(

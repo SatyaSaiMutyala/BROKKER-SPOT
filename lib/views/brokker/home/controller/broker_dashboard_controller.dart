@@ -53,11 +53,14 @@ class BrokerDashboardController extends GetxController {
 
     isLoading.value = true;
     if (stats.value == null) error.value = null;
+    final session = _session;
     try {
       final response = await api.getRequest(
         endPoint: '${api.baseUrl}${ApiEndpoints.brokerDashboard}',
         headers: api.buildHeaders(),
       );
+      // Signed out while this was out — these are that account's numbers.
+      if (session != _session) return;
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       if (json['success'] != true) {
         throw json['message'] ?? 'Could not load the dashboard';
@@ -71,12 +74,13 @@ class BrokerDashboardController extends GetxController {
       _loadedAt = DateTime.now();
       error.value = null;
     } catch (e) {
+      if (session != _session) return;
       if (kDebugMode) debugPrint('📊 [Dashboard] load failed: $e');
       // Only surfaced while there is nothing to show; otherwise the numbers
       // already on screen stand.
       if (stats.value == null) error.value = e.toString();
     } finally {
-      isLoading.value = false;
+      if (session == _session) isLoading.value = false;
     }
   }
 
@@ -184,8 +188,13 @@ class BrokerDashboardController extends GetxController {
 
   /// Drops the counters — on logout, and on a role switch, so the next
   /// account never sees the previous one's numbers.
+  /// Bumped by [clear] — see the guard in [load].
+  int _session = 0;
+
   void clear() {
+    _session++;
     _debounce?.cancel();
+    isLoading.value = false;
     stats.value = null;
     error.value = null;
     _loadedAt = null;

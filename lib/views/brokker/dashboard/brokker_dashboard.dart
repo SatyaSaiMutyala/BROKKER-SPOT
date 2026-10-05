@@ -203,6 +203,16 @@ class _BrokerDashBoardViewState extends State<BrokerDashBoardView> {
       showLoginRequiredDialog(context);
       return;
     }
+    // Signed in but the broker profile was skipped: browsing the feed is
+    // allowed, posting to it is not — same rule as the feed screen's own
+    // create icon. `role` is 0 until the profile request lands, and 0 is
+    // "unknown", not "no broker role", so it is not treated as skipped.
+    final skippedProfile = profileController.role.value != 0 &&
+        !profileController.hasBrokerRole;
+    if (skippedProfile) {
+      showCompleteProfileDialog(context);
+      return;
+    }
     Get.to(() => const CreateAnnouncementView(fromBroker: true));
   }
 

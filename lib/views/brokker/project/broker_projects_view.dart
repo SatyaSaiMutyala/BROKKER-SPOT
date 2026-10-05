@@ -8,6 +8,7 @@ import 'package:brokkerspot/core/services/login_return.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_filter_bar.dart';
+import 'package:brokkerspot/widgets/announcements/home_filter_bar.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card.dart';
 import 'package:brokkerspot/widgets/home/home_announcement_card_shimmer.dart';
 import 'package:brokkerspot/widgets/announcements/announcement_card_skeleton.dart';
@@ -17,7 +18,7 @@ import 'package:brokkerspot/views/brokker/project/broker_announcement_detail_vie
 import 'package:brokkerspot/views/user/announcements/create_announcement_view.dart';
 import 'package:brokkerspot/core/services/route_observer.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
-import 'package:brokkerspot/views/user/home/search_view.dart';
+import 'package:brokkerspot/views/user/home/controller/property_search_controller.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart'
     show showLoginRequiredDialog;
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
@@ -49,6 +50,26 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       ? Get.find<ProfileController>()
       : Get.put(ProfileController());
   final _scrollController = ScrollController();
+
+  /// Server-side filtering for the public feed — the same filters, the same
+  /// endpoint and the same controller as the user side's home, with the
+  /// backend picking the listings for the broker side from the token.
+  ///
+  /// Its own instance rather than the shared `.to` one: the user home's
+  /// filter must not leak into this feed (or the other way round) when the
+  /// account flips sides, so it lives and dies with this screen. Only the
+  /// feed has it — "My Announcements" is a different endpoint with a status
+  /// filter alone.
+  late final PropertySearchController? _searchCtrl =
+      widget.showMineOnly ? null : Get.put(PropertySearchController(), tag: _searchTag);
+  late final String _searchTag = 'broker-feed:${identityHashCode(this)}';
+
+  /// Whether the feed is showing filtered results from the server rather than
+  /// the cached, unfiltered list.
+  bool get _isFiltering {
+    final search = _searchCtrl;
+    return search != null && !search.filter.value.isEmpty;
+  }
 
   String? _selectedListingType;
   String? _selectedPropertyType;
@@ -86,9 +107,14 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
   /// Whether the backend actually holds more announcements than the cap
   /// renders — either we fetched more than we show, or more pages exist.
   /// Guards against promising "more announcements" when there are none.
-  bool get _hasMoreBehindGate =>
-      _controller.brokerAnnouncements.length > kGuestAnnouncementLimit ||
-      _controller.hasMoreBroker;
+  bool get _hasMoreBehindGate {
+    final search = _searchCtrl;
+    if (search != null && _isFiltering) {
+      return search.results.length > kGuestAnnouncementLimit || search.hasMore;
+    }
+    return _controller.brokerAnnouncements.length > kGuestAnnouncementLimit ||
+        _controller.hasMoreBroker;
+  }
 
   @override
   void initState() {
@@ -109,6 +135,9 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     appRouteObserver.unsubscribe(this);
+    if (_searchCtrl != null) {
+      Get.delete<PropertySearchController>(tag: _searchTag);
+    }
     super.dispose();
   }
 
@@ -148,7 +177,11 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
     // nothing to interrupt the scroll with.
     if (_isCapped) return;
 
-    if (pos.pixels >= pos.maxScrollExtent - 300 && _controller.hasMoreBroker) {
+    if (pos.pixels < pos.maxScrollExtent - 300) return;
+    final search = _searchCtrl;
+    if (search != null && _isFiltering) {
+      if (search.hasMore) search.loadMore();
+    } else if (_controller.hasMoreBroker) {
       _controller.loadMoreBroker();
     }
   }
@@ -218,7 +251,29 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
           children: [
             _buildHeader(theme),
             SizedBox(height: 12.h),
-            AnnouncementFilterBar(
+            _buildFilterBar(),
+            SizedBox(height: 20.h),
+            Expanded(child: _buildContent(theme)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The feed gets the full filter set, applied by the server; "My
+  /// Announcements" keeps its chips, which sieve the page already fetched.
+  Widget _buildFilterBar() {
+    final search = _searchCtrl;
+    if (search != null) {
+      return Obx(() => HomeFilterBar(
+            horizontalPadding: 16.w,
+            filter: search.filter.value,
+            onFilterChanged: search.applyFacets,
+            // Back to the cached feed; nothing to fetch for that.
+            onResetAll: search.clearAll,
+          ));
+    }
+    return AnnouncementFilterBar(
               selectedListingType: _selectedListingType,
               selectedPropertyType: _selectedPropertyType,
               selectedIsCommercial: _selectedIsCommercial,
@@ -236,13 +291,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                 setState(() => _selectedStatus = status);
                 _controller.loadBrokerMine(status: status);
               },
-            ),
-            SizedBox(height: 20.h),
-            Expanded(child: _buildContent(theme)),
-          ],
-        ),
-      ),
-    );
+            );
   }
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -296,8 +345,10 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
               ),
             ),
             GestureDetector(
-              onTap: () =>
-                  Get.to(() => const CreateAnnouncementView(fromBroker: true)),
+              // Through the same gate as the nav bar's "+": a guest is asked
+              // to sign in, a skipped broker profile to finish it. This icon
+              // used to open the form directly for both.
+              onTap: _onCreateTap,
               behavior: HitTestBehavior.opaque,
               child: _createIcon(theme),
             ),
@@ -358,17 +409,20 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
   Widget _buildContent(ThemeData theme) {
     return Obx(() {
       final isMine = widget.showMineOnly;
+      // With a filter on, the feed comes from the server already sieved;
+      // otherwise it is the cached, unfiltered list as before.
+      final search = _isFiltering ? _searchCtrl : null;
 
       final isLoading = isMine
           ? _controller.isLoadingBrokerMine.value
-          : _controller.isLoadingBroker.value;
+          : search?.isLoading.value ?? _controller.isLoadingBroker.value;
       final error = isMine
           ? _controller.brokerMineError.value
-          : _controller.brokerError.value;
+          : search?.error.value ?? _controller.brokerError.value;
       final myId = _profileCtrl.currentUserId;
       final rawList = isMine
           ? _controller.brokerMineAnnouncements.toList()
-          : _controller.brokerAnnouncements
+          : (search?.results ?? _controller.brokerAnnouncements)
               // Hide the broker's own posts from the public feed. A guest has
               // no id, so nothing gets excluded (and a null userId on a real
               // announcement is never mistaken for "mine").
@@ -378,7 +432,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
 
       Future<void> refresh() => isMine
           ? _controller.loadBrokerMine(status: _selectedStatus, force: true)
-          : _controller.loadBroker(force: true);
+          : search?.refreshResults() ?? _controller.loadBroker(force: true);
 
       // Shimmer until the first fetch has actually come back. `isLoading` alone
       // is still false while this screen waits for its postFrameCallback to
@@ -386,7 +440,7 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       // spinner even started.
       final settled = isMine
           ? _controller.brokerMineSettled.value
-          : _controller.brokerSettled.value;
+          : search != null || _controller.brokerSettled.value;
       if ((isLoading || !settled) && announcements.isEmpty) {
         return _buildShimmer();
       }
@@ -425,7 +479,9 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                 child: Text(
                     isMine
                         ? 'You have no announcements yet'
-                        : 'No announcements',
+                        : search != null
+                            ? 'No announcements match these filters'
+                            : 'No announcements',
                     style: GoogleFonts.inter(
                         fontSize: 14.sp, color: Colors.grey.shade400)),
               ),
@@ -434,8 +490,10 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
         );
       }
 
-      final showLoadingMore =
-          !isMine && !_isCapped && _controller.isLoadingMoreBroker.value;
+      final showLoadingMore = !isMine &&
+          !_isCapped &&
+          (search?.isLoadingMore.value ??
+              _controller.isLoadingMoreBroker.value);
       final cardEnd = announcements.length;
       final skeletonIdx = showLoadingMore ? cardEnd : -1;
       final itemCount = cardEnd + (showLoadingMore ? 1 : 0);

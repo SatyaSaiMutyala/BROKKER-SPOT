@@ -4,6 +4,8 @@ import 'package:brokkerspot/core/services/announcement_cache.dart';
 import 'package:brokkerspot/views/brokker/home/controller/broker_dashboard_controller.dart';
 import 'package:brokkerspot/core/services/presence_service.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
+import 'package:brokkerspot/views/auth/controller/login_controller.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/home/controller/property_search_controller.dart';
@@ -21,6 +23,15 @@ import 'package:get/get.dart';
 ///  • Presence map
 ///  • Open socket connection
 Future<void> clearUserSession() async {
+  // The account itself: name, photo, role, verification state. Permanent, so
+  // it kept the previous account on screen for a guest until this was added.
+  if (Get.isRegistered<ProfileController>()) {
+    Get.find<ProfileController>().clear();
+  }
+  // And the credentials typed into the login form, which is permanent too.
+  if (Get.isRegistered<LoginController>()) {
+    Get.find<LoginController>().clearForm();
+  }
   if (Get.isRegistered<AnnouncementListController>()) {
     AnnouncementListController.to.clearAll();
   }

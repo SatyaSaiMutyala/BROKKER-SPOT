@@ -146,7 +146,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
       _uploadAndSave();
       return;
     }
-    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _showErrors = true);
     final first = _requiredFields.where((f) => f.missing).firstOrNull;
     if (first == null) return;
@@ -278,7 +278,7 @@ class _PropertyLocationViewState extends State<PropertyLocationView> {
   }
 
   Future<void> _uploadAndSave() async {
-    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
 
     final c = Get.find<AnnouncementController>();
     c.setLocation(

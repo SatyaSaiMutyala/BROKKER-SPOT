@@ -137,12 +137,19 @@ class WishlistController extends GetxController {
 
   /// Loads page 1 of the wishlist. Cached for the session — pass [force] for
   /// pull-to-refresh, per the project's fetch-once rule.
+  /// Bumped by [clearAll] so a page requested before a logout cannot land
+  /// afterwards and refill the next session's grid — see the same guard in
+  /// AnnouncementListController.
+  int _session = 0;
+
   Future<void> load({bool force = false}) async {
     if (_loaded && !force) return;
+    final session = _session;
     try {
       isLoading.value = true;
       error.value = null;
       final result = await _repo.fetchWishlist(page: 1, perPage: _perPage);
+      if (session != _session) return;
       items.assignAll(result.items);
       _page = result.page;
       _totalPages = result.totalPages;
@@ -151,12 +158,15 @@ class WishlistController extends GetxController {
       wishlistedIds.addAll(result.items.map((a) => a.id).whereType<String>());
       _loaded = true;
     } catch (e) {
+      if (session != _session) return;
       if (items.isEmpty) error.value = e.toString();
     } finally {
-      isLoading.value = false;
-      // Clear either way — a failed refetch must not leave the grid
-      // shimmering forever.
-      isStale.value = false;
+      if (session == _session) {
+        isLoading.value = false;
+        // Clear either way — a failed refetch must not leave the grid
+        // shimmering forever.
+        isStale.value = false;
+      }
     }
   }
 
@@ -165,9 +175,11 @@ class WishlistController extends GetxController {
   Future<void> loadMore() async {
     if (isLoadingMore.value || !hasMore) return;
     final next = _page + 1;
+    final session = _session;
     try {
       isLoadingMore.value = true;
       final result = await _repo.fetchWishlist(page: next, perPage: _perPage);
+      if (session != _session) return;
       items.addAll(result.items);
       _page = result.page;
       _totalPages = result.totalPages;
@@ -175,12 +187,13 @@ class WishlistController extends GetxController {
     } catch (_) {
       // Silent — keep showing the pages we already have.
     } finally {
-      isLoadingMore.value = false;
+      if (session == _session) isLoadingMore.value = false;
     }
   }
 
   /// Drop everything on logout so the next account starts clean.
   void clearAll() {
+    _session++;
     wishlistedIds.clear();
     pendingIds.clear();
     items.clear();

@@ -6,7 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Broker-side row on the Meeting list: property thumbnail (left), listing
-/// details (middle), and the client's avatar + unread-chat count (right).
+/// details (middle), and the client's avatar (right).
 class BrokerMeetingCard extends StatelessWidget {
   final MeetingItem meeting;
   final bool isOwn;
@@ -134,7 +134,6 @@ class BrokerMeetingCard extends StatelessWidget {
               fallbackInitial:
                   ((peer?.name?.isNotEmpty == true ? peer!.name![0] : 'U'))
                       .toUpperCase(),
-              count: meeting.chatProfilesCount,
               // Left non-tappable when there is no peer behind the circle, so
               // the row's own tap target keeps working.
               onTap: (onProfileTap != null && peer != null)
@@ -208,14 +207,12 @@ class _PropertyThumb extends StatelessWidget {
 class _ClientAvatar extends StatelessWidget {
   final String? imageUrl;
   final String fallbackInitial;
-  final int count;
 
   final VoidCallback? onTap;
 
   const _ClientAvatar({
     required this.imageUrl,
     required this.fallbackInitial,
-    required this.count,
     this.onTap,
   });
 
@@ -239,28 +236,6 @@ class _ClientAvatar extends StatelessWidget {
               ),
               child: ClipOval(child: _image()),
             ),
-            if (count > 0)
-              Positioned(
-                top: -2,
-                right: -2,
-                child: Container(
-                  width: 22.w,
-                  height: 22.w,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.primary,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    count > 9 ? '9+' : '$count',
-                    style: GoogleFonts.poppins(
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

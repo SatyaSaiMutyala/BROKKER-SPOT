@@ -20,6 +20,11 @@ class HomeAppBar extends StatelessWidget {
   /// belong to — the bell is dropped rather than shown pointing at nothing.
   final bool isGuest;
 
+  /// Whether the bell is drawn at all for a signed-in viewer. The broker
+  /// side turns it off for an account that skipped its broker profile: the
+  /// server keeps notifications per side, and that side has none for them.
+  final bool showNotifications;
+
   /// Optional pill shown right after the greeting (e.g. the broker side's
   /// verification status) — same row, not a separate line underneath.
   final Widget? statusBadge;
@@ -35,6 +40,7 @@ class HomeAppBar extends StatelessWidget {
     required this.onNotificationTap,
     required this.onSearchTap,
     this.isGuest = false,
+    this.showNotifications = true,
     this.statusBadge,
   });
 
@@ -117,8 +123,9 @@ class HomeAppBar extends StatelessWidget {
         // Notification pill (#FAF7F1, r:39). Was 91.w when it also held the
         // search icon — restore that width if search comes back.
         // Dropped entirely for a guest — there's no account to hold
-        // notifications, so the bell would just point at nothing.
-        if (!isGuest)
+        // notifications, so the bell would just point at nothing. And for
+        // whoever the host says has none to see — see [showNotifications].
+        if (!isGuest && showNotifications)
           Container(
             width: 48.w,
             height: 42.h,

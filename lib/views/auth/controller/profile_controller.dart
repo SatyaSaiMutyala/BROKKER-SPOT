@@ -135,7 +135,37 @@ class ProfileController extends GetxController {
     }
   }
 
+  /// Bumped by [clear], so a profile request that was already out when the
+  /// account signed out cannot land afterwards and put that account's name
+  /// and photo back on a guest's screen.
+  int _session = 0;
+
+  /// Forgets everything about the signed-in account — for logout.
+  ///
+  /// This controller is permanent, so without this the previous account's
+  /// name, photo, role and verification state outlived the session: a guest
+  /// browsing right after a logout was still greeted by the old name.
+  void clear() {
+    _session++;
+    profileData.value = null;
+    userName.value = '';
+    userEmail.value = '';
+    userMobile.value = '';
+    userCountryCode.value = '';
+    profileImage.value = '';
+    brokerProfileImage.value = '';
+    accountType.value = 0;
+    role.value = 0;
+    currentRole.value = 0;
+    dealingCities.clear();
+    dealingAreas.clear();
+    knownLanguages.clear();
+    savingCurrencyCode.value = null;
+    isLoading.value = false;
+  }
+
   Future<void> getProfile() async {
+    final session = _session;
     try {
       isLoading.value = true;
 
@@ -143,6 +173,9 @@ class ProfileController extends GetxController {
         endPoint: '${baseUrl}user/auth/me',
         headers: buildHeaders(),
       );
+      // Signed out while this was in flight — the answer is about an account
+      // that is no longer here.
+      if (session != _session) return;
 
       print('=== Profile API Response ===');
       print('Status: ${response.statusCode}');

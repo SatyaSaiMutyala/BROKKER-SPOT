@@ -37,17 +37,21 @@ class NotificationListController extends GetxController {
     if (_loaded && !force) return;
     // A fetch is already running — it will publish the same fresh page.
     if (isLoading.value) return;
+    final session = _session;
     try {
       isLoading.value = true;
       error.value = null;
       final result = await _repo.fetchNotifications();
+      // Signed out while this was out — the list belongs to that account.
+      if (session != _session) return;
       notifications.assignAll(result.items);
       unseenCount.value = result.totalUnseen;
       _loaded = true;
     } catch (e) {
+      if (session != _session) return;
       if (notifications.isEmpty) error.value = e.toString();
     } finally {
-      isLoading.value = false;
+      if (session == _session) isLoading.value = false;
     }
   }
 
@@ -104,7 +108,12 @@ class NotificationListController extends GetxController {
   }
 
   /// Drops all in-memory state. Called on logout via [clearUserSession].
+  /// Bumped by [clearAll] — see the guard in [load].
+  int _session = 0;
+
   void clearAll() {
+    _session++;
+    isLoading.value = false;
     notifications.clear();
     unseenCount.value = 0;
     error.value = null;

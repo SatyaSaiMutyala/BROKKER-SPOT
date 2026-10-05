@@ -14,6 +14,10 @@ const int kMaxPublishedContracts = 3;
 /// Read off `proposal_details.status` in the broker-role `fetch-all` response —
 /// this broker's own proposal on the announcement, or null when they have not
 /// sent one.
+/// Badge colours are kept muted on purpose — about half the saturation of the
+/// design's swatches, lightness held around 40% — so the pill sits on the
+/// photo rather than shouting over it, while white text still reads on all
+/// of them. Each keeps its hue, so the states stay tellable apart.
 class ProposalBadge {
   final String title;
 
@@ -47,12 +51,12 @@ ProposalBadge? contractBadgeFor({
   if (status == 4) {
     return const ProposalBadge(
       title: 'Contract Cancelled',
-      color: Color(0xFFE5484D),
+      color: Color(0xFF9F4245),
     );
   }
   return const ProposalBadge(
     title: 'Contract Signed',
-    color: Color(0xFF2E8B22),
+    color: Color(0xFF447A3D),
   );
 }
 
@@ -77,46 +81,46 @@ ProposalBadge? feedBadgeFor({int? proposalStatus, bool? isViewed}) {
         // Off an older listing the server has no view record for, this reads
         // "Unseen" — which is what it means: not opened since views began.
         subtitle: isViewed == true ? 'Seen' : 'Unseen',
-        color: const Color(0xFF1FA02A),
+        color: const Color(0xFF3C8342),
       );
     case 0:
       return const ProposalBadge(
         title: 'SENT PROPOSAL',
         subtitle: 'Awaiting',
-        color: Color(0xFFE0A21B),
+        color: Color(0xFFA18240),
       );
     case 1:
       // The owner has signed; the broker's signature is the one outstanding.
       return const ProposalBadge(
         title: 'MEDIATE TO SIGN',
         subtitle: 'Pending',
-        color: Color(0xFF8B2FE8),
+        color: Color(0xFF703FA2),
       );
     case 3:
       // Both sides signed. Publishing is what is left.
       return const ProposalBadge(
         title: 'ACCEPTED PROPOSAL',
         subtitle: 'Confirmed',
-        color: Color(0xFF1E7BE8),
+        color: Color(0xFF3E6CA2),
       );
     case 4:
       return const ProposalBadge(
         title: 'CONTRACT SIGNED',
         subtitle: 'Published',
-        color: Color(0xFF1A3D9E),
+        color: Color(0xFF384B80),
       );
     case 5:
       // The owner asked to cancel; the 48-hour window is still open.
       return const ProposalBadge(
         title: 'PENDING CANCELLATION',
         subtitle: '48h Pending',
-        color: Color(0xFFF26A1B),
+        color: Color(0xFFA76239),
       );
     case 6:
       return const ProposalBadge(
         title: 'CANCELLED',
         subtitle: 'Closed',
-        color: Color(0xFFF5254A),
+        color: Color(0xFFA8384C),
       );
     default:
       return null;

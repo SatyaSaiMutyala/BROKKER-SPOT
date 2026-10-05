@@ -84,6 +84,14 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
     );
   }
 
+  /// Signed in, but the broker profile was skipped. `role.value != 0` waits
+  /// for the profile fetch to actually answer before calling someone
+  /// "skipped" — while it is still the default 0, hasBrokerRole would read
+  /// false for anyone, including a real broker whose profile just hasn't
+  /// landed yet.
+  bool get _skippedProfile =>
+      _profileCtrl.role.value != 0 && !_profileCtrl.hasBrokerRole;
+
   // ─── HEADER ───
   Widget _buildHeader() {
     return Obx(() {
@@ -100,6 +108,10 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
         // Hides the bell for a guest, same as the user-side home — there is
         // no account to hold notifications.
         isGuest: _profileCtrl.isGuest,
+        // And for a skipped broker profile: notifications are kept per side
+        // on the server, and the broker side has none for an account that
+        // never became a broker — the screen behind the bell would be empty.
+        showNotifications: !_skippedProfile,
         // Read in the SAME Obx as the rest of the header rather than in a
         // nested Obx of its own — a nested Obx here previously caused a
         // "[Get] the improper use of a GetX has been detected" crash plus a
@@ -215,9 +227,16 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
         // actually answer before calling someone "skipped" — while it is
         // still the default 0, hasBrokerRole would read false for anyone,
         // including a real broker whose profile just hasn't landed yet.
-        final skippedProfile =
-            _profileCtrl.role.value != 0 && !_profileCtrl.hasBrokerRole;
-        if (_profileCtrl.isGuest || skippedProfile) {
+        //
+        // The same goes for a finished profile the admin has not approved
+        // (pending, rejected): the counters are only live for an approved
+        // broker. Null status means the profile has not landed yet, and is
+        // left to the shimmer below rather than flashing zeros at a broker
+        // who is about to get real numbers.
+        final skippedProfile = _skippedProfile;
+        final status = _profileCtrl.verificationStatus;
+        final notApproved = status != null && status != 'approved';
+        if (_profileCtrl.isGuest || skippedProfile || notApproved) {
           return _buildStaticStats();
         }
         final stats = _dashboardCtrl.stats.value;

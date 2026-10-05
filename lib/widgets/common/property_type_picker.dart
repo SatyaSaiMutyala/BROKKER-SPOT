@@ -344,13 +344,19 @@ Future<PropertyTypeSelection?> showPropertyTypeSheet(
                 onChanged: (next) => setSheet(() => current = next),
               ),
               SizedBox(height: 24.h),
+              // Nothing picked, nothing to apply — Clear is the way to drop
+              // a filter that is already on. Same grey as the filter
+              // screen's idle Apply.
               SizedBox(
                 width: double.infinity,
                 height: 50.h,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.of(ctx).pop(current),
+                  onPressed: current.isEmpty
+                      ? null
+                      : () => Navigator.of(ctx).pop(current),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
+                    disabledBackgroundColor: filterApplyDisabledColor(isDark),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30.r),
@@ -361,7 +367,9 @@ Future<PropertyTypeSelection?> showPropertyTypeSheet(
                     style: GoogleFonts.poppins(
                       fontSize: 15.sp,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: current.isEmpty
+                          ? filterApplyDisabledTextColor(isDark)
+                          : Colors.white,
                     ),
                   ),
                 ),
@@ -373,6 +381,14 @@ Future<PropertyTypeSelection?> showPropertyTypeSheet(
     ),
   );
 }
+
+/// The idle Apply button on the filter sheets — the same grey the filter
+/// screen uses when there is nothing to apply.
+Color filterApplyDisabledColor(bool isDark) =>
+    isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E4);
+
+Color filterApplyDisabledTextColor(bool isDark) =>
+    isDark ? Colors.grey.shade500 : Colors.grey.shade600;
 
 /// The filter chip's label for a selection: the type when one is picked,
 /// else the category, else [placeholder].

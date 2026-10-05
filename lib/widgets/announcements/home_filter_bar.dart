@@ -585,6 +585,9 @@ class HomeFilterBar extends StatelessWidget {
     final maxCtrl = TextEditingController(
       text: price.end < _priceCeil ? price.end.round().toString() : '',
     );
+    // Lives outside the builder: declared inside it, every setSheet rebuild
+    // reset it to false before the message or the Apply button could see it.
+    var priceError = false;
 
     showModalBottomSheet(
       context: context,
@@ -604,7 +607,6 @@ class HomeFilterBar extends StatelessWidget {
             builder: (ctx, setSheet) {
               // Round to nearest AED 5,000 for clean slider steps.
               double snap(double v) => (v / 5000).round() * 5000;
-              var priceError = false;
 
               void syncFromSlider(RangeValues v) {
                 final snapped = RangeValues(snap(v.start), snap(v.end));
@@ -819,23 +821,24 @@ class HomeFilterBar extends StatelessWidget {
                       ),
                     ],
                     SizedBox(height: 12.h),
-                    _applyBtn(() {
-                      var f = filter.cleared(price: true);
-                      // The price filter is "engaged" once either handle moves off
-                      // the full-range extremes. When it is, send BOTH bounds
-                      // explicitly — including min_price=0 (a real lower bound the
-                      // user picked, not the same as "no minimum").
-                      final priceEngaged =
-                          price.start > _priceFloor || price.end < _priceCeil;
-                      if (priceEngaged) {
-                        f = f.copyWith(
+                    // The price filter is "engaged" once either handle moves
+                    // off the full-range extremes. Until then there is
+                    // nothing to apply, so the button waits — and it waits
+                    // through a max below the min too.
+                    _applyBtn(
+                      () {
+                        // Send BOTH bounds explicitly — including min_price=0
+                        // (a real lower bound the user picked, not the same
+                        // as "no minimum").
+                        onFilterChanged(filter.cleared(price: true).copyWith(
                           minPrice: price.start,
                           maxPrice: price.end,
-                        );
-                      }
-                      onFilterChanged(f);
-                      Navigator.of(ctx).pop();
-                    }, isDark),
+                        ));
+                        Navigator.of(ctx).pop();
+                      },
+                      isDark,
+                      enabled: priceRangeEngaged(price) && !priceError,
+                    ),
                     SizedBox(height: 20.h),
                   ],
                 ),
@@ -997,14 +1000,21 @@ class HomeFilterBar extends StatelessWidget {
     );
   }
 
-  Widget _applyBtn(VoidCallback onTap, bool isDark) {
+  /// True once either handle has moved off the full-range extremes — the
+  /// only state in which the price sheet has anything to apply.
+  @visibleForTesting
+  static bool priceRangeEngaged(RangeValues price) =>
+      price.start > _priceFloor || price.end < _priceCeil;
+
+  Widget _applyBtn(VoidCallback onTap, bool isDark, {bool enabled = true}) {
     return SizedBox(
       width: double.infinity,
       height: 50.h,
       child: ElevatedButton(
-        onPressed: onTap,
+        onPressed: enabled ? onTap : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
+          disabledBackgroundColor: filterApplyDisabledColor(isDark),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30.r),
@@ -1015,7 +1025,7 @@ class HomeFilterBar extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontSize: 15.sp,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: enabled ? Colors.white : filterApplyDisabledTextColor(isDark),
           ),
         ),
       ),

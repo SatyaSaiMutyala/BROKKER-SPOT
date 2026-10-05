@@ -279,6 +279,7 @@ class AnnouncementListController extends GetxController {
       }
     }
     if (_allLoaded && !force) return;
+    final session = _session;
     try {
       isLoadingAll.value = true;
       allError.value = null;
@@ -286,6 +287,7 @@ class AnnouncementListController extends GetxController {
           ? await _repo.fetchAllAnnouncements(page: 1, perPage: _allPerPage)
           : await _repo.fetchGuestAnnouncements(
               page: 1, perPage: _allPerPage, userRole: 2);
+      if (session != _session) return;
       allAnnouncements.assignAll(result.items);
       _allPage = result.page;
       _allTotalPages = result.totalPages;
@@ -296,10 +298,17 @@ class AnnouncementListController extends GetxController {
       AnnouncementCache.saveList(AnnouncementCache.keyAll, result.raw);
       _allLoaded = true;
     } catch (e) {
+      // Unconditional, so a release build's device log still says why the
+      // feed came up empty.
+      debugPrint('⚠️ [Feed] loadAll failed — loggedIn='
+          '${LocalStorageService.isLoggedIn()} session=$session/$_session: $e');
+      if (session != _session) return;
       if (allAnnouncements.isEmpty) allError.value = e.toString();
     } finally {
-      isLoadingAll.value = false;
-      allSettled.value = true;
+      if (session == _session) {
+        isLoadingAll.value = false;
+        allSettled.value = true;
+      }
     }
   }
 
@@ -311,19 +320,21 @@ class AnnouncementListController extends GetxController {
   Future<void> loadMoreAll() async {
     if (isLoadingMoreAll.value || !hasMoreAll) return;
     final next = _allPage + 1;
+    final session = _session;
     try {
       isLoadingMoreAll.value = true;
       final result = LocalStorageService.isLoggedIn()
           ? await _repo.fetchAllAnnouncements(page: next, perPage: _allPerPage)
           : await _repo.fetchGuestAnnouncements(
               page: next, perPage: _allPerPage, userRole: 2);
+      if (session != _session) return;
       allAnnouncements.addAll(result.items);
       _allPage = result.page;
       _allTotalPages = result.totalPages;
     } catch (_) {
       // Silent — keep showing the pages we already have.
     } finally {
-      isLoadingMoreAll.value = false;
+      if (session == _session) isLoadingMoreAll.value = false;
     }
   }
 
@@ -341,6 +352,7 @@ class AnnouncementListController extends GetxController {
       }
     }
     if (_brokerLoaded && !force) return;
+    final session = _session;
     try {
       isLoadingBroker.value = true;
       brokerError.value = null;
@@ -352,6 +364,7 @@ class AnnouncementListController extends GetxController {
           // sees server-side — see the class comment above.
           : await _repo.fetchGuestAnnouncements(
               page: 1, perPage: _brokerPerPage, userRole: 1);
+      if (session != _session) return;
       brokerAnnouncements.assignAll(result.items);
       _brokerPage = result.page;
       _brokerTotalPages = result.totalPages;
@@ -361,10 +374,13 @@ class AnnouncementListController extends GetxController {
       AnnouncementCache.saveList(AnnouncementCache.keyBroker, result.raw);
       _brokerLoaded = true;
     } catch (e) {
+      if (session != _session) return;
       if (brokerAnnouncements.isEmpty) brokerError.value = e.toString();
     } finally {
-      isLoadingBroker.value = false;
-      brokerSettled.value = true;
+      if (session == _session) {
+        isLoadingBroker.value = false;
+        brokerSettled.value = true;
+      }
     }
   }
 
@@ -372,6 +388,7 @@ class AnnouncementListController extends GetxController {
   Future<void> loadMoreBroker() async {
     if (isLoadingMoreBroker.value || !hasMoreBroker) return;
     final next = _brokerPage + 1;
+    final session = _session;
     try {
       isLoadingMoreBroker.value = true;
       final result = LocalStorageService.isLoggedIn()
@@ -379,13 +396,14 @@ class AnnouncementListController extends GetxController {
               page: next, perPage: _brokerPerPage)
           : await _repo.fetchGuestAnnouncements(
               page: next, perPage: _brokerPerPage, userRole: 1);
+      if (session != _session) return;
       brokerAnnouncements.addAll(result.items);
       _brokerPage = result.page;
       _brokerTotalPages = result.totalPages;
     } catch (_) {
       // Silent — keep showing the pages we already have.
     } finally {
-      isLoadingMoreBroker.value = false;
+      if (session == _session) isLoadingMoreBroker.value = false;
     }
   }
 
@@ -415,10 +433,12 @@ class AnnouncementListController extends GetxController {
       myAnnouncements.clear();
       myError.value = null;
     }
+    final session = _session;
     try {
       isLoadingMine.value = true;
       myError.value = null;
       final result = await _repo.fetchAnnouncements(status: status);
+      if (session != _session) return;
       _mineCache[status] = result.items;
       _mineLoaded = true;
       AnnouncementCache.saveList(AnnouncementCache.keyMine(status), result.raw);
@@ -427,11 +447,12 @@ class AnnouncementListController extends GetxController {
         myAnnouncements.assignAll(result.items);
       }
     } catch (e) {
+      if (session != _session) return;
       if (_currentMineStatus == status && myAnnouncements.isEmpty) {
         myError.value = e.toString();
       }
     } finally {
-      isLoadingMine.value = false;
+      if (session == _session) isLoadingMine.value = false;
     }
   }
 
@@ -446,6 +467,7 @@ class AnnouncementListController extends GetxController {
       }
     }
     if (_homeLoaded && !force) return;
+    final session = _session;
     try {
       isLoadingHome.value = true;
       homeError.value = null;
@@ -454,13 +476,15 @@ class AnnouncementListController extends GetxController {
           // User side, same role as loadAll — see its doc comment.
           : await _repo.fetchGuestAnnouncements(
               page: 1, perPage: 5, userRole: 2);
+      if (session != _session) return;
       homeAnnouncements.assignAll(result.items);
       AnnouncementCache.saveList(AnnouncementCache.keyHome, result.raw);
       _homeLoaded = true;
     } catch (e) {
+      if (session != _session) return;
       if (homeAnnouncements.isEmpty) homeError.value = e.toString();
     } finally {
-      isLoadingHome.value = false;
+      if (session == _session) isLoadingHome.value = false;
     }
   }
 
@@ -491,20 +515,25 @@ class AnnouncementListController extends GetxController {
       }
     }
     if (_brokerMineLoaded && !force) return;
+    final session = _session;
     try {
       isLoadingBrokerMine.value = true;
       brokerMineError.value = null;
       final result = await _repo.fetchAnnouncements(status: status);
+      if (session != _session) return;
       brokerMineAnnouncements.assignAll(result.items);
       if (status == null) {
         AnnouncementCache.saveList(AnnouncementCache.keyBrokerMine, result.raw);
       }
       _brokerMineLoaded = true;
     } catch (e) {
+      if (session != _session) return;
       if (brokerMineAnnouncements.isEmpty) brokerMineError.value = e.toString();
     } finally {
-      isLoadingBrokerMine.value = false;
-      brokerMineSettled.value = true;
+      if (session == _session) {
+        isLoadingBrokerMine.value = false;
+        brokerMineSettled.value = true;
+      }
     }
   }
 
@@ -567,7 +596,14 @@ class AnnouncementListController extends GetxController {
   /// Wipe every cached list and loaded-flag. Call on logout so the next account
   /// doesn't see the previous account's data flash on screen before its own
   /// fetch completes.
+  /// Bumped by [clearAll]. Every network load notes the value it started
+  /// under and drops its result if the value has moved — a page requested
+  /// before a logout used to land afterwards and refill the list (and the
+  /// on-disk cache) with the previous account's listings, badges and all.
+  int _session = 0;
+
   void clearAll() {
+    _session++;
     allAnnouncements.clear();
     brokerAnnouncements.clear();
     myAnnouncements.clear();

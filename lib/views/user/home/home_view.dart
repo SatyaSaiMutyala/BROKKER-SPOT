@@ -12,6 +12,7 @@ import 'package:brokkerspot/views/user/home/more_property_view.dart'; // ignore:
 import 'package:brokkerspot/widgets/announcements/home_filter_bar.dart';
 import 'package:brokkerspot/widgets/common/app_search_bar.dart';
 import 'package:brokkerspot/widgets/common/pinned_header_delegate.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -365,7 +366,8 @@ class _HomeViewState extends State<HomeView> with RouteAware {
     if (ctrl.error.value != null && ctrl.results.isEmpty) {
       return [
         SliverToBoxAdapter(
-          child: _buildErrorState(onRetry: ctrl.refreshResults),
+          child: _buildErrorState(
+              onRetry: ctrl.refreshResults, detail: ctrl.error.value),
         ),
       ];
     }
@@ -463,7 +465,10 @@ class _HomeViewState extends State<HomeView> with RouteAware {
     if (ctrl.allError.value != null && ctrl.allAnnouncements.isEmpty) {
       return [
         SliverToBoxAdapter(
-          child: _buildErrorState(onRetry: () => ctrl.loadAll(force: true)),
+          child: _buildErrorState(
+            onRetry: () => ctrl.loadAll(force: true),
+            detail: ctrl.allError.value,
+          ),
         ),
       ];
     }
@@ -580,7 +585,10 @@ class _HomeViewState extends State<HomeView> with RouteAware {
     );
   }
 
-  Widget _buildErrorState({required VoidCallback onRetry}) {
+  /// [detail] is the failure itself. Shown under the message in debug builds
+  /// only — it is the server's or Dart's wording, for whoever is debugging,
+  /// not for the user.
+  Widget _buildErrorState({required VoidCallback onRetry, String? detail}) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: _gutter, vertical: 24.h),
       child: Center(
@@ -593,6 +601,16 @@ class _HomeViewState extends State<HomeView> with RouteAware {
                   fontSize: 13.sp, color: Colors.grey.shade500),
               textAlign: TextAlign.center,
             ),
+            if (kDebugMode && detail != null && detail.trim().isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(top: 6.h),
+                child: Text(
+                  detail,
+                  style: GoogleFonts.inter(
+                      fontSize: 11.sp, color: Colors.grey.shade400),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             TextButton(
               onPressed: onRetry,
               child: Text('Retry',

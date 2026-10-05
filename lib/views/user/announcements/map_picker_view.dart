@@ -190,7 +190,7 @@ class _MapPickerViewState extends State<MapPickerView> {
       _suggestions = [];
       _searchError = null;
     });
-    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
     try {
       // Place Details (New) — the legacy `place/details` endpoint is denied on
       // this project for the same reason as autocomplete. `X-Goog-FieldMask` is

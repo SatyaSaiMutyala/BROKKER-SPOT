@@ -101,7 +101,7 @@ class _PropertyPriceBrokerageViewState
       _save();
       return;
     }
-    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _showErrors = true);
     final first = _requiredFields.where((f) => f.missing).firstOrNull;
     if (first == null) return;

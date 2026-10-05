@@ -19,7 +19,7 @@ import 'package:brokkerspot/views/user/wishlist/controller/wishlist_controller.d
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/models/meeting_item_model.dart';
 import 'package:brokkerspot/views/user/account/account_view.dart'
-    show showLoginRequiredDialog;
+    show showLoginRequiredDialog, showCompleteProfileDialog;
 import 'package:brokkerspot/views/user/announcements/announcement_chat_view.dart';
 import 'package:brokkerspot/views/user/announcements/controller/announcement_list_controller.dart';
 import 'package:brokkerspot/views/user/announcements/repo/announcement_repo.dart';
@@ -110,13 +110,13 @@ class _BrokerAnnouncementDetailViewState
       : Get.put(ProfileController());
 
   /// A guest, or a broker who skipped completing their profile — neither has
-  /// a real conversation or proposal to start, so the chat/proposal pill at
-  /// the bottom is dropped for them rather than shown and then blocked with
-  /// a login prompt or a "complete your profile" dialog on tap. `role.value
-  /// != 0` waits for the profile fetch to actually answer before calling a
-  /// logged-in broker "skipped" — while it is still the unset default,
-  /// hasBrokerRole reads false for a real broker too, whose profile just
-  /// hasn't landed yet.
+  /// a real conversation or proposal to start. They still see the chat pill
+  /// at the bottom, so the screen reads the same as it does for a broker,
+  /// and tapping it says what is missing: sign in, or finish the profile
+  /// (see [_onGatedChatTap]). `role.value != 0` waits for the profile fetch
+  /// to actually answer before calling a logged-in broker "skipped" — while
+  /// it is still the unset default, hasBrokerRole reads false for a real
+  /// broker too, whose profile just hasn't landed yet.
   bool get _isGuestOrSkipped =>
       !LocalStorageService.isLoggedIn() ||
       (_profileCtrl.role.value != 0 && !_profileCtrl.hasBrokerRole);
@@ -401,6 +401,16 @@ class _BrokerAnnouncementDetailViewState
       // it — so say the feed is out of date.
       AnnouncementListController.to.markBrokerStale();
     }
+  }
+
+  /// The chat pill's tap for someone who cannot chat yet: a guest is asked
+  /// to sign in, a broker who skipped their profile to finish it.
+  void _onGatedChatTap() {
+    if (!LocalStorageService.isLoggedIn()) {
+      showLoginRequiredDialog(context);
+      return;
+    }
+    showCompleteProfileDialog(context);
   }
 
   void _openChat() {
@@ -998,12 +1008,12 @@ class _BrokerAnnouncementDetailViewState
       return const SizedBox.shrink();
     }
 
-    // A guest or a skipped-profile broker has no real conversation or
-    // proposal behind this listing to open — see _isGuestOrSkipped.
-    if (_isGuestOrSkipped) return const SizedBox.shrink();
-
+    // A guest or a skipped-profile broker gets the chat pill too, with the
+    // tap explaining what is missing instead of opening a chat they cannot
+    // have yet — see _isGuestOrSkipped.
+    final gated = _isGuestOrSkipped;
     final alreadySent = _proposalSent || _data.isProposalSent == true;
-    final chatReady = _data.isChatAvailable == true;
+    final chatReady = gated || _data.isChatAvailable == true;
 
     final Widget button;
 
@@ -1019,7 +1029,7 @@ class _BrokerAnnouncementDetailViewState
       final ownerAvatar = _resolvedOwnerAvatar;
 
       button = GestureDetector(
-        onTap: _openChat,
+        onTap: gated ? _onGatedChatTap : _openChat,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(90.r),
           child: BackdropFilter(

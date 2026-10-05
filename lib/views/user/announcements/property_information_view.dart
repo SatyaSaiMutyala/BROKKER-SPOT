@@ -170,7 +170,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     if (_isUploading) return;
     // Dismiss the keyboard immediately so it doesn't stay open during the
     // save progress or on the way back to the previous screen.
-    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
     if (_isValid) {
       _saveAndNext();
       return;
@@ -582,7 +582,13 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     // handler wrapping the body — and a still-focused field makes the keyboard
     // flash back when the picker hands the activity over, which shifts the
     // scroll position out from under the user.
-    FocusScope.of(context).unfocus();
+    //
+    // Unfocused from the field itself, not the screen's scope: unfocusing the
+    // scope hides the keyboard but leaves the field remembered as the scope's
+    // focused child, and the moment this sheet pops, the Navigator hands focus
+    // back to the scope — which hands it straight back to the field. That is
+    // the number keypad coming up over the picker, with nothing to type into.
+    FocusManager.instance.primaryFocus?.unfocus();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
@@ -703,7 +709,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         behavior: HitTestBehavior.translucent,
         child: Stack(
           children: [

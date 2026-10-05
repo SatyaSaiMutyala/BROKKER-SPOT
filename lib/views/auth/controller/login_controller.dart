@@ -3,6 +3,7 @@ import 'package:brokkerspot/core/constants/flutter_toast.dart';
 import 'package:brokkerspot/core/services/session_cleanup.dart';
 import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/core/services/login_return.dart';
+import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/models/login_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -36,6 +37,18 @@ class LoginController extends GetxController {
 
   void togglePasswordVisibility() {
     obscurePassword.value = !obscurePassword.value;
+  }
+
+  /// Empties the form — for logout. The controller is permanent, so the
+  /// previous account's email and password otherwise sat prefilled on the
+  /// login screen for whoever picked the phone up next.
+  void clearForm() {
+    emailController.clear();
+    passwordController.clear();
+    obscurePassword.value = true;
+    rememberMe.value = false;
+    isFormValid.value = false;
+    isLoading.value = false;
   }
 
   Future<void> login() async {
@@ -85,6 +98,12 @@ class LoginController extends GetxController {
           debugPrint('🔑 [Login] session cleared, calling socket connect() — stored_user=${LocalStorageService.getUserIdFromToken()}');
           SocketService.to.connect();
           debugPrint('🔑 [Login] socket connect() returned');
+          // clearUserSession just emptied the profile; load this account's
+          // before the dashboard draws, the way the social logins do. The
+          // user side has no other fetch of its own, so without this the
+          // home greeting stayed blank — or, before the clear, showed the
+          // previous account.
+          await ProfileController.to.getProfile();
 
           AppToast.success(loginModel.message);
 
