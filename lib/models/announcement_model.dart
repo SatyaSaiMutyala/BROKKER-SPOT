@@ -18,7 +18,8 @@ class PropertyLocation {
 
   PropertyLocation({required this.type, required this.coordinates});
 
-  factory PropertyLocation.fromJson(Map<String, dynamic> json) => PropertyLocation(
+  factory PropertyLocation.fromJson(Map<String, dynamic> json) =>
+      PropertyLocation(
         type: json['type'] ?? 'Point',
         coordinates: (json['coordinates'] as List?)
                 ?.map((e) => (e as num).toDouble())
@@ -66,7 +67,8 @@ class PassportDocument {
 
   PassportDocument({this.frontUrl, this.backUrl});
 
-  factory PassportDocument.fromJson(Map<String, dynamic> json) => PassportDocument(
+  factory PassportDocument.fromJson(Map<String, dynamic> json) =>
+      PassportDocument(
         frontUrl: json['frontUrl'],
         backUrl: json['backUrl'],
       );
@@ -84,14 +86,17 @@ class PropertyDocuments {
 
   PropertyDocuments({this.titleDeed, this.passport, this.noc});
 
-  factory PropertyDocuments.fromJson(Map<String, dynamic> json) => PropertyDocuments(
+  factory PropertyDocuments.fromJson(Map<String, dynamic> json) =>
+      PropertyDocuments(
         titleDeed: json['titleDeed'] != null
             ? PropertyDocumentFile.fromJson(json['titleDeed'])
             : null,
         passport: json['passport'] != null
             ? PassportDocument.fromJson(json['passport'])
             : null,
-        noc: json['noc'] != null ? PropertyDocumentFile.fromJson(json['noc']) : null,
+        noc: json['noc'] != null
+            ? PropertyDocumentFile.fromJson(json['noc'])
+            : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -111,12 +116,26 @@ class ProposalBroker {
   final String? brokerProfileImage;
   final String? message;
   final String? createdAt;
+
   /// Proposal workflow status:
   /// 0 = awaiting owner, 1 = owner signed, 2 = declined,
-  /// 3 = both signed, 4 = published.
+  /// 3 = both signed, 4 = published, 5 = cancellation requested,
+  /// 6 = cancelled.
   final int? status;
+
   /// Set when the broker has published the announcement (status == 4).
   final String? publishedAt;
+
+  /// The reason given for a cancellation request (status == 5 or 6).
+  final String? cancellationReason;
+
+  /// When the 48-hour withdrawal window started (status == 5).
+  final String? cancellationRequestedAt;
+
+  /// The server's own deadline for withdrawing the cancellation — preferred
+  /// over deriving it from [cancellationRequestedAt] locally, same reasoning
+  /// as ChatController.withdrawDeadline.
+  final String? cancellationExpiresAt;
 
   /// Stamped when the owner approved the proposal and the agreement was
   /// rendered — the closest thing the record has to "contract signed".
@@ -147,10 +166,27 @@ class ProposalBroker {
     this.approvedAt,
     this.updatedAt,
     this.isChatAvailable,
+    this.cancellationReason,
+    this.cancellationRequestedAt,
+    this.cancellationExpiresAt,
   });
 
   /// Best available "contract signed" timestamp, most specific first.
   String? get signedAt => approvedAt ?? updatedAt ?? createdAt;
+
+  /// The server's own deadline for withdrawing the cancellation. Falls back
+  /// to 48h after the request when the server hasn't sent the deadline
+  /// itself — same reasoning as ChatController.withdrawDeadline.
+  DateTime? get cancellationDeadline {
+    final expiry = cancellationExpiresAt == null
+        ? null
+        : DateTime.tryParse(cancellationExpiresAt!);
+    if (expiry != null) return expiry;
+    final requested = cancellationRequestedAt == null
+        ? null
+        : DateTime.tryParse(cancellationRequestedAt!);
+    return requested?.add(const Duration(hours: 48));
+  }
 
   factory ProposalBroker.fromJson(Map<String, dynamic> json) {
     final nested = (json['broker'] ?? json['user_id'] ?? json['user']);
@@ -170,6 +206,9 @@ class ProposalBroker {
       approvedAt: json['approved_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
       isChatAvailable: json['is_chat_available'] as bool?,
+      cancellationReason: json['reason']?.toString(),
+      cancellationRequestedAt: json['cancellation_requested_at']?.toString(),
+      cancellationExpiresAt: json['cancellation_expires_at']?.toString(),
     );
   }
 }
@@ -214,13 +253,13 @@ class AnnouncementModel {
   final String? ownerName;
   final String? ownerAvatarUrl;
   final String? brokerAvatarUrl;
-  final String? listingType;   // 'Rent' | 'Sell' — string for display
+  final String? listingType; // 'Rent' | 'Sell' — string for display
   final List<String>? imageUrls; // mirrors propertyMedia.images
-  final int? sqft;              // mirrors propertySize.sqft
-  final String? location;       // derived: "area, city"
+  final int? sqft; // mirrors propertySize.sqft
+  final String? location; // derived: "area, city"
   final String? timeAgo;
   final bool? isWishlisted;
-  final String? status;         // 'Active' | 'Pending' | 'Rejected' | 'Draft'
+  final String? status; // 'Active' | 'Pending' | 'Rejected' | 'Draft'
 
   /// The server's `status` as sent — 0 draft, 1 submitted, 2 approved,
   /// 3 rejected, 4 cancelled after going live. [status] is the display label,
@@ -477,8 +516,7 @@ class AnnouncementModel {
       rejectionReason: json['rejection_reason'] as String?,
       // Field was declared but never parsed; accept either casing so the
       // heart reflects server state once the fetch payload carries it.
-      isWishlisted:
-          (json['is_wishlisted'] ?? json['isWishlisted']) as bool?,
+      isWishlisted: (json['is_wishlisted'] ?? json['isWishlisted']) as bool?,
       // derived display fields
       ownerName: ownerNameParsed,
       ownerAvatarUrl: ownerAvatarParsed,
@@ -529,7 +567,8 @@ class AnnouncementModel {
         if (propertyCity != null) 'property_city': propertyCity,
         if (propertyArea != null) 'property_area': propertyArea,
         if (propertyAddress != null) 'property_address': propertyAddress,
-        if (propertyLocation != null) 'property_location': propertyLocation!.toJson(),
+        if (propertyLocation != null)
+          'property_location': propertyLocation!.toJson(),
         if (propertyType != null) 'property_type': propertyType,
         if (propertyTypeId != null) 'property_type_id': propertyTypeId,
         if (propertyName != null) 'property_name': propertyName,
@@ -550,6 +589,7 @@ class AnnouncementModel {
         if (proposalsLimit != null) 'proposals_limit': proposalsLimit,
         if (rentPeriod != null) 'rentPeriod': rentPeriod,
         if (availableDate != null) 'availableDate': availableDate,
-        if (propertyDocuments != null) 'property_documents': propertyDocuments!.toJson(),
+        if (propertyDocuments != null)
+          'property_documents': propertyDocuments!.toJson(),
       };
 }

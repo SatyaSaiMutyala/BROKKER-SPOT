@@ -78,6 +78,12 @@ class HomeAnnouncementCard extends StatelessWidget {
   /// Off by default, so every other screen keeps the original arrangement.
   final bool brokerFeedLayout;
 
+  /// Overrides the top-right timeAgo/avatar block's vertical position.
+  /// Null keeps the normal spot — set this when a caller stacks something
+  /// of its own (e.g. a broker-avatar stack) above that corner, so the
+  /// card's own time text sits below it instead of underneath it.
+  final double? topRightOffset;
+
   const HomeAnnouncementCard({
     super.key,
     required this.announcement,
@@ -95,6 +101,7 @@ class HomeAnnouncementCard extends StatelessWidget {
     this.statusBadge,
     this.showListingTypeText = false,
     this.brokerFeedLayout = false,
+    this.topRightOffset,
   });
 
   // Strip sits flush below the image card — no overlap.
@@ -349,7 +356,7 @@ class HomeAnnouncementCard extends StatelessWidget {
                     // listing's age under it.
                     if (showAvatar || (brokerFeedLayout && a.timeAgo != null))
                       Positioned(
-                        top: 14.h,
+                        top: topRightOffset ?? 14.h,
                         right: 10.w,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,

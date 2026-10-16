@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -39,11 +40,17 @@ class StoryCircle extends StatelessWidget {
               ),
               child: ClipOval(
                 child: imageUrl != null && imageUrl!.isNotEmpty
-                    ? Image.asset(
-                        imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _placeholder(),
-                      )
+                    ? (imageUrl!.startsWith('http')
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl!,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => _placeholder(),
+                          )
+                        : Image.asset(
+                            imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _placeholder(),
+                          ))
                     : _placeholder(),
               ),
             ),

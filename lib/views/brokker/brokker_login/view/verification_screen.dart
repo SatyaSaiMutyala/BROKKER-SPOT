@@ -94,17 +94,42 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   SizedBox(
                     height: 250,
                     child: Center(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final size = MediaQuery.of(context).size.width * 0.55;
-                          return Image.asset(
-                            'assets/images/wait_image.png',
-                            width: size,
-                            height: size,
-                            fit: BoxFit.contain,
-                          );
-                        },
-                      ),
+                      // The broker-announcement variant has nothing to wait
+                      // on (see the text below), so it gets its own icon
+                      // instead of the hourglass — a small nav-bar asset,
+                      // so it sits in a soft badge circle rather than
+                      // stretched to the hourglass's hero size, which would
+                      // just blur it.
+                      child: widget.isAnnouncement && widget.fromBroker
+                          ? Container(
+                              width: 140.w,
+                              height: 140.w,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFB8963E)
+                                    .withValues(alpha: 0.12),
+                              ),
+                              child: Center(
+                                child: Image.asset(
+                                  'assets/images/broker_announcement.png',
+                                  width: 72.w,
+                                  height: 72.w,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            )
+                          : LayoutBuilder(
+                              builder: (context, constraints) {
+                                final size =
+                                    MediaQuery.of(context).size.width * 0.55;
+                                return Image.asset(
+                                  'assets/images/wait_image.png',
+                                  width: size,
+                                  height: size,
+                                  fit: BoxFit.contain,
+                                );
+                              },
+                            ),
                     ),
                   ),
                   SizedBox(height: 16.h),
@@ -122,15 +147,33 @@ class _VerificationScreenState extends State<VerificationScreen> {
                           ),
                         ),
                         SizedBox(height: 16.h),
-                        _bulletPoint(
-                          '1. Your announcement is now visible to the Brokker Community.',
-                          textColor,
-                        ),
-                        SizedBox(height: 10.h),
-                        _bulletPoint(
-                          '2. Interested brokers may contact you for approval to share your announcement with their clients.',
-                          textColor,
-                        ),
+                        // A broker's own listing goes live the moment it's
+                        // posted (see AnnouncementService.createAnnouncement
+                        // — current_role == 2 forces status straight to
+                        // "approved"), unlike a user's listing, which still
+                        // waits on admin review. The copy here shouldn't
+                        // promise a review that never happens.
+                        if (widget.fromBroker) ...[
+                          _bulletPoint(
+                            '1. Your announcement is now live and visible to users.',
+                            textColor,
+                          ),
+                          SizedBox(height: 10.h),
+                          _bulletPoint(
+                            '2. Interested users can reach out to you directly about this property.',
+                            textColor,
+                          ),
+                        ] else ...[
+                          _bulletPoint(
+                            '1. Your announcement is now visible to the Brokker Community.',
+                            textColor,
+                          ),
+                          SizedBox(height: 10.h),
+                          _bulletPoint(
+                            '2. Interested brokers may contact you for approval to share your announcement with their clients.',
+                            textColor,
+                          ),
+                        ],
                       ],
                     )
                   else

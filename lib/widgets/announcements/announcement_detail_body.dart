@@ -24,6 +24,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:brokkerspot/views/user/profile/profile_view.dart';
+import 'package:brokkerspot/views/user/announcements/cancellation/cancellation_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main body widget
@@ -91,6 +92,7 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
   int _tabIndex = 0;
   bool _descExpanded = false;
   bool _amenitiesExpanded = false;
+  bool _brokersExpanded = false;
 
   final _amenityCtrl = AmenityController.to;
 
@@ -111,6 +113,7 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
       _tabIndex = 0;
       _descExpanded = false;
       _amenitiesExpanded = false;
+      _brokersExpanded = false;
     }
   }
 
@@ -134,6 +137,11 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
             _buildCommissionCard(isDark),
             SizedBox(height: 10.h),
           ],
+          // Shown once here rather than per-tab — it used to sit at the end
+          // of the Overview/Photos tab content, so switching tabs duplicated
+          // it and moving between tabs made it look like it jumped around.
+          _buildContractedBrokersSection(isDark),
+          SizedBox(height: 10.h),
           _buildStatsCard(isDark),
           SizedBox(height: 10.h),
           _buildTabBar(isDark),
@@ -352,8 +360,6 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
         ],
         SizedBox(height: 10.h),
         _buildLocationSection(isDark),
-        SizedBox(height: 10.h),
-        _buildContractedBrokersSection(isDark),
       ],
     );
   }
@@ -417,8 +423,6 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
         ],
         SizedBox(height: 10.h),
         _buildLocationSection(isDark),
-        SizedBox(height: 10.h),
-        _buildContractedBrokersSection(isDark),
       ],
     );
   }
@@ -954,8 +958,11 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
 
   /// "Property Advertise by Brokers" — the brokers who signed the agreement.
   ///
-  /// Fed by [AnnouncementDetailBody.contractedBrokers] (proposal status 3 or
-  /// 4). Hidden entirely when none have signed yet.
+  /// Fed by [AnnouncementDetailBody.contractedBrokers] (proposal status 3,
+  /// 4 or 5). Hidden entirely when none have signed yet. Collapsed by
+  /// default to a summary (title + overlapping avatar stack); tapping it
+  /// expands to the full per-broker list, and tapping the header again
+  /// collapses it back.
   Widget _buildContractedBrokersSection(bool isDark) {
     final brokers = widget.contractedBrokers;
     if (brokers.isEmpty) return const SizedBox.shrink();
@@ -976,7 +983,24 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle('Property Advertise by Brokers', isDark),
+          GestureDetector(
+            onTap: () => setState(() => _brokersExpanded = !_brokersExpanded),
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Expanded(
+                    child:
+                        _sectionTitle('Property Advertise by Brokers', isDark)),
+                Icon(
+                  _brokersExpanded
+                      ? Icons.keyboard_arrow_down
+                      : Icons.chevron_right,
+                  size: 22.sp,
+                  color: subColor,
+                ),
+              ],
+            ),
+          ),
           SizedBox(height: 4.h),
           Text(
             'Broker have permission to Advertise this property',
@@ -987,18 +1011,85 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
             ),
           ),
           SizedBox(height: 12.h),
-          for (int i = 0; i < brokers.length; i++) ...[
-            if (i > 0)
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 4.h),
-                child: Divider(height: 1, color: borderColor),
-              ),
-            _contractedBrokerRow(brokers[i], textColor, subColor, isDark),
-          ],
+          if (!_brokersExpanded)
+            _contractedBrokersAvatarStack(brokers)
+          else
+            for (int i = 0; i < brokers.length; i++) ...[
+              if (i > 0)
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4.h),
+                  child: Divider(height: 1, color: borderColor),
+                ),
+              _contractedBrokerRow(brokers[i], textColor, subColor, isDark),
+            ],
         ],
       ),
     );
   }
+
+  /// Collapsed-state summary: up to 3 overlapping avatars, with a "+N" badge
+  /// on the last circle when there are more than that — same stacking
+  /// convention as the announcement detail screen's own broker avatar stack.
+  Widget _contractedBrokersAvatarStack(List<ProposalBroker> brokers) {
+    const double size = 40;
+    const double overlap = 12;
+    final shown = brokers.take(3).toList();
+    final extra = brokers.length - shown.length;
+
+    return SizedBox(
+      height: size.h,
+      width: (size + (shown.length - 1) * (size - overlap)).w,
+      child: Stack(
+        children: [
+          for (int i = shown.length - 1; i >= 0; i--)
+            Positioned(
+              left: (i * (size - overlap)).w,
+              child: Container(
+                width: size.w,
+                height: size.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.primary, width: 1.5),
+                ),
+                child: ClipOval(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      shown[i].brokerProfileImage?.isNotEmpty == true
+                          ? CachedNetworkImage(
+                              imageUrl: shown[i].brokerProfileImage!,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) =>
+                                  _brokerStackPlaceholder(),
+                            )
+                          : _brokerStackPlaceholder(),
+                      if (i == shown.length - 1 && extra > 0)
+                        Container(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '+$extra',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _brokerStackPlaceholder() => Container(
+        color: const Color(0xFF2A2A2A),
+        child: Icon(Icons.person, size: 18.sp, color: Colors.white54),
+      );
 
   Widget _contractedBrokerRow(
     ProposalBroker broker,
@@ -1057,11 +1148,13 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
                   ),
                   SizedBox(height: 3.h),
                   Text(
-                    'Sign Contract ${_signedAgo(broker)}',
+                    broker.status == 5
+                        ? 'Cancellation pending${_withdrawHoursLeft(broker)}'
+                        : 'Sign Contract ${_signedAgo(broker)}',
                     style: GoogleFonts.poppins(
                       fontSize: 11.sp,
                       fontWeight: FontWeight.w300,
-                      color: subColor,
+                      color: broker.status == 5 ? CancelTheme.red : subColor,
                     ),
                   ),
                 ],
@@ -1107,6 +1200,18 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
     }
     if (diff.inMinutes >= 1) return '${diff.inMinutes} min ago';
     return 'just now';
+  }
+
+  /// " — Xh left to withdraw" appended to the cancellation-pending message,
+  /// empty once the server's own deadline has passed (the cron just hasn't
+  /// finalized it to status 6 yet).
+  String _withdrawHoursLeft(ProposalBroker broker) {
+    final deadline = broker.cancellationDeadline;
+    if (deadline == null) return '';
+    final left = deadline.difference(DateTime.now());
+    if (left.isNegative) return '';
+    final hours = left.inHours;
+    return hours >= 1 ? ' — ${hours}h left' : ' — <1h left';
   }
 
   Widget _buildLocationSection(bool isDark) {

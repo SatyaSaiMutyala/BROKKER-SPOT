@@ -81,7 +81,11 @@ class _PropertyPriceBrokerageViewState
         ],
       ];
 
-  void _save() {
+  /// Writes the current field values onto the shared draft controller —
+  /// called on an explicit Save, and also just before leaving via the back
+  /// arrow (see [_buildHeader]), so stepping back doesn't quietly discard
+  /// a toggle or a typed price the way popping without saving used to.
+  void _persistToController() {
     Get.find<AnnouncementController>().setPrice(
       price: _price,
       brokeragePercent: _brokeragePercent,
@@ -91,6 +95,10 @@ class _PropertyPriceBrokerageViewState
       rentPeriod: _isSell ? null : _priceType,
       availableDate: _isSell ? null : _availableDate,
     );
+  }
+
+  void _save() {
+    _persistToController();
     Navigator.pop(context, true);
   }
 
@@ -251,7 +259,13 @@ class _PropertyPriceBrokerageViewState
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              // Keeps whatever's on screen — including the commission
+              // toggle — instead of silently reverting to whatever was on
+              // the controller before this screen opened.
+              _persistToController();
+              Navigator.pop(context);
+            },
             child: Container(
               width: 38.w,
               height: 38.w,

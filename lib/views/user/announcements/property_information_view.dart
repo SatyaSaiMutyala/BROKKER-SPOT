@@ -132,8 +132,12 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
           label: 'Property Size',
           missing: _sizeCtrl.text.trim().isEmpty
         ),
-        (key: _bedroomKey, label: 'Bedroom', missing: _bedroom == null),
-        (key: _bathroomKey, label: 'Bathroom', missing: _bathroom == null),
+        // Commercial listings don't carry a bedroom/bathroom count — the
+        // fields are hidden for them below, so they can't block Save either.
+        if (!_isCommercial) ...[
+          (key: _bedroomKey, label: 'Bedroom', missing: _bedroom == null),
+          (key: _bathroomKey, label: 'Bathroom', missing: _bathroom == null),
+        ],
         (key: _floorKey, label: 'Floor', missing: _floor == null),
         (
           key: _totalFloorKey,
@@ -239,8 +243,7 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
       _propertyFor != null &&
       _propertyType != null &&
       _sizeCtrl.text.trim().isNotEmpty &&
-      _bedroom != null &&
-      _bathroom != null &&
+      (_isCommercial || (_bedroom != null && _bathroom != null)) &&
       _floor != null &&
       _totalFloor != null &&
       !_floorExceedsTotal &&
@@ -537,7 +540,8 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                 source: ImageSource.gallery, imageQuality: 80);
             picked = one == null ? <XFile>[] : <XFile>[one];
           } else {
-            picked = await _picker.pickMultiImage(imageQuality: 80, limit: free);
+            picked =
+                await _picker.pickMultiImage(imageQuality: 80, limit: free);
           }
 
           if (picked.isNotEmpty) {
@@ -850,54 +854,61 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
                           SizedBox(height: 16.h),
 
                           // ── Bedroom + Bathroom ─────────────────────────────────
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _label('Bedroom',
-                                        required: true, isDark: isDark),
-                                    SizedBox(height: 8.h),
-                                    OverlayDropdownField(
-                                      key: _bedroomKey,
-                                      hasError: _showErrors && _bedroom == null,
-                                      hint: '0',
-                                      value: _bedroom,
-                                      items: _bedroomBathroomCounts,
-                                      onSelect: (v) =>
-                                          setState(() => _bedroom = v),
-                                      prefixIcon: Icons.bed_outlined,
-                                    ),
-                                  ],
+                          // Commercial listings (offices, warehouses, etc.)
+                          // don't have these — residential only.
+                          if (!_isCommercial) ...[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _label('Bedroom',
+                                          required: true, isDark: isDark),
+                                      SizedBox(height: 8.h),
+                                      OverlayDropdownField(
+                                        key: _bedroomKey,
+                                        hasError:
+                                            _showErrors && _bedroom == null,
+                                        hint: '0',
+                                        value: _bedroom,
+                                        items: _bedroomBathroomCounts,
+                                        onSelect: (v) =>
+                                            setState(() => _bedroom = v),
+                                        prefixIcon: Icons.bed_outlined,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              SizedBox(width: 12.w),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _label('Bathroom',
-                                        required: true, isDark: isDark),
-                                    SizedBox(height: 8.h),
-                                    OverlayDropdownField(
-                                      key: _bathroomKey,
-                                      hasError:
-                                          _showErrors && _bathroom == null,
-                                      hint: '0',
-                                      value: _bathroom,
-                                      items: _bedroomBathroomCounts,
-                                      onSelect: (v) =>
-                                          setState(() => _bathroom = v),
-                                      prefixIcon: Icons.bathtub_outlined,
-                                    ),
-                                  ],
+                                SizedBox(width: 12.w),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _label('Bathroom',
+                                          required: true, isDark: isDark),
+                                      SizedBox(height: 8.h),
+                                      OverlayDropdownField(
+                                        key: _bathroomKey,
+                                        hasError:
+                                            _showErrors && _bathroom == null,
+                                        hint: '0',
+                                        value: _bathroom,
+                                        items: _bedroomBathroomCounts,
+                                        onSelect: (v) =>
+                                            setState(() => _bathroom = v),
+                                        prefixIcon: Icons.bathtub_outlined,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 16.h),
+                              ],
+                            ),
+                            SizedBox(height: 16.h),
+                          ],
 
                           // ── Floor + Total Floor ────────────────────────────────
                           Row(
@@ -1373,9 +1384,16 @@ class _PropertyInformationViewState extends State<PropertyInformationView> {
   /// matches.
   void _onCategoryChanged(String value) {
     if (_propertyCategory == value) return;
+    final goingCommercial = value == PropertyTypeController.commercial;
     setState(() {
       _propertyCategory = value;
       _propertyType = null;
+      // Bedroom/bathroom only apply to Residential; drop a stale value from
+      // before the switch rather than silently submitting it with Commercial.
+      if (goingCommercial) {
+        _bedroom = null;
+        _bathroom = null;
+      }
     });
     _propertyTypeCtrl.load(category: value);
   }

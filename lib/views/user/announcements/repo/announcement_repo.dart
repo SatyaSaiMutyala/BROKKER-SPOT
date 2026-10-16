@@ -8,7 +8,8 @@ import 'package:brokkerspot/models/property_filter_model.dart';
 import 'package:brokkerspot/models/property_type_model.dart';
 
 class AnnouncementRepository {
-  Future<AnnouncementModel> createAnnouncement(Map<String, dynamic> body) async {
+  Future<AnnouncementModel> createAnnouncement(
+      Map<String, dynamic> body) async {
     final response = await api.postRequest(
       '',
       endPoint: ApiEndpoints.addAnnouncement,
@@ -47,7 +48,14 @@ class AnnouncementRepository {
     }
   }
 
-  Future<({List<AnnouncementModel> items, List<Map<String, dynamic>> raw, int totalRecords, int totalPages, int page})>
+  Future<
+          ({
+            List<AnnouncementModel> items,
+            List<Map<String, dynamic>> raw,
+            int totalRecords,
+            int totalPages,
+            int page
+          })>
       fetchAnnouncements({int page = 1, int perPage = 10, int? status}) async {
     // status: 0=draft, 1=submitted, 2=approved, 3=rejected. Omit for "all".
     // user_role omitted — BE extracts the caller's role from the access token.
@@ -73,8 +81,16 @@ class AnnouncementRepository {
     throw json['message'] ?? 'Failed to fetch announcements';
   }
 
-  Future<({List<AnnouncementModel> items, List<Map<String, dynamic>> raw, int totalRecords, int totalPages, int page})>
-      fetchAllAnnouncements({int page = 1, int perPage = 10, PropertyFilter? filter}) async {
+  Future<
+          ({
+            List<AnnouncementModel> items,
+            List<Map<String, dynamic>> raw,
+            int totalRecords,
+            int totalPages,
+            int page
+          })>
+      fetchAllAnnouncements(
+          {int page = 1, int perPage = 10, PropertyFilter? filter}) async {
     // user_role omitted — BE extracts the caller's role from the access token.
     final filterQuery = filter?.toQueryString() ?? '';
     final response = await api.getRequest(
@@ -100,8 +116,19 @@ class AnnouncementRepository {
 
   /// Fetches announcements for unauthenticated (guest) users.
   /// Uses the public `/guest/announcements/fetch-all` endpoint — no auth header.
-  Future<({List<AnnouncementModel> items, List<Map<String, dynamic>> raw, int totalRecords, int totalPages, int page})>
-      fetchGuestAnnouncements({int page = 1, int perPage = 10, int userRole = 1, PropertyFilter? filter}) async {
+  Future<
+          ({
+            List<AnnouncementModel> items,
+            List<Map<String, dynamic>> raw,
+            int totalRecords,
+            int totalPages,
+            int page
+          })>
+      fetchGuestAnnouncements(
+          {int page = 1,
+          int perPage = 10,
+          int userRole = 1,
+          PropertyFilter? filter}) async {
     final filterQuery = filter?.toQueryString() ?? '';
     final response = await api.getRequest(
       endPoint:
@@ -156,7 +183,8 @@ class AnnouncementRepository {
     throw json['message'] ?? 'Failed to fetch count';
   }
 
-  Future<void> sendProposal(String announcementId, {required String message}) async {
+  Future<void> sendProposal(String announcementId,
+      {required String message}) async {
     final response = await api.postRequest(
       '',
       endPoint: ApiEndpoints.sendProposal,
@@ -200,8 +228,14 @@ class AnnouncementRepository {
   }
 
   /// The signed-in user's wishlisted announcements, newest page first.
-  Future<({List<AnnouncementModel> items, List<Map<String, dynamic>> raw, int totalRecords, int totalPages, int page})>
-      fetchWishlist({int page = 1, int perPage = 10}) async {
+  Future<
+      ({
+        List<AnnouncementModel> items,
+        List<Map<String, dynamic>> raw,
+        int totalRecords,
+        int totalPages,
+        int page
+      })> fetchWishlist({int page = 1, int perPage = 10}) async {
     final response = await api.getRequest(
       endPoint:
           '${api.baseUrl}${ApiEndpoints.fetchWishlist}?page=$page&perPage=$perPage',
@@ -308,9 +342,13 @@ class AnnouncementRepository {
     return s == 0 || s == 1 || s == 2;
   }
 
-  /// Brokers who signed the agreement (3) or have already published it (4).
+  /// Brokers who signed the agreement (3), have already published it (4), or
+  /// have a cancellation request pending (5) — they stay listed, with a red
+  /// warning instead of being dropped, until the 48-hour window resolves one
+  /// way or the other (withdrawn back to 3/4, or finalized to 6 and no
+  /// longer contracted).
   static bool isContractedBroker(ProposalBroker p) =>
-      p.status == 3 || p.status == 4;
+      p.status == 3 || p.status == 4 || p.status == 5;
 
   Future<AnnouncementModel> fetchAnnouncementDetail(String id) async {
     final response = await api.getRequest(
@@ -328,7 +366,8 @@ class AnnouncementRepository {
   /// Uses the public `/guest/announcements/fetch/{id}` endpoint — no auth header.
   Future<AnnouncementModel> fetchGuestAnnouncementDetail(String id) async {
     final response = await api.getRequest(
-      endPoint: '${api.baseUrl}${ApiEndpoints.guestFetchAnnouncementDetail}/$id',
+      endPoint:
+          '${api.baseUrl}${ApiEndpoints.guestFetchAnnouncementDetail}/$id',
       headers: api.buildHeader(),
     );
     final json = jsonDecode(response.body) as Map<String, dynamic>;

@@ -20,11 +20,15 @@ class ApiEndpoints {
   static const String editMobileNumber = 'user/profile/edit-mobilenumber';
   static const String editEmail = 'user/profile/edit-email';
   static const String verifyEmailOtp = 'user/profile/verify-email-otp';
+
   /// Another user's public profile. Append `/{user_id}`.
   static const String getUserById = 'user/profile/get-user';
 
   /// Broker-only counters for the broker home screen.
   static const String brokerDashboard = 'user/dashboard';
+
+  /// Approved brokers, for the user-side home screen's story row.
+  static const String userBrokersList = 'user/dashboard/brokers';
 
   // Help requests — the same body either way; the guest route is for the
   // Need Help screen reached from Welcome, before anyone has signed in.
@@ -32,8 +36,10 @@ class ApiEndpoints {
   static const String guestSubmitHelpRequest = 'guest/help-requests/submit';
 
   // Guest (no auth required)
-  static const String guestFetchAllAnnouncements = 'guest/announcements/fetch-all';
-  static const String guestFetchAnnouncementDetail = 'guest/announcements/fetch';
+  static const String guestFetchAllAnnouncements =
+      'guest/announcements/fetch-all';
+  static const String guestFetchAnnouncementDetail =
+      'guest/announcements/fetch';
 
   // Announcements
   static const String addAnnouncement = 'user/announcements/add';
@@ -59,7 +65,8 @@ class ApiEndpoints {
   // Notifications
   static const String fetchNotifications = 'user/notifications/fetch';
   static const String fetchNotificationDetail = 'user/notifications/fetch';
-  static const String markAllNotificationsRead = 'user/notifications/mark-all-read';
+  static const String markAllNotificationsRead =
+      'user/notifications/mark-all-read';
   static const String deleteNotification = 'user/notifications/delete';
 
   // Common reference data

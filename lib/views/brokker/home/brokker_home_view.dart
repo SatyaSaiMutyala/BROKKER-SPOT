@@ -266,7 +266,7 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
                     title: 'PROPOSALS',
                     rows: [
                       StatInfoCardRow(
-                          value: '${stats.proposalsPending}', label: 'PENDING'),
+                          value: '${stats.proposalsPending}', label: 'SENT'),
                       StatInfoCardRow(
                           value: '${stats.proposalsAccepted}',
                           label: 'ACCEPTED'),
@@ -333,7 +333,7 @@ class _BrokerHomeViewState extends State<BrokerHomeView> {
           children: [
             zero('OPPORTUNITY', 'SEEN', 'UNSEEN'),
             SizedBox(width: 10.w),
-            zero('PROPOSALS', 'PENDING', 'ACCEPTED'),
+            zero('PROPOSALS', 'SENT', 'ACCEPTED'),
           ],
         ),
         SizedBox(height: 10.h),

@@ -42,6 +42,13 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
   bool _isSubmitting = false;
   bool _isSavingDraft = false;
 
+  /// True once a step has changed since the last successful "Save Draft" —
+  /// gates the back arrow's save-or-discard prompt. Without this, the
+  /// prompt fired every time there was any progress at all, even right
+  /// after Save Draft had just persisted exactly that progress to the
+  /// server, asking the user to save something already saved.
+  bool _unsavedSinceDraftSave = false;
+
   // All three steps are required. The broker-proposal limit is no longer a
   // step — it's asked for on the Announce Now tap.
   bool get _allSectionsDone =>
@@ -88,7 +95,8 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
       // Broker flow never surfaces this field — always unlimited (see
       // _onAnnounceTap), even when editing a listing that happens to carry
       // an old value from before this was broker-hidden.
-      _brokerProposalLimit = widget.fromBroker ? null : a.proposalsLimit?.toString();
+      _brokerProposalLimit =
+          widget.fromBroker ? null : a.proposalsLimit?.toString();
       _deriveStepFlags();
     } else {
       _ctrl.loadDraft().then((flags) {
@@ -103,6 +111,15 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
             _brokerProposalLimit = widget.fromBroker
                 ? null
                 : flags['brokerProposalLimit'] as String?;
+            // This is the on-disk local draft, not necessarily what's on
+            // the server — treat a resumed session as unsaved so the back
+            // prompt still offers to push it server-side, same as before
+            // this flag existed.
+            _unsavedSinceDraftSave = _locationSaved ||
+                _informationSaved ||
+                _videoImagesSaved ||
+                _priceSaved ||
+                _documentsSaved;
           });
         }
       });
@@ -204,7 +221,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
     _ctrl.setProposalsLimit(_proposalLimitValue);
     final success = await _ctrl.createDraftAnnouncement();
     if (!mounted) return;
-    setState(() => _isSavingDraft = false);
+    setState(() {
+      _isSavingDraft = false;
+      if (success) _unsavedSinceDraftSave = false;
+    });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(success
           ? 'Draft saved successfully'
@@ -224,7 +244,11 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
   /// open, which meant nobody was ever asked what should happen to it. Now the
   /// choice is explicit: keep the work as a real draft, or drop it.
   Future<void> _handleBack() async {
-    if (widget.isEditing || !_hasProgress) {
+    // Nothing to ask about: either there's no progress to lose, or it's
+    // already sitting on the server from the last Save Draft tap and
+    // nothing has changed since — re-asking would be asking to save
+    // something already saved.
+    if (widget.isEditing || !_hasProgress || !_unsavedSinceDraftSave) {
       Get.back();
       return;
     }
@@ -719,6 +743,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                                 : c.listingType == 2
                                     ? 'Rent'
                                     : null;
+                            _unsavedSinceDraftSave = true;
                           });
                           _saveLocally();
                         }
@@ -741,6 +766,7 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                           setState(() {
                             _locationSaved = true;
                             _documentsSaved = true;
+                            _unsavedSinceDraftSave = true;
                           });
                           _saveLocally();
                         }
@@ -763,7 +789,10 @@ class _CreateAnnouncementViewState extends State<CreateAnnouncementView> {
                                       fromBroker: widget.fromBroker,
                                     )));
                         if (result == true) {
-                          setState(() => _priceSaved = true);
+                          setState(() {
+                            _priceSaved = true;
+                            _unsavedSinceDraftSave = true;
+                          });
                           _saveLocally();
                         }
                       },

@@ -44,7 +44,6 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
     'Shared Broker',
     'Rejected',
     'Draft',
-    'Live'
   ];
 
   int? _statusForTab(int i) {
@@ -57,8 +56,6 @@ class _MyAnnouncementsTabViewState extends State<MyAnnouncementsTabView>
         return 3;
       case 4:
         return 0;
-      case 5:
-        return 4; // Live — published announcements
       default:
         return null;
     }
@@ -374,6 +371,10 @@ class _CardWithStatusBadge extends StatelessWidget {
                 showAvatar: false,
                 brokerFeedLayout: true,
                 onTap: onTap,
+                // Push the card's own timeAgo text below the interested-
+                // brokers avatar stack below, instead of under it, whenever
+                // that stack is actually shown.
+                topRightOffset: count > 0 && proposalsSettled ? 68.h : null,
               ),
 
               // ── Status + time pill — above AED text ──────────────────────
@@ -433,6 +434,9 @@ class _CardWithStatusBadge extends StatelessWidget {
                 ),
 
               // ── Stacked broker avatars + count badge — top right ────────
+              // The card's own timeAgo text is pushed below this (see
+              // `topRightOffset` above) rather than the other way round, so
+              // the avatar stack stays in its usual spot.
               if (count > 0 && proposalsSettled)
                 Positioned(
                   top: 10.h,

@@ -99,11 +99,11 @@ class StatInfoCard extends StatelessWidget {
                       ),
                       child: _StatRow(
                         row: rows[i],
-                        // Light theme fades every row after the first; dark
-                        // theme keeps them all solid gold.
-                        badgeColor: isDark || i == 0
-                            ? const Color(0xFFC8AF69)
-                            : const Color(0xFFE3D6B2),
+                        // First row is the solid "primary" badge; the rest
+                        // are the same gold as an outline instead of a
+                        // washed-out fill, so they read as a deliberate
+                        // secondary tier rather than a faded/disabled one.
+                        isPrimary: i == 0,
                         isDark: isDark,
                       ),
                     ),
@@ -118,18 +118,24 @@ class StatInfoCard extends StatelessWidget {
 }
 
 class _StatRow extends StatelessWidget {
+  static const _gold = Color(0xFFC8AF69);
+
   final StatInfoCardRow row;
-  final Color badgeColor;
+  final bool isPrimary;
   final bool isDark;
 
   const _StatRow({
     required this.row,
-    required this.badgeColor,
+    required this.isPrimary,
     required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Primary badge: solid gold fill, white value. Secondary: the same gold
+    // as a ring around the card's own background, gold value — a deliberate
+    // outline tier instead of a translucent/faded circle.
+    final cardBg = isDark ? const Color(0xFF242833) : Colors.white;
     return Row(
       children: [
         Container(
@@ -138,14 +144,15 @@ class _StatRow extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: badgeColor,
+            color: isPrimary ? _gold : cardBg,
+            border: isPrimary ? null : Border.all(color: _gold, width: 1.6),
           ),
           child: Text(
             row.value,
             style: GoogleFonts.poppins(
               fontSize: 13.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              color: isPrimary ? Colors.white : _gold,
             ),
           ),
         ),

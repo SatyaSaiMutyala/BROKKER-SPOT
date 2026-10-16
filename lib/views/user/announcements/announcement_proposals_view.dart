@@ -283,7 +283,16 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
   }
 
   Widget _avatar(String? url, bool isDark) {
-    final placeholder = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200;
+    final placeholderBg =
+        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200;
+    final placeholderIconColor = isDark ? Colors.white54 : Colors.grey.shade500;
+    // Plain person icon for a broker with no profile photo — same
+    // convention as the card's own avatar fallback, instead of a stock
+    // placeholder image.
+    Widget personIcon() => Container(
+          color: placeholderBg,
+          child: Icon(Icons.person, size: 26.sp, color: placeholderIconColor),
+        );
     return Container(
       width: 52.w,
       height: 52.w,
@@ -296,13 +305,10 @@ class _AnnouncementProposalsViewState extends State<AnnouncementProposalsView> {
             ? CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(color: placeholder),
-                errorWidget: (_, __, ___) => Image.asset(
-                  'assets/images/story1.png',
-                  fit: BoxFit.cover,
-                ),
+                placeholder: (_, __) => Container(color: placeholderBg),
+                errorWidget: (_, __, ___) => personIcon(),
               )
-            : Image.asset('assets/images/story1.png', fit: BoxFit.cover),
+            : personIcon(),
       ),
     );
   }

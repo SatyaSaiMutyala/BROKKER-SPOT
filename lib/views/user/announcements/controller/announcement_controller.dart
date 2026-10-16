@@ -172,9 +172,8 @@ class AnnouncementController extends GetxController {
     description = a.description;
     amenities = List.of(a.amenities ?? []);
     propertyStatus = a.propertyStatus;
-    completionDate = a.completionDate != null
-        ? DateTime.tryParse(a.completionDate!)
-        : null;
+    completionDate =
+        a.completionDate != null ? DateTime.tryParse(a.completionDate!) : null;
     isCommercialProperty = (a.isCommercialProperty == true) ? 1 : 0;
     imageUrls = List.of(a.propertyMedia?.images ?? []);
     videoUrl = a.propertyMedia?.videos;
@@ -205,8 +204,13 @@ class AnnouncementController extends GetxController {
   /// half-filled user-side form used to surface on the broker side the moment
   /// Create Announcement was opened there — and vice versa. Keying by side
   /// keeps each one's work to itself.
+  /// Scoped by account too, not just side — keying on side alone meant
+  /// switching to a different account on the same device (or testing with
+  /// more than one) silently inherited whatever the previous account had
+  /// left mid-draft, commission toggle included.
   static String get _draftKey =>
-      'create_announcement_draft_${LocalStorageService.getLastSide()}';
+      'create_announcement_draft_${LocalStorageService.getLastSide()}_'
+      '${LocalStorageService.getUserIdFromToken() ?? 'guest'}';
 
   Future<void> saveDraft({
     String? propertyFor,
@@ -251,7 +255,8 @@ class AnnouncementController extends GetxController {
       'currency': currency,
       'brokeragePercent': brokeragePercent,
       if (rentPeriod != null) 'rentPeriod': rentPeriod,
-      if (availableDate != null) 'availableDate': availableDate!.toIso8601String(),
+      if (availableDate != null)
+        'availableDate': availableDate!.toIso8601String(),
       if (titleDeedUrl != null) 'titleDeedUrl': titleDeedUrl,
       if (passportFrontUrl != null) 'passportFrontUrl': passportFrontUrl,
       if (passportBackUrl != null) 'passportBackUrl': passportBackUrl,
@@ -263,7 +268,8 @@ class AnnouncementController extends GetxController {
       'videoImagesSaved': videoImagesSaved,
       'priceSaved': priceSaved,
       'documentsSaved': documentsSaved,
-      if (brokerProposalLimit != null) 'brokerProposalLimit': brokerProposalLimit,
+      if (brokerProposalLimit != null)
+        'brokerProposalLimit': brokerProposalLimit,
     };
     await prefs.setString(_draftKey, jsonEncode(draft));
   }
@@ -369,7 +375,8 @@ class AnnouncementController extends GetxController {
   /// country resolve reliably because their full lists are loaded app-wide;
   /// city and area only resolve if their parent list happens to be loaded, so
   /// they stay best-effort.
-  String? _resolveMissingId(String? current, String? name, String? Function() lookup) {
+  String? _resolveMissingId(
+      String? current, String? name, String? Function() lookup) {
     final existing = _idOrNull(current);
     if (existing != null) return existing;
     if (name == null || name.isEmpty) return null;
@@ -559,7 +566,8 @@ class AnnouncementController extends GetxController {
     try {
       isLoading.value = true;
       errorMessage.value = null;
-      final result = await _repo.fetchAnnouncements(page: page, perPage: perPage);
+      final result =
+          await _repo.fetchAnnouncements(page: page, perPage: perPage);
       announcements.assignAll(result.items);
     } catch (e) {
       errorMessage.value = e.toString();

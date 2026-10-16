@@ -931,29 +931,30 @@ class _BrokerAnnouncementDetailViewState
         ],
       ),
       padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 12.h + bottomPad),
-      child: SizedBox(
-        width: double.infinity,
-        height: 52.h,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14.r),
-            ),
-          ),
-          onPressed: () => Get.to(() => CreateAnnouncementView(
+      child: Center(
+        child: GestureDetector(
+          onTap: () => Get.to(() => CreateAnnouncementView(
                 announcement: _data,
                 fromBroker: true,
               ))?.then((result) {
             if (result == true && mounted) Get.back(result: true);
           }),
-          child: Text(
-            'Complete Your Announcement',
-            style: GoogleFonts.poppins(
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          child: Container(
+            width: 286.w,
+            height: 51.h,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(38.r),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              'Complete Your Announcement',
+              style: GoogleFonts.poppins(
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                height: 1.0,
+              ),
             ),
           ),
         ),
@@ -1183,8 +1184,8 @@ class _BrokerAnnouncementDetailViewState
       padding: EdgeInsets.fromLTRB(44.w, 0, 44.w, 10.h + bottomPad),
       child: controller == null
           ? bar(const [])
-          : Obx(() =>
-              bar(controller.conversations.map((c) => c.user).toList())),
+          : Obx(
+              () => bar(controller.conversations.map((c) => c.user).toList())),
     );
   }
 

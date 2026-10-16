@@ -141,6 +141,12 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
   }
 
   /// Opens the owner's chat with a broker from the advertising section.
+  ///
+  /// Refreshes [_contractedBrokers] on the way back — a cancellation
+  /// requested in that chat (or withdrawn, or finalized) changes this
+  /// broker's status, and this screen has no other way to hear about it:
+  /// the list is a plain field set once in [_fetchContractedBrokers], not
+  /// bound to anything reactive.
   void _openBrokerChat(ProposalBroker broker) {
     AnnouncementChatView.open(
       announcementId: _data.id ?? widget.announcement.id ?? '',
@@ -151,7 +157,9 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       // owner-only, but an owner who posted from their broker side sits on
       // side 2 — the announcement is the only thing that knows.
       userRole: _data.viewerSide(_myId),
-    );
+    ).then((_) {
+      if (mounted) _fetchContractedBrokers();
+    });
   }
 
   /// Opens the non-owner bottom bar's chat — shared by the avatar and the
@@ -1202,6 +1210,20 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       // A guest sees the pill too — the screen then reads the same as it
       // does signed in — and the tap asks them to sign in, from
       // AnnouncementChatView.open.
+      void openOwnerProfile() => UserProfileView.open(
+            userId: a.userId ?? widget.announcement.userId,
+            name: a.ownerName ??
+                widget.announcement.ownerName ??
+                _brokerName ??
+                widget.ownerName,
+            avatarUrl: a.brokerAvatarUrl ??
+                widget.announcement.brokerAvatarUrl ??
+                _brokerAvatar ??
+                widget.ownerAvatarUrl,
+            // This bar is only built for a broker-posted listing, so its
+            // poster is being looked at as a broker.
+            viewAsBroker: true,
+          );
       return Padding(
         padding: EdgeInsets.fromLTRB(44.w, 0, 44.w, 10.h + bottomPad),
         child: ClipRRect(
@@ -1223,20 +1245,7 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                   // tapping it still gets the login prompt, from
                   // UserProfileView.open.
                   GestureDetector(
-                    onTap: () => UserProfileView.open(
-                      userId: a.userId ?? widget.announcement.userId,
-                      name: a.ownerName ??
-                          widget.announcement.ownerName ??
-                          _brokerName ??
-                          widget.ownerName,
-                      avatarUrl: a.brokerAvatarUrl ??
-                          widget.announcement.brokerAvatarUrl ??
-                          _brokerAvatar ??
-                          widget.ownerAvatarUrl,
-                      // This bar is only built for a broker-posted listing,
-                      // so its poster is being looked at as a broker.
-                      viewAsBroker: true,
-                    ),
+                    onTap: openOwnerProfile,
                     child: Container(
                       width: 46.w,
                       height: 46.w,
@@ -1283,39 +1292,45 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
                     ),
                   ),
                   SizedBox(width: 12.w),
-                  // Name + role
+                  // Name + role — same tap as the chat icon (only the avatar
+                  // opens the profile), so the name isn't a dead label
+                  // between two things that both work.
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          a.ownerName ??
-                              widget.announcement.ownerName ??
-                              _brokerName ??
-                              widget.ownerName ??
-                              'Owner',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : Colors.black87,
-                            height: 1.2,
+                    child: GestureDetector(
+                      onTap: () => _openOwnerOrBrokerChat(a),
+                      behavior: HitTestBehavior.opaque,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            a.ownerName ??
+                                widget.announcement.ownerName ??
+                                _brokerName ??
+                                widget.ownerName ??
+                                'Owner',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : Colors.black87,
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          'Property Expert',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w300,
-                            color: isDark
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600,
-                            height: 1.2,
+                          Text(
+                            'Property Expert',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.w300,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
+                              height: 1.2,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   SizedBox(width: 10.w),
@@ -1475,26 +1490,31 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
       return Container(
         decoration: BoxDecoration(color: barBg, boxShadow: shadow),
         padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 12.h + bottomPad),
-        child: SizedBox(
-          width: double.infinity,
-          height: 52.h,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14.r)),
-            ),
-            onPressed: () => Get.to(() =>
+        child: Center(
+          child: GestureDetector(
+            onTap: () => Get.to(() =>
                     CreateAnnouncementView(announcement: widget.announcement))
                 ?.then((result) {
               if (result == true && mounted) Get.back(result: true);
             }),
-            child: Text('Complete Your Announcement',
+            child: Container(
+              width: 286.w,
+              height: 51.h,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(38.r),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                'Complete Your Announcement',
                 style: GoogleFonts.poppins(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white)),
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                  height: 1.0,
+                ),
+              ),
+            ),
           ),
         ),
       );
@@ -1562,15 +1582,19 @@ class _AnnouncementDetailViewState extends State<AnnouncementDetailView> {
             ? CachedNetworkImage(
                 imageUrl: broker.brokerProfileImage!,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => Image.asset(
-                  'assets/images/story1.png',
-                  fit: BoxFit.cover,
-                ),
+                errorWidget: (_, __, ___) => _avatarPlaceholder(sz),
               )
-            : Image.asset('assets/images/story1.png', fit: BoxFit.cover),
+            : _avatarPlaceholder(sz),
       ),
     );
   }
+
+  /// Plain person icon for a broker with no profile photo — same convention
+  /// as the card's own avatar fallback, instead of a stock placeholder image.
+  Widget _avatarPlaceholder(double sz) => Container(
+        color: const Color(0xFF2A2A2A),
+        child: Icon(Icons.person, size: sz * 0.45, color: Colors.white54),
+      );
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 

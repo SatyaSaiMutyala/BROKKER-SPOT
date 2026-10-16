@@ -1,5 +1,10 @@
+import 'dart:convert';
 import 'dart:math' show Random, max;
+import 'package:brokkerspot/core/common_widget/api_service.dart' as api;
+import 'package:brokkerspot/core/constants/api_endpoints.dart';
 import 'package:brokkerspot/core/services/route_observer.dart';
+import 'package:brokkerspot/models/broker_summary_model.dart';
+import 'package:brokkerspot/views/user/profile/profile_view.dart';
 import 'package:brokkerspot/views/auth/controller/profile_controller.dart';
 import 'package:brokkerspot/views/notifications/controller/notification_controller.dart';
 import 'package:brokkerspot/views/notifications/notifications_view.dart';
@@ -72,17 +77,54 @@ class _HomeViewState extends State<HomeView> with RouteAware {
   double get _searchFilterExtent =>
       12.h + 45.h + 12.h + 33.h + 10.h; // gap + search + gap + chips + gap
 
-  static const _stories = [
-    {'name': 'Brokkerspot', 'image': 'assets/images/brocker-icon.png'},
+  /// The app's own brand circle — first in the row, ahead of any broker.
+  static const _brandStory = {
+    'name': 'Brokkerspot',
+    'image': 'assets/images/brocker-icon.png',
+  };
+
+  /// Approved brokers for the rest of the row, from `user/dashboard/brokers`.
+  /// Tapping one opens their profile the same way every other broker avatar
+  /// in the app does.
+  List<BrokerSummary> _brokers = [];
+
+  /// Placeholder row for a guest — `user/dashboard/brokers` needs a signed-in
+  /// user's token (`validateUserAccess` requires currentRole == 1), so there
+  /// is nothing real to show without one. Same art as the old static row.
+  static const _staticGuestStories = [
     {'name': 'Rachid', 'image': 'assets/images/story1.png'},
     {'name': 'Nisha', 'image': 'assets/images/story2.png'},
     {'name': 'Joya', 'image': 'assets/images/story3.png'},
     {'name': 'Aman', 'image': 'assets/images/story4.png'},
-    {'name': 'Sara', 'image': 'assets/images/story1.png'},
-    {'name': 'Ali', 'image': 'assets/images/story2.png'},
-    {'name': 'Riya', 'image': 'assets/images/story3.png'},
-    {'name': 'Omar', 'image': 'assets/images/story4.png'},
   ];
+
+  Future<void> _loadBrokers() async {
+    // No token to send, and the endpoint only answers a signed-in user
+    // anyway — skip the call rather than let it fail silently.
+    if (_profileCtrl.isGuest) return;
+    try {
+      final response = await api.getRequest(
+        endPoint: '${api.baseUrl}${ApiEndpoints.userBrokersList}',
+        headers: api.buildHeaders(),
+      );
+      if (!mounted) return;
+      final json = jsonDecode(response.body);
+      if (json['success'] == true) {
+        final list = (json['data']?['data'] as List?) ?? [];
+        setState(() {
+          _brokers = list
+              .whereType<Map<String, dynamic>>()
+              .map(BrokerSummary.fromJson)
+              .toList();
+        });
+      } else {
+        debugPrint('⚠️ Brokers list fetch — ${response.statusCode}: '
+            '${json['message']}');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Failed to load brokers for the story row: $e');
+    }
+  }
 
   @override
   void initState() {
@@ -90,6 +132,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
     _scrollController.addListener(_onScroll);
     _announcementCtrl.loadAll();
     _notificationCtrl.load();
+    _loadBrokers();
 
     // The country filter starts empty on purpose: the feed opens worldwide and
     // only narrows once a country is picked from the chip.
@@ -266,17 +309,46 @@ class _HomeViewState extends State<HomeView> with RouteAware {
   // ── Stories ──────────────────────────────────────────────────────────────────
 
   Widget _buildStoryRow() {
+    // Guest: nothing real to fetch (see _loadBrokers), so the rest of the
+    // row stays the original static art instead of sitting empty.
+    final isGuest = _profileCtrl.isGuest;
+    final restCount = isGuest ? _staticGuestStories.length : _brokers.length;
+
     return SizedBox(
       height: 94.h,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.symmetric(horizontal: _gutter),
-        itemCount: _stories.length,
+        itemCount: restCount + 1,
         separatorBuilder: (_, __) => SizedBox(width: 8.w),
-        itemBuilder: (_, i) => StoryCircle(
-          name: _stories[i]['name']!,
-          imageUrl: _stories[i]['image'],
-        ),
+        itemBuilder: (_, i) {
+          if (i == 0) {
+            return StoryCircle(
+              name: _brandStory['name']!,
+              imageUrl: _brandStory['image'],
+            );
+          }
+          if (isGuest) {
+            final story = _staticGuestStories[i - 1];
+            return StoryCircle(
+              name: story['name']!,
+              imageUrl: story['image'],
+            );
+          }
+          final broker = _brokers[i - 1];
+          return StoryCircle(
+            name: broker.name?.trim().isNotEmpty == true
+                ? broker.name!.trim()
+                : 'Broker',
+            imageUrl: broker.brokerProfileImage,
+            onTap: () => UserProfileView.open(
+              userId: broker.id,
+              name: broker.name,
+              avatarUrl: broker.brokerProfileImage,
+              viewAsBroker: true,
+            ),
+          );
+        },
       ),
     );
   }
