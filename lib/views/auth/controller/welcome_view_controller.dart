@@ -71,6 +71,8 @@ class WelcomeViewController extends GetxController {
         print('Backend google-login failed, used Firebase token as fallback');
       }
 
+      await _startFreshSession(backendSaved: backendSaved);
+
       // Refresh profile so name/image show on home screen
       final profileCtrl = Get.put(ProfileController());
       await profileCtrl.getProfile();
@@ -184,6 +186,8 @@ class WelcomeViewController extends GetxController {
           print('Firebase fallback token saved');
         }
       }
+
+      await _startFreshSession(backendSaved: backendSaved);
 
       // Set name/email immediately before getProfile
       final profileCtrl = Get.put(ProfileController());
@@ -412,18 +416,29 @@ class WelcomeViewController extends GetxController {
   /// [backendSaved] — true when we have a real backend JWT. FCM registration
   /// and socket reconnect are skipped in the Firebase-fallback case because
   /// the stored token is a Firebase ID token the backend won't accept.
-  void _navigateByRole(int currentRole, {required bool backendSaved}) async {
-    // Every social sign-in lands here, so this is where the pre-login cache
-    // goes. Coming from guest mode the permanent list controllers still hold
-    // the guest feed and their "already loaded" flags, and the dashboard
-    // opened below would skip its fetch and show it. Also tears the old
-    // socket down.
-    await clearUserSession();
+  /// Drops everything cached before this sign-in and brings the socket and
+  /// push registration up on the new token.
+  ///
+  /// Called right after the backend accepts the sign-in and BEFORE the
+  /// profile is fetched. It used to run at the very end, in [_navigateByRole],
+  /// after getProfile — and once clearUserSession started resetting
+  /// ProfileController on logout, that order wiped the profile the moment it
+  /// had loaded: the home opened with a blank name and photo, and the roles
+  /// read as 0, until some other screen fetched the profile again.
+  ///
+  /// Coming from guest mode the permanent list controllers still hold the
+  /// guest feed and their "already loaded" flags, and the dashboard would
+  /// skip its fetch and show it — so the clear itself still has to happen.
+  Future<void> _startFreshSession({required bool backendSaved}) async {
+    await clearUserSession(); // also tears the old socket down
     if (backendSaved) {
       // Reconnect on the fresh backend token (same fix as email login).
       SocketService.to.connect();
       DeviceService.registerDevice();
     }
+  }
+
+  void _navigateByRole(int currentRole, {required bool backendSaved}) async {
     final goBroker = currentRole == 2 ||
         (currentRole != 1 && LocalStorageService.getLastSide() == 'broker');
     // Back to wherever a login prompt was raised, if one was — which may

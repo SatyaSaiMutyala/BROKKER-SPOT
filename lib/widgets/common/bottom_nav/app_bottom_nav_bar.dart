@@ -19,9 +19,28 @@ class AppBottomNavBar extends StatelessWidget {
   /// user set's artwork. See [AppNavDestination.iconSize].
   static const double defaultIconSize = 26;
 
-  /// Padding kept under the row. The home-indicator inset is capped so the bar
-  /// does not grow a band of empty space beneath the icons.
+  /// Padding kept under the row when the system inset is a gesture area. The
+  /// home-indicator inset is capped so the bar does not grow a band of empty
+  /// space beneath the icons.
   static const double _maxBottomInset = 12;
+
+  /// The largest bottom inset a gesture bar reports — iOS's home indicator
+  /// is 34, Android's gesture pill less. Anything bigger is an opaque system
+  /// bar with buttons on it (Android three-button navigation, 48), which the
+  /// cap above must not apply to: the system draws its buttons over whatever
+  /// sits in that strip, so the whole of it has to stay clear.
+  static const double _gestureInsetMax = 34;
+
+  /// How much to pad under the row for a given system [inset] — see
+  /// [_maxBottomInset] and [_gestureInsetMax].
+  ///
+  /// With the cap applied to every inset, phones with three-button
+  /// navigation had their buttons drawn over the bottom 36 px of this bar.
+  @visibleForTesting
+  static double bottomPaddingFor(double inset, {required double cap}) {
+    if (inset > _gestureInsetMax) return inset;
+    return math.min(inset, cap);
+  }
 
   final List<AppNavDestination> destinations;
   final int currentIndex;
@@ -43,9 +62,9 @@ class AppBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = AppBottomNavBarTheme.of(context);
-    final bottomInset = math.min(
+    final bottomInset = bottomPaddingFor(
       MediaQuery.paddingOf(context).bottom,
-      _maxBottomInset.h,
+      cap: _maxBottomInset.h,
     );
 
     return Container(
