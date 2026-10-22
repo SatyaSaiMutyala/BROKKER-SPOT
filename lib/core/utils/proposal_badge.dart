@@ -38,16 +38,23 @@ class ProposalBadge {
 /// Null for the broker's own listings — no contract behind them, they keep
 /// the plain FOR SELL / FOR RENT badge.
 ///
-/// A published copy stays at status 2 while the contract stands. The only
-/// thing that moves it to 4 is the owner's cancellation being finalised (the
-/// backend cron, once the 48-hour window closes), so 4 reads as cancelled.
-/// During that window it still reads as signed: the response carries no
-/// sign of a pending cancellation.
+/// A published copy stays at status 2 while the contract stands. The owner
+/// requesting a cancellation stamps it to 5 for the 48-hour window (both on
+/// their own listing and on this broker's published copy — see
+/// AnnouncementService.cancelAgreement on the backend); the backend cron
+/// then moves it to 4 once that window closes without being withdrawn, so 4
+/// reads as cancelled.
 ProposalBadge? contractBadgeFor({
   required bool brokeredForOwner,
   required int? status,
 }) {
   if (!brokeredForOwner) return null;
+  if (status == 5) {
+    return const ProposalBadge(
+      title: 'Cancellation In Progress',
+      color: Color(0xFFA76239),
+    );
+  }
   if (status == 4) {
     return const ProposalBadge(
       title: 'Contract Cancelled',

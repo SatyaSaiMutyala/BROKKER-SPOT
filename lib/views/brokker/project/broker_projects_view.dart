@@ -3,7 +3,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:brokkerspot/core/constants/app_colors.dart';
 import 'package:brokkerspot/core/constants/local_storage.dart';
+import 'package:brokkerspot/core/services/socket_service.dart';
 import 'package:brokkerspot/core/utils/proposal_badge.dart';
+import 'package:brokkerspot/views/user/announcements/chat/chat_events.dart';
 import 'package:brokkerspot/core/services/login_return.dart';
 import 'package:brokkerspot/models/announcement_model.dart';
 import 'package:brokkerspot/core/common_widget/cached_video_player.dart';
@@ -51,6 +53,16 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
       : Get.put(ProfileController());
   final _scrollController = ScrollController();
 
+  /// Live proposal status for a brokered-for-owner card on "My Announcements"
+  /// — keyed by [AnnouncementModel.ownerAnnouncementId], since that's what
+  /// the socket response echoes back. `getBrokersList`/`getMyAnnouncements`
+  /// never sends this (only the user side gets the proposal join), so each
+  /// such card asks for it individually over the socket instead — the same
+  /// `announcement:proposal:status` request the chat screen already uses,
+  /// no backend change needed.
+  final Map<String, int?> _liveContractStatus = {};
+  final Set<String> _requestedContractStatus = {};
+
   /// Server-side filtering for the public feed — the same filters, the same
   /// endpoint and the same controller as the user side's home, with the
   /// backend picking the listings for the broker side from the token.
@@ -60,8 +72,9 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
   /// account flips sides, so it lives and dies with this screen. Only the
   /// feed has it — "My Announcements" is a different endpoint with a status
   /// filter alone.
-  late final PropertySearchController? _searchCtrl =
-      widget.showMineOnly ? null : Get.put(PropertySearchController(), tag: _searchTag);
+  late final PropertySearchController? _searchCtrl = widget.showMineOnly
+      ? null
+      : Get.put(PropertySearchController(), tag: _searchTag);
   late final String _searchTag = 'broker-feed:${identityHashCode(this)}';
 
   /// Whether the feed is showing filtered results from the server rather than
@@ -120,6 +133,9 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    if (widget.showMineOnly) {
+      SocketService.to.on(ChatEvents.proposalStatus, _onProposalStatusResponse);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (widget.showMineOnly) {
@@ -130,11 +146,43 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
     });
   }
 
+  /// `announcement:proposal:status` response for a brokered-for-owner card —
+  /// matched back to the card by `announcement_id`, which is the owner's
+  /// original listing id ([AnnouncementModel.ownerAnnouncementId] on the
+  /// broker's copy), since that's what was sent in the request.
+  void _onProposalStatusResponse(dynamic data) {
+    if (data is! Map) return;
+    final announcementId = data['announcement_id']?.toString();
+    if (announcementId == null || announcementId.isEmpty) return;
+    final status = (data['status'] as num?)?.toInt();
+    if (!mounted) return;
+    setState(() => _liveContractStatus[announcementId] = status);
+  }
+
+  /// Asks for [a]'s live proposal status once, the first time its card is
+  /// built — cheap to call repeatedly, since the set stops it from asking
+  /// twice.
+  void _ensureContractStatus(AnnouncementModel a) {
+    final ownerAnnouncementId = a.ownerAnnouncementId;
+    final ownerId = a.ownerId;
+    if (ownerAnnouncementId == null || ownerAnnouncementId.isEmpty) return;
+    if (ownerId == null || ownerId.isEmpty) return;
+    if (!_requestedContractStatus.add(ownerAnnouncementId)) return;
+    SocketService.to.emit(ChatEvents.proposalStatus, {
+      'announcement_id': ownerAnnouncementId,
+      'recipient_id': ownerId,
+    });
+  }
+
   @override
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     appRouteObserver.unsubscribe(this);
+    if (widget.showMineOnly) {
+      SocketService.to
+          .off(ChatEvents.proposalStatus, _onProposalStatusResponse);
+    }
     if (_searchCtrl != null) {
       Get.delete<PropertySearchController>(tag: _searchTag);
     }
@@ -274,24 +322,23 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
           ));
     }
     return AnnouncementFilterBar(
-              selectedListingType: _selectedListingType,
-              selectedPropertyType: _selectedPropertyType,
-              selectedIsCommercial: _selectedIsCommercial,
-              onIsCommercialChanged: (val) =>
-                  setState(() => _selectedIsCommercial = val),
-              onListingTypeChanged: (val) =>
-                  setState(() => _selectedListingType = val),
-              onPropertyTypeChanged: (type) =>
-                  setState(() => _selectedPropertyType = type),
-              // Drafts only exist on the broker's own list.
-              showDraftChip: widget.showMineOnly,
-              draftSelected: _selectedStatus == _draftStatus,
-              onDraftChanged: (on) {
-                final status = on ? _draftStatus : null;
-                setState(() => _selectedStatus = status);
-                _controller.loadBrokerMine(status: status);
-              },
-            );
+      selectedListingType: _selectedListingType,
+      selectedPropertyType: _selectedPropertyType,
+      selectedIsCommercial: _selectedIsCommercial,
+      onIsCommercialChanged: (val) =>
+          setState(() => _selectedIsCommercial = val),
+      onListingTypeChanged: (val) => setState(() => _selectedListingType = val),
+      onPropertyTypeChanged: (type) =>
+          setState(() => _selectedPropertyType = type),
+      // Drafts only exist on the broker's own list.
+      showDraftChip: widget.showMineOnly,
+      draftSelected: _selectedStatus == _draftStatus,
+      onDraftChanged: (on) {
+        final status = on ? _draftStatus : null;
+        setState(() => _selectedStatus = status);
+        _controller.loadBrokerMine(status: status);
+      },
+    );
   }
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -516,6 +563,9 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
             itemBuilder: (_, i) {
               if (i < cardEnd) {
                 final a = announcements[i];
+                if (widget.showMineOnly && a.isBrokeredForOwner) {
+                  _ensureContractStatus(a);
+                }
                 final card = HomeAnnouncementCard(
                   announcement: a,
                   index: i,
@@ -553,7 +603,13 @@ class _BrokerProjectsViewState extends State<BrokerProjectsView>
                   statusBadge: widget.showMineOnly
                       ? contractBadgeFor(
                           brokeredForOwner: a.isBrokeredForOwner,
-                          status: a.statusCode,
+                          // The live proposal status — fetched per card over
+                          // the socket, since this list's own status field
+                          // never carries 5 (cancellation pending); falls
+                          // back to it for everything else (4, or unset
+                          // while the request is still in flight).
+                          status: _liveContractStatus[a.ownerAnnouncementId] ??
+                              a.statusCode,
                         )
                       : null,
                   onTap: () => Get.to(

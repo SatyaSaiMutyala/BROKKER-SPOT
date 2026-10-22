@@ -564,6 +564,30 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
 
   // ── Property Details ───────────────────────────────────────────────────────
 
+  static const _months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  /// "15 Nov 2026" — null for anything unparseable, so the chip is dropped
+  /// rather than shown blank.
+  String? _formatAvailableDate(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return null;
+    return '${dt.day} ${_months[dt.month - 1]} ${dt.year}';
+  }
+
   Widget _buildPropertyDetailsSection(bool isDark) {
     final items = <_DetailItem>[];
     if (a.propertyType != null) {
@@ -587,6 +611,15 @@ class _AnnouncementDetailBodyState extends State<AnnouncementDetailBody> {
     if (widget.showBrokerage && a.brokkeragePercent != null) {
       items.add(
           _DetailItem(Icons.percent, 'Brokerage', '${a.brokkeragePercent}%'));
+    }
+    // Rent-only — collected on the price step (property_price_brokerage_view)
+    // but never shown anywhere after that until now.
+    if (a.rentPeriod != null) {
+      final formatted = _formatAvailableDate(a.availableDate);
+      if (formatted != null) {
+        items.add(_DetailItem(
+            Icons.event_available_outlined, 'Available From', formatted));
+      }
     }
     if (items.isEmpty) return const SizedBox.shrink();
 
