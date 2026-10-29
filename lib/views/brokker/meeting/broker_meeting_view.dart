@@ -35,12 +35,17 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> with RouteAware {
   /// unread badge moves while the user is sitting on this screen.
   Worker? _staleWorker;
 
-  // Same filter set + labels as the user-side meeting screen.
+  // Broker-only filter set — "Owners" (own=true) and "Client" (own=false)
+  // split the user-side "OWN" filter into the two sides of a broker's book:
+  // listings the broker owns themselves vs. clients' listings the broker is
+  // working. The user-side meeting screen keeps its own separate list and is
+  // untouched by this.
   final List<({String label, MeetingFilter filter})> _filters = const [
     (label: 'ALL', filter: MeetingFilter.all),
     (label: 'BUY', filter: MeetingFilter.buy),
     (label: 'RENT', filter: MeetingFilter.rent),
-    (label: 'OWN', filter: MeetingFilter.own),
+    (label: 'OWNERS', filter: MeetingFilter.own),
+    (label: 'CLIENT', filter: MeetingFilter.client),
   ];
 
   Worker? _precacheWorker;
@@ -212,57 +217,61 @@ class _BrokerMeetingViewState extends State<BrokerMeetingView> with RouteAware {
     );
   }
 
-  // ─── Filter chips (ALL / BUY / RENT / OWN) ───
-  // Identical UI to the user-side meeting screen; taps switch the broker
+  // ─── Filter chips (ALL / BUY / RENT / OWNERS / CLIENT) ───
+  // Same chip UI as the user-side meeting screen; taps switch the broker
   // slot's filter and re-fetch (cache-first per filter).
   Widget _buildFilterChips(ThemeData theme) {
     final isDark = theme.brightness == Brightness.dark;
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+      padding: EdgeInsets.only(left: 16.w, right: 0, top: 16.h, bottom: 16.h),
       child: Obx(() {
         final current = _ctrl.brokerFilter.value;
-        return Row(
-          children: _filters.map((f) {
-            final isSelected = current == f.filter;
-            return Padding(
-              padding: EdgeInsets.only(right: 8.w),
-              child: GestureDetector(
-                onTap: () => _ctrl.loadBroker(f: f.filter),
-                child: Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.primary
-                        : isDark
-                            ? const Color(0xFF2A2A2A)
-                            : Colors.white,
-                    borderRadius: BorderRadius.circular(20.r),
-                    border: isSelected
-                        ? null
-                        : Border.all(
-                            color: isDark
-                                ? Colors.grey.shade700
-                                : Colors.grey.shade300,
-                          ),
-                  ),
-                  child: Text(
-                    f.label,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12.sp,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.normal,
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.only(right: 16.w),
+          child: Row(
+            children: _filters.map((f) {
+              final isSelected = current == f.filter;
+              return Padding(
+                padding: EdgeInsets.only(right: 8.w),
+                child: GestureDetector(
+                  onTap: () => _ctrl.loadBroker(f: f.filter),
+                  child: Container(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
+                    decoration: BoxDecoration(
                       color: isSelected
-                          ? Colors.white
+                          ? AppColors.primary
                           : isDark
-                              ? Colors.white70
-                              : Colors.black87,
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.white,
+                      borderRadius: BorderRadius.circular(20.r),
+                      border: isSelected
+                          ? null
+                          : Border.all(
+                              color: isDark
+                                  ? Colors.grey.shade700
+                                  : Colors.grey.shade300,
+                            ),
+                    ),
+                    child: Text(
+                      f.label,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12.sp,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected
+                            ? Colors.white
+                            : isDark
+                                ? Colors.white70
+                                : Colors.black87,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         );
       }),
     );

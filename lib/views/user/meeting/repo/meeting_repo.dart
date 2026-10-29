@@ -9,6 +9,7 @@ enum MeetingFilter {
   buy, // listing_type=1
   rent, // listing_type=2
   own, // own=true
+  client, // own=false — broker side only
 }
 
 class MeetingRepository {
@@ -32,6 +33,9 @@ class MeetingRepository {
         break;
       case MeetingFilter.own:
         qs.write('&own=true');
+        break;
+      case MeetingFilter.client:
+        qs.write('&own=false');
         break;
       case MeetingFilter.all:
         break;
